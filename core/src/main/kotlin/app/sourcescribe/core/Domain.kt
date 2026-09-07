@@ -111,6 +111,7 @@ data class Provenance(
     val languageEvidence: String? = null,
     val engineVersions: Map<String, String> = emptyMap(),
     val reportedLanguages: List<String> = emptyList(),
+    val reusedArtifactId: String? = null,
 )
 
 @Serializable

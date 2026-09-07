@@ -228,6 +228,7 @@ object TranscriptExporter {
             MetadataField("Requested model", provenance.requestedModel),
             MetadataField("Reported model", provenance.reportedModel),
             MetadataField("Language evidence", provenance.languageEvidence),
+            MetadataField("Reused artifact", provenance.reusedArtifactId),
             MetadataField("Source audio track", audioTrackValue(provenance.sourceAudioTrack)),
             MetadataField("Caption track", captionTrackValue(provenance.captionTrack)),
             MetadataField("Engine versions", mapValue(provenance.engineVersions)),

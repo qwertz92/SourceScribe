@@ -11,6 +11,17 @@ import org.junit.Test
 
 class TranscriptExporterTest {
     @Test
+    fun reusedArtifactProvenanceSurvivesJsonAndHumanReadableExport() {
+        val parent = "00000000-0000-4000-8000-000000000001"
+        val original = document(segments = listOf(Segment("reused fixture")))
+        val derived = original.copy(provenance = original.provenance.copy(reusedArtifactId = parent))
+        val restored = Json.decodeFromString<TranscriptDocument>(TranscriptExporter.render(derived, ExportFormat.JSON))
+        assertEquals(parent, restored.provenance.reusedArtifactId)
+        assertTrue(TranscriptExporter.render(derived, ExportFormat.MARKDOWN).contains(parent))
+        assertEquals(null, original.provenance.reusedArtifactId)
+    }
+
+    @Test
     fun markdownEscapesMetadataAndUsesFenceLongerThanCaptionFence() {
         val document = document(
             title = "Title\n## injected",
