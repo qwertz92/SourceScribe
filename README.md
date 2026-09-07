@@ -1,47 +1,51 @@
-# SourceScribe — Codex-Übergabepaket v3
+# SourceScribe
 
-**Stand:** 5. September 2026. **Status:** konsolidierte Spezifikation; noch keine Android-Implementierung, kein APK und keine ausgeführten App-Tests.
+**Stand:** 8. September 2026 · **Status:** Entwicklung, auf Nutzerwunsch pausiert
 
-## Ziel
+SourceScribe ist eine persönlich genutzte Android-App für nachvollziehbare
+Transkripte. Eine ausdrücklich eingegebene YouTube-Quelle lässt sich teilen oder
+einfügen; vorhandene Untertitel werden gesichert und Audio kann über den gewählten
+Provider transkribiert werden. Ergebnisse bleiben zunächst intern und können als
+Datei über das Android-Share-Sheet weitergegeben werden. Deutsche Zusammenfassung
+und Faktencheck bleiben außerhalb der App.
 
-Eine persönlich genutzte Android-App: YouTube-Link teilen oder einfügen, vorhandene Untertitel sichern und/oder Audio über AssemblyAI, OpenAI oder Groq transkribieren. Ergebnisse mit nachvollziehbarer Herkunft lokal aufbewahren und als Datei an ChatGPT weitergeben. Deutsche Zusammenfassung und Faktencheck bleiben außerhalb der App.
+## Aktueller Stand
 
-Dieses Paket ersetzt die früheren SourceScribe-Prompts einschließlich ihrer Override-Blöcke. Die frühere Unterhaltung erklärt die Motivation, ist aber keine zusätzliche konkurrierende Spezifikation. Spätere ausdrückliche Nutzerentscheidungen bleiben maßgeblich.
+Das öffentliche Repository ist [qwertz92/SourceScribe](https://github.com/qwertz92/SourceScribe).
+Debug-App, aktuelles Instrumentation-APK und unsigned Release sind gebaut.
+103 JVM-Tests bestanden zuletzt; der aktuelle Build r57 besteht einschließlich
+vollständigem App-Lint Debug/Release und Extractor-Lint Release. Echte Android-
+Caption-/Audioextraktion sowie der Caption-App-Pfad bis SAF-Export wurden geprüft.
+Die erweiterten App-Gerätetests, UI-Überarbeitung und vollständige v1-Abnahme
+bleiben offen. Der genaue [Wiederaufnahmestand](docs/HANDOFF.md) ist gesichert.
 
-## So beginnt die Implementierung
+Live-Provideraufrufe haben keine freigegebenen Zugangsdaten. Ein physisches
+ARM64-Gerät ist derzeit nicht verfügbar. Eine öffentliche APK-Freigabe bleibt
+wegen der dokumentierten offenen Native-Lizenz- und Corresponding-Source-Belege
+gesperrt; eigene Quelltexte und geprüfte Begleitdateien sind davon getrennt.
 
-Im Projektordner zuerst [AGENTS.md](AGENTS.md), Produkt und Roadmap lesen. Der
-[gemeinsame Dokumentationsindex](docs/INDEX.md) führt zu den technischen Verträgen
-und tatsächlichen Nachweisen. Ein vorhandenes Repository zuerst prüfen und erhalten.
+Die maßgeblichen Nachweise werden fortgeschrieben:
 
-Für ADB-Tests muss Codex den bereitgestellten Emulator tatsächlich über `adb devices -l` erreichen. Ein Cloud-Workspace hat nicht automatisch Zugriff auf einen Emulator des eigenen Rechners. Unter Windows/WSL den bereits funktionierenden ADB-Zugriffsweg verwenden, statt einen ungeschützten ADB-Server ins Netzwerk zu öffnen.
+- [Tatsächlicher Projektstatus](docs/STATUS.md)
+- [Build und persönliche Auslieferung](docs/BUILD.md)
+- [Build-/P0-Prüfbericht](docs/reports/2026-09-07-build-and-p0.md)
+- [Lizenz- und Provenienzprüfung](docs/reports/2026-09-07-licenses.md)
 
-API-Schlüssel ausschließlich über lokale, nicht versionierte Konfiguration beziehungsweise die App bereitstellen. Kein Schlüssel gehört in einen Chat, eine Spezifikation, einen Screenshot oder ein Git-Commit.
+## Einstieg
 
-## Dokumente und Zuständigkeit
+Der [Dokumentationsindex](docs/INDEX.md) führt zu Produktumfang, Architektur,
+Sicherheitsgrenzen, Integrationsverträgen, Roadmap und Testplan. Vor Änderungen
+bitte [AGENTS.md](AGENTS.md) lesen.
 
-| Datei | Verbindlicher Inhalt |
-|---|---|
-| [docs/INDEX.md](docs/INDEX.md) | Gemeinsamer Einstieg für alle Agenten |
-| [AGENTS.md](AGENTS.md) | Dauerhafte Arbeits-, Review- und Nachweisregeln |
-| [docs/PRODUCT.md](docs/PRODUCT.md) | Funktionsumfang, Bedienung, Vorgaben und Anforderungs-IDs |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Technologie, Datenmodell, Zustände, Hintergrundausführung, Speicherung |
-| [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md) | Extraktion, Provider, Audioaufbereitung und Provenienz |
-| [docs/SECURITY_UPDATES.md](docs/SECURITY_UPDATES.md) | Sicherheitsgrenzen, Schlüssel, Updates und Rollback |
-| [docs/ROADMAP.md](docs/ROADMAP.md) | Implementierungsreihenfolge und Freigabestufen |
-| [docs/TEST_PLAN.md](docs/TEST_PLAN.md) | Abnahmefälle und beweisbare Fertigstellung |
-| [docs/RESEARCH.md](docs/RESEARCH.md) | Geprüfte Primärquellen und offene Integrationsfragen |
-| [docs/STATUS.md](docs/STATUS.md) | Tatsächlicher Projektfortschritt; anfänglich alles unimplementiert |
-| [extras/SUMMARIZE_GUARDRAIL.md](extras/SUMMARIZE_GUARDRAIL.md) | Separater Zusatz für das ChatGPT-Projekt „Summarize“ |
+Der lokale Build-Einstieg steht in [docs/BUILD.md](docs/BUILD.md). Er erzeugt
+keine Provideraufrufe und installiert nichts auf einem Gerät. ADB-, Provider- und
+weitere Live-Nachweise werden in den Berichten mit ihrer tatsächlichen Ebene als
+`PASS`, `BLOCKED` oder `NOT_RUN` geführt.
 
-Anforderungen werden in PRODUCT definiert; technische Dokumente konkretisieren sie, statt eigene konkurrierende Produktmodi einzuführen. Bei einem echten Widerspruch die sichere, nicht kostenverursachende Variante wählen, ihn dokumentieren und vor einer irreversiblen Entscheidung klären. Normale technische Detailentscheidungen selbst treffen und begründen.
+## Technische Leitlinien
 
-## Wesentliche Entscheidungen
-
-Native Android-App mit Kotlin und Jetpack Compose/Material 3. Kein Svelte-Frontend, kein eigener Server und keine zusätzliche LLM-API für Zusammenfassungen. Vier eindeutige Beschaffungsmodi statt mehrerer überlappender „Auto“-Varianten. Getrennte Zustände für Verarbeitung, Transkriptartefakte und externe Exporte. Kleine, klar abgegrenzte Codebereiche statt einer unnötig großen Modul-Landschaft.
-
-Besonders risikoreich sind Android-taugliche yt-dlp-/Python-/JavaScript-Komponenten, sichere Komponentenupdates, Lebenszyklusverhalten und mehrdeutige Provider-Timeouts. Diese Punkte werden früh praktisch geprüft, nicht erst nach der UI-Implementierung.
-
-## Was dieses Paket nicht behauptet
-
-Es garantiert weder fehlerfreie Software noch jederzeitige YouTube-Erreichbarkeit. Es bestätigt keine accountabhängigen Kontingente und keine Audioqualität ohne Referenztranskript. Es ist keine bereits getestete App. Die konkrete Android-Extractor-Integration wird erst durch den vorgeschriebenen Techniknachweis ausgewählt.
+SourceScribe ist eine native Kotlin-/Jetpack-Compose-App ohne eigenen Server und
+ohne zusätzliche LLM-API für Zusammenfassungen. Quellen, Konfigurationen,
+Verarbeitungszustände und Exporte haben getrennte Verträge. API-Schlüssel,
+temporäre Audiodaten und vollständige Transkripte gehören weder in Git noch in
+Logs, Diagnoseexporte oder Testberichte.

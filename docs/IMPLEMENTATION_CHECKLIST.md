@@ -1,6 +1,6 @@
 # Implementierungs- und Nachweischeckliste
 
-Stand: 7. September 2026. Endzustände je Arbeitspaket: `complete`, `no_change`,
+Stand: 8. September 2026. Endzustände je Arbeitspaket: `complete`, `no_change`,
 `blocked`, `conflict`. Bis zum Nachweis bleibt ein Paket offen. Die Prüflabels
 IMPLEMENTED / TESTED_WITH_FIXTURES / LIVE_VERIFIED sind keine austauschbaren Begriffe.
 
@@ -15,6 +15,7 @@ IMPLEMENTED / TESTED_WITH_FIXTURES / LIVE_VERIFIED sind keine austauschbaren Beg
 | P3 | AssemblyAI/OpenAI, alle Modi, Optionen/Tracks/Presets | Hauptagent | offen |
 | P4 | Queue, Limits, Recovery, Submission-Unsicherheit, Exportreparatur, Updates | Hauptagent | offen |
 | P5 | Deutsche Compose-UI, Suche/Share/Formate, Settings, Diagnose, Signing/CI | Hauptagent (Astra für UI) | offen |
+| P5 UI-Feedback | Kompakte Auswahlfelder, Abstände unterer Schaltflächen, App-Sprachwahl Deutsch/Englisch; System/Hell/Dunkel vorhanden | Hauptagent (Astra); Nutzerfeedback vom 8. September | offen |
 | P6 | T01–T34, ADB-Fälle, unabhängige Reviews, Regression, Abschlussbericht | Hauptagent + unabhängige Reviewer | offen |
 | Live-Provider | Freigegebene Credentials, Dateien und Kostenrahmen je Provider | Nutzerfreigabe fehlt | blocked |
 | Physisches ARM64 | Gerätelauf zusätzlich zum statischen ABI-Nachweis | Gerät nicht angeschlossen | blocked |

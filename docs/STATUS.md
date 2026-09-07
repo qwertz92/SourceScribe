@@ -1,16 +1,24 @@
 # Tatsächlicher Projektstatus
 
-**Stand:** 7. September 2026. **Paketversion:** v3. **Freigabe:** Entwicklungsstand.
+**Stand:** 8. September 2026. **Paketversion:** v3. **Freigabe:** Entwicklungsstand.
+
+**Auf Nutzerwunsch pausiert.** Wiederaufnahme über [HANDOFF](HANDOFF.md).
+Der letzte Build r57 war erfolgreich: Debug-App, Instrumentation-APK, unsigned
+Release und vollständiges App-Lint Debug/Release sowie Extractor-Lint Release;
+alle drei erzeugten Lint-Berichte enthalten null Befunde. Debug-App und Test-APK
+sind auf dem Emulator installiert. Die neue breite App-Instrumentation wurde
+vor der Pause ausdrücklich nicht mehr gestartet. Neues UI-Feedback und de/en-
+App-Sprachwahl sind verbindlich dokumentiert, noch nicht implementiert.
 
 ## Vorhanden
 
 Übergabepaket, gemeinsamer Wissensindex, lokales `main` und öffentliches
 [GitHub-Repository](https://github.com/qwertz92/SourceScribe). Android-Projekt mit
 drei Modulen und Debug-APK gebaut. Erste Quellen-/Planner-/Metadatenverträge
-implementiert. Nach Wiederaufnahme bestanden 89 JVM-Tests (Lauf r38, 7. September), einschließlich der neuen Speicher- und Providerregressionen.
+implementiert. Nach Wiederaufnahme bestanden zuletzt 103 JVM-Tests (r52, 8. September), einschließlich der vollständigen Modus-/Providerfehlermatrix, lokaler HTTPS-Timeout-/Redirect-Gegenproben und der Herkunft wiederverwendeter Artefakte.
 Parser/Exporter, drei Provideradapter, Signatur-/Updateverwaltung, begrenzter
 Native-Runner, Room/DataStore, CredentialStore, Import-/Exportlogik und die erste
-Compose-Bedienung sind geschrieben. Verlauf-Aktionen, Schema-1→2-Migration, Speicherreservierungen,
+Compose-Bedienung sind geschrieben. Verlauf-Aktionen, Schema-1→3-Migration, Speicherreservierungen,
 Schlüsselersatz unter bestehender Referenz und redigierte Diagnose sind ergänzt;
 ihre integrierten Android-Gates laufen. Der echte Caption-App-Pfad einschließlich SAF-Markdown und Teilen-Dialog wurde
 auf dem Emulator ausgeführt; die vollständige Abnahme läuft weiter.
@@ -28,22 +36,25 @@ Keine Providerrequests und keine freigegebenen Testzugangsdaten.
 
 ## Nächster tatsächlicher Schritt
 
-Den vollständigen App-Pfad auf dem API-37-/16-KB-Emulator prüfen: Share/Paste,
-Untertitel, interne Speicherung, Viewer und SAF-Export. Die native Extraktionskette
-und ein signiertes Update samt Rollback sind inzwischen tatsächlich ausgeführt. [Tatsächliche Befehle und Ergebnisse](reports/2026-09-07-build-and-p0.md).
+Den integrierten Stand nach den unabhängigen Reviews erneut bauen und auf dem
+API-37-/16-KB-Emulator prüfen. Behoben bzw. in der Regression: geerbte Leases,
+Absturz zwischen Artefaktfinalisierung und Room-Zeile, Import-/Audio-Cleanup,
+AAI-Receipt-Wiederaufnahme, echte Mehrabschnitt-Fixtures, separate Exportreparatur
+und die bei 200-%-Schrift/Querformat reproduzierte Viewer-Layoutverletzung.
+Diese neuesten Änderungen sind vor bestandenem Gesamtlauf nur IMPLEMENTED.
+[P0-/P1-Nachweise](reports/2026-09-07-build-and-p0.md) und
+[aktuelle Integrationsläufe, bestätigte Fehler und Wiederaufnahme](reports/2026-09-07-integration.md).
 
-Die statische Prüfung hat fünf nur 4-KB-ausgerichtete WebP-Bibliotheken im
-FFmpeg-Paket gefunden; drei sind über `DT_NEEDED` erreichbar. Diese Bibliotheken wurden neu gebaut. Reale FFmpeg-/ffprobe- und Audioaufbereitungstests
-auf dem 16-KB-Gerät bestehen nach Integration. Android-spezifische ZIP-/Pfadprobleme
-wurden danach getrennt gefunden; die vollständige Kette wird weiter geprüft.
-Das offizielle yt-dlp-2026.08.19-Paket wurde auf dem
-Entwicklungsrechner erfolgreich gegen die feste Upstream-PGP-Identität geprüft;
-dies ist noch kein Android-Update-/Rollback-Nachweis.
+Die fünf nur 4-KB-ausgerichteten WebP-Bibliotheken wurden für beide ABIs neu gebaut;
+FFmpeg/ffprobe und Audioaufbereitung liefen tatsächlich auf dem 16-KB-Gerät.
+Das signierte Nightly-Update auf 2026.08.30.232658 mit echter Quellenprobe und
+Rollback auf 2026.08.19 wurde im Android-Test r40 erneut nachgewiesen. ARM64
+besitzt weiterhin nur Build-/ELF-Prüfung, keinen physischen Gerätenachweis.
 
 Am 7. September um 18:14–18:16 trat auf dem Entwicklerhost ein bestätigter
 WSL-Speicherfehler auf. Nach dem Neustart sind 16 GiB Swap aktiv. Quellcode und
-Room-Schemas blieben erhalten; Toolchain/Caches werden auf dem Projektlaufwerk
-wiederhergestellt. [Diagnose und Speicherbegrenzung](reports/2026-09-07-wsl-recovery.md).
+Room-Schemas blieben erhalten; Toolchain/Caches liegen wieder auf dem Projektlaufwerk; Builds sind auf einen
+Worker und 2 GiB Java-Heap begrenzt. [Diagnose und Speicherbegrenzung](reports/2026-09-07-wsl-recovery.md).
 
 ## Bei jedem Implementierungsfortschritt ergänzen
 

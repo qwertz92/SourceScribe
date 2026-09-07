@@ -27,6 +27,8 @@ Titel, Kanal, Dauer, Veröffentlichungsdatum und Thumbnail nur anzeigen, soweit 
 
 Globale Startvorgabe: `CAPTIONS_THEN_STT`, Originalsprache bevorzugt, vom Kanal bereitgestellte Tracks vor automatisch erzeugten, automatische Übersetzungen aus. Ein Provider wird im Onboarding ausdrücklich ausgewählt. Ohne konfigurierten Provider sind Nur-YouTube-Jobs weiter möglich; ein nicht ausführbarer Fallback wird vor dem Start angezeigt.
 
+Die bewusste Auswahl des Cloud-Providers und das Starten des konkreten Auftrags gelten als Freigabe der dafür nötigen Audioübermittlung im gewählten Modus und Kostenrahmen. Kein zusätzlicher allgemeiner Übermittlungs-Schalter. Die interne Freigabebindung an Quelle und Konfigurationssnapshot sowie das Verbot stiller Providerwechsel bleiben bestehen. Dies ist Produktverhalten, keine Freigabe realer Provider-Tests durch Entwicklungsagenten.
+
 Ein bestätigtes Fehlen akzeptabler Captions ist nicht dasselbe wie HTTP 429, Offline-Zustand oder ein Parserfehler. Bei solchen Abruffehlern zunächst begrenzt wiederholen, danach standardmäßig nachfragen/pausieren. Optional darf der Nutzer global oder pro Job auch dafür STT-Fallback erlauben. Die Entscheidung wird mit dem Job gespeichert. Niemals alleine wegen eines Health-Hinweises automatisch neu transkribieren.
 
 ### SS-03 — Globale Vorgaben, Presets und Job-Overrides
@@ -87,6 +89,6 @@ Lokale Usage-Zählung ist nur eine Teilansicht dieses Geräts, keine verbindlich
 
 ### SS-12 — Bedienqualität und Nachweise
 
-Deutsche UI mit systematischer Ressourcenlokalisierung, System/hell/dunkel, lesbarer Typografie, ausreichenden Touch-Flächen, TalkBack-Semantik, Schriftvergrößerung und klaren Leer-/Fehlerzuständen. Aufwendige Grafiken dürfen Funktion und Performance nicht verdrängen. Clipboard nur nach Nutzeraktion lesen, nicht dauernd überwachen. Laufende Jobs über passende Notifications anzeigen; verweigerte Berechtigungen verständlich behandeln.
+Deutsch und Englisch als ausdrücklich wählbare App-Sprache (`de`/`en`) mit systematischer Ressourcenlokalisierung, unabhängig von der Transkriptionssprache. System/hell/dunkel, lesbare Typografie, ausreichende Touch-Flächen, TalkBack-Semantik, Schriftvergrößerung und klare Leer-/Fehlerzustände. Untere Schaltflächen brauchen sichtbare Abstände; Auswahlfelder für Beschaffung, Anbieter und Modell sollen kompakt bleiben, ohne abgeschnittene Inhalte oder Layoutsprünge bei Schriftvergrößerung. Aufwendige Grafiken dürfen Funktion und Performance nicht verdrängen. Clipboard nur nach Nutzeraktion lesen, nicht dauernd überwachen. Laufende Jobs über passende Notifications anzeigen; verweigerte Berechtigungen verständlich behandeln.
 
 Vollständiges Repository, nachvollziehbare Build-Anleitung, CI, Testberichte, debug APK und ein für persönliche Updates reproduzierbar signierbarer Release-Pfad. Die vollständige v1-Abnahme folgt TEST_PLAN, nicht dem bloßen Vorhandensein von Screenshots.

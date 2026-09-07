@@ -2,7 +2,7 @@
 
 ## T0 — Nachweisformat
 
-Jeder Fall erhält `PASS`, `FAIL`, `BLOCKED` oder `NOT_RUN` sowie Prüfebene, Datum, Commit, tatsächlichen Befehl/Ablauf, Gerät/API/ABI/Seitengröße, Ergebnis und bereinigte Evidenz. Ausführungsnachweise unter einem dokumentierten Testbericht sammeln; private Logs nicht automatisch committen. In diesem Übergabepaket sind sämtliche App-Tests noch `NOT_RUN`.
+Jeder Fall erhält `PASS`, `FAIL`, `BLOCKED` oder `NOT_RUN` sowie Prüfebene, Datum, Commit, tatsächlichen Befehl/Ablauf, Gerät/API/ABI/Seitengröße, Ergebnis und bereinigte Evidenz. Ausführungsnachweise unter einem dokumentierten Testbericht sammeln; private Logs nicht automatisch committen. Beim ursprünglichen Übergabepaket waren sämtliche App-Tests `NOT_RUN`. Der aktuelle Nachweisstand steht in [STATUS](STATUS.md) und den dort verlinkten Testberichten.
 
 Ebenen unterscheiden: JVM-Unit, Provider-/Extractor-Contract mit Fixtures, Android-Instrumentation, reale öffentliche Quelle, echte kostenrelevante Provider-API und physisches Gerät. Eine simulierte Updateprüfung ist wertvoll, aber kein Nachweis, dass ein echtes Upstream-Release auf Android aktiviert werden konnte.
 
@@ -39,7 +39,7 @@ Ebenen unterscheiden: JVM-Unit, Provider-/Extractor-Contract mit Fixtures, Andro
 | T27 | SS-10 | Offline/private Quelle/429 führt nicht zu reflexivem Update; Update-Retry höchstens gemäß Richtlinie |
 | T28 | SS-11 | Geschätzte Preise/Limits unbekannt oder veraltet: sichtbar; Organisationskontingent nicht als lokales Guthaben darstellen |
 | T29 | SS-10/11 | HTTP-Redirect/Retry: kein Secret an fremden Host, keine unkontrollierte Wiederholung einer Submission |
-| T30 | SS-12 | Dark Mode, 200-%-Schrift, TalkBack, lange Titel, Rotation, kleine/große Displays und verweigerte Notifications |
+| T30 | SS-12 | Deutsch/Englisch-App-Sprachwechsel, System/hell/dunkel, 200-%-Schrift, TalkBack, lange Titel, Rotation, kleine/große Displays und verweigerte Notifications; Screenshots der Ansichten kritisch auf Abstände, Ausrichtung und Proportionen prüfen |
 | T31 | SS-04/10 | Fixture-Provider, Test-HTTP und Debug-Aktionen im persönlichen Release-Build nicht erreichbar |
 | T32 | SS-05/08 | Room-Migration/Upgrade erhält Verlauf und Artefaktbezüge; kein destruktiver Fallback ohne Auftrag |
 | T33 | SS-08/09 | Lokaler Audioimport über content-URI, temporärer Grant und Prozessneustart: kontrollierte interne Kopie/Permission |
