@@ -14,6 +14,21 @@ import org.junit.Test
 
 class ArtifactFilesTest {
     @Test
+    fun opaqueRawZipIsRetainedByteForByte() = withStore { store ->
+        val raw = java.io.ByteArrayOutputStream().also { bytes ->
+            java.util.zip.ZipOutputStream(bytes).use { zip ->
+                zip.putNextEntry(java.util.zip.ZipEntry("response-0.json"))
+                zip.write("{ \"text\": \"original\", \"unknown\": true }".toByteArray())
+                zip.closeEntry()
+            }
+        }.toByteArray()
+        val retained = document(acquisition = JobConfig(retainRaw = true))
+        store.write(retained, raw, "zip")
+        assertArrayEquals(raw, requireNotNull(store.rawFile(retained.artifactId)).readBytes())
+        assertEquals(retained, store.read(retained.artifactId))
+    }
+
+    @Test
     fun writeIsIdempotentAndConflictsStayImmutable() = withStore { store ->
         val document = document()
 

@@ -77,7 +77,7 @@ class ArtifactFiles(private val root: File) {
         private const val MAX_METADATA_BYTES = 16 * 1024
         private val ARTIFACT_ID = Regex("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
         private val SHA256 = Regex("[0-9a-f]{64}")
-        private val RAW_EXTENSIONS = setOf("srt", "vtt", "json3", "json", "txt")
+        private val RAW_EXTENSIONS = setOf("srt", "vtt", "json3", "json", "txt", "zip")
     }
 
     @Serializable
@@ -555,7 +555,7 @@ class ArtifactFiles(private val root: File) {
         var current = path.root ?: return
         for (part in path) {
             current = current.resolve(part)
-            if (Files.isSymbolicLink(current)) {
+            if (isUntrustedStorageSymlink(current)) {
                 fail(ArtifactFilesException.SYMLINK_NOT_ALLOWED, "symlink in artifact path")
             }
         }

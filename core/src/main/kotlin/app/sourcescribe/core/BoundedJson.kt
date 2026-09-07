@@ -4,7 +4,10 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 
 /** Bound recursion before the library parser visits even unknown fields. Strings are opaque. */
-fun Json.parseBounded(raw: String): JsonElement {
+fun Json.parseBounded(raw: String): JsonElement = parseToJsonElement(boundedJsonText(raw))
+
+/** Also usable before platform JSON readers, with no second parsing pass. */
+fun boundedJsonText(raw: String): String {
     var depth = 0
     var quoted = false
     var escaped = false
@@ -22,5 +25,5 @@ fun Json.parseBounded(raw: String): JsonElement {
         }
     }
     require(!quoted && depth == 0) { "JSON_UNBALANCED" }
-    return parseToJsonElement(raw)
+    return raw
 }
