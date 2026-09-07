@@ -36,6 +36,7 @@ coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-androi
 serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
 okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
 okhttp-mockwebserver = { module = "com.squareup.okhttp3:mockwebserver", version.ref = "okhttp" }
+okhttp-tls = { module = "com.squareup.okhttp3:okhttp-tls", version.ref = "okhttp" }
 extractor-library = { module = "io.github.junkfood02.youtubedl-android:library", version.ref = "extractor" }
 extractor-ffmpeg = { module = "io.github.junkfood02.youtubedl-android:ffmpeg", version.ref = "extractor" }
 junit = { module = "junit:junit", version.ref = "junit" }
