@@ -9,6 +9,7 @@ android {
     }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     packaging {
+        resources.merges += listOf("META-INF/LICENSE.md", "META-INF/NOTICE.md")
         jniLibs {
             useLegacyPackaging = true
             // These audited upstream files include ZIP containers, not strippable libraries.
@@ -22,6 +23,7 @@ dependencies {
     implementation(project(":core"))
     implementation(libs.coroutines.android)
     implementation(libs.serialization.json)
+    implementation(libs.okhttp)
     implementation(libs.extractor.library)
     implementation(libs.extractor.ffmpeg)
     androidTestImplementation(libs.android.test.runner)

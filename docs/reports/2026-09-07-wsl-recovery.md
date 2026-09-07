@@ -47,4 +47,9 @@ Diagnosebefehle: `journalctl --list-boots`, `journalctl -k -b -1`, `dmesg -T`,
 `findmnt -no TARGET,FSTYPE /tmp`.
 
 Status: Speicherfehler, Neustart und Swap-Aktivierung `LIVE_VERIFIED`.
-Vollständige Zuordnung des Python-Prozesses und erneute App-Gesamttests `NOT_RUN`.
+Die Zuordnung des Python-Prozesses wurde anhand der erhaltenen Agenten-/Hostprotokolle
+untersucht, bleibt aber unbelegt (`BLOCKED`: fehlender Prozessaufruf). Erneute
+App-Gesamttests waren zu diesem Diagnosezeitpunkt `NOT_RUN`.
+
+Bei laufendem Build r22 um 18:57 CEST: 3,1 GiB RAM belegt, 12 GiB verfügbar,
+16 GiB Swap weiterhin vollständig unbenutzt.

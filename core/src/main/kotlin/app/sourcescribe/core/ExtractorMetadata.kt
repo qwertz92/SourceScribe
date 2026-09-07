@@ -40,20 +40,21 @@ object ExtractorMetadata {
         for ((key, generation) in listOf("subtitles" to Generation.UPLOADER_PROVIDED, "automatic_captions" to Generation.AUTOMATIC)) {
             val languages = root[key] as? JsonObject ?: continue
             for ((language, formats) in languages) {
-                if (language.length > 64) continue
+                if (!Regex("[A-Za-z0-9][A-Za-z0-9_.-]{0,63}").matches(language)) continue
                 val choices = (formats as? JsonArray)?.filterIsInstance<JsonObject>() ?: continue
                 val selected = listOf("json3", "vtt", "srt").firstNotNullOfOrNull { format ->
-                    choices.firstOrNull { (it["ext"] as? JsonPrimitive)?.contentOrNull == format }
+                    choices.lastOrNull { (it["ext"] as? JsonPrimitive)?.contentOrNull == format }
                 } ?: continue
                 val format = (selected["ext"] as JsonPrimitive).content
                 val url = (selected["url"] as? JsonPrimitive)?.contentOrNull ?: throw InvalidSource("INVALID_CAPTION_URL")
                 requireCaptionUrl(url)
+                val segmented = URI(url).host == "manifest.googlevideo.com"
                 val translated = URI(url).rawQuery.orEmpty().split('&').any { it.substringBefore('=') == "tlang" }
                 val id = "$key:$language:$format"
                 tracks += CaptionTrack(id, requireNotNull(source.videoId), language,
                     (selected["name"] as? JsonPrimitive)?.contentOrNull?.take(1000), format,
                     generation, if (translated) Translation.AUTOMATIC else Translation.NONE,
-                    "yt-dlp:$key;timedtext:tlang=${if (translated) "present" else "absent"}")
+                    "yt-dlp:$key;timedtext:tlang=${if (translated) "present" else "absent"}${if (segmented) ";hls-vtt-assembled" else ""}")
                 urls[id] = url
             }
         }
@@ -71,9 +72,12 @@ object ExtractorMetadata {
 
     fun requireCaptionUrl(value: String) {
         val uri = try { URI(value) } catch (_: Exception) { throw InvalidSource("INVALID_CAPTION_URL") }
+        val direct = uri.host in setOf("www.youtube.com", "youtube.com", "video.google.com") &&
+            uri.path in setOf("/api/timedtext", "/timedtext")
+        val segmented = uri.host == "manifest.googlevideo.com" &&
+            uri.path?.startsWith("/api/manifest/hls_timedtext_playlist/") == true
         if (value.length > 32768 || uri.scheme != "https" || uri.rawUserInfo != null || uri.port != -1 ||
-            uri.host !in setOf("www.youtube.com", "youtube.com", "video.google.com") ||
-            uri.path !in setOf("/api/timedtext", "/timedtext")) throw InvalidSource("INVALID_CAPTION_URL")
+            uri.rawFragment != null || (!direct && !segmented)) throw InvalidSource("INVALID_CAPTION_URL")
     }
 
     private fun validImageUrl(value: String): Boolean = try {

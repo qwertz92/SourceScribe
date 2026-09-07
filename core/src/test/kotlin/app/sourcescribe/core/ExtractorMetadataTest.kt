@@ -24,6 +24,28 @@ class ExtractorMetadataTest {
         assertThrows(InvalidSource::class.java) { ExtractorMetadata.requireCaptionUrl("https://evil.test/api/timedtext") }
     }
 
+    @Test fun youtubeHlsCaptionsAreAcceptedWithExactEndpointAndMarkedAssembly() {
+        val url = "https://manifest.googlevideo.com/api/manifest/hls_timedtext_playlist/opaque-fixture"
+        val resolved = ExtractorMetadata.parse("""{"id":"BaW_jenozKc","subtitles":{"en":[{"ext":"vtt","url":"$url"}]}}""", source)
+        assertEquals(1, resolved.captions.size)
+        org.junit.Assert.assertTrue(resolved.captions.single().evidence.contains("hls-vtt-assembled"))
+        for (bad in listOf(url.replace("manifest.googlevideo.com", "evil.test"), url.replace("hls_timedtext_playlist", "video"), "$url#fragment", url.replace("https:", "http:"))) {
+            assertThrows(InvalidSource::class.java) { ExtractorMetadata.requireCaptionUrl(bad) }
+        }
+    }
+
+    @Test fun directCaptionFormatWinsOverEarlierHlsVariantLikeYtDlp() {
+        val resolved = ExtractorMetadata.parse("""{"id":"BaW_jenozKc","subtitles":{"en":[{"ext":"vtt","url":"https://manifest.googlevideo.com/api/manifest/hls_timedtext_playlist/fixture"},{"ext":"vtt","url":"https://www.youtube.com/api/timedtext?lang=en"}]}}""", source)
+        assertEquals("https://www.youtube.com/api/timedtext?lang=en", resolved.captionUrls.values.single())
+    }
+
+    @Test fun subtitleLanguageCannotAddRegexSelectionsOrPaths() {
+        for (language in listOf("en,.*", "../en", "en/../../a", "en$")) {
+            val resolved = ExtractorMetadata.parse("""{"id":"BaW_jenozKc","subtitles":{"$language":[{"ext":"vtt","url":"https://www.youtube.com/api/timedtext?lang=en"}]}}""", source)
+            assertEquals(0, resolved.captions.size)
+        }
+    }
+
     @Test fun ambiguousAudioRequiresChoice() {
         val tracks = listOf(AudioTrack("140", "BaW_jenozKc", "de", null, null, "fixture"), AudioTrack("140-1", "BaW_jenozKc", "en", null, null, "fixture"))
         val resolved = ResolvedSource(source, emptyList(), tracks, emptyMap())

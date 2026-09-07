@@ -7,9 +7,9 @@ IMPLEMENTED / TESTED_WITH_FIXTURES / LIVE_VERIFIED sind keine austauschbaren Beg
 | Paket | Abnahme/Evidenz | Integrationsverantwortung | Zustand |
 |---|---|---|---|
 | Wiki | Geprüftes Konzept; gemeinsamer Index; Claude-Brücke | Hauptagent | complete |
-| Umgebung/Git | Dateien erhalten, Toolchain/Netz/ADB gemessen, Public-Repo und Commits | Hauptagent | offen |
+| Umgebung/Git | Dateien erhalten, Toolchain/Netz/ADB gemessen, Public-Repo und Commits | Hauptagent | complete |
 | P0 Runtime | Android Python/JS/EJS/FFmpeg, TLS, Metadaten/Caption/Audio, ABI/16 KB | Hauptagent | offen |
-| P0 Updates | Authentizität, Kompatibilität, Aktivierung/Rollback oder belegter Blocker | Hauptagent | offen |
+| P0 Updates | Android-Nightly 2026.08.30.232658 aktiviert und auf 2026.08.19 zurückgesetzt; Schadfixtures und Lint bestanden | Hauptagent | complete |
 | P1 | Share/Paste, Caption, Herkunft, intern sichern, MD/SAF, Viewer/Verlauf | Hauptagent | offen |
 | P2 | Groq, lokaler Import, Vorbereitung/Chunks, Credential-Schutz | Hauptagent | offen |
 | P3 | AssemblyAI/OpenAI, alle Modi, Optionen/Tracks/Presets | Hauptagent | offen |
@@ -27,4 +27,5 @@ IMPLEMENTED / TESTED_WITH_FIXTURES / LIVE_VERIFIED sind keine austauschbaren Beg
   `sdk_gphone16k_x86_64`, ABI-Liste `x86_64,arm64-v8a`, `PAGE_SIZE=16384`.
   ARM64 in der Liste belegt keine native physische ARM64-Ausführung.
 - WSL: OpenJDK 17.0.20.1; Gradle 9.6.0 erfolgreich gestartet. Lokaler isolierter
-  SDK-/Gradle-Cache unter `/tmp` für diesen Lauf; keine globalen Sicherheitseinstellungen geändert.
+  SDK-/Gradle-Cache zunächst unter `/tmp`; nach dem belegten Speicherfehler
+  nach `.local-tools/` auf das Projektlaufwerk verlegt. Keine globalen Sicherheitseinstellungen geändert.
