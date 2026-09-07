@@ -49,7 +49,7 @@ object ExtractorMetadata {
                 val url = (selected["url"] as? JsonPrimitive)?.contentOrNull ?: throw InvalidSource("INVALID_CAPTION_URL")
                 requireCaptionUrl(url)
                 val segmented = URI(url).host == "manifest.googlevideo.com"
-                val translated = URI(url).rawQuery.orEmpty().split('&').any { it.substringBefore('=') == "tlang" }
+                val translated = "tlang" in captionParameters(url)
                 val id = "$key:$language:$format"
                 tracks += CaptionTrack(id, requireNotNull(source.videoId), language,
                     (selected["name"] as? JsonPrimitive)?.contentOrNull?.take(1000), format,
@@ -78,6 +78,20 @@ object ExtractorMetadata {
             uri.path?.startsWith("/api/manifest/hls_timedtext_playlist/") == true
         if (value.length > 32768 || uri.scheme != "https" || uri.rawUserInfo != null || uri.port != -1 ||
             uri.rawFragment != null || (!direct && !segmented)) throw InvalidSource("INVALID_CAPTION_URL")
+    }
+
+    /** Decode identity keys before comparing them; encoded duplicates must not bypass binding. */
+    fun captionParameters(value: String): Map<String, String> {
+        val parameters = linkedMapOf<String, String>()
+        try {
+            for (part in URI(value).rawQuery.orEmpty().split('&')) {
+                val key = java.net.URLDecoder.decode(part.substringBefore('='), "UTF-8")
+                if (key !in setOf("v", "lang", "tlang")) continue
+                val content = java.net.URLDecoder.decode(part.substringAfter('=', ""), "UTF-8")
+                if (parameters.put(key, content) != null) throw InvalidSource("INVALID_CAPTION_URL")
+            }
+        } catch (_: IllegalArgumentException) { throw InvalidSource("INVALID_CAPTION_URL") }
+        return parameters
     }
 
     private fun validImageUrl(value: String): Boolean = try {

@@ -13,6 +13,9 @@ import java.io.File
 import java.io.IOException
 import java.nio.file.Files
 import java.util.UUID
+import java.net.URI
+import org.json.JSONArray
+import org.json.JSONObject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import app.sourcescribe.core.Generation
@@ -34,15 +37,17 @@ class ExtractorEngine(private val runtime: NativeRuntime) {
         if (track !in resolved.captions || track.generation == Generation.UNKNOWN ||
             !Regex("[A-Za-z0-9][A-Za-z0-9_.-]{0,63}").matches(track.language) ||
             track.format !in setOf("json3", "vtt", "srt")) throw InvalidSource("CAPTION_TRACK_CHANGED")
-        ExtractorMetadata.requireCaptionUrl(resolved.captionUrls[track.id] ?: throw InvalidSource("CAPTION_TRACK_CHANGED"))
+        val info = captionDownloadInfo(resolved, track)
         if (!directory.isDirectory || Files.isSymbolicLink(directory.toPath())) throw ExtractionException(ExtractionFailure.STORAGE)
         val temporary = File(directory, "caption-${UUID.randomUUID()}")
         if (!temporary.mkdir()) throw ExtractionException(ExtractionFailure.STORAGE)
         try {
+            val infoFile = File(temporary, "selected-caption.json").also { it.writeText(info.toString()) }
             val languagePattern = "^" + track.language.map { if (it.isLetterOrDigit() || it == '_') it.toString() else "\\$it" }.joinToString("") + "$"
             val result = coroutineScope {
                 val download = async {
                     runtime.ytDlp(listOf(
+                        "--load-info-json", infoFile.absolutePath, "--ignore-no-formats-error",
                         "--no-simulate", "--skip-download", "--no-part", "--no-continue", "--no-overwrites",
                         if (track.generation == Generation.UPLOADER_PROVIDED) "--write-subs" else "--write-auto-subs",
                         if (track.generation == Generation.UPLOADER_PROVIDED) "--no-write-auto-subs" else "--no-write-subs",
@@ -50,7 +55,7 @@ class ExtractorEngine(private val runtime: NativeRuntime) {
                         "--max-filesize", MAX_CAPTION_BYTES.toString(),
                         "--print", "video:SS_SOURCE_ID=%(id)s",
                         "--output", "subtitle:${File(temporary, "%(id)s").absolutePath}",
-                        "--", requireNotNull(resolved.source.canonicalUrl),
+                        "--output", "default:${File(temporary, "%(id)s").absolutePath}",
                     ), timeoutSeconds = 180, engine = engine)
                 }
                 while (!download.isCompleted) {
@@ -134,12 +139,20 @@ class ExtractorEngine(private val runtime: NativeRuntime) {
             output.delete()
             throw failure
         }
+        return validateAudioDownload(source, output, maxBytes, result)
+    }
+
+    /** A failed native command or source/size check must never leave reusable audio behind. */
+    internal fun validateAudioDownload(source: Source, output: File, maxBytes: Long, result: RuntimeOutput): File = try {
         requireSuccessful(result)
         val observed = result.stdout.lineSequence().filter { it.startsWith("SS_SOURCE_ID=") }.map { it.removePrefix("SS_SOURCE_ID=").trim() }.toList()
         if (observed.size != 1) throw InvalidSource("SOURCE_ID_MISMATCH")
         SourceResolver.requireMatchingVideo(source, observed.single())
         if (!output.isFile || output.length() <= 0 || output.length() > maxBytes) throw ExtractionException(ExtractionFailure.INVALID_RESPONSE)
-        return output
+        output
+    } catch (failure: Exception) {
+        output.delete()
+        throw failure
     }
 
     private fun requireSuccessful(output: RuntimeOutput) {
@@ -156,4 +169,20 @@ class ExtractorEngine(private val runtime: NativeRuntime) {
     }
 
     private companion object { const val MAX_CAPTION_BYTES = 4 * 1024 * 1024 }
+}
+
+/** A minimal, exact track recipe. No webpage_url: yt-dlp would otherwise re-extract on error. */
+internal fun captionDownloadInfo(resolved: ResolvedSource, track: CaptionTrack): JSONObject {
+    val url = resolved.captionUrls[track.id] ?: throw InvalidSource("CAPTION_TRACK_CHANGED")
+    ExtractorMetadata.requireCaptionUrl(url)
+    val uri = URI(url)
+    val parameters = ExtractorMetadata.captionParameters(url)
+    if (parameters["v"]?.let { it != resolved.source.videoId } == true) throw InvalidSource("SOURCE_ID_MISMATCH")
+    val language = parameters["tlang"] ?: parameters["lang"]
+    if (language != null && !language.equals(track.language.removeSuffix("-orig"), ignoreCase = true)) throw InvalidSource("CAPTION_TRACK_CHANGED")
+    val subtitle = JSONObject().put("url", url).put("ext", track.format)
+        .put("protocol", if (uri.host == "manifest.googlevideo.com") "m3u8_native" else "https")
+    return JSONObject().put("id", requireNotNull(resolved.source.videoId)).put("title", "SourceScribe")
+        .put(if (track.generation == Generation.UPLOADER_PROVIDED) "subtitles" else "automatic_captions",
+            JSONObject().put(track.language, JSONArray().put(subtitle)))
 }
