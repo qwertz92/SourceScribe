@@ -1,14 +1,18 @@
 # Tatsächlicher Projektstatus
 
-**Stand:** 5. September 2026. **Paketversion:** v3.
+**Stand:** 7. September 2026. **Paketversion:** v3. **Freigabe:** Entwicklungsstand.
 
 ## Vorhanden
 
-Konsolidierte Anforderungen, Architekturentscheidungen, Recherchequellen, Roadmap, Arbeitsregeln und Test-/Abnahmeplan. Noch kein Android-Projektcode. Keine Zugangsdaten, keine Providerrequests, kein APK und keine echten Geräte-/App-Tests.
+Übergabepaket, gemeinsamer Wissensindex, lokales `main` und öffentliches
+[GitHub-Repository](https://github.com/qwertz92/SourceScribe). Android-Projekt mit
+drei Modulen und Debug-APK gebaut. Erste Quellen-/Planner-/Metadatenverträge
+implementiert und mit 7 JVM-Tests geprüft. Noch kein funktional abgenommener App-Pfad.
+Keine Providerrequests und keine freigegebenen Testzugangsdaten.
 
 | Phase | Implementierung | Fixture-Tests | Live-/ADB-Nachweise |
 |---|---|---|---|
-| P0 | NOT_STARTED | NOT_RUN | NOT_RUN |
+| P0 | IMPLEMENTED: Build/erste Verträge; Runtime in Arbeit | TESTED_WITH_FIXTURES: 7 JVM-Tests | LIVE_VERIFIED: Umgebung/ADB; Extraktion NOT_RUN |
 | P1 | NOT_STARTED | NOT_RUN | NOT_RUN |
 | P2 | NOT_STARTED | NOT_RUN | NOT_RUN |
 | P3 | NOT_STARTED | NOT_RUN | NOT_RUN |
@@ -18,7 +22,8 @@ Konsolidierte Anforderungen, Architekturentscheidungen, Recherchequellen, Roadma
 
 ## Nächster tatsächlicher Schritt
 
-Codex im Projektordner starten, Arbeitsumgebung prüfen und P0 ausführen. Die Auswahl eines Android-Extractors und dessen Updatevertrauen müssen erst nachgewiesen werden.
+Native Runtime auf dem angeschlossenen API-37-/16-KB-Emulator ausführen und
+Extraktion sowie Updatevertrauen prüfen. [Tatsächliche Befehle und Ergebnisse](reports/2026-09-07-build-and-p0.md).
 
 ## Bei jedem Implementierungsfortschritt ergänzen
 
