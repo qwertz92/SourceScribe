@@ -618,6 +618,33 @@ class AssemblyAiAdapterTest {
     }
 
     @Test
+    fun speakerIdsAndEvidenceStayScopedAcrossCombinedChunks() {
+        val raw = fixture("submit_completed.json").toByteArray()
+        val transcripts = (0..1).map { chunkIndex ->
+            (adapter.parseSavedResponse(
+                raw,
+                request(
+                    config = baseConfig(diarization = true, wordTimestamps = true),
+                    chunkIndex = chunkIndex,
+                    chunkStartMs = chunkIndex * 2_000L,
+                ),
+            ) as SubmissionResult.Direct).transcript
+        }
+        val segments = transcripts.flatMap { it.segments }
+        val words = transcripts.flatMap { it.words }
+
+        assertEquals(listOf("Hello world.", "Hello world."), segments.map(Segment::text))
+        assertEquals(listOf("chunk-0:A", "chunk-1:A"), segments.map(Segment::speaker))
+        assertEquals(listOf(0, 1), segments.map(Segment::chunkIndex))
+        assertEquals(listOf("Hello", "world.", "Hello", "world."), words.map(Segment::text))
+        assertEquals(
+            listOf("chunk-0:A", "chunk-0:A", "chunk-1:A", "chunk-1:A"),
+            words.map(Segment::speaker),
+        )
+        assertEquals(listOf(0, 0, 1, 1), words.map(Segment::chunkIndex))
+    }
+
+    @Test
     fun mismatchedPollIdIsRejectedAfterRawResponseIsSpooled() {
         server.enqueue(
             MockResponse().setBody(

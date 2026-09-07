@@ -277,6 +277,32 @@ class SyncProviderTest {
     }
 
     @Test
+    fun diarizedSpeakerIdsStayScopedAcrossCombinedChunks() {
+        val raw = fixture("openai_diarized.json").toByteArray(StandardCharsets.UTF_8)
+        val transcripts = (0..1).map { chunkIndex ->
+            (OpenAiAdapter().parseSavedResponse(
+                raw,
+                request(
+                    Provider.OPENAI,
+                    OpenAiAdapter.MODEL_GPT_4O_TRANSCRIBE_DIARIZE,
+                    diarization = true,
+                    chunkIndex = chunkIndex,
+                    chunkStartMs = chunkIndex * 2_000L,
+                    durationMs = 31_000,
+                ),
+            ) as SubmissionResult.Direct).transcript
+        }
+        val segments = transcripts.flatMap { it.segments }
+
+        assertEquals(listOf("Hello", "there", "Hello", "there"), segments.map(Segment::text))
+        assertEquals(
+            listOf("chunk-0:A", "chunk-0:B", "chunk-1:A", "chunk-1:B"),
+            segments.map(Segment::speaker),
+        )
+        assertEquals(listOf(0, 0, 1, 1), segments.map(Segment::chunkIndex))
+    }
+
+    @Test
     fun reportedLanguageArrayIsRetainedAndSingularLanguageBecomesUnknown() {
         val result = OpenAiAdapter().parseSavedResponse(
             "{\"text\":\"hello\",\"language\":\"en\",\"languages\":[{\"code\":\"de\"},{\"code\":\"en\"},\"invalid\"]}"

@@ -40,6 +40,7 @@ class ProviderFailureMatrixTest {
             val cases = adapterCases(fixture.http, audio)
             for (adapterCase in cases) {
                 for (failure in Failure.entries) {
+                    val context = "${adapterCase.adapter.provider}/${failure.name}"
                     val requestCountBefore = fixture.server.requestCount
                     if (adapterCase.hasUploadPrelude) {
                         fixture.server.enqueue(uploadResponse())
@@ -56,8 +57,8 @@ class ProviderFailureMatrixTest {
                         }
                     }
 
-                    assertEquals(failure.expectedCode, error.code)
-                    assertEquals(failure.httpStatus, error.httpStatus)
+                    assertEquals(context, failure.expectedCode, error.code)
+                    assertEquals(context, failure.httpStatus, error.httpStatus)
                     assertEquals(failure.expectedCode.name, error.message)
                     assertFalse(error.message.orEmpty().contains("provider secret", ignoreCase = true))
                     assertEquals(
@@ -121,23 +122,114 @@ class ProviderFailureMatrixTest {
         }
     }
 
+    @Test
+    fun everyAdapterMapsPaidHttpsReadTimeoutAsUncertainWithoutRetry() {
+        val fixture = TlsFixture(readTimeoutMillis = 150)
+        val audio = audioFile()
+        try {
+            for (adapterCase in adapterCases(fixture.http, audio)) {
+                val requestCountBefore = fixture.server.requestCount
+                if (adapterCase.hasUploadPrelude) fixture.server.enqueue(uploadResponse())
+                fixture.server.enqueue(
+                    MockResponse()
+                        .setResponseCode(200)
+                        .setBody("{}")
+                        .setBodyDelay(800, TimeUnit.MILLISECONDS),
+                )
+
+                val error = assertThrows(ProviderError::class.java) {
+                    runBlocking {
+                        adapterCase.adapter.submit(adapterCase.request, "matrix-test-key", ResponseSpool {})
+                    }
+                }
+
+                assertEquals(
+                    adapterCase.adapter.provider.name,
+                    ProviderErrorCode.SUBMISSION_UNCERTAIN,
+                    error.code,
+                )
+                assertNull(error.httpStatus)
+                assertEquals(
+                    requestCountBefore + if (adapterCase.hasUploadPrelude) 2 else 1,
+                    fixture.server.requestCount,
+                )
+                if (adapterCase.hasUploadPrelude) assertEquals("/v2/upload", takeRequest(fixture.server).path)
+                assertEquals(adapterCase.path, takeRequest(fixture.server).path)
+                assertNull(takeRequestOrNull(fixture.server))
+            }
+        } finally {
+            audio.delete()
+            fixture.close()
+        }
+    }
+
+    @Test
+    fun everyAdapterRejectsHttpsRedirectWithoutLeakingAuthorizationOrRetrying() {
+        val fixture = TlsFixture()
+        val redirectTarget = fixture.newServer()
+        val audio = audioFile()
+        try {
+            repeat(3) { redirectTarget.enqueue(MockResponse().setResponseCode(418)) }
+            for (adapterCase in adapterCases(fixture.http, audio)) {
+                val requestCountBefore = fixture.server.requestCount
+                if (adapterCase.hasUploadPrelude) fixture.server.enqueue(uploadResponse())
+                fixture.server.enqueue(
+                    MockResponse()
+                        .setResponseCode(307)
+                        .setHeader("Location", redirectTarget.url("/authorization-canary")),
+                )
+
+                val error = assertThrows(ProviderError::class.java) {
+                    runBlocking {
+                        adapterCase.adapter.submit(adapterCase.request, "matrix-test-key", ResponseSpool {})
+                    }
+                }
+
+                assertEquals(
+                    adapterCase.adapter.provider.name,
+                    ProviderErrorCode.INVALID_INPUT,
+                    error.code,
+                )
+                assertEquals(307, error.httpStatus)
+                assertEquals(
+                    requestCountBefore + if (adapterCase.hasUploadPrelude) 2 else 1,
+                    fixture.server.requestCount,
+                )
+                if (adapterCase.hasUploadPrelude) assertEquals("/v2/upload", takeRequest(fixture.server).path)
+                val paidRequest = takeRequest(fixture.server)
+                assertEquals(adapterCase.path, paidRequest.path)
+                assertEquals(adapterCase.authorization, paidRequest.getHeader("Authorization"))
+                assertNull(takeRequestOrNull(fixture.server))
+            }
+            assertEquals(0, redirectTarget.requestCount)
+            assertNull(takeRequestOrNull(redirectTarget))
+        } finally {
+            audio.delete()
+            redirectTarget.shutdown()
+            fixture.close()
+        }
+    }
+
     private fun adapterCases(http: ProviderHttp, audio: File): List<AdapterCase> = listOf(
         AdapterCase(
             AssemblyAiAdapter(http),
             request(Provider.ASSEMBLYAI, AssemblyAiAdapter.MODEL_U2, audio),
             "/v2/transcript",
+            "matrix-test-key",
             hasUploadPrelude = true,
         ),
         AdapterCase(
             OpenAiAdapter(http),
             request(Provider.OPENAI, OpenAiAdapter.MODEL_WHISPER_1, audio),
             "/v1/audio/transcriptions",
+            "Bearer matrix-test-key",
             hasUploadPrelude = false,
         ),
         AdapterCase(
             GroqAdapter(http),
             request(Provider.GROQ, GroqAdapter.MODEL_TURBO, audio),
             "/openai/v1/audio/transcriptions",
+            "Bearer matrix-test-key",
             hasUploadPrelude = false,
         ),
     )
@@ -213,10 +305,11 @@ class ProviderFailureMatrixTest {
         val adapter: ProviderAdapter,
         val request: TranscriptionRequest,
         val path: String,
+        val authorization: String,
         val hasUploadPrelude: Boolean,
     )
 
-    private class TlsFixture {
+    private class TlsFixture(private val readTimeoutMillis: Int? = null) {
         private val tls = TlsMaterial.create()
         val server = MockWebServer()
         val http: ProviderHttp
@@ -235,10 +328,19 @@ class ProviderFailureMatrixTest {
                         .host(fixtureUrl.host)
                         .port(fixtureUrl.port)
                         .build()
-                    chain.proceed(original.newBuilder().url(rewritten).build())
+                    val routed = original.newBuilder().url(rewritten).build()
+                    val timedChain = readTimeoutMillis
+                        ?.let { chain.withReadTimeout(it, TimeUnit.MILLISECONDS) }
+                        ?: chain
+                    timedChain.proceed(routed)
                 }
                 .build()
             http = ProviderHttp(client)
+        }
+
+        fun newServer(): MockWebServer = MockWebServer().apply {
+            useHttps(tls.sslContext.socketFactory, false)
+            start()
         }
 
         fun close() {
