@@ -257,6 +257,31 @@ class ArtifactFilesTest {
     }
 
     @Test
+    fun perIdRecoveryIsolatesCorruptedSiblingAndIgnoresAbsentOrIncompleteArtifacts() = withStore { store ->
+        val valid = document()
+        val corrupted = document(artifactId = "00000000-0000-0000-0000-000000000002")
+        val incomplete = document(artifactId = "00000000-0000-0000-0000-000000000003")
+        val stored = store.write(valid)
+        store.write(corrupted)
+        Files.write(
+            store.canonicalFile(corrupted.artifactId).toPath(),
+            "{\"corrupted\":true}".toByteArray(),
+            StandardOpenOption.WRITE,
+            StandardOpenOption.TRUNCATE_EXISTING,
+        )
+        Files.createDirectories(store.canonicalFile(incomplete.artifactId).toPath().parent)
+        Files.write(store.canonicalFile(incomplete.artifactId).toPath(), "{}".toByteArray())
+
+        assertEquals(stored, store.recoverable(valid.artifactId))
+        assertNull(store.recoverable(incomplete.artifactId))
+        assertNull(store.recoverable("00000000-0000-0000-0000-000000000004"))
+        val failure = assertThrows(ArtifactFilesException::class.java) {
+            store.recoverable(corrupted.artifactId)
+        }
+        assertEquals(ArtifactFilesException.CORRUPT_CANONICAL, failure.reason)
+    }
+
+    @Test
     fun sizeBoundsAndRetentionBoundaryAreEnforced() = withStore { store ->
         val oversizedCanonical = document(segments = listOf(Segment("x".repeat(ArtifactFiles.MAX_CANONICAL_BYTES))))
         val canonicalFailure = assertThrows(ArtifactFilesException::class.java) {

@@ -216,6 +216,16 @@ class ArtifactFiles(private val root: File) {
     }
 
     @Synchronized
+    fun recoverable(id: String): StoredArtifact? = storage {
+        val artifactId = validateArtifactId(id)
+        val directory = artifactDirectory(artifactId, create = false)
+        if (!directoryExists(directory)) return@storage null
+        validateEntries(directory, expectedRawExtension = null, finalized = false)
+        if (!entryExists(directory.resolve(COMMIT_NAME))) return@storage null
+        storedArtifact(loadFinalized(directory, artifactId))
+    }
+
+    @Synchronized
     fun delete(id: String): Unit = storage {
         val artifactId = validateArtifactId(id)
         val directory = artifactDirectory(artifactId, create = false)
