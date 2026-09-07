@@ -1,0 +1,8 @@
+{
+  "events": [
+    {"tStartMs": 0, "dDurationMs": 3000, "segs": [{"utf8": "Hello"}]},
+    {"tStartMs": 2000, "dDurationMs": 3000, "segs": [{"utf8": "Hello world"}]},
+    {"tStartMs": 5000, "dDurationMs": 1000, "segs": [{"utf8": "No no, 42"}]},
+    {"dDurationMs": 1000, "segs": [{"utf8": "No timestamp"}]}
+  ]
+}

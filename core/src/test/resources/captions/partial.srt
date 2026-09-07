@@ -1,0 +1,10 @@
+1
+00:00:00,000 --> 00:00:01,000
+First line
+
+broken cue
+not a timestamp
+
+3
+00:00:02,000 --> 00:00:03,000
+Third line

@@ -1,0 +1,6 @@
+{
+  "events": [
+    {"tStartMs": 0, "dDurationMs": 1000, "wWinId": 7, "segs": [{"utf8": "Hello"}]},
+    {"tStartMs": 0, "dDurationMs": 2000, "wWinId": 7, "segs": [{"utf8": "Hello world"}]}
+  ]
+}

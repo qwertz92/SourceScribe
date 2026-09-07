@@ -26,8 +26,8 @@ object SourceResolver {
         val params = try {
             uri.rawQuery.orEmpty().split('&').filter { it.isNotEmpty() }.map { part ->
                 val pair = part.split('=', limit = 2)
-                URLDecoder.decode(pair[0], StandardCharsets.UTF_8) to
-                    URLDecoder.decode(pair.getOrElse(1) { "" }, StandardCharsets.UTF_8)
+                URLDecoder.decode(pair[0], StandardCharsets.UTF_8.name()) to
+                    URLDecoder.decode(pair.getOrElse(1) { "" }, StandardCharsets.UTF_8.name())
             }
         } catch (_: Exception) { throw InvalidSource("INVALID_QUERY") }
         if (params.count { it.first == "v" } > 1) throw InvalidSource("AMBIGUOUS_VIDEO")

@@ -110,6 +110,7 @@ data class Provenance(
     val captionTrack: CaptionTrack? = null,
     val languageEvidence: String? = null,
     val engineVersions: Map<String, String> = emptyMap(),
+    val reportedLanguages: List<String> = emptyList(),
 )
 
 @Serializable
@@ -145,6 +146,7 @@ data class TranscriptDocument(
     val createdAt: Long,
     val rawHash: String? = null,
     val normalizationVersion: String = "1",
+    val words: List<Segment> = emptyList(),
 ) {
     val text: String get() = segments.joinToString("\n") { it.text }
 }

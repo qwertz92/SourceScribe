@@ -21,7 +21,7 @@ object ExtractorMetadata {
 
     fun parse(raw: String, requested: Source): ResolvedSource {
         if (raw.length > 8 * 1024 * 1024) throw InvalidSource("METADATA_TOO_LARGE")
-        val root = try { json.parseToJsonElement(raw) as? JsonObject }
+        val root = try { json.parseBounded(raw) as? JsonObject }
         catch (_: Exception) { null } ?: throw InvalidSource("INVALID_METADATA")
         fun string(name: String) = (root[name] as? JsonPrimitive)?.contentOrNull
         SourceResolver.requireMatchingVideo(requested, string("id"))
