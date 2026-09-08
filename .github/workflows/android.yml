@@ -105,7 +105,17 @@ jobs:
             -gpu software -accel on -memory 2048 -cores 2 -no-boot-anim \
             > emulator.log 2>&1 &
           emulator_pid=$!
-          trap 'timeout 15 adb -s emulator-5554 emu kill >/dev/null 2>&1 || true; kill "$emulator_pid" 2>/dev/null || true' EXIT
+          cleanup() {
+            result=$?
+            if [[ "$result" -ne 0 ]]; then
+              tail -n 160 emulator.log || true
+              timeout 15 adb devices -l || true
+            fi
+            timeout 15 adb -s emulator-5554 emu kill >/dev/null 2>&1 || true
+            kill "$emulator_pid" 2>/dev/null || true
+            exit "$result"
+          }
+          trap cleanup EXIT
           timeout 180 adb -s emulator-5554 wait-for-device
           timeout 180 bash -c 'until [[ "$(adb -s emulator-5554 shell getprop sys.boot_completed | tr -d "\r")" == 1 ]]; do sleep 2; done'
           timeout 25 adb -s emulator-5554 shell input keyevent 82
