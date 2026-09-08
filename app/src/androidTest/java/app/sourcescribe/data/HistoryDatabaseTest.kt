@@ -9,6 +9,7 @@ import app.sourcescribe.core.ExportState
 import app.sourcescribe.core.JobConfig
 import app.sourcescribe.core.Outcome
 import java.util.UUID
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
@@ -176,6 +177,47 @@ class HistoryDatabaseTest {
             assertTrue(dao.requestDeletion(second.job.id))
             dao.finishDeletion(second.job.id)
             assertNull(dao.source(source.id))
+        }
+    }
+
+    @Test
+    fun remoteDeletionJobIdsRequireLiveAssemblyAiHandleAndRemainDistinct() = runBlocking {
+        Room.inMemoryDatabaseBuilder(context, SourceScribeDatabase::class.java).build().useDatabase { database ->
+            val dao = database.records()
+            val seeded = seed(dao)
+
+            assertTrue(dao.observeRemoteDeletionJobIds().first().isEmpty())
+
+            val groq = submission(seeded.attempt.id, "groq").copy(remoteId = "groq-remote")
+            dao.insertSubmission(groq)
+            assertTrue(dao.observeRemoteDeletionJobIds().first().isEmpty())
+
+            val assemblyAiWithoutHandle = submission(seeded.attempt.id, "assemblyai-without-handle").copy(
+                chunkIndex = 1,
+                provider = "ASSEMBLYAI",
+            )
+            dao.insertSubmission(assemblyAiWithoutHandle)
+            assertTrue(dao.observeRemoteDeletionJobIds().first().isEmpty())
+
+            val firstAssemblyAiHandle = assemblyAiWithoutHandle.copy(
+                id = "assemblyai-handle-1",
+                chunkIndex = 2,
+                remoteId = "assemblyai-remote-1",
+            )
+            dao.insertSubmission(firstAssemblyAiHandle)
+            assertEquals(listOf(seeded.job.id), dao.observeRemoteDeletionJobIds().first())
+
+            val secondAssemblyAiHandle = firstAssemblyAiHandle.copy(
+                id = "assemblyai-handle-2",
+                chunkIndex = 3,
+                remoteId = "assemblyai-remote-2",
+            )
+            dao.insertSubmission(secondAssemblyAiHandle)
+            assertEquals(listOf(seeded.job.id), dao.observeRemoteDeletionJobIds().first())
+
+            dao.updateSubmission(firstAssemblyAiHandle.copy(state = SubmissionState.REMOTE_DELETED))
+            dao.updateSubmission(secondAssemblyAiHandle.copy(state = SubmissionState.REMOTE_DELETED))
+            assertTrue(dao.observeRemoteDeletionJobIds().first().isEmpty())
         }
     }
 

@@ -208,4 +208,5 @@
     <string name="missing_retry_response_saved">Für einen fehlenden Abschnitt liegt bereits eine Providerantwort vor. „Fehlenden Zweig erneut versuchen“ ist gesperrt, damit diese Antwort keine weiteren Kosten verursacht. Das vorhandene Teilergebnis bleibt erhalten.</string>
     <string name="job_config_invalid">Die gespeicherten Auftragseinstellungen sind beschädigt. Dieser Auftrag wird nicht automatisch fortgesetzt. Vorhandene Ergebnisse und andere Aufträge bleiben erhalten.</string>
     <string name="artifact_file_missing">Die intern gespeicherte Ergebnisdatei fehlt oder wurde nicht vollständig gesichert. Andere Ergebnisse bleiben erhalten. Es wird keine neue Transkription automatisch angefordert.</string>
+    <string name="stt_configuration">STT-Vorgabe: %1$s</string>
 </resources>

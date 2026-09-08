@@ -62,6 +62,7 @@ class MainViewModel @Inject constructor(
     val attempts = records.observeAttempts().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val artifacts = records.observeArtifacts().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val exports = records.observeExports().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val remoteDeletionJobIds = records.observeRemoteDeletionJobIds().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val previewOwner = java.util.UUID.randomUUID().toString().also(SourceFiles::registerPreviewOwner)
     private val previewRevision = AtomicLong()

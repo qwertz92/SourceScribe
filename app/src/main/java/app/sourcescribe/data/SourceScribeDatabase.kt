@@ -131,6 +131,8 @@ abstract class SourceScribeDao {
     @Query("SELECT * FROM attempts ORDER BY createdAt") abstract fun observeAttempts(): Flow<List<AttemptRow>>
     @Query("SELECT * FROM artifacts ORDER BY createdAt DESC") abstract fun observeArtifacts(): Flow<List<ArtifactRow>>
     @Query("SELECT * FROM exports ORDER BY createdAt DESC") abstract fun observeExports(): Flow<List<ExportRow>>
+    @Query("SELECT DISTINCT attempts.jobId FROM submissions INNER JOIN attempts ON attempts.id = submissions.attemptId WHERE submissions.provider = 'ASSEMBLYAI' AND submissions.remoteId IS NOT NULL AND submissions.state != 'REMOTE_DELETED'")
+    abstract fun observeRemoteDeletionJobIds(): Flow<List<String>>
     @Query("SELECT * FROM jobs WHERE id = :id") abstract suspend fun job(id: String): JobRow?
     @Query("SELECT * FROM jobs") abstract suspend fun allJobs(): List<JobRow>
     @Query("SELECT * FROM attempts") abstract suspend fun allAttempts(): List<AttemptRow>

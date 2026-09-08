@@ -96,6 +96,7 @@ private fun SourceScribeApp(incoming: String, shareSerial: Int, model: MainViewM
     val attempts by model.attempts.collectAsStateWithLifecycle()
     val artifacts by model.artifacts.collectAsStateWithLifecycle()
     val exports by model.exports.collectAsStateWithLifecycle()
+    val remoteDeletionJobIds by model.remoteDeletionJobIds.collectAsStateWithLifecycle()
     val dark = settings.theme == "DARK" || settings.theme == "SYSTEM" && isSystemInDarkTheme()
     SideEffect {
         (context as? ComponentActivity)?.window?.let { window ->
@@ -170,7 +171,7 @@ private fun SourceScribeApp(incoming: String, shareSerial: Int, model: MainViewM
                             model.startPreviews(); page = 1
                         }, onCancelPreview = model::clearPreview,
                         onImport = { audioPicker.launch(arrayOf("audio/*", "video/mp4", "video/webm")) })
-                    1 -> History(jobs, sources, attempts, artifacts, exports, model, !notificationsGranted) { id ->
+                    1 -> History(jobs, sources, attempts, artifacts, exports, remoteDeletionJobIds, model, !notificationsGranted) { id ->
                         model.prepareAgain(id, config); page = 0
                     }
                     else -> SettingsScreen(settings, config, state, jobs, change, model)
@@ -345,7 +346,7 @@ private fun budgetValue(text: String): Long? = if (text.isBlank()) null else run
 }.getOrDefault(-1L)
 
 @Composable
-private fun History(jobs: List<JobRow>, sources: List<SourceRow>, attempts: List<AttemptRow>, artifacts: List<ArtifactRow>, exports: List<ExportRow>, model: MainViewModel, notificationsDisabled: Boolean, otherProvider: (String) -> Unit) {
+private fun History(jobs: List<JobRow>, sources: List<SourceRow>, attempts: List<AttemptRow>, artifacts: List<ArtifactRow>, exports: List<ExportRow>, remoteDeletionJobIds: List<String>, model: MainViewModel, notificationsDisabled: Boolean, otherProvider: (String) -> Unit) {
     var confirmation by remember { mutableStateOf<Pair<String, Int>?>(null) }
     val context = LocalContext.current
     var retryExportId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -385,7 +386,10 @@ private fun History(jobs: List<JobRow>, sources: List<SourceRow>, attempts: List
                     Text(stringResource(outcomeLabel(job.outcome)))
                     val savedConfig = remember(job.config) { decodeStoredJobConfig(job.config) }
                     if (savedConfig == null) Text(stringResource(R.string.job_config_invalid), color = MaterialTheme.colorScheme.error)
-                    else Text(listOfNotNull(savedConfig.provider?.let(::providerName), savedConfig.model).joinToString(" · "), style = MaterialTheme.typography.bodySmall)
+                    else if (savedConfig.mode != AcquisitionMode.CAPTIONS_ONLY) {
+                        val provider = savedConfig.provider?.let(::providerName) ?: stringResource(R.string.no_provider)
+                        Text(stringResource(R.string.stt_configuration, listOfNotNull(provider, savedConfig.model).joinToString(" · ")), style = MaterialTheme.typography.bodySmall)
+                    }
                     if (job.state == ExecutionState.WAITING_REMOTE) Text(stringResource(R.string.provider_elapsed, duration((now - job.createdAt).coerceAtLeast(0))), style = MaterialTheme.typography.bodySmall)
                     attempts.filter { it.jobId == job.id }.forEach { attempt ->
                         Text("${if (attempt.branch == Branch.CAPTIONS) stringResource(R.string.mode_captions_only) else stringResource(R.string.mode_stt_only)} · ${stringResource(phaseLabel(attempt.phase))}", style = MaterialTheme.typography.bodySmall)
@@ -399,8 +403,12 @@ private fun History(jobs: List<JobRow>, sources: List<SourceRow>, attempts: List
                     }
                     val artifactIds = artifacts.filter { it.jobId == job.id }.map { it.id }.toSet()
                     exports.filter { it.artifactId in artifactIds }.forEach { row ->
-                        Text("${formatName(ExportFormat.valueOf(row.format))} · ${messageText("EXPORT_${row.state.name}")}", style = MaterialTheme.typography.bodySmall)
-                        row.error?.let { Text(messageText(it), style = MaterialTheme.typography.bodySmall) }
+                        val statusMessage = messageText("EXPORT_${row.state.name}")
+                        Text("${formatName(ExportFormat.valueOf(row.format))} · $statusMessage", style = MaterialTheme.typography.bodySmall)
+                        row.error?.let { error ->
+                            val errorMessage = messageText(error)
+                            if (errorMessage != statusMessage) Text(errorMessage, style = MaterialTheme.typography.bodySmall)
+                        }
                         if (!job.deleteRequested && row.state in setOf(ExportState.FAILED, ExportState.PERMISSION_REQUIRED)) {
                             TextButton({ retryExportId = row.id; exportFolder.launch(null) }) { Text(stringResource(R.string.retry_export_folder)) }
                         }
@@ -409,12 +417,14 @@ private fun History(jobs: List<JobRow>, sources: List<SourceRow>, attempts: List
                         if (job.state !in setOf(ExecutionState.FINISHED, ExecutionState.CANCELLED)) TextButton({ model.cancel(job.id) }) { Text(stringResource(R.string.cancel_job)) }
                         if (savedConfig != null && job.state == ExecutionState.WAITING_USER && !job.cancelRequested) TextButton({ model.resume(job.id) }) { Text(stringResource(R.string.resume_job)) }
                         if (savedConfig != null && job.state != ExecutionState.RUNNING) {
-                            TextButton({ confirmation = job.id to R.string.retry_missing }) { Text(stringResource(R.string.retry_missing)) }
+                            if (job.outcome !in setOf(Outcome.SUCCESS, Outcome.SUCCESS_WITH_WARNINGS)) {
+                                TextButton({ confirmation = job.id to R.string.retry_missing }) { Text(stringResource(R.string.retry_missing)) }
+                            }
                             TextButton({ confirmation = job.id to R.string.retry_all }) { Text(stringResource(R.string.retry_all)) }
                             TextButton({ otherProvider(job.id) }) { Text(stringResource(R.string.other_provider)) }
                         }
                         if (job.state in setOf(ExecutionState.FINISHED, ExecutionState.CANCELLED) &&
-                            savedConfig?.provider == Provider.ASSEMBLYAI) {
+                            job.id in remoteDeletionJobIds) {
                             TextButton({ confirmation = job.id to R.string.delete_remote }) { Text(stringResource(R.string.delete_remote)) }
                         }
                         TextButton({ confirmation = job.id to R.string.delete_job }) { Text(stringResource(R.string.delete_job)) }

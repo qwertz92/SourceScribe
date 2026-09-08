@@ -206,4 +206,5 @@
     <string name="missing_retry_response_saved">A provider response already exists for a missing section. “Retry missing branch” is disabled so this response does not incur further costs. The existing partial result remains available.</string>
     <string name="job_config_invalid">The saved job settings are corrupted. This job will not resume automatically. Existing results and other jobs remain available.</string>
     <string name="artifact_file_missing">The internally stored result file is missing or was not saved completely. Other results remain available. No new transcription is requested automatically.</string>
+    <string name="stt_configuration">STT configuration: %1$s</string>
 </resources>
