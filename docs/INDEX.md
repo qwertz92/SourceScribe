@@ -9,7 +9,8 @@ OpenCode und Menschen. Keine zweite Kopie der Anforderungen in einem Agenten-Wik
 | [Produkt](PRODUCT.md) | Verbindliche SS-01 bis SS-12 |
 | [Roadmap](ROADMAP.md) | P0 bis P6 und Freigabegrenzen |
 | [Status](STATUS.md) | Tatsächlich erreichter Stand und Blocker |
-| [Gesicherte Arbeitspause](HANDOFF.md) | Wiederaufnahme, offene Prüfungen und aktuelles UI-Feedback |
+| [Übergabe](HANDOFF.md) | Aktueller Einstieg und historische Arbeitspause |
+| [Preview-Prüfbericht](reports/2026-09-08-preview.md) | Aktuelle Tests, APK-Hashes, Gerätegrenzen und Restabnahme |
 | [Architektur](ARCHITECTURE.md) | Gemeinsame Verträge und Persistenz |
 | [Integrationen](INTEGRATIONS.md) | Extraktion, drei Provider und Exportdaten |
 | [Sicherheit](SECURITY_UPDATES.md) | Vertrauen, Secrets und Updates |

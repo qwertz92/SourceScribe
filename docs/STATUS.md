@@ -1,63 +1,63 @@
 # Tatsächlicher Projektstatus
 
-**Stand:** 8. September 2026. **Paketversion:** v3. **Freigabe:** Entwicklungsstand.
+**Stand:** 8. September 2026. **Arbeit PAUSIERT auf Nutzerwunsch.** **Freigabe:** Persönliche Preview; vollständige v1
+weiterhin blockiert. App-Quellstand `b631bbe`, CI-Diagnose `f9d4f8b`, lokales `main` und öffentliches
+[GitHub-Repository](https://github.com/qwertz92/SourceScribe).
 
-**Auf Nutzerwunsch pausiert.** Wiederaufnahme über [HANDOFF](HANDOFF.md).
-Der letzte Build r57 war erfolgreich: Debug-App, Instrumentation-APK, unsigned
-Release und vollständiges App-Lint Debug/Release sowie Extractor-Lint Release;
-alle drei erzeugten Lint-Berichte enthalten null Befunde. Debug-App und Test-APK
-sind auf dem Emulator installiert. Die neue breite App-Instrumentation wurde
-vor der Pause ausdrücklich nicht mehr gestartet. Neues UI-Feedback und de/en-
-App-Sprachwahl sind verbindlich dokumentiert, noch nicht implementiert.
+Native Android-App mit Compose/Material 3, allen vier Beschaffungsmodi,
+AssemblyAI/OpenAI/Groq, unveränderlichen Jobkonfigurationen, paralleler Queue,
+Prozess-Recovery, geschützten Credentials, Herkunft/Verlauf, SAF-Export und
+signierten Engineupdates implementiert. Keine Zusammenfassungs-API, kein
+Web-Frontend und kein eigener Backend-Dienst.
 
-## Vorhanden
+r80-Build/Lint regulär beendet, kein Build-/Testworker mehr aktiv.
+103 JVM-Tests und zuletzt **180 tatsächlich ausgeführte Android-App-Tests**
+bestanden. Der Runner führt zusätzlich fünf opt-in-Skips; deren separate
+Nachweise stehen im [Preview-Prüfbericht](reports/2026-09-08-preview.md).
+Debug-/AndroidTest-/unsigned Release-APKs gebaut; alle vier aktuellen Lintberichte
+haben null Issues. Echte Android-Extraktion und Caption-App-Durchstich auf dem
+API-37-/x86_64-/16-KB-Emulator nachgewiesen. Keine echte STT-API aufgerufen.
 
-Übergabepaket, gemeinsamer Wissensindex, lokales `main` und öffentliches
-[GitHub-Repository](https://github.com/qwertz92/SourceScribe). Android-Projekt mit
-drei Modulen und Debug-APK gebaut. Erste Quellen-/Planner-/Metadatenverträge
-implementiert. Nach Wiederaufnahme bestanden zuletzt 103 JVM-Tests (r52, 8. September), einschließlich der vollständigen Modus-/Providerfehlermatrix, lokaler HTTPS-Timeout-/Redirect-Gegenproben und der Herkunft wiederverwendeter Artefakte.
-Parser/Exporter, drei Provideradapter, Signatur-/Updateverwaltung, begrenzter
-Native-Runner, Room/DataStore, CredentialStore, Import-/Exportlogik und die erste
-Compose-Bedienung sind geschrieben. Verlauf-Aktionen, Schema-1→3-Migration, Speicherreservierungen,
-Schlüsselersatz unter bestehender Referenz und redigierte Diagnose sind ergänzt;
-ihre integrierten Android-Gates laufen. Der echte Caption-App-Pfad einschließlich SAF-Markdown und Teilen-Dialog wurde
-auf dem Emulator ausgeführt; die vollständige Abnahme läuft weiter.
-Keine Providerrequests und keine freigegebenen Testzugangsdaten.
+| Phase | Implementierung und Fixtures | Reale Nachweise / offene Freigabe |
+|---|---|---|
+| P0 | IMPLEMENTED / TESTED_WITH_FIXTURES: Runtime, Verifier, Manager; WebP für beide ABIs mit 16-KB-Ausrichtung neu gebaut | LIVE_VERIFIED: Python/TLS, JS/EJS, FFmpeg, exakte YouTube-Metadaten/Caption/Audio, Update/Rollback. Physisches ARM64 BLOCKED. |
+| P1 | IMPLEMENTED / TESTED_WITH_FIXTURES: URL/Planner, Caption/Provenienz, Room, Export/Viewer | LIVE_VERIFIED: Android Share → echte Caption → intern → SAF-Markdown mit Inhaltsvergleich → Teilen-Dialog. |
+| P2 | IMPLEMENTED / TESTED_WITH_FIXTURES: Groq, lokaler Import, Audiovorbereitung/Chunks, Credentials, Submissiongrenzen | Echte Groq-Transkription BLOCKED: keine freigegebenen Testzugänge/Inhalte/Kosten. |
+| P3 | IMPLEMENTED / TESTED_WITH_FIXTURES: AssemblyAI, OpenAI, alle Modi, BOTH-Teilfehler, Sprache/Tracks/Optionen/Presets | Echte AssemblyAI-/OpenAI-Transkription BLOCKED; kein Mock als Provider-PASS. |
+| P4 | IMPLEMENTED / TESTED_WITH_FIXTURES: Queue/Limits, Recovery, unsichere Submissions, Exportreparatur, Updatefehler | LIVE_VERIFIED: Android-Prozess-/Grantgrenzen, Reboot-Recovery mit Providerfixture, echtes signiertes Update/Rollback. T26 mit zwei laufenden Fixturejobs PASS r70. |
+| P5 | IMPLEMENTED: de/en-App-Sprache, System/Hell/Dunkel, überarbeitete Auswahlfelder/Navigation, Viewer/Suche/Kopieren/Share, Formate/Diagnose/Signierpfad | ADB-/Screenshotprüfungen einschließlich 200-%-Schrift und Querformat bestanden. Vollständige TalkBack-Bedienung BLOCKED; dauerhafte persönliche Release-Signatur NOT_RUN. |
+| P6 | Integrierte Regression und unabhängige Reviews ausgeführt; bestätigte Defekte samt Regression behoben | Vollständige Abnahme BLOCKED: Provider, physisches ARM64, TalkBack und öffentliche APK-Lizenz-/Quellbelege fehlen. |
 
-| Phase | Implementierung | Fixture-Tests | Live-/ADB-Nachweise |
-|---|---|---|---|
-| P0 | IMPLEMENTED: Runtime/Verifier/Manager; 16-KB-WebP für beide ABIs neu gebaut und integriert | TESTED_WITH_FIXTURES: aktueller Verifier (8 Tests) | LIVE_VERIFIED: Python/OpenSSL/TLS, JS/EJS, FFmpeg/ffprobe, Audioaufbereitung, Prozessbereinigung, Signatur-/ZIP-Prüfung und echte YouTube-Metadaten, Caption und Audio einschließlich FFmpeg-Aufbereitung; x86_64/16 KB nachgewiesen, ARM64 physisch blockiert |
-| P1 | IMPLEMENTED: erster Caption-/Room-/Compose-Pfad; Integration läuft | TESTED_WITH_FIXTURES: Parser/Exporter (17 Tests) | LIVE_VERIFIED: Share → explizite englische Caption → Room/Viewer → SAF-Markdown mit Inhaltsvergleich → Teilen-Dialog (r38) |
-| P2 | IMPLEMENTED: Groq, Keystore, Import/Audiovorbereitung; STT-Orchestrierung mit Wiederaufnahme implementiert; Gegenproben laufen | TESTED_WITH_FIXTURES: Adapter/HTTP einschließlich Fehlerregressionen (40 Tests) | BLOCKED: keine freigegebenen Providercredentials |
-| P3 | IMPLEMENTED: drei Adapter, Modusverträge und Auswahl; Integration läuft | TESTED_WITH_FIXTURES: Adapter/HTTP einschließlich Fehlerregressionen (40 Tests) | BLOCKED: keine freigegebenen Providercredentials |
-| P4 | IMPLEMENTED: DB-Claims, Recovery-Ansatz und Updateverwaltung; Integration läuft | TESTED_WITH_FIXTURES: 44 Android-Prüfungen für DB/Migration, Keystore, Quoten, Diagnose und STT-Wiederaufnahme (r37); weitere Reviewregressionen laufen | LIVE_VERIFIED: signiertes Nightly-Update, Aktivierung mit echter Quellenprobe und Rollback nach Manager-Neustart (r38b) |
-| P5 | IMPLEMENTED: erste deutsche Compose-Oberfläche, Einstellungen/Viewer | LIVE_VERIFIED: App-Start/Navigation; vollständige UI-/SAF-Abnahme offen | NOT_RUN |
-| P6 | Unabhängige Reviews laufen; keine Freigabe | Offene Gesamtregression | BLOCKED: Pflichtnachweise fehlen |
+## UI-Feedback umgesetzt
 
-## Nächster tatsächlicher Schritt
+Auswahlfelder haben abgestimmte Label-/Wertabstände und reservieren auch bei großer
+Schrift genug Platz für die längste Option. Untere Navigation mit „Mehr“/„More“
+bleibt lesbar. App-Sprache Deutsch/Englisch ist unabhängig von ASR und Theme.
+Der separate allgemeine Audioübermittlungs-Schalter ist entfernt; bewusste
+Providerwahl plus Auftragsstart erzeugen die intern an Quelle/Konfiguration
+gebundene Freigabe. Dies erlaubt keine Live-Tests durch Entwicklungsagenten.
 
-Den integrierten Stand nach den unabhängigen Reviews erneut bauen und auf dem
-API-37-/16-KB-Emulator prüfen. Behoben bzw. in der Regression: geerbte Leases,
-Absturz zwischen Artefaktfinalisierung und Room-Zeile, Import-/Audio-Cleanup,
-AAI-Receipt-Wiederaufnahme, echte Mehrabschnitt-Fixtures, separate Exportreparatur
-und die bei 200-%-Schrift/Querformat reproduzierte Viewer-Layoutverletzung.
-Diese neuesten Änderungen sind vor bestandenem Gesamtlauf nur IMPLEMENTED.
-[P0-/P1-Nachweise](reports/2026-09-07-build-and-p0.md) und
-[aktuelle Integrationsläufe, bestätigte Fehler und Wiederaufnahme](reports/2026-09-07-integration.md).
+## Artefakte und Grenzen
 
-Die fünf nur 4-KB-ausgerichteten WebP-Bibliotheken wurden für beide ABIs neu gebaut;
-FFmpeg/ffprobe und Audioaufbereitung liefen tatsächlich auf dem 16-KB-Gerät.
-Das signierte Nightly-Update auf 2026.08.30.232658 mit echter Quellenprobe und
-Rollback auf 2026.08.19 wurde im Android-Test r40 erneut nachgewiesen. ARM64
-besitzt weiterhin nur Build-/ELF-Prüfung, keinen physischen Gerätenachweis.
+Neu gebaut, noch nicht installiert/erneut gerätegeprüft: Debug-APK r80: `app/build/outputs/apk/debug/app-debug.apk` (159.065.550 Bytes).
+SHA-256: `ad94d85da0b1fc3cf3bbc885b3f3fa2857806448d4e20524a3c5971e3a887b32`.
+Release-APK: `app/build/outputs/apk/release/app-release-unsigned.apk`, unsigniert.
+Genaue Build-/Testbefehle, APK-Hashes, Versionen und Rohbelegnamen im
+[Preview-Prüfbericht](reports/2026-09-08-preview.md), chronologische Fehlversuche
+und Reviewkorrekturen im [Integrationsbericht](reports/2026-09-07-integration.md).
 
-Am 7. September um 18:14–18:16 trat auf dem Entwicklerhost ein bestätigter
-WSL-Speicherfehler auf. Nach dem Neustart sind 16 GiB Swap aktiv. Quellcode und
-Room-Schemas blieben erhalten; Toolchain/Caches liegen wieder auf dem Projektlaufwerk; Builds sind auf einen
-Worker und 2 GiB Java-Heap begrenzt. [Diagnose und Speicherbegrenzung](reports/2026-09-07-wsl-recovery.md).
+Öffentliche APK-Verteilung bleibt wegen fehlender vollständiger
+FFmpeg-Corresponding-Source-/Lizenzzuordnung gesperrt. Kein Release veröffentlicht.
+Die GitHub-CI hat Build/JVM/Lint bestanden und den Emulator erfolgreich gestartet.
+Run 34252821287 scheiterte anschließend im Gerätetest; der konkrete Einzelfehler
+ist noch unbekannt. Eine gezielte Berichtsausgabe ist vorbereitet, aber wegen
+Pause noch nicht in CI ausgeführt. Die abschließenden kleinen UI-Änderungen r80
+erhalten erst bei Fortsetzung einen neuen Geräte-/Screenshot-/Releaseaudit.
 
-## Bei jedem Implementierungsfortschritt ergänzen
+Nach dem belegten WSL-Speicherfehler sind 16 GiB Swap aktiv. Builds verwenden einen
+Worker, 2 GiB Java-Heap und projektlokale Caches. Keine neue globale Konfiguration.
+[Diagnose und Speicherbegrenzung](reports/2026-09-07-wsl-recovery.md).
 
-Commit und Änderungen; tatsächliche Tool-/Runtimeversionen; Testbefehl mit Ergebnis; Gerät/API/ABI/Page Size; Reviewfunde und Regression; blockierte Anforderungen; nächster Integrationsschritt. Secrets und private Audio-/Transkriptinhalte auslassen.
-
-Eine verfügbare Funktion ohne ausgeführten Test als IMPLEMENTED führen, nicht LIVE_VERIFIED. Ein fehlender Testzugang ist BLOCKED oder NOT_RUN, nie ein bestandener Test.
+Die aktuelle Pause und der konkrete nächste Prüfschritt stehen ganz oben in
+[HANDOFF](HANDOFF.md). Keine automatische Fortsetzung oder weitere Tests.
+Bereits erledigte Implementierung und Fixtureprüfungen bleiben erhalten.

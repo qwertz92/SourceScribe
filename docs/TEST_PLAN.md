@@ -57,7 +57,14 @@ Alle vier Modi einschließlich fehlender Captions und BOTH-Teilerfolg ausführen
 
 Mindestens zwei gleichzeitige Jobs, Abbruch eines Jobs und Weiterlauf des anderen. App in Hintergrund, Display aus, Navigation, Rotation, normale Prozessbeendigung, Reboot und ausdrücklichen Force-Stop getrennt prüfen. Force-Stop soll keinen magischen Fortlauf ergeben; beim nächsten Öffnen korrekten Abgleich beweisen. Unterbrechung während Download, Upload, Remote-Warten, interner Ergebnissicherung und Export prüfen.
 
-Flugmodus/Netzwechsel, Rate-Limit, abgelaufene URL, entzogene Ordnerberechtigung und Speicherfehler kontrolliert auslösen. Akku-/OS-Einschränkungen dokumentieren, statt alle Tests nur im dauerhaft sichtbaren Vordergrund auszuführen. Logcat auf Crash, ANR und Secret-Leaks prüfen. Screenshots ergänzen die funktionale Prüfung, ersetzen sie nicht.
+Flugmodus/Netzwechsel, Rate-Limit, abgelaufene URL, entzogene Ordnerberechtigung und Speicherfehler kontrolliert auslösen. Akku-/OS-Einschränkungen dokumentieren, statt alle Tests nur im dauerhaft sichtbaren Vordergrund auszuführen. Logcat auf Crash, ANR und Secret-Leaks prüfen. Screenshots ergänzen die funktionale Prüfung, ersetzen sie nicht. Für Compose nutzen wir das gelesene
+[Prüfprotokoll von Chris Banes](https://github.com/chrisbanes/skills/blob/main/skills/compose-ui-testing-patterns/SKILL.md)
+(geprüft am 8. September 2026): Semantiktests für Verhalten, tatsächliche Screenshots
+für Abstand, Ausrichtung, Clipping, Farbe und Schrift. Daten für diese Layoutfälle
+sind deterministisch; echte Quellenprüfungen bleiben separat. Keine zusätzliche
+Screenshot-Testplattform allein zur Anwendung dieser Checkliste. Hörbare
+TalkBack-Tests vorher ankündigen und temporäre Accessibility-Einstellungen danach
+auf den zuvor gemessenen Zustand zurücksetzen.
 
 ## T3 — Echte Provider- und Update-Nachweise
 

@@ -1,6 +1,6 @@
 # SourceScribe
 
-**Stand:** 8. September 2026 · **Status:** Entwicklung, auf Nutzerwunsch pausiert
+**Stand:** 8. September 2026 · Arbeit auf Nutzerwunsch pausiert · **Status:** Persönliche Preview; vollständige v1-Abnahme blockiert
 
 SourceScribe ist eine persönlich genutzte Android-App für nachvollziehbare
 Transkripte. Eine ausdrücklich eingegebene YouTube-Quelle lässt sich teilen oder
@@ -12,17 +12,26 @@ und Faktencheck bleiben außerhalb der App.
 ## Aktueller Stand
 
 Das öffentliche Repository ist [qwertz92/SourceScribe](https://github.com/qwertz92/SourceScribe).
-Debug-App, aktuelles Instrumentation-APK und unsigned Release sind gebaut.
-103 JVM-Tests bestanden zuletzt; der aktuelle Build r57 besteht einschließlich
-vollständigem App-Lint Debug/Release und Extractor-Lint Release. Echte Android-
-Caption-/Audioextraktion sowie der Caption-App-Pfad bis SAF-Export wurden geprüft.
-Die erweiterten App-Gerätetests, UI-Überarbeitung und vollständige v1-Abnahme
-bleiben offen. Der genaue [Wiederaufnahmestand](docs/HANDOFF.md) ist gesichert.
+Debug-App, Instrumentation-APK und unsignierte Release-APK sind gebaut. Bestanden
+sind 103 JVM-Tests und zuletzt 180 Android-App-Prüfungen; fünf opt-in-Fälle wurden
+im Gesamtlauf übersprungen und separat ausgeführt. Echte Android-Caption-/
+Audioextraktion und der Caption-App-Pfad bis SAF-Export sind auf dem
+API-37-/x86_64-/16-KB-Emulator nachgewiesen. Deutsch/Englisch, System/Hell/Dunkel,
+überarbeitete Auswahlfelder und die Freigabe durch bewussten Auftragsstart sind
+integriert. Die letzten kleinen History-Anpassungen nach dem r77-Gerätelauf
+sind noch nicht erneut auf dem Gerät geprüft. Ein signiertes Engineupdate während zweier laufender Fixturejobs ist
+bestanden. [Preview-Prüfbericht](docs/reports/2026-09-08-preview.md) und
+[STATUS](docs/STATUS.md) trennen Implementierung, Fixtures und reale Nachweise.
 
-Live-Provideraufrufe haben keine freigegebenen Zugangsdaten. Ein physisches
-ARM64-Gerät ist derzeit nicht verfügbar. Eine öffentliche APK-Freigabe bleibt
-wegen der dokumentierten offenen Native-Lizenz- und Corresponding-Source-Belege
-gesperrt; eigene Quelltexte und geprüfte Begleitdateien sind davon getrennt.
+Echte Transkriptionen mit AssemblyAI, OpenAI und Groq bleiben mangels freigegebener
+Zugangsdaten, Testinhalte und Kostenrahmen blockiert. Ein physisches ARM64-Gerät
+fehlt; vollständige TalkBack-Bedienung ist mit der verfügbaren Eingabeautomation
+nicht nachgewiesen. Der Release-Build ist unsigniert. Öffentliche APK-Verteilung
+bleibt wegen fehlender vollständiger FFmpeg-Lizenz-/Quellbelege gesperrt.
+
+Die CI startet inzwischen den Emulator, scheitert aber noch im Gerätetest mit
+unbekannter Einzelursache. Der nächste gezielte Diagnoseweg ist in
+[HANDOFF](docs/HANDOFF.md) gesichert; kein weiterer Lauf während der Pause.
 
 Die maßgeblichen Nachweise werden fortgeschrieben:
 

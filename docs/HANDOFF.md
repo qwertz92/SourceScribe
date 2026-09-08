@@ -1,3 +1,72 @@
+# Aktive Arbeitspause — 8. September 2026
+
+**Nutzerauftrag:** Wegen des knappen Weekly-Budgets jetzt pausieren. Keine neuen
+Implementierungen, Tests, Subagenten oder CI-Läufe starten. Nur den bereits
+laufenden r80-Build regulär auslaufen lassen und den Stand sichern. Fortsetzung
+nur nach neuem ausdrücklichem Auftrag. Die ältere Aussage weiter unten, die Pause
+sei aufgehoben, beschreibt die vorherige Fortsetzung und ist jetzt überholt.
+
+Gesichert: App-Code `b631bbe`, CI-Diagnose `f9d4f8b`.
+Keine SourceScribe-Build-/Testworker mehr aktiv; alle Subagenten abgeschlossen.
+r80 ist regulär mit BUILD SUCCESSFUL beendet (10 min 19 s). Seine APKs und
+Quellhashes sind gesichert; installiert bleibt r77. Keine Geräteprüfung nach r77.
+
+## Nächster begrenzter Arbeitsschritt
+
+1. STATUS und Previewbericht lesen; vorhandene Implementierung und 180 bestandene
+   Android-App-Tests r77 nicht neu erarbeiten. Alle Subagenten sind abgeschlossen.
+2. Letzte History-Korrektur r80 auf dem Gerät prüfen: doppelter Exporthinweis weg,
+   Missing-Retry bei SUCCESS/SUCCESS_WITH_WARNINGS ausgeblendet. r77 ist auf dem
+   Emulator installiert und geprüft; r80 wird während der Pausensicherung nicht
+   installiert und erhält keinen neuen Instrumentation-/Screenshotlauf.
+3. Aktuelle APK statisch gegen ihren Hash prüfen. Der alte lokale
+   `release-audit-r77.py` ist ein Inventarhelfer, kein alleiniger Security-Gate.
+   Offizielles aapt2 aus `.local-tools/sdk/build-tools/37.0.0/` für Manifest und
+   Resource-Zuordnung verwenden. Dort ist auch apksigner vorhanden. Der versuchte
+   r77-Audit sah bereits r79-Bytes; kein konsistenter r77-/r80-PASS daraus ableiten.
+4. CI gezielt fortsetzen: Run 34252821287 auf 558527f bootete Android in 47,555 s,
+   erkannte das Gerät und scheiterte in connectedDebugAndroidTest. Das Konsolenlog
+   nennt keinen einzelnen Fehler. Die vorbereitete CI-Korrektur gibt beim nächsten
+   Lauf JUnit-Fehler/UTP-Logs aus. Syntax und synthetische Fehlerextraktion sind
+   geprüft; ein echter Lauf dieser Diagnose ist NOT_RUN. Nicht pauschal Tests
+   abschwächen oder Timeouts erhöhen. Der Emulator erhöhte 2 auf 4 GiB selbst;
+   die neue Konfiguration nennt die tatsächlich nötigen 4 GiB ausdrücklich.
+5. Erst dann eng begrenzt korrigieren und betroffene Gates ausführen. UI-Änderungen
+   samt statischem Review vor einem neuen vollständigen Build bündeln; keine
+   fortlaufende Kosmetikschleife beim Abschluss.
+
+Externe Freigabelücken bleiben: Live-STT aller drei Provider ohne Testfreigabe,
+physisches ARM64, vollständige TalkBack-Bedienung, FFmpeg-Source-/Lizenzzuordnung
+für öffentliche APK-Verteilung und dauerhafter persönlicher Signing-Key.
+Kein kostenpflichtiger Provideraufruf. Kein neuer CI-Lauf beim Sicherungspush
+(`[skip ci]` ist eine ausdrückliche Pause, kein grüner Testnachweis).
+
+Die frühere 70-%-Schätzung war keine belastbare Aufwandsschätzung. Geschriebene
+Funktionen und verbleibende Integration/Abnahme nicht erneut zu einer einzigen
+Fortschrittszahl vermischen. Der nächste Auftrag soll ein begrenztes Prüfziel
+bekommen; volle v1 ist nicht nur kosmetisch offen und hat ohne externe Nachweise
+keine seriös zusagbare Restzeit.
+
+---
+
+# Aktuelle Übergabe — 8. September 2026
+
+Die unten dokumentierte Pause wurde durch den späteren Nutzerauftrag „bitte fahre
+fort“ aufgehoben. Die dortigen offenen Punkte und Teststände sind **historisch**.
+Für die nächste Fortsetzung zuerst [STATUS](STATUS.md), den
+[Preview-Prüfbericht](reports/2026-09-08-preview.md) und die
+[Nachweischeckliste](IMPLEMENTATION_CHECKLIST.md) lesen. Bereits erledigte
+Implementierung, Fixture-Erzeugung und Prüfungen nicht erneut beginnen.
+
+Die vorhandene synthetische UI-Datei umfasst 10.000 Segmente. Sie und der echte
+YouTube-Caption-Verlauf bleiben erhalten. Keine Providerzugänge für Live-Tests
+freigegeben. Root betreibt jeweils nur einen Gradle- und einen ADB-Prüfstrom;
+Astra verantwortet Produktions-UI, größere abgegrenzte Implementierungen gehen
+an Sol, unabhängige Reviews an Luna. Lokale APKs und Rohlogs liegen auf dem
+Projektlaufwerk und überstehen einen normalen Neustart.
+
+---
+
 # Gesicherte Arbeitspause — 8. September 2026
 
 Der Nutzer hat ausdrücklich eine Pause bis zum nächsten Weiterarbeiten angeordnet: keine neuen Aufgaben, kontrolliertes Ende laufender Prozesse und Subagenten, danach darf der Rechner ausgeschaltet werden. Nicht automatisch weiterarbeiten. Beim nächsten Auftrag dieses Dokument, STATUS und den Integrationsbericht lesen; vorhandenen Code und Fixtures fortsetzen, nicht neu erzeugen.
