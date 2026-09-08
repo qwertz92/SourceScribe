@@ -51,10 +51,19 @@ public final class AudioImportFixtureProvider extends ContentProvider {
             String sortOrder
     ) {
         Fixture fixture = fixture(uri);
-        MatrixCursor cursor = new MatrixCursor(
-                new String[]{OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE}
-        );
-        cursor.addRow(new Object[]{fixture.name, (long) fixture.bytes.length});
+        String[] columns = projection == null
+                ? new String[]{OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE}
+                : projection;
+        Object[] row = new Object[columns.length];
+        for (int index = 0; index < columns.length; index++) {
+            if (OpenableColumns.DISPLAY_NAME.equals(columns[index])) {
+                row[index] = fixture.name;
+            } else if (OpenableColumns.SIZE.equals(columns[index])) {
+                row[index] = (long) fixture.bytes.length;
+            }
+        }
+        MatrixCursor cursor = new MatrixCursor(columns);
+        cursor.addRow(row);
         return cursor;
     }
 

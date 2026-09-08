@@ -3,6 +3,7 @@ package app.sourcescribe.data
 import android.content.Context
 import android.content.ContextWrapper
 import android.net.Uri
+import android.provider.OpenableColumns
 import androidx.room.Room
 import androidx.core.net.toUri
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -19,6 +20,7 @@ import kotlinx.serialization.json.Json
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Before
@@ -56,6 +58,25 @@ class AudioImportTest {
     fun rejectsContentUrisWithoutAuthority() = runBlocking {
         expectCode(AudioImportCode.INVALID_INPUT) {
             importer().import("content:///audio/1".toUri())
+        }
+    }
+
+    @Test
+    fun fixtureHonorsRequestedAndDefaultProjections() {
+        val columns = arrayOf(OpenableColumns.SIZE, "unknown", OpenableColumns.DISPLAY_NAME)
+
+        context.contentResolver.query(AudioImportFixtureProvider.WAV_URI, columns, null, null, null)!!.use { cursor ->
+            assertEquals(columns.toList(), cursor.columnNames.toList())
+            assertTrue(cursor.moveToFirst())
+            assertEquals(AudioImportFixtureProvider.WAV_BYTES.size.toLong(), cursor.getLong(0))
+            assertNull(cursor.getString(1))
+            assertEquals("audio-import-fixture.wav", cursor.getString(2))
+        }
+        context.contentResolver.query(AudioImportFixtureProvider.WAV_URI, null, null, null, null)!!.use { cursor ->
+            assertEquals(listOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE), cursor.columnNames.toList())
+            assertTrue(cursor.moveToFirst())
+            assertEquals("audio-import-fixture.wav", cursor.getString(0))
+            assertEquals(AudioImportFixtureProvider.WAV_BYTES.size.toLong(), cursor.getLong(1))
         }
     }
 

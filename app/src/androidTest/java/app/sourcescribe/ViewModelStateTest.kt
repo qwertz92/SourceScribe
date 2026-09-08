@@ -43,6 +43,7 @@ import app.sourcescribe.extractor.EngineUpdateManager
 import app.sourcescribe.extractor.ExtractorEngine
 import app.sourcescribe.extractor.NativeRuntime
 import java.io.File
+import java.nio.file.Files
 import java.security.MessageDigest
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicInteger
@@ -231,7 +232,9 @@ class ViewModelStateTest {
     }
 
     private fun <T> withFixture(block: suspend Fixture.() -> T): T {
-        val fixture = Fixture(InstrumentationRegistry.getInstrumentation().targetContext)
+        val base = InstrumentationRegistry.getInstrumentation().targetContext
+        runBlocking { NativeRuntime(base).initialize() }
+        val fixture = Fixture(base)
         return try {
             runBlocking { fixture.block() }
         } finally {
@@ -243,7 +246,13 @@ class ViewModelStateTest {
         private val instrumentation = InstrumentationRegistry.getInstrumentation()
         private val root = File(base.cacheDir, "view-model-state-${UUID.randomUUID()}").also { check(it.mkdirs()) }
         private val context = IsolatedContext(base, root)
-        init { ensureWorkManager(base) }
+        private val runtimeLink = File(context.noBackupFilesDir, "youtubedl-android")
+        init {
+            val actualRuntime = File(base.noBackupFilesDir, runtimeLink.name)
+            check(actualRuntime.isDirectory)
+            Files.createSymbolicLink(runtimeLink.toPath(), actualRuntime.toPath())
+            ensureWorkManager(base)
+        }
         private val database = Room.inMemoryDatabaseBuilder(context, SourceScribeDatabase::class.java).build()
         private val dao = database.records()
         val settings = SettingsStore(context)
@@ -356,6 +365,7 @@ class ViewModelStateTest {
             runBlocking { withTimeout(TIMEOUT_MS) { viewModel.screen.first { !it.busy } } }
             val providerRequests = providerGuard.requestCount
             database.close()
+            if (Files.isSymbolicLink(runtimeLink.toPath())) Files.delete(runtimeLink.toPath())
             root.deleteRecursively()
             check(providerRequests == 0) { "Provider request escaped the test guard" }
         }

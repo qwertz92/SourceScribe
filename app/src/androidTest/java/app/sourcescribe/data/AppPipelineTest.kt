@@ -384,6 +384,7 @@ class AppPipelineTest {
 
     @Test
     fun retryMissingOnlyUsesLatestFallbackSttAttemptInsteadOfOlderSuccess() = withFixture {
+        prepareNativeRuntime()
         val config = captionConfig().copy(mode = AcquisitionMode.CAPTIONS_THEN_STT)
         val seeded = seedCaption(config = config)
         val checkpoint = json.encodeToString(AttemptCheckpoint(source = seeded.source))
@@ -1356,9 +1357,10 @@ class AppPipelineTest {
         }
     }
 
-    private class PipelineFixture(base: Context) {
+    private class PipelineFixture(private val base: Context) {
         private val root = File(base.cacheDir, "app-pipeline-${UUID.randomUUID()}").also { check(it.mkdirs()) }
         private val context = IsolatedContext(base, root)
+        private val runtimeLink = File(context.noBackupFilesDir, "youtubedl-android")
         private val workManager = ensureWorkManager(base)
         private val database = Room.inMemoryDatabaseBuilder(context, SourceScribeDatabase::class.java).build()
         private val jobIds = mutableSetOf<String>()
@@ -1624,9 +1626,17 @@ class AppPipelineTest {
 
         fun providerRequests(): Int = providerGuard.requestCount
 
+        suspend fun prepareNativeRuntime() {
+            NativeRuntime(base).initialize()
+            val actualRuntime = File(base.noBackupFilesDir, runtimeLink.name)
+            check(actualRuntime.isDirectory)
+            Files.createSymbolicLink(runtimeLink.toPath(), actualRuntime.toPath())
+        }
+
         fun close() {
             jobIds.forEach { workManager.cancelAllWorkByTag("job:$it") }
             database.close()
+            if (Files.isSymbolicLink(runtimeLink.toPath())) Files.delete(runtimeLink.toPath())
             root.deleteRecursively()
         }
 
