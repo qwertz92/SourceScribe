@@ -20,6 +20,8 @@ jobs:
     env:
       # Keep all Gradle state in the workspace; no user-wide init scripts apply.
       GRADLE_USER_HOME: ${{ github.workspace }}/.ci-gradle
+      ANDROID_USER_HOME: ${{ github.workspace }}/.ci-android
+      ANDROID_AVD_HOME: ${{ github.workspace }}/.ci-android/avd
 
     steps:
       # Official v7.0.1 release, resolved to an immutable commit.
@@ -41,6 +43,9 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+
+      - name: Prepare Android state directories
+        run: mkdir -p "$ANDROID_AVD_HOME"
 
       # Official v4.0.1 release, resolved to an immutable commit.
       # https://github.com/android-actions/setup-android/releases/tag/v4.0.1
@@ -100,6 +105,8 @@ jobs:
           printf 'no\n' | timeout 60 avdmanager create avd \
             --name sourcescribe-ci \
             --package 'system-images;android-37.0;google_apis_ps16k;x86_64'
+          test -s "$ANDROID_AVD_HOME/sourcescribe-ci.ini"
+          timeout 20 avdmanager list avd -c | grep -Fxq 'sourcescribe-ci'
           timeout 1200 "$ANDROID_HOME/emulator/emulator" \
             -avd sourcescribe-ci -no-window -no-audio -no-snapshot \
             -gpu software -accel on -memory 2048 -cores 2 -no-boot-anim \
