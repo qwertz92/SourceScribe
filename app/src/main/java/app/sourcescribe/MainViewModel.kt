@@ -100,10 +100,11 @@ class MainViewModel @Inject constructor(
     }
 
     fun startPreviews() = action(starting = true) {
-        val previews = screen.value.previews
+        val current = screen.value
+        val previews = current.previews.map { it.copy(config = configurationForStart(it.config, current.credentials)) }
         check(previews.isNotEmpty())
         previews.forEach { preview ->
-            val error = previewError(preview, screen.value.credentials)
+            val error = previewError(preview, current.credentials)
             if (error != null) {
                 mutable.update { it.copy(message = error) }
                 return@action
@@ -330,14 +331,23 @@ class MainViewModel @Inject constructor(
             }
         }
 
+        /** Only the deliberate Start action persists this approval, bound to its exact job configuration. */
+        fun configurationForStart(config: JobConfig, credentials: List<CredentialInfo>): JobConfig = config.copy(
+            uploadApproved = config.mode != AcquisitionMode.CAPTIONS_ONLY && config.model != null &&
+                credentials.any { it.id == config.credentialId && it.provider == config.provider && it.region == config.region },
+        )
+
         fun previewError(preview: SourcePreview, credentials: List<CredentialInfo>): String? {
-            val config = preview.config
+            val config = configurationForStart(preview.config, credentials)
             val captions = TrackSelection.captions(preview.resolved, config)
             if (config.mode == AcquisitionMode.CAPTIONS_ONLY && captions.isEmpty()) return "NO_ACCEPTABLE_CAPTIONS"
             val requiresStt = config.mode in setOf(AcquisitionMode.STT_ONLY, AcquisitionMode.BOTH)
-            if (requiresStt) configError(config)?.let { return it }
             val availableKey = credentials.any { it.id == config.credentialId && it.provider == config.provider && it.region == config.region }
-            if (requiresStt && !availableKey) return "CREDENTIAL_REQUIRED"
+            if (requiresStt) {
+                if (config.provider == null || config.model == null) return "PROVIDER_REQUIRED"
+                if (!availableKey) return "CREDENTIAL_REQUIRED"
+                configError(config)?.let { return it }
+            }
             if ((requiresStt || config.mode == AcquisitionMode.CAPTIONS_THEN_STT && captions.isEmpty() && config.uploadApproved && availableKey) &&
                 preview.resolved.source.kind == SourceKind.YOUTUBE && TrackSelection.audio(preview.resolved, config.audioTrackId) == null) {
                 return if (preview.resolved.audio.isEmpty()) "NO_AUDIO" else "CHOOSE_AUDIO_TRACK"

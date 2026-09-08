@@ -13,6 +13,25 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class ViewRulesTest {
     @Test
+    fun deliberateStartBindsApprovalToModeCredentialProviderAndRegionWithoutChangingTheDraft() {
+        val key = CredentialInfo("selected-key", Provider.GROQ, Region.US)
+        val draft = JobConfig(mode = AcquisitionMode.STT_ONLY, provider = key.provider, region = key.region,
+            credentialId = key.id, model = GroqAdapter.MODEL_TURBO, maxCostMicrousd = 123,
+            audioTrackId = "chosen-audio", uploadApproved = false)
+        for (mode in AcquisitionMode.entries) {
+            val selected = draft.copy(mode = mode)
+            assertEquals(selected.copy(uploadApproved = mode != AcquisitionMode.CAPTIONS_ONLY),
+                MainViewModel.configurationForStart(selected, listOf(key)))
+        }
+        val staleApproval = draft.copy(uploadApproved = true)
+        for (keys in listOf(emptyList(), listOf(key.copy(id = "other-key")),
+            listOf(key.copy(provider = Provider.OPENAI)), listOf(key.copy(region = Region.EU)))) {
+            assertEquals(draft, MainViewModel.configurationForStart(staleApproval, keys))
+        }
+        assertEquals(false, draft.uploadApproved)
+    }
+
+    @Test
     fun damagedStoredConfigurationHasNoFallbackProviderOrDefaults() {
         for (raw in listOf("", "{", "{\"mode\":\"BROKEN\"}", "{\"provider\":\"UNKNOWN\"}")) {
             assertNull(app.sourcescribe.data.decodeStoredJobConfig(raw))
@@ -46,7 +65,7 @@ class ViewRulesTest {
         assertNull(MainViewModel.previewError(captionOnly.copy(config = JobConfig()), emptyList()))
         val key = CredentialInfo("fixture-key", Provider.GROQ, Region.US)
         val stt = captionOnly.copy(config = JobConfig(mode = AcquisitionMode.STT_ONLY, provider = key.provider,
-            model = GroqAdapter.MODEL_TURBO, credentialId = key.id, uploadApproved = true))
+            model = GroqAdapter.MODEL_TURBO, credentialId = key.id, uploadApproved = false))
         assertEquals("CHOOSE_AUDIO_TRACK", MainViewModel.previewError(stt, listOf(key)))
         assertEquals("CREDENTIAL_REQUIRED", MainViewModel.previewError(stt, emptyList()))
         assertNull(MainViewModel.previewError(stt.copy(config = stt.config.copy(audioTrackId = "b")), listOf(key)))

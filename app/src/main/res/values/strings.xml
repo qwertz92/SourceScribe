@@ -2,7 +2,10 @@
     <string name="app_name">SourceScribe</string>
     <string name="new_job">Neue Quelle</string>
     <string name="history">Verlauf</string>
-    <string name="settings">Einstellungen</string>
+    <string name="settings">Mehr</string>
+    <string name="app_language">App-Sprache</string>
+    <string name="language_german" translatable="false">Deutsch</string>
+    <string name="language_english" translatable="false">English</string>
     <string name="source_hint">YouTube-Link oder geteilter Text</string>
     <string name="source_help">Explizite Videos werden vollständig verarbeitet. Zeitmarken werden nicht als Ausschnitt verwendet.</string>
     <string name="inspect_source">Quelle prüfen</string>
@@ -15,7 +18,7 @@
     <string name="provider">Anbieter</string>
     <string name="model">Modell</string>
     <string name="no_provider">Noch kein Anbieter</string>
-    <string name="no_provider_help">Untertitel sind möglich. Für STT zuerst einen eigenen API-Schlüssel in den Einstellungen hinterlegen.</string>
+    <string name="no_provider_help">Für YouTube-Untertitel ist kein Anbieter nötig. Für STT zuerst einen eigenen API-Schlüssel in den Einstellungen hinterlegen.</string>
     <string name="advanced">Expertenoptionen</string>
     <string name="original_language">Originalsprache bevorzugen</string>
     <string name="uploader_captions">Vom Kanal bereitgestellte Untertitel</string>
@@ -30,7 +33,6 @@
     <string name="context_terms">Kontextbegriffe, jeweils eine Zeile</string>
     <string name="retain_raw">Originaldaten zusätzlich aufbewahren</string>
     <string name="unmetered">Nur ungetaktete Verbindungen</string>
-    <string name="upload_approval">Ich erlaube die Übermittlung dieser Audiodaten an den ausgewählten Anbieter und mögliche Kosten.</string>
     <string name="upload_help">Ein lokal abgebrochener Auftrag kann beim Anbieter weiterlaufen. Kosten werden nicht automatisch erneut ausgelöst.</string>
     <string name="duration_limit">Maximale Audiodauer in Minuten</string>
     <string name="cost_limit">Budget in US-Dollar (leer: kein lokales Limit)</string>
@@ -119,9 +121,9 @@
     <string name="audio_temporary">Nur technisch notwendig</string>
     <string name="audio_until_persisted">Bis zur Transkript-Sicherung</string>
     <string name="audio_keep">Dauerhaft behalten</string>
-    <string name="missing_provider">STT erfordert Anbieter, Modell, Schlüssel und Upload-Freigabe.</string>
+    <string name="missing_provider">STT erfordert einen Anbieter, ein Modell und einen passenden gespeicherten Schlüssel.</string>
     <string name="choose_audio_help">Die gewählte Audioversion kann vom Original abweichen.</string>
-    <string name="privacy">Keine Telemetrie. Schlüssel bleiben auf diesem Gerät. Externe STT überträgt Audio nur nach deiner Freigabe.</string>
+    <string name="privacy">Keine Telemetrie. Schlüssel bleiben auf diesem Gerät. Externe STT beginnt erst, wenn du den Auftrag startest.</string>
     <string name="estimated_cost">Geschätzter Basispreis: %1$s USD · Tarifstand %2$s</string>
     <string name="price_unknown">Preis unbekannt – kein kostenloses Versprechen</string>
     <string name="restore_key">Dieser Auftrag benötigt seinen ursprünglichen Schlüssel. Öffne Einstellungen und wähle „Fehlenden Schlüssel wiederherstellen“ für denselben Anbieter und dieselbe Region.</string>
@@ -165,7 +167,7 @@
     <string name="translation_value">Übersetzung: %1$s</string>
     <string name="audio_track_value">Audiospur: %1$s</string>
     <string name="caption_track_value">Untertitelspur: %1$s</string>
-    <string name="copy_large_help">Für die Android-Zwischenablage wird dieser lange Text in vollständige, aufeinanderfolgende Abschnitte geteilt. Wähle den gewünschten Abschnitt oder teile die gesamte Datei.</string>
+    <string name="copy_large_help">Großer Text: Kopiere einen Abschnitt oder teile die vollständige Datei.</string>
     <string name="external_stt">Externe Transkription</string>
     <string name="origin_uploader">YouTube · vom Kanal bereitgestellt</string>
     <string name="origin_automatic">YouTube · automatisch erzeugt</string>
@@ -203,7 +205,7 @@
     <string name="missing_retry_data">Die geprüften Audiodaten oder Antworten für diese Teilwiederholung fehlen oder wurden verändert. Das alte Ergebnis bleibt erhalten. Eine vollständige neue Ausführung muss separat bestätigt werden und kann erneut Kosten verursachen.</string>
     <string name="key_unavailable_help">Der gespeicherte Schlüssel ist gesperrt oder beschädigt. Entsperre das Gerät und versuche es erneut. Falls der Fehler bleibt, ersetze den Schlüssel in Einstellungen für denselben Anbieter und dieselbe Region und setze den Auftrag danach ausdrücklich fort.</string>
     <string name="key_storage_help">Der Schlüssel konnte nicht sicher gespeichert oder gelesen werden. Prüfe den freien Gerätespeicher und versuche es erneut. Vorhandene Aufträge behalten ihre Schlüsselreferenz.</string>
-    <string name="missing_retry_response_saved">Für einen fehlenden Abschnitt liegt bereits eine Providerantwort vor. „Nur Fehlendes“ ist gesperrt, damit diese Antwort keine weiteren Kosten verursacht. Das vorhandene Teilergebnis bleibt erhalten.</string>
+    <string name="missing_retry_response_saved">Für einen fehlenden Abschnitt liegt bereits eine Providerantwort vor. „Fehlenden Zweig erneut versuchen“ ist gesperrt, damit diese Antwort keine weiteren Kosten verursacht. Das vorhandene Teilergebnis bleibt erhalten.</string>
     <string name="job_config_invalid">Die gespeicherten Auftragseinstellungen sind beschädigt. Dieser Auftrag wird nicht automatisch fortgesetzt. Vorhandene Ergebnisse und andere Aufträge bleiben erhalten.</string>
     <string name="artifact_file_missing">Die intern gespeicherte Ergebnisdatei fehlt oder wurde nicht vollständig gesichert. Andere Ergebnisse bleiben erhalten. Es wird keine neue Transkription automatisch angefordert.</string>
 </resources>

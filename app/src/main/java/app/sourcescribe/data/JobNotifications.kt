@@ -28,6 +28,7 @@ class JobNotifications @Inject constructor(
     fun update(job: JobRow, attempts: List<AttemptRow>) {
         if (!notificationsAllowed()) return
         ensureChannel()
+        val localized = ContextCompat.getContextForLanguage(context)
         val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName) ?: return
         val phase = attempts
             .firstOrNull { it.state in ACTIVE_STATES }
@@ -35,9 +36,9 @@ class JobNotifications @Inject constructor(
             ?: attempts.firstOrNull { it.state !in TERMINAL_STATES }?.phase
             ?: attempts.maxByOrNull { it.createdAt }?.phase
             ?: Phase.RESOLVE
-        val stateLabel = context.getString(stateResource(job.state))
-        val phaseLabel = context.getString(phaseResource(phase))
-        val outcomeLabel = if (job.outcome == Outcome.NONE) null else context.getString(outcomeResource(job.outcome))
+        val stateLabel = localized.getString(stateResource(job.state))
+        val phaseLabel = localized.getString(phaseResource(phase))
+        val outcomeLabel = if (job.outcome == Outcome.NONE) null else localized.getString(outcomeResource(job.outcome))
         val text = listOfNotNull(stateLabel, phaseLabel, outcomeLabel).joinToString(" · ")
         val ongoing = job.state in ACTIVE_STATES
         val pendingIntent = PendingIntent.getActivity(

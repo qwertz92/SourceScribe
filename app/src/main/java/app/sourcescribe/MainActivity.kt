@@ -7,11 +7,15 @@ import android.content.Intent
 import androidx.core.net.toUri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.os.LocaleListCompat
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.layout.*
@@ -22,15 +26,23 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Constraints
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.sourcescribe.core.*
@@ -50,7 +62,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
 
 @AndroidEntryPoint
-class MainActivity : ComponentActivity() {
+class MainActivity : AppCompatActivity() {
     private val incoming = mutableStateOf("")
     private val shareSerial = mutableIntStateOf(0)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -93,8 +105,12 @@ private fun SourceScribeApp(incoming: String, shareSerial: Int, model: MainViewM
             }
         }
     }
-    val colors = if (dark) darkColorScheme(primary = Color(0xff77d6c5), secondary = Color(0xffb6c9c6))
-        else lightColorScheme(primary = Color(0xff006b5c), secondary = Color(0xff41665e), surface = Color(0xfff8faf8))
+    val colors = if (dark) darkColorScheme(primary = Color(0xff77d6c5), onPrimary = Color(0xff00382f),
+        secondary = Color(0xffb6c9c6), secondaryContainer = Color(0xff334c46), onSecondaryContainer = Color(0xffcbe8df))
+        else lightColorScheme(primary = Color(0xff006b5c), onPrimary = Color.White, secondary = Color(0xff41665e),
+            secondaryContainer = Color(0xffdcefe8), onSecondaryContainer = Color(0xff103d32),
+            surface = Color(0xfff8faf8), background = Color(0xfff8faf8))
+    val navigationLabelWidth = (with(LocalDensity.current) { LocalWindowInfo.current.containerSize.width.toDp() } - 24.dp) / 3
     var page by rememberSaveable { mutableIntStateOf(0) }
     var input by rememberSaveable { mutableStateOf("") }
     val config = state.draft ?: settings.defaults
@@ -132,8 +148,10 @@ private fun SourceScribeApp(incoming: String, shareSerial: Int, model: MainViewM
             NavigationBar {
                 listOf(R.string.new_job, R.string.history, R.string.settings).forEachIndexed { index, label ->
                     NavigationBarItem(selected = page == index, onClick = { page = index },
-                        icon = { Text((index + 1).toString().padStart(2, '0'), fontWeight = FontWeight.Bold) },
-                        label = { Text(stringResource(label)) })
+                        icon = { Icon(painterResource(when (index) { 0 -> R.drawable.ic_add; 1 -> R.drawable.ic_history; else -> R.drawable.ic_settings }),
+                            contentDescription = null, modifier = Modifier.size(24.dp)) },
+                        label = { Text(stringResource(label), Modifier.widthIn(max = navigationLabelWidth), minLines = 2, maxLines = 2,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center) })
                 }
             }
         }) { insets ->
@@ -192,8 +210,10 @@ private fun NewSource(input: String, setInput: (String) -> Unit, config: JobConf
         }
         item { ConfigControls(config, change, state.credentials.map { Triple(it.id, it.provider, it.region) }, state.previews.any { it.resolved.source.kind == SourceKind.LOCAL_AUDIO }, enabled = !state.starting) }
         item {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Button(inspect, Modifier.fillMaxWidth().heightIn(min = 52.dp), enabled = input.isNotBlank() && !state.busy) { Text(stringResource(R.string.inspect_source)) }
             OutlinedButton(onImport, Modifier.fillMaxWidth().heightIn(min = 52.dp), enabled = !state.busy) { Text(stringResource(R.string.import_audio)) }
+            }
         }
         if (state.previews.isNotEmpty()) {
             item { SectionTitle(R.string.preview) }
@@ -233,10 +253,15 @@ private fun NewSource(input: String, setInput: (String) -> Unit, config: JobConf
                 }
             }
             item {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (state.previews.any { it.config.provider != null && it.config.mode != AcquisitionMode.CAPTIONS_ONLY }) {
+                    Text(stringResource(R.string.upload_help), style = MaterialTheme.typography.bodySmall)
+                }
                 Button(onStart, Modifier.fillMaxWidth().heightIn(min = 52.dp), enabled = !state.busy && state.previews.all {
                     MainViewModel.previewError(it, state.credentials) == null
                 }) { Text(stringResource(R.string.start_jobs)) }
                 TextButton(onCancelPreview, Modifier.fillMaxWidth(), enabled = !state.starting) { Text(stringResource(R.string.cancel)) }
+                }
             }
         }
     }
@@ -261,8 +286,6 @@ private fun ConfigControls(config: JobConfig, change: (JobConfig) -> Unit, crede
                     keys, { "${regionName(it.third)} · ••••${it.first.takeLast(4)}" }, enabled = enabled) { change(config.copy(credentialId = it.first, region = it.third, uploadApproved = false)) }
             }
             if (config.credentialId == null) Text(stringResource(R.string.no_provider_help), style = MaterialTheme.typography.bodySmall)
-            Toggle(R.string.upload_approval, config.uploadApproved && credentials.any { it.first == config.credentialId }, enabled = enabled && credentials.any { it.first == config.credentialId && it.second == config.provider && it.third == config.region }) { change(config.copy(uploadApproved = it)) }
-            Text(stringResource(R.string.upload_help), style = MaterialTheme.typography.bodySmall)
         }
         TextButton({ advanced = !advanced }, enabled = enabled) { Text(stringResource(R.string.advanced)) }
         if (advanced) {
@@ -416,10 +439,11 @@ private fun History(jobs: List<JobRow>, sources: List<SourceRow>, attempts: List
 
 @Composable
 private fun ConfirmationDialog(title: String, explanation: String, close: () -> Unit, confirm: () -> Unit) {
+    val maximumHeight = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() } * 0.85f
     androidx.compose.ui.window.Dialog(close) {
         Surface(shape = MaterialTheme.shapes.large) {
-            Column(Modifier.fillMaxWidth().fillMaxHeight(0.85f).padding(20.dp)) {
-                LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Column(Modifier.fillMaxWidth().heightIn(max = maximumHeight).padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                LazyColumn(Modifier.weight(1f, fill = false), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     item { Text(title, style = MaterialTheme.typography.titleLarge) }
                     item { Text(explanation) }
                     item { Button(confirm, Modifier.fillMaxWidth()) { Text(title) } }
@@ -450,6 +474,7 @@ private fun SettingsScreen(settings: AppSettings, config: JobConfig, state: Scre
     var presetName by rememberSaveable { mutableStateOf("") }
     var probe by rememberSaveable { mutableStateOf("") }
     val context = LocalContext.current
+    val appLanguage = LocalConfiguration.current.locales[0].language.let { if (it == "en") "en" else "de" }
     val folder = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri != null) {
             try {
@@ -460,6 +485,14 @@ private fun SettingsScreen(settings: AppSettings, config: JobConfig, state: Scre
         }
     }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Choice(stringResource(R.string.app_language), languageName(appLanguage), listOf("de", "en"), { languageName(it) }, enabled = !state.busy) {
+                    AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(it))
+                }
+                Choice(stringResource(R.string.appearance), themeName(settings.theme), listOf("SYSTEM", "LIGHT", "DARK"), { themeName(it) }) { value -> model.changeSettings { it.copy(theme = value) } }
+            }
+        }
         item { Text(stringResource(R.string.privacy)); SectionTitle(R.string.credentials) }
         item {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -495,18 +528,20 @@ private fun SettingsScreen(settings: AppSettings, config: JobConfig, state: Scre
             }
         }
         item {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionTitle(R.string.defaults)
             Button({ model.saveDefaults(config) }) { Text(stringResource(R.string.save_defaults)) }
             OutlinedTextField(presetName, { presetName = it.take(80) }, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.preset_name)) })
             TextButton({ model.savePreset(presetName, config); presetName = "" }, enabled = presetName.isNotBlank()) { Text(stringResource(R.string.save_preset)) }
             TextButton({ folder.launch(null) }) { Text(stringResource(R.string.export_tree)) }
             Text(if (config.exportTreeUri == null) stringResource(R.string.no_export_tree) else stringResource(R.string.export_saved), style = MaterialTheme.typography.bodySmall)
+            }
         }
         item {
-            SectionTitle(R.string.appearance)
-            Choice(stringResource(R.string.appearance), themeName(settings.theme), listOf("SYSTEM", "LIGHT", "DARK"), { themeName(it) }) { value -> model.changeSettings { it.copy(theme = value) } }
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Choice(stringResource(R.string.storage_limit), "${settings.storageLimitBytes / 1024 / 1024} MiB", listOf(256L, 512L, 1024L, 2048L, 4096L, 8192L, 16384L, 32768L), { "$it MiB" }) { limit -> model.changeSettings { it.copy(storageLimitBytes = limit * 1024 * 1024) } }
             Choice(stringResource(R.string.parallel_jobs), settings.parallelJobs.toString(), (1..4).toList(), { it.toString() }) { count -> model.changeSettings { it.copy(parallelJobs = count) } }
+            }
         }
         item {
             SectionTitle(R.string.diagnostics)
@@ -596,10 +631,11 @@ private fun TranscriptDialog(document: TranscriptDocument, close: () -> Unit, sh
             }
         }
     }
+    val maximumActionsHeight = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() } * 0.8f
     if (showActions) androidx.compose.ui.window.Dialog({ showActions = false }) {
         Surface(shape = MaterialTheme.shapes.large) {
-            Column(Modifier.fillMaxWidth().fillMaxHeight(0.8f).padding(16.dp)) {
-                LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(Modifier.fillMaxWidth().heightIn(max = maximumActionsHeight).padding(16.dp)) {
+                LazyColumn(Modifier.weight(1f, fill = false), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     item { Text(stringResource(R.string.result_actions), style = MaterialTheme.typography.titleLarge) }
                     item {
                         TextButton({ showActions = false; if (copyRanges.size == 1) copyPart(copyRanges.single()) else chooseCopyPart = true },
@@ -638,19 +674,39 @@ private fun TranscriptDialog(document: TranscriptDocument, close: () -> Unit, sh
 @Composable
 private fun <T> Choice(label: String, selected: String, options: List<T>, name: @Composable (T) -> String, enabled: Boolean = true, choose: (T) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
-    OutlinedButton({ expanded = true }, Modifier.fillMaxWidth().heightIn(min = 56.dp), shape = MaterialTheme.shapes.small, enabled = enabled) {
-        Column(Modifier.fillMaxWidth()) {
-            Text(label, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-            Text(selected, style = MaterialTheme.typography.bodyLarge, minLines = 2, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+    val optionNames = options.map { name(it) }
+    val valueStyle = MaterialTheme.typography.bodyLarge
+    val textMeasurer = rememberTextMeasurer()
+    val maximumDialogHeight = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() } * 0.7f
+    Surface(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp).semantics { role = Role.Button },
+        shape = MaterialTheme.shapes.small, enabled = enabled,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        color = MaterialTheme.colorScheme.surface,
+        contentColor = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)) {
+        Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                BoxWithConstraints(Modifier.fillMaxWidth()) {
+                    // Reserve the tallest option at the actual font/width so selection never moves its neighbours.
+                    val valueHeightPx = remember(optionNames, selected, valueStyle, constraints.maxWidth, textMeasurer) {
+                        (optionNames + selected).maxOf { value ->
+                            textMeasurer.measure(value, valueStyle, constraints = Constraints(maxWidth = constraints.maxWidth)).size.height
+                        }
+                    }
+                    Text(selected, Modifier.heightIn(min = with(LocalDensity.current) { valueHeightPx.toDp() }), style = valueStyle)
+                }
+            }
+            Icon(painterResource(R.drawable.ic_expand_more), contentDescription = null, modifier = Modifier.size(24.dp))
         }
     }
     if (expanded && enabled) androidx.compose.ui.window.Dialog({ expanded = false }) {
         Surface(shape = MaterialTheme.shapes.large) {
-            Column(Modifier.fillMaxWidth().fillMaxHeight(0.65f).padding(16.dp)) {
-                LazyColumn(Modifier.weight(1f)) {
-                    item { Text(label, style = MaterialTheme.typography.titleLarge) }
+            Column(Modifier.fillMaxWidth().heightIn(max = maximumDialogHeight).padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(label, style = MaterialTheme.typography.titleLarge, modifier = Modifier.semantics { heading() })
+                LazyColumn(Modifier.weight(1f, fill = false), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     items(options.size) { index ->
-                    TextButton({ choose(options[index]); expanded = false }, Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(name(options[index]), Modifier.fillMaxWidth()) }
+                    TextButton({ choose(options[index]); expanded = false }, Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(optionNames[index], Modifier.fillMaxWidth()) }
                 } }
                 TextButton({ expanded = false }, Modifier.fillMaxWidth()) { Text(stringResource(R.string.cancel)) }
             }
@@ -659,7 +715,7 @@ private fun <T> Choice(label: String, selected: String, options: List<T>, name: 
 }
 
 @Composable private fun Toggle(label: Int, checked: Boolean, enabled: Boolean = true, change: (Boolean) -> Unit) {
-    Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).toggleable(value = checked, enabled = enabled, role = Role.Switch, onValueChange = change), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).toggleable(value = checked, enabled = enabled, role = Role.Switch, onValueChange = change), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(stringResource(label), Modifier.weight(1f).padding(vertical = 12.dp))
         Switch(checked, null, enabled = enabled)
     }
@@ -673,6 +729,7 @@ private fun providerName(value: Provider): String = when (value) { Provider.ASSE
 @Composable private fun modeName(mode: AcquisitionMode) = stringResource(modeLabel(mode))
 private fun modeLabel(mode: AcquisitionMode) = when (mode) { AcquisitionMode.CAPTIONS_ONLY -> R.string.mode_captions_only; AcquisitionMode.CAPTIONS_THEN_STT -> R.string.mode_captions_then_stt; AcquisitionMode.STT_ONLY -> R.string.mode_stt_only; AcquisitionMode.BOTH -> R.string.mode_both }
 @Composable private fun themeName(theme: String) = stringResource(when (theme) { "DARK" -> R.string.theme_dark; "LIGHT" -> R.string.theme_light; else -> R.string.theme_system })
+@Composable private fun languageName(language: String) = stringResource(if (language == "en") R.string.language_english else R.string.language_german)
 @Composable private fun audioRetentionName(value: AudioRetention) = stringResource(when (value) { AudioRetention.TEMPORARY -> R.string.audio_temporary; AudioRetention.UNTIL_PERSISTED -> R.string.audio_until_persisted; AudioRetention.KEEP -> R.string.audio_keep })
 private fun stateLabel(state: ExecutionState) = when (state) { ExecutionState.QUEUED -> R.string.state_queued; ExecutionState.RUNNING -> R.string.state_running; ExecutionState.WAITING_NETWORK -> R.string.state_waiting_network; ExecutionState.WAITING_RATE_LIMIT -> R.string.state_waiting_rate_limit; ExecutionState.WAITING_USER -> R.string.state_waiting_user; ExecutionState.WAITING_REMOTE -> R.string.state_waiting_remote; ExecutionState.SUBMISSION_UNCERTAIN -> R.string.state_submission_uncertain; ExecutionState.FINISHED -> R.string.state_finished; ExecutionState.CANCELLED -> R.string.state_cancelled }
 private fun outcomeLabel(outcome: Outcome) = when (outcome) { Outcome.NONE -> R.string.outcome_none; Outcome.SUCCESS -> R.string.outcome_success; Outcome.SUCCESS_WITH_WARNINGS -> R.string.outcome_success_with_warnings; Outcome.PARTIAL_SUCCESS -> R.string.outcome_partial_success; Outcome.FAILED -> R.string.outcome_failed; Outcome.CANCELLED -> R.string.outcome_cancelled }

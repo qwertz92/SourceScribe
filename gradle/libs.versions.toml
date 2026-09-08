@@ -20,6 +20,7 @@ work = "2.11.2"
 datastore = "1.2.1"
 androidx-hilt = "1.4.0"
 core-ktx = "1.19.0"
+appcompat = "1.8.0"
 
 [libraries]
 compose-bom = { module = "androidx.compose:compose-bom", version.ref = "compose-bom" }
@@ -56,6 +57,7 @@ work-runtime = { module = "androidx.work:work-runtime-ktx", version.ref = "work"
 work-testing = { module = "androidx.work:work-testing", version.ref = "work" }
 datastore = { module = "androidx.datastore:datastore-preferences", version.ref = "datastore" }
 core-ktx = { module = "androidx.core:core-ktx", version.ref = "core-ktx" }
+appcompat = { module = "androidx.appcompat:appcompat", version.ref = "appcompat" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

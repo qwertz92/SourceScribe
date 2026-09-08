@@ -46,7 +46,7 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class UiFixtureTest {
     @Test
-    fun seedSyntheticUiFixtureForAdbViewer() = runBlocking {
+    fun seedSyntheticUiFixtureForAdbViewer(): Unit = runBlocking {
         assumeTrue(
             "Ui fixture is opt-in: pass sourcescribeUiFixture=true",
             InstrumentationRegistry.getArguments().getString("sourcescribeUiFixture") == "true",
@@ -105,7 +105,9 @@ class UiFixtureTest {
             val stored = artifacts.write(document)
             database.withTransaction {
                 val dao = database.records()
-                check(dao.insertSource(SourceRow(source.id, json.encodeToString(source), requireNotNull(source.title))) == 1L)
+                check(dao.insertSource(SourceRow(source.id, json.encodeToString(source), requireNotNull(source.title))) != -1L) {
+                    "synthetic source was unexpectedly already present"
+                }
                 dao.insertJob(job)
                 dao.insertAttempt(attempt)
                 dao.insertArtifact(
