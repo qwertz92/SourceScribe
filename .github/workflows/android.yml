@@ -109,7 +109,7 @@ jobs:
           timeout 20 avdmanager list avd -c | grep -Fxq 'sourcescribe-ci'
           timeout 1200 "$ANDROID_HOME/emulator/emulator" \
             -avd sourcescribe-ci -no-window -no-audio -no-snapshot \
-            -gpu software -accel on -memory 2048 -cores 2 -no-boot-anim \
+            -gpu software -accel on -memory 4096 -cores 2 -no-boot-anim \
             > emulator.log 2>&1 &
           emulator_pid=$!
           cleanup() {
@@ -117,6 +117,25 @@ jobs:
             if [[ "$result" -ne 0 ]]; then
               tail -n 160 emulator.log || true
               timeout 15 adb devices -l || true
+              timeout 45 python3 - <<'PY_REPORT' || true
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          for module in ("app", "extractor"):
+              directory = Path(module) / "build/outputs/androidTest-results"
+              for path in sorted(directory.rglob("*")):
+                  if path.suffix == ".xml":
+                      print(f"TEST REPORT: {path}")
+                      try:
+                          root = ET.parse(path).getroot()
+                          print(root.attrib)
+                          for failure in (*root.iter("failure"), *root.iter("error")):
+                              print(ET.tostring(failure, encoding="unicode")[:12000])
+                      except ET.ParseError as error:
+                          print(f"Invalid XML: {error}")
+                  elif path.suffix == ".log":
+                      print(f"TEST LOG: {path}")
+                      print(path.read_text(errors="replace")[-12000:])
+          PY_REPORT
             fi
             timeout 15 adb -s emulator-5554 emu kill >/dev/null 2>&1 || true
             kill "$emulator_pid" 2>/dev/null || true
