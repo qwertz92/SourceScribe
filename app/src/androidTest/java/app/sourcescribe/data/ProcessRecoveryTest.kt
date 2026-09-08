@@ -2,6 +2,10 @@ package app.sourcescribe.data
 
 import android.content.Context
 import android.content.ContextWrapper
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import androidx.core.net.toUri
 import android.os.Process
 import android.util.Log
 import androidx.room.Room
@@ -206,6 +210,135 @@ class ProcessRecoveryTest {
         assertFalse(root.exists())
     }
 
+    @Test
+    fun stage1PersistsRevokedLocalAudioImport() {
+        val base = requireStage(IMPORT_STAGE_ONE)
+        val root = File(base.noBackupFilesDir, IMPORT_ROOT_NAME)
+        assertFalse("pending audio import fixture already exists: run stage 2 or inspect it", root.exists())
+        assertTrue("could not create isolated audio import fixture root", root.mkdir())
+        val context = IsolatedContext(base, root)
+        var evidence: ImportEvidence? = null
+        var providerReset = false
+        try {
+            val treeUri = providerAdmin {
+                ExportFixtureProvider.configure(base, ExportFixtureProvider.Mode.SUCCESS, base.packageName)
+            }
+            val documentUri = providerAdmin {
+                ExportFixtureProvider.seedDocument(base, IMPORT_DOCUMENT_NAME, AudioImportFixtureProvider.WAV_BYTES)
+            }.toUri()
+            assertTrue("fixture document read grant was not installed", hasReadGrant(base, documentUri))
+
+            val database = Room.databaseBuilder(context, SourceScribeDatabase::class.java, DATABASE_NAME).build()
+            try {
+                runBlocking {
+                    val dao = database.records()
+                    val imported = AudioImport(context, NativeRuntime(base), SettingsStore(context), dao).import(documentUri)
+                    val row = requireNotNull(dao.source(imported.id))
+                    val importedFile = requireNotNull(row.importedPath).let(::File)
+                    val expectedFile = File(context.noBackupFilesDir, "imports/${AudioImportFixtureProvider.WAV_SHA256}.audio")
+
+                    assertEquals("local:${AudioImportFixtureProvider.WAV_SHA256}", imported.id)
+                    assertEquals(SourceKind.LOCAL_AUDIO, imported.kind)
+                    assertEquals(AudioImportFixtureProvider.WAV_SHA256, imported.contentHash)
+                    assertEquals(AudioImportFixtureProvider.WAV_BYTES.size.toLong(), imported.fileBytes)
+                    assertEquals(100L, imported.durationMs)
+                    assertTrue(imported.mimeType.orEmpty().startsWith("audio/"))
+                    assertFalse("durable source snapshot retained the external URI", row.snapshot.contains(documentUri.toString()))
+                    assertEquals(expectedFile.absolutePath, importedFile.absolutePath)
+                    assertTrue("private imported audio is missing", importedFile.isFile)
+                    assertFalse("private imported audio must not be a symbolic link", Files.isSymbolicLink(importedFile.toPath()))
+                    val privateBytes = importedFile.readBytes()
+                    assertArrayEquals(AudioImportFixtureProvider.WAV_BYTES, privateBytes)
+                    assertEquals(AudioImportFixtureProvider.WAV_SHA256, sha256(privateBytes))
+
+                    evidence = ImportEvidence(
+                        stageOnePid = Process.myPid(),
+                        sourceId = imported.id,
+                        contentHash = requireNotNull(imported.contentHash),
+                        fileBytes = requireNotNull(imported.fileBytes),
+                        durationMs = requireNotNull(imported.durationMs),
+                        importedPath = importedFile.absolutePath,
+                        documentUri = documentUri.toString(),
+                        grantBeforeImport = true,
+                        grantAfterRevocation = false,
+                        externalFixtureDeleted = true,
+                    )
+                }
+            } finally {
+                database.close()
+            }
+
+            assertTrue("Room database was not persisted on disk", context.getDatabasePath(DATABASE_NAME).isFile)
+            providerAdmin { ExportFixtureProvider.revokeTreeGrant(base, treeUri) }
+            assertFalse("fixture document grant remained after explicit revocation", hasReadGrant(base, documentUri))
+            providerAdmin { ExportFixtureProvider.reset(base) }
+            providerReset = true
+        } finally {
+            if (!providerReset) {
+                providerAdmin { ExportFixtureProvider.reset(base) }
+            }
+        }
+
+        writeDurably(
+            File(root, IMPORT_EVIDENCE_NAME),
+            json.encodeToString(requireNotNull(evidence)).toByteArray(StandardCharsets.UTF_8),
+        )
+        Log.i(TAG, "stage=import-1 result=COPIED grant=revoked source=deleted db=closed evidence=durable")
+    }
+
+    @Test
+    fun stage2ReopensPrivateAudioAfterGrantAndSourceLoss() {
+        val base = requireStage(IMPORT_STAGE_TWO)
+        val root = File(base.noBackupFilesDir, IMPORT_ROOT_NAME)
+        val evidenceFile = File(root, IMPORT_EVIDENCE_NAME)
+        assertTrue("audio import stage 1 evidence is missing", evidenceFile.isFile)
+        val evidenceBytes = readBounded(evidenceFile)
+        val evidence = json.decodeFromString<ImportEvidence>(evidenceBytes.toString(StandardCharsets.UTF_8))
+        assertNotEquals("audio import stage 2 must run in a new instrumentation process", evidence.stageOnePid, Process.myPid())
+        assertTrue(evidence.grantBeforeImport)
+        assertFalse(evidence.grantAfterRevocation)
+        assertTrue(evidence.externalFixtureDeleted)
+        assertEquals(AudioImportFixtureProvider.WAV_SHA256, evidence.contentHash)
+        assertEquals(AudioImportFixtureProvider.WAV_BYTES.size.toLong(), evidence.fileBytes)
+        assertEquals(100L, evidence.durationMs)
+        val documentUri = evidence.documentUri.toUri()
+        assertFalse("revoked fixture grant unexpectedly returned in the new process", hasReadGrant(base, documentUri))
+
+        val context = IsolatedContext(base, root)
+        assertTrue("Room database from audio import stage 1 is missing", context.getDatabasePath(DATABASE_NAME).isFile)
+        val database = Room.databaseBuilder(context, SourceScribeDatabase::class.java, DATABASE_NAME).build()
+        try {
+            runBlocking {
+                val row = requireNotNull(database.records().source(evidence.sourceId))
+                val source = json.decodeFromString<Source>(row.snapshot)
+                val importedFile = requireNotNull(row.importedPath).let(::File)
+                val expectedFile = File(context.noBackupFilesDir, "imports/${evidence.contentHash}.audio")
+
+                assertEquals(evidence.sourceId, source.id)
+                assertEquals(SourceKind.LOCAL_AUDIO, source.kind)
+                assertEquals(evidence.contentHash, source.contentHash)
+                assertEquals(evidence.fileBytes, source.fileBytes)
+                assertEquals(evidence.durationMs, source.durationMs)
+                assertTrue(source.mimeType.orEmpty().startsWith("audio/"))
+                assertFalse("reopened source snapshot retained the external URI", row.snapshot.contains(evidence.documentUri))
+                assertEquals(evidence.importedPath, importedFile.absolutePath)
+                assertEquals(expectedFile.absolutePath, importedFile.absolutePath)
+                assertTrue("reopened private imported audio is missing", importedFile.isFile)
+                assertFalse("reopened private imported audio must not be a symbolic link", Files.isSymbolicLink(importedFile.toPath()))
+                val privateBytes = importedFile.readBytes()
+                assertArrayEquals(AudioImportFixtureProvider.WAV_BYTES, privateBytes)
+                assertEquals(evidence.contentHash, sha256(privateBytes))
+                assertArrayEquals(evidenceBytes, readBounded(evidenceFile))
+            }
+        } finally {
+            database.close()
+        }
+        assertArrayEquals(evidenceBytes, readBounded(evidenceFile))
+        Log.i(TAG, "stage=import-2 result=PRIVATE_COPY_VERIFIED process_changed=true grant=denied access=room_file_only evidence=unchanged")
+        assertTrue("verified audio import fixture root could not be removed", root.deleteRecursively())
+        assertFalse(root.exists())
+    }
+
     private fun requireStage(expected: String): Context {
         val arguments = InstrumentationRegistry.getArguments()
         assumeTrue("process fixture is opt-in", arguments.getString(OPT_IN_ARGUMENT) == "true")
@@ -399,6 +532,20 @@ class ProcessRecoveryTest {
     )
 
     @Serializable
+    private data class ImportEvidence(
+        val stageOnePid: Int,
+        val sourceId: String,
+        val contentHash: String,
+        val fileBytes: Long,
+        val durationMs: Long,
+        val importedPath: String,
+        val documentUri: String,
+        val grantBeforeImport: Boolean,
+        val grantAfterRevocation: Boolean,
+        val externalFixtureDeleted: Boolean,
+    )
+
+    @Serializable
     private data class FixtureCheckpoint(
         val artifactId: String,
         val artifactCreatedAt: Long,
@@ -428,9 +575,14 @@ class ProcessRecoveryTest {
         private const val STAGE_ARGUMENT = "sourcescribeProcessStage"
         private const val STAGE_ONE = "1"
         private const val STAGE_TWO = "2"
+        private const val IMPORT_STAGE_ONE = "import-1"
+        private const val IMPORT_STAGE_TWO = "import-2"
         private const val ROOT_NAME = "process-recovery-fixture-v1"
+        private const val IMPORT_ROOT_NAME = "process-audio-import-fixture-v1"
         private const val DATABASE_NAME = "process-recovery.db"
         private const val EVIDENCE_NAME = "stage-1-evidence.json"
+        private const val IMPORT_EVIDENCE_NAME = "import-stage-1-evidence.json"
+        private const val IMPORT_DOCUMENT_NAME = "process-audio-import.wav"
         private const val AUDIO_MIME_TYPE = "audio/mpeg"
         private const val AUDIO_BYTES = 4 * 1024
         private const val DURATION_MS = 1_000L
@@ -457,6 +609,20 @@ class ProcessRecoveryTest {
         } catch (_: IllegalStateException) {
             WorkManagerTestInitHelper.initializeTestWorkManager(context)
             WorkManager.getInstance(context)
+        }
+
+        private fun hasReadGrant(context: Context, uri: Uri): Boolean =
+            context.checkUriPermission(uri, Process.myPid(), Process.myUid(), Intent.FLAG_GRANT_READ_URI_PERMISSION) ==
+                PackageManager.PERMISSION_GRANTED
+
+        private inline fun <T> providerAdmin(operation: () -> T): T {
+            val uiAutomation = InstrumentationRegistry.getInstrumentation().uiAutomation
+            uiAutomation.adoptShellPermissionIdentity(ExportFixtureProvider.CONTROL_PERMISSION)
+            return try {
+                operation()
+            } finally {
+                uiAutomation.dropShellPermissionIdentity()
+            }
         }
 
         private fun sha256(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256")

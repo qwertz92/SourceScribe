@@ -1,11 +1,14 @@
 package app.sourcescribe.data
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.ContextWrapper
 import androidx.room.Room
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.work.Data
 import androidx.work.WorkManager
+import androidx.work.impl.WorkManagerImpl
 import androidx.work.testing.WorkManagerTestInitHelper
 import app.sourcescribe.core.AcquisitionMode
 import app.sourcescribe.core.ArtifactFiles
@@ -38,6 +41,7 @@ import java.io.RandomAccessFile
 import java.nio.file.Files
 import java.security.MessageDigest
 import java.util.UUID
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
@@ -45,6 +49,8 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
+import org.json.JSONArray
+import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -81,6 +87,39 @@ class AppPipelineTest {
         coordinator.recover()
         assertFalse(coordinator.run(seeded.caption.id))
         assertEquals(1, dao.artifacts(seeded.job.id).size)
+        assertEquals(0, providerRequests())
+    }
+
+    @Test
+    fun persistedAcquisitionAndExportWorkContainOnlyAttemptId() = withFixture {
+        val canaryUri = "content://fixture/CANARY_URI_MUST_NOT_REACH_WORK_DATA"
+        val canaryApiKey = "CANARY_API_KEY_MUST_NOT_REACH_WORK_DATA"
+        val canaryTranscript = "CANARY_TRANSCRIPT_MUST_NOT_REACH_WORK_DATA"
+        val config = captionConfig().copy(
+            credentialId = canaryApiKey,
+            exportTreeUri = canaryUri,
+        )
+        val seeded = seedCaption(config = config)
+        writeAttemptFile(
+            seeded.caption.id,
+            "normalized.json",
+            json.encodeToString(
+                seeded.document.copy(segments = listOf(Segment(canaryTranscript, 0, 1_000))),
+            ),
+        )
+        fun assertAttemptOnly(input: Data) {
+            assertEquals(mapOf("attemptId" to seeded.caption.id), input.keyValueMap)
+            val persisted = input.keyValueMap.toString()
+            assertFalse(persisted.contains(canaryUri))
+            assertFalse(persisted.contains(canaryApiKey))
+            assertFalse(persisted.contains(canaryTranscript))
+        }
+
+        coordinator.scheduleNext(seeded.caption.id)
+        assertAttemptOnly(persistedWorkInput("attempt:${seeded.caption.id}"))
+
+        assertFalse(coordinator.run(seeded.caption.id))
+        assertAttemptOnly(persistedWorkInput("exports:${seeded.caption.id}"))
         assertEquals(0, providerRequests())
     }
 
@@ -379,6 +418,83 @@ class AppPipelineTest {
         assertEquals(1, callbackCalls)
         assertEquals(beforeAttempt, requireNotNull(dao.attempt(seeded.caption.id)))
         assertEquals(beforeJob, requireNotNull(dao.job(seeded.job.id)))
+        assertEquals(0, providerRequests())
+    }
+
+    @Test
+    fun captionRateLimitRetriesThenWaitsWithoutStartingStt() = withFixture {
+        val seeded = seedCaptionFailure(
+            captionThenSttConfig(fallbackOnCaptionError = false),
+            CaptionFailure.RATE_LIMIT,
+        )
+
+        repeat(4) { retry ->
+            if (retry > 0) {
+                dao.updateAttempt(requireNotNull(dao.attempt(seeded.attempt.id)).copy(nextAt = 0))
+            }
+
+            assertEquals(retry < 3, coordinator.run(seeded.attempt.id))
+            val attempt = requireNotNull(dao.attempt(seeded.attempt.id))
+            assertEquals(
+                if (retry < 3) ExecutionState.WAITING_RATE_LIMIT else ExecutionState.WAITING_USER,
+                attempt.state,
+            )
+            assertEquals("RATE_LIMIT", attempt.error)
+            assertEquals(retry + 1, attempt.retries)
+            assertTrue(dao.attempts(seeded.job.id).none { it.branch == Branch.STT })
+            assertTrue(dao.submissions(seeded.attempt.id).isEmpty())
+            assertEquals(0, providerRequests())
+        }
+
+        assertEquals(ExecutionState.WAITING_USER, requireNotNull(dao.job(seeded.job.id)).state)
+    }
+
+    @Test
+    fun captionParserFailureDoesNotCreateFallbackOutsideExplicitCaptionThenSttOptIn() {
+        val cases = listOf(
+            captionThenSttConfig(fallbackOnCaptionError = false),
+            captionConfig().copy(fallbackOnCaptionError = true),
+            bothConfig().copy(fallbackOnCaptionError = true),
+        )
+        cases.forEach { config ->
+            withFixture {
+                val seeded = seedCaptionFailure(config, CaptionFailure.MALFORMED_VTT)
+                val beforeSttIds = dao.attempts(seeded.job.id)
+                    .filter { it.branch == Branch.STT }
+                    .map { it.id }
+
+                assertFalse(coordinator.run(seeded.attempt.id))
+
+                val caption = requireNotNull(dao.attempt(seeded.attempt.id))
+                assertEquals(config.mode.name, ExecutionState.WAITING_USER, caption.state)
+                assertEquals(config.mode.name, "MALFORMED_INPUT", caption.error)
+                val afterSttIds = dao.attempts(seeded.job.id)
+                    .filter { it.branch == Branch.STT }
+                    .map { it.id }
+                assertEquals(config.mode.name, beforeSttIds, afterSttIds)
+                assertTrue(config.mode.name, dao.submissions(seeded.attempt.id).isEmpty())
+                assertEquals(config.mode.name, 0, providerRequests())
+            }
+        }
+    }
+
+    @Test
+    fun captionParserFailureCreatesFallbackOnlyWithExplicitOptIn() = withFixture {
+        val seeded = seedCaptionFailure(
+            captionThenSttConfig(fallbackOnCaptionError = true),
+            CaptionFailure.MALFORMED_VTT,
+        )
+
+        assertFalse(coordinator.run(seeded.attempt.id))
+
+        val caption = requireNotNull(dao.attempt(seeded.attempt.id))
+        assertEquals(ExecutionState.FINISHED, caption.state)
+        assertEquals(app.sourcescribe.core.Outcome.FAILED, caption.outcome)
+        assertEquals("MALFORMED_INPUT", caption.error)
+        val fallback = dao.attempts(seeded.job.id).single { it.branch == Branch.STT }
+        assertEquals(fallbackAttemptId(seeded.attempt.id), fallback.id)
+        assertEquals(ExecutionState.QUEUED, fallback.state)
+        assertTrue(dao.submissions(fallback.id).isEmpty())
         assertEquals(0, providerRequests())
     }
 
@@ -1454,6 +1570,38 @@ class AppPipelineTest {
             return CaptionSeed(job, attempt, source, config, artifactId, document)
         }
 
+        suspend fun seedCaptionFailure(config: JobConfig, failure: CaptionFailure): AttemptSeed {
+            prepareNativeRuntime()
+            val engineId = installCaptionFixtureEngine(failure)
+            val jobId = UUID.randomUUID().toString()
+            val now = System.currentTimeMillis()
+            val caption = AttemptRow(
+                id = UUID.randomUUID().toString(),
+                jobId = jobId,
+                branch = Branch.CAPTIONS,
+                number = 1,
+                createdAt = now,
+                checkpoint = json.encodeToString(AttemptCheckpoint(source = source)),
+                engineId = engineId,
+            )
+            val attempts = mutableListOf(caption)
+            if (config.mode == AcquisitionMode.BOTH) {
+                attempts += AttemptRow(
+                    id = UUID.randomUUID().toString(),
+                    jobId = jobId,
+                    branch = Branch.STT,
+                    number = 1,
+                    createdAt = now,
+                    checkpoint = json.encodeToString(AttemptCheckpoint(source = source)),
+                    engineId = engineId,
+                )
+            }
+            val job = JobRow(jobId, source.id, json.encodeToString(config), now)
+            dao.createJob(SourceRow(source.id, json.encodeToString(source), "Fixture source"), job, attempts)
+            jobIds += jobId
+            return AttemptSeed(job, caption)
+        }
+
         suspend fun seedBoth(): BothSeed {
             val config = bothConfig()
             val caption = seedCaption(config = config)
@@ -1626,11 +1774,80 @@ class AppPipelineTest {
 
         fun providerRequests(): Int = providerGuard.requestCount
 
+        // WorkInfo 2.11.2 omits request input; this test-only library-group access reads the
+        // WorkSpec that WorkManager actually persisted instead of inspecting the request builder.
+        @SuppressLint("RestrictedApi")
+        fun persistedWorkInput(uniqueName: String): Data {
+            val info = workManager.getWorkInfosForUniqueWork(uniqueName)
+                .get(30, TimeUnit.SECONDS)
+                .single()
+            val implementation = workManager as WorkManagerImpl
+            return requireNotNull(
+                implementation.workDatabase.workSpecDao().getWorkSpec(info.id.toString()),
+            ).input
+        }
+
         suspend fun prepareNativeRuntime() {
             NativeRuntime(base).initialize()
             val actualRuntime = File(base.noBackupFilesDir, runtimeLink.name)
             check(actualRuntime.isDirectory)
             Files.createSymbolicLink(runtimeLink.toPath(), actualRuntime.toPath())
+        }
+
+        private fun installCaptionFixtureEngine(failure: CaptionFailure): String {
+            val script = """
+                # SourceScribe T05 Android instrumentation fixture; never packaged in production.
+                import json
+                import pathlib
+                import sys
+
+                video_id = "$SOURCE_VIDEO_ID"
+                if "--dump-single-json" in sys.argv:
+                    print(json.dumps({
+                        "id": video_id,
+                        "title": "T05 fixture source",
+                        "duration": 1,
+                        "language": "en",
+                        "subtitles": {"en": [{
+                            "ext": "vtt",
+                            "name": "English",
+                            "url": f"https://www.youtube.com/api/timedtext?v={video_id}&lang=en",
+                        }]},
+                    }))
+                    sys.exit(0)
+                if "--load-info-json" in sys.argv:
+                    if "${failure.name}" == "RATE_LIMIT":
+                        sys.stderr.write("HTTP Error 429: Too Many Requests")
+                        sys.exit(1)
+                    info = pathlib.Path(sys.argv[sys.argv.index("--load-info-json") + 1])
+                    (info.parent / f"{video_id}.en.vtt").write_text("not a WEBVTT document", encoding="utf-8")
+                    print(f"SS_SOURCE_ID={video_id}")
+                    sys.exit(0)
+                sys.exit(64)
+            """.trimIndent().toByteArray(Charsets.UTF_8)
+            val id = sha256(script)
+            val enginesDirectory = File(context.noBackupFilesDir, "engines").also { check(it.mkdirs()) }
+            val slot = File(enginesDirectory, id).also { check(it.mkdirs()) }
+            File(slot, "yt-dlp").writeBytes(script)
+            val installation = JSONObject()
+                .put("id", id)
+                .put("version", "t05-fixture")
+                .put("ejsVersion", "t05-fixture")
+                .put("channel", "STABLE")
+                .put("sha256", id)
+                .put("healthy", true)
+                .put("bundled", false)
+            File(enginesDirectory, "state.json").writeText(
+                JSONObject()
+                    .put("active", id)
+                    .put("previous", JSONObject.NULL)
+                    .put("healthy", JSONArray().put(id))
+                    .put("installations", JSONArray().put(installation))
+                    .put("lastCheckedMs", 0)
+                    .put("nextAllowedMs", 0)
+                    .toString(),
+            )
+            return id
         }
 
         fun close() {
@@ -1696,6 +1913,8 @@ class AppPipelineTest {
         val attempt: AttemptRow,
     )
 
+    private enum class CaptionFailure { RATE_LIMIT, MALFORMED_VTT }
+
     private data class LocalSeed(
         val job: JobRow,
         val attempt: AttemptRow,
@@ -1720,6 +1939,17 @@ class AppPipelineTest {
 
         private fun captionConfig() = JobConfig(
             mode = AcquisitionMode.CAPTIONS_ONLY,
+            exportFormats = setOf(ExportFormat.MARKDOWN),
+            audioRetention = AudioRetention.UNTIL_PERSISTED,
+        )
+
+        private fun captionThenSttConfig(fallbackOnCaptionError: Boolean) = JobConfig(
+            mode = AcquisitionMode.CAPTIONS_THEN_STT,
+            provider = Provider.GROQ,
+            model = app.sourcescribe.core.providers.GroqAdapter.MODEL_TURBO,
+            region = Region.US,
+            uploadApproved = true,
+            fallbackOnCaptionError = fallbackOnCaptionError,
             exportFormats = setOf(ExportFormat.MARKDOWN),
             audioRetention = AudioRetention.UNTIL_PERSISTED,
         )
