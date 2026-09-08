@@ -1,6 +1,6 @@
 # Implementierungs- und Nachweischeckliste
 
-Stand: 8. September 2026. **PAUSIERT auf Nutzerwunsch.** Endzustände je Arbeitspaket: `complete`, `no_change`,
+Stand: 8. September 2026. **Persönlicher Preview-Abschluss, danach PAUSE.** Endzustände je Arbeitspaket: `complete`, `no_change`,
 `blocked`, `conflict`. Bis zum Nachweis bleibt ein Paket offen. Die Prüflabels
 IMPLEMENTED / TESTED_WITH_FIXTURES / LIVE_VERIFIED sind keine austauschbaren Begriffe.
 
@@ -15,13 +15,13 @@ IMPLEMENTED / TESTED_WITH_FIXTURES / LIVE_VERIFIED sind keine austauschbaren Beg
 | P1 | Echter Share → Caption → Herkunft → Room → MD/SAF → Viewer/Teilen | Hauptagent | complete |
 | P2 Implementierung/Fixtures | Groq, Import, Vorbereitung/Chunks, Credentials, Submissiongrenzen | Hauptagent | complete |
 | P3 Implementierung/Fixtures | AssemblyAI/OpenAI, vier Modi, Tracks/Optionen/Presets, Teilfehler | Hauptagent | complete |
-| P4 Implementierung/Fixtures | Queue/Limits, Recovery/Unsicherheit, Exportreparatur, Updategrenzen; Gesamtlauf r77 | Hauptagent | complete |
+| P4 Implementierung/Fixtures | Queue/Limits, Recovery/Unsicherheit, Exportreparatur, Updategrenzen; Gesamtlauf r81 | Hauptagent | complete |
 | P5 UI-Feedback | Feld-/Buttonabstände, de/en, System/Hell/Dunkel, Startfreigabe ohne allgemeinen Uploadschalter, tatsächliche Screenshotkritik | Hauptagent/Astra | complete |
 | P5 Viewer/Export | 10.000 Segmente, Suche/Share/Kopierauswahl, keine erfundenen Zeitformate; SAF-Fehlerregressionen | Hauptagent | complete |
 | P5 TalkBack | Semantik und Dialogaktivierung geprüft; vollständige TalkBack-Traversierung mit verfügbarer Eingabeautomation nicht möglich | Toolinggrenze | blocked |
-| P5 Signing | Signierskript mit temporärem Testkey geprüft; kein dauerhafter persönlicher Key vorhanden | Persönlicher Schlüssel fehlt | blocked |
+| P5 Signing | Dauerhafter externer persönlicher Key; r81 signiert, apksigner/zipalign geprüft und installiert. Separate Key-Sicherung und künftiges App-Upgrade noch NOT_RUN | Hauptagent | complete |
 | P5 CI | Run 34252821287: Build/JVM/Lint und Emulatorstart PASS; connectedDebugAndroidTest FAIL, Einzelursache noch unbekannt. Diagnoseausgabe vorbereitet, neuer Lauf pausiert | Hauptagent | offen |
-| Letzte History-Anzeige r80 | Build/Lint PASS; neuer Geräte-/Screenshotlauf und finaler Releaseaudit wegen Pause NOT_RUN | Hauptagent | offen |
+| Letzte History-Anzeige r80 | r81 auf aktueller APK: 180 App-Tests, betrachteter Nachher-Screenshot und statischer Releaseaudit PASS | Hauptagent | complete |
 | P6 lokale Regression/Reviews | 103 JVM + 180 ausgeführte Android-App-Tests; unabhängige Reviews und dokumentierte Regressionen | Hauptagent + Reviewer | complete |
 | P6 vollständige Abnahme | Pflichtnachweise wegen untenstehender externer Grenzen unvollständig | Hauptagent | blocked |
 | Live-Provider | Kein freigegebener Testzugang/Inhalt/Kostenrahmen für AssemblyAI/OpenAI/Groq | Nutzerfreigabe fehlt | blocked |

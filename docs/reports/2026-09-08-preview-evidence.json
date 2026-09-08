@@ -1,0 +1,115 @@
+{
+  "date": "2026-09-08",
+  "app_source_commit": "b631bbe",
+  "ci_diagnostics_commit": "f9d4f8b",
+  "candidate": "v0.1.0-preview.1",
+  "version_name": "0.1.0",
+  "version_code": 1,
+  "build": "r80 BUILD SUCCESSFUL, 619 seconds, 216 tasks, 29 executed",
+  "app_instrumentation": {
+    "run": "r81",
+    "seconds": 124.41,
+    "passed": 180,
+    "opt_in_skipped": 5,
+    "failed": 0,
+    "excluded": "app.sourcescribe.data.UiFixtureTest"
+  },
+  "core": {
+    "run": "r52 (unchanged since then)",
+    "tests": 103,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "device": {
+    "fingerprint": "google/sdk_gphone16k_x86_64/emu64xa16k:17/CP31.260618.005/15731206:user/dev-keys",
+    "page_size": "16384",
+    "font_scale": "1.0",
+    "accessibility": "null"
+  },
+  "signed_apk": {
+    "apk": "app/build/outputs/apk/release/SourceScribe-0.1.0-preview.1.apk",
+    "bytes": 147376546,
+    "sha256": "410b654fd08bdb2b7f8142dd88f440b7f49ffe123e363dd3607582b9e855c20a",
+    "payload_entries_byte_identical_to_unsigned": 510,
+    "signature_extra_entries": [
+      "META-INF/MANIFEST.MF",
+      "META-INF/SOURCESC.RSA",
+      "META-INF/SOURCESC.SF"
+    ],
+    "apksigner_verify": "PASS",
+    "zipalign_16kb": "PASS"
+  },
+  "certificate_sha256": "19d1da9a8fe704082a531faed8a24d966c485aae581a7076dd4b4f66c11d3881",
+  "release_static": {
+    "run": "r81",
+    "unsigned_sha256": "ab860009744d54496550c11e77846c3f0f973c37e2ff6e6e26f68b236d10d952",
+    "official_aapt2_manifest_resource_mapping": "PASS",
+    "allow_backup": false,
+    "cleartext": false,
+    "debuggable": false,
+    "test_only": false,
+    "backup_exclusions": 18,
+    "fixture_component_matches": 0,
+    "native_elf_count": 528,
+    "original_inner_webp_4kb_count": 10,
+    "runtime_replacement_webp_16kb_count": 10,
+    "runtime_replacement_issues": 0,
+    "physical_arm64": "NOT_RUN",
+    "android_test_descriptor_pattern_matches": 0
+  },
+  "ci": {
+    "run": 34252821287,
+    "build_jvm_lint_boot": "PASS",
+    "instrumentation": "FAIL, individual cause unknown",
+    "prepared_diagnostics_execution": "NOT_RUN"
+  },
+  "live_stt": {
+    "assemblyai": "BLOCKED",
+    "openai": "BLOCKED",
+    "groq": "BLOCKED",
+    "paid_calls": 0
+  },
+  "raw_evidence_sha256": {
+    "android-app-r81.txt": "a9a813ba4932421560e496142a0985d5c0aad47ac6f14f04b66a284285ca5832",
+    "release-manifest-r81.txt": "cc1d825aea347676c171586f1da7281f7bed155e4d7e3880484ce0a3b6fb0f2e",
+    "release-backup-r81.txt": "74d80216ccbc8774c3699ead4a8406fe2c404d8d33333538d65bdd856d178208",
+    "release-resources-r81.txt": "9d5edd8483f2fb1dd78338ecb256a6e9fd526379b3010cbebf8920bc1d0c8e14",
+    "release-audit-r81.json": "31769bed503f39957f59db95b885b8748ff9c8f67d199068c38773e327956b1e",
+    "release-signature-r81.txt": "347d94d635f49a2437bd1f491f7d905d6faa8f3aa3bcdea76e334e19bc857783",
+    "release-install-r81.txt": "781a31c82430c97897af612ece5e0ca2205e301cb5ff121ce2660541ea5182c7",
+    "ui-history-r81.txt": "f855a66e398c1451dc83505edeffaad4a001b65453f355082cb538078a677b39",
+    "device-r81.json": "c81f7e60ec494d18d2db67551cb5de81c5740d0c6faac83611c8d04ce52373e3",
+    "release-smoke-r81.json": "9648ea0d08f0355081fd3ac1a921e7f6fae716a1154f0b2f0dd5003f15094232",
+    "preview-pause-r81.json": "ccc3cf8582d77b60d6468050f1b77c52857e4afac021b8a52261f32d70b0f8c4"
+  },
+  "signed_apk_live_smoke": {
+    "run": "r81",
+    "package": "app.sourcescribe",
+    "source_id": "jNQXAC9IVRw",
+    "caption_language": "en",
+    "mode": "CAPTIONS_ONLY",
+    "providers_configured": false,
+    "first_run_notifications": "denied",
+    "history_completed_successful": true,
+    "viewer_after_explicit_force_stop_and_reopen": "PASS",
+    "expected_caption_present": true,
+    "exact_source_in_expanded_details": true,
+    "original_probe": "FAIL: source ID checked before expanding details; corrected with actual UI expansion",
+    "raw_viewer_text_logged": false,
+    "viewer_dump_sha256": "df778ffe63ccf96dfb2fc13c372d2896af435515c659b39002268839df9b0391",
+    "source_details_dump_sha256": "2b781a26006de2751c04e43279d880dedf69ebe3087b3564dc79fb2f6f4fb554",
+    "export": "NOT_RUN on signed APK; debug real SAF flow verified separately"
+  },
+  "final_device_state": {
+    "app_language": "de",
+    "talkback_enabled_services": "null",
+    "font_scale": "1.0",
+    "stopped_package_pids": {
+      "app.sourcescribe": "",
+      "app.sourcescribe.debug": "",
+      "app.sourcescribe.debug.test": "",
+      "app.sourcescribe.extractor.test": ""
+    }
+  }
+}

@@ -1,6 +1,6 @@
 # SourceScribe
 
-**Stand:** 8. September 2026 · Arbeit auf Nutzerwunsch pausiert · **Status:** Persönliche Preview; vollständige v1-Abnahme blockiert
+**Stand:** 8. September 2026 · Persönliche Preview 0.1.0-preview.1; danach Arbeitspause · **Status:** Persönliche Preview; vollständige v1-Abnahme blockiert
 
 SourceScribe ist eine persönlich genutzte Android-App für nachvollziehbare
 Transkripte. Eine ausdrücklich eingegebene YouTube-Quelle lässt sich teilen oder
@@ -12,21 +12,24 @@ und Faktencheck bleiben außerhalb der App.
 ## Aktueller Stand
 
 Das öffentliche Repository ist [qwertz92/SourceScribe](https://github.com/qwertz92/SourceScribe).
-Debug-App, Instrumentation-APK und unsignierte Release-APK sind gebaut. Bestanden
+Debug-App, Instrumentation-APK und persönlich signierte Release-APK sind gebaut.
+[Einstieg zum Testen](docs/TRY_PREVIEW.md) · [Preview-Quellstand](https://github.com/qwertz92/SourceScribe/releases/tag/v0.1.0-preview.1). Bestanden
 sind 103 JVM-Tests und zuletzt 180 Android-App-Prüfungen; fünf opt-in-Fälle wurden
 im Gesamtlauf übersprungen und separat ausgeführt. Echte Android-Caption-/
 Audioextraktion und der Caption-App-Pfad bis SAF-Export sind auf dem
 API-37-/x86_64-/16-KB-Emulator nachgewiesen. Deutsch/Englisch, System/Hell/Dunkel,
 überarbeitete Auswahlfelder und die Freigabe durch bewussten Auftragsstart sind
-integriert. Die letzten kleinen History-Anpassungen nach dem r77-Gerätelauf
-sind noch nicht erneut auf dem Gerät geprüft. Ein signiertes Engineupdate während zweier laufender Fixturejobs ist
+integriert. Die letzten History-Anpassungen sind in r81 auf der aktuellen r80-App erneut
+mit 180 App-Tests und betrachtetem Screenshot geprüft. Ein signiertes Engineupdate während zweier laufender Fixturejobs ist
 bestanden. [Preview-Prüfbericht](docs/reports/2026-09-08-preview.md) und
 [STATUS](docs/STATUS.md) trennen Implementierung, Fixtures und reale Nachweise.
 
 Echte Transkriptionen mit AssemblyAI, OpenAI und Groq bleiben mangels freigegebener
 Zugangsdaten, Testinhalte und Kostenrahmen blockiert. Ein physisches ARM64-Gerät
 fehlt; vollständige TalkBack-Bedienung ist mit der verfügbaren Eingabeautomation
-nicht nachgewiesen. Der Release-Build ist unsigniert. Öffentliche APK-Verteilung
+nicht nachgewiesen. Die persönliche APK ist dauerhaft signiert und auf dem Emulator installiert.
+Sie liegt lokal unter `app/build/outputs/apk/release/SourceScribe-0.1.0-preview.1.apk`;
+die GitHub-Preview enthält nur den Quellstand. Öffentliche APK-Verteilung
 bleibt wegen fehlender vollständiger FFmpeg-Lizenz-/Quellbelege gesperrt.
 
 Die CI startet inzwischen den Emulator, scheitert aber noch im Gerätetest mit
@@ -36,6 +39,8 @@ unbekannter Einzelursache. Der nächste gezielte Diagnoseweg ist in
 Die maßgeblichen Nachweise werden fortgeschrieben:
 
 - [Tatsächlicher Projektstatus](docs/STATUS.md)
+- [Restarbeiten und nächste Prüfziele](docs/NEXT_STEPS.md)
+- [Lernprotokoll für andere Agenten](docs/LEARNINGS.md)
 - [Build und persönliche Auslieferung](docs/BUILD.md)
 - [Build-/P0-Prüfbericht](docs/reports/2026-09-07-build-and-p0.md)
 - [Lizenz- und Provenienzprüfung](docs/reports/2026-09-07-licenses.md)

@@ -1,6 +1,6 @@
 # Tatsächlicher Projektstatus
 
-**Stand:** 8. September 2026. **Arbeit PAUSIERT auf Nutzerwunsch.** **Freigabe:** Persönliche Preview; vollständige v1
+**Stand:** 8. September 2026. **Persönlicher Preview-Abschluss, danach PAUSE auf Nutzerwunsch.** **Freigabe:** Persönliche Preview; vollständige v1
 weiterhin blockiert. App-Quellstand `b631bbe`, CI-Diagnose `f9d4f8b`, lokales `main` und öffentliches
 [GitHub-Repository](https://github.com/qwertz92/SourceScribe).
 
@@ -14,7 +14,7 @@ r80-Build/Lint regulär beendet, kein Build-/Testworker mehr aktiv.
 103 JVM-Tests und zuletzt **180 tatsächlich ausgeführte Android-App-Tests**
 bestanden. Der Runner führt zusätzlich fünf opt-in-Skips; deren separate
 Nachweise stehen im [Preview-Prüfbericht](reports/2026-09-08-preview.md).
-Debug-/AndroidTest-/unsigned Release-APKs gebaut; alle vier aktuellen Lintberichte
+Debug-/AndroidTest-/unsigned und persönlich signierte Release-APKs gebaut; alle vier aktuellen Lintberichte
 haben null Issues. Echte Android-Extraktion und Caption-App-Durchstich auf dem
 API-37-/x86_64-/16-KB-Emulator nachgewiesen. Keine echte STT-API aufgerufen.
 
@@ -25,7 +25,7 @@ API-37-/x86_64-/16-KB-Emulator nachgewiesen. Keine echte STT-API aufgerufen.
 | P2 | IMPLEMENTED / TESTED_WITH_FIXTURES: Groq, lokaler Import, Audiovorbereitung/Chunks, Credentials, Submissiongrenzen | Echte Groq-Transkription BLOCKED: keine freigegebenen Testzugänge/Inhalte/Kosten. |
 | P3 | IMPLEMENTED / TESTED_WITH_FIXTURES: AssemblyAI, OpenAI, alle Modi, BOTH-Teilfehler, Sprache/Tracks/Optionen/Presets | Echte AssemblyAI-/OpenAI-Transkription BLOCKED; kein Mock als Provider-PASS. |
 | P4 | IMPLEMENTED / TESTED_WITH_FIXTURES: Queue/Limits, Recovery, unsichere Submissions, Exportreparatur, Updatefehler | LIVE_VERIFIED: Android-Prozess-/Grantgrenzen, Reboot-Recovery mit Providerfixture, echtes signiertes Update/Rollback. T26 mit zwei laufenden Fixturejobs PASS r70. |
-| P5 | IMPLEMENTED: de/en-App-Sprache, System/Hell/Dunkel, überarbeitete Auswahlfelder/Navigation, Viewer/Suche/Kopieren/Share, Formate/Diagnose/Signierpfad | ADB-/Screenshotprüfungen einschließlich 200-%-Schrift und Querformat bestanden. Vollständige TalkBack-Bedienung BLOCKED; dauerhafte persönliche Release-Signatur NOT_RUN. |
+| P5 | IMPLEMENTED: de/en-App-Sprache, System/Hell/Dunkel, überarbeitete Auswahlfelder/Navigation, Viewer/Suche/Kopieren/Share, Formate/Diagnose/Signierpfad | ADB-/Screenshotprüfungen einschließlich 200-%-Schrift und Querformat bestanden. Vollständige TalkBack-Bedienung BLOCKED; dauerhafte persönliche Release-Signatur und Installation PASS r81. |
 | P6 | Integrierte Regression und unabhängige Reviews ausgeführt; bestätigte Defekte samt Regression behoben | Vollständige Abnahme BLOCKED: Provider, physisches ARM64, TalkBack und öffentliche APK-Lizenz-/Quellbelege fehlen. |
 
 ## UI-Feedback umgesetzt
@@ -39,25 +39,32 @@ gebundene Freigabe. Dies erlaubt keine Live-Tests durch Entwicklungsagenten.
 
 ## Artefakte und Grenzen
 
-Neu gebaut, noch nicht installiert/erneut gerätegeprüft: Debug-APK r80: `app/build/outputs/apk/debug/app-debug.apk` (159.065.550 Bytes).
+r81 installiert und erneut gerätegeprüft: Debug-APK r80: `app/build/outputs/apk/debug/app-debug.apk` (159.065.550 Bytes).
 SHA-256: `ad94d85da0b1fc3cf3bbc885b3f3fa2857806448d4e20524a3c5971e3a887b32`.
-Release-APK: `app/build/outputs/apk/release/app-release-unsigned.apk`, unsigniert.
+Persönlich signierte Release-APK:
+`app/build/outputs/apk/release/SourceScribe-0.1.0-preview.1.apk` (147.376.546 Bytes).
+SHA-256: `410b654fd08bdb2b7f8142dd88f440b7f49ffe123e363dd3607582b9e855c20a`.
+Signierte App zusätzlich real mit englischer YouTube-Caption bis zum erneut
+geöffneten gespeicherten Viewer geprüft; deren SAF-Export separat NOT_RUN.
+Version 0.1.0 / Code 1; Preview-Tag `v0.1.0-preview.1`. [Testleitfaden](TRY_PREVIEW.md).
 Genaue Build-/Testbefehle, APK-Hashes, Versionen und Rohbelegnamen im
 [Preview-Prüfbericht](reports/2026-09-08-preview.md), chronologische Fehlversuche
 und Reviewkorrekturen im [Integrationsbericht](reports/2026-09-07-integration.md).
 
 Öffentliche APK-Verteilung bleibt wegen fehlender vollständiger
-FFmpeg-Corresponding-Source-/Lizenzzuordnung gesperrt. Kein Release veröffentlicht.
+FFmpeg-Corresponding-Source-/Lizenzzuordnung gesperrt. GitHub-Preview enthält nur den Quellstand; die signierte APK bleibt lokal.
 Die GitHub-CI hat Build/JVM/Lint bestanden und den Emulator erfolgreich gestartet.
 Run 34252821287 scheiterte anschließend im Gerätetest; der konkrete Einzelfehler
 ist noch unbekannt. Eine gezielte Berichtsausgabe ist vorbereitet, aber wegen
 Pause noch nicht in CI ausgeführt. Die abschließenden kleinen UI-Änderungen r80
-erhalten erst bei Fortsetzung einen neuen Geräte-/Screenshot-/Releaseaudit.
+sind in r81 mit 180 App-Tests, betrachtetem Screenshot und aktuellem statischen
+Releaseaudit nachgeprüft. Offizielle Signatur-/Ausrichtungsprüfung ebenfalls PASS.
 
 Nach dem belegten WSL-Speicherfehler sind 16 GiB Swap aktiv. Builds verwenden einen
 Worker, 2 GiB Java-Heap und projektlokale Caches. Keine neue globale Konfiguration.
 [Diagnose und Speicherbegrenzung](reports/2026-09-07-wsl-recovery.md).
 
-Die aktuelle Pause und der konkrete nächste Prüfschritt stehen ganz oben in
-[HANDOFF](HANDOFF.md). Keine automatische Fortsetzung oder weitere Tests.
+Die aktuelle Übergabe steht in [HANDOFF](HANDOFF.md), konkrete Restarbeiten in
+[NEXT_STEPS](NEXT_STEPS.md), verifizierte Fallstricke in [LEARNINGS](LEARNINGS.md).
+Keine automatische Fortsetzung nach diesem begrenzten Preview-Abschluss.
 Bereits erledigte Implementierung und Fixtureprüfungen bleiben erhalten.
