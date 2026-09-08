@@ -25,6 +25,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import okhttp3.Call
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONArray
@@ -88,22 +89,22 @@ data class EngineInstallation(
  * A slot is addressed by its complete SHA-256 and is never overwritten. State is
  * the only mutable pointer, written through Android's crash-safe AtomicFile.
  */
-class EngineUpdateManager(
+class EngineUpdateManager internal constructor(
     context: Context,
-    private val runtime: NativeRuntime = NativeRuntime(context),
+    private val runtime: NativeRuntime,
+    private val calls: Call.Factory,
+    private val writeDownloadedFile: (File, ByteArray) -> Unit,
 ) {
+    constructor(context: Context, runtime: NativeRuntime = NativeRuntime(context)) : this(
+        context,
+        runtime,
+        defaultClient(),
+        ::writeSyncedBytes,
+    )
+
     private val appContext = context.applicationContext
     // This per-instance mutex is sufficient while Hilt supplies the manager as a singleton.
     private val mutex = Mutex()
-    private val client = OkHttpClient.Builder()
-        .followRedirects(false)
-        .followSslRedirects(false)
-        .retryOnConnectionFailure(false)
-        .connectTimeout(20, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .callTimeout(60, TimeUnit.SECONDS)
-        .build()
-
     private var loadedState: ManagerState? = null
     private var bundledCache: EngineInstallation? = null
 
@@ -694,11 +695,7 @@ class EngineUpdateManager(
     private suspend fun downloadFile(url: String, destination: File, maxBytes: Long) = withContext(Dispatchers.IO) {
         val result = fetch(url, maxBytes.toInt(), null)
         try {
-            FileOutputStream(destination).use { output ->
-                output.write(result.body)
-                output.flush()
-                output.fd.sync()
-            }
+            writeDownloadedFile(destination, result.body)
         } catch (_: Exception) {
             throw EngineUpdateException(EngineUpdateCode.STORAGE)
         }
@@ -713,7 +710,7 @@ class EngineUpdateManager(
                 if (redirect == 0) etag?.let { header("If-None-Match", it) }
             }.build()
             val response = try {
-                client.newCall(request).execute()
+                calls.newCall(request).execute()
             } catch (_: IOException) {
                 throw EngineUpdateException(EngineUpdateCode.NETWORK)
             }
@@ -1021,6 +1018,23 @@ class EngineUpdateManager(
     )
 
     private companion object {
+        fun defaultClient(): OkHttpClient = OkHttpClient.Builder()
+            .followRedirects(false)
+            .followSslRedirects(false)
+            .retryOnConnectionFailure(false)
+            .connectTimeout(20, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .callTimeout(60, TimeUnit.SECONDS)
+            .build()
+
+        fun writeSyncedBytes(destination: File, bytes: ByteArray) {
+            FileOutputStream(destination).use { output ->
+                output.write(bytes)
+                output.flush()
+                output.fd.sync()
+            }
+        }
+
         const val ENGINES_DIRECTORY = "engines"
         const val STATE_FILE_NAME = "state.json"
         const val METADATA_FILE_NAME = "metadata.json"

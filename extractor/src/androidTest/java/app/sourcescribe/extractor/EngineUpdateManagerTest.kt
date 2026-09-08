@@ -11,10 +11,20 @@ import app.sourcescribe.core.EngineVerifier
 import app.sourcescribe.core.SourceResolver
 import app.sourcescribe.core.boundedJsonText
 import java.io.File
+import java.io.IOException
 import java.io.RandomAccessFile
 import java.nio.file.Files
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 import kotlinx.coroutines.runBlocking
+import okhttp3.Call
+import okhttp3.OkHttpClient
+import okhttp3.Protocol
+import okhttp3.Request
+import okhttp3.Response
+import okhttp3.ResponseBody.Companion.toResponseBody
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
@@ -198,6 +208,121 @@ class EngineUpdateManagerTest {
     }
 
     @Test
+    fun offlineUpdateCheckKeepsTheActiveSlotAndDoesNotStage() = runBlocking {
+        withIsolatedManager { harness ->
+            val active = harness.manager.bundled()
+            val slots = hashSlotNames(harness)
+            val manager = newManager(harness, fixtureCalls { request ->
+                assertEquals(STABLE_RELEASE_URL, request.url.toString())
+                throw IOException("offline fixture")
+            })
+
+            val failure = expectUpdateFailure { manager.check(EngineChannel.STABLE, force = true) }
+
+            assertEquals(EngineUpdateCode.NETWORK, failure.code)
+            assertEquals(active.id, manager.active().id)
+            assertEquals(slots, hashSlotNames(harness))
+            assertNoUpdateTemporaryDirectories(harness)
+        }
+    }
+
+    @Test
+    fun rateLimitedUpdateCheckPersistsRetryAfterWithoutAnotherRequestOrStage() = runBlocking {
+        withIsolatedManager { harness ->
+            val active = harness.manager.bundled()
+            val slots = hashSlotNames(harness)
+            val requests = AtomicInteger()
+            val calls = fixtureCalls { request ->
+                assertEquals(STABLE_RELEASE_URL, request.url.toString())
+                requests.incrementAndGet()
+                response(request, 429, "Retry-After" to "17")
+            }
+            val first = expectUpdateFailure {
+                newManager(harness, calls).check(EngineChannel.STABLE, force = true)
+            }
+            val second = expectUpdateFailure {
+                newManager(harness, calls).check(EngineChannel.STABLE, force = true)
+            }
+
+            assertEquals(EngineUpdateCode.RATE_LIMIT, first.code)
+            assertEquals(17L, first.retryAfterSeconds)
+            assertEquals(EngineUpdateCode.RATE_LIMIT, second.code)
+            assertTrue(requireNotNull(second.retryAfterSeconds) in 1L..17L)
+            assertEquals(1, requests.get())
+            assertEquals(active.id, newManager(harness).active().id)
+            assertEquals(slots, hashSlotNames(harness))
+            assertNoUpdateTemporaryDirectories(harness)
+        }
+    }
+
+    @Test
+    fun artifactWriteFailureKeepsActiveSlotAndCleansStagingAcrossRestart() = runBlocking {
+        withIsolatedManager { harness ->
+            val active = harness.manager.bundled()
+            val repository = when (active.channel) {
+                EngineChannel.STABLE -> "yt-dlp/yt-dlp"
+                EngineChannel.NIGHTLY -> "yt-dlp/yt-dlp-nightly-builds"
+            }
+            val releaseBase = "https://github.com/$repository/releases/download/${active.version}"
+            val expectedRequests = ArrayDeque(
+                listOf(
+                    "$releaseBase/SHA2-256SUMS",
+                    "$releaseBase/SHA2-256SUMS.sig",
+                    "$releaseBase/yt-dlp",
+                ),
+            )
+            val calls = fixtureCalls { request ->
+                assertEquals(expectedRequests.removeFirst(), request.url.toString())
+                response(request, 200)
+            }
+            val manager = EngineUpdateManager(harness.storage, NativeRuntime(harness.storage), calls) { _, _ ->
+                throw IOException("controlled disk-full fixture")
+            }
+            assertEquals(active.id, manager.bundled().id)
+            val slots = hashSlotNames(harness)
+            val update = AvailableEngine(
+                id = active.version,
+                version = active.version,
+                ejsVersion = active.ejsVersion,
+                channel = active.channel,
+                gitHead = active.gitHead,
+                sha256 = active.sha256,
+            )
+
+            val failure = expectUpdateFailure { manager.stage(update) }
+
+            assertEquals(EngineUpdateCode.STORAGE, failure.code)
+            assertTrue(expectedRequests.isEmpty())
+            assertEquals(active.id, manager.active().id)
+            assertEquals(slots, hashSlotNames(harness))
+            assertNoUpdateTemporaryDirectories(harness)
+            assertEquals(active.id, newManager(harness).active().id)
+            assertEquals(slots, hashSlotNames(harness))
+        }
+    }
+
+    @Test
+    fun privateAndOfflineProbeFailuresKeepCandidateStagedAndActiveSlotUnchanged() = runBlocking {
+        withIsolatedManager { harness ->
+            val active = harness.manager.bundled()
+            val candidates = listOf(
+                createScriptedCandidate(harness, "ERROR: Private video. Sign in if you have access"),
+                createScriptedCandidate(harness, "ERROR: Unable to download webpage: Temporary failure in name resolution"),
+            )
+            candidates.forEach { writeState(harness, active = active, previous = null, candidate = it) }
+            val manager = newManager(harness)
+            val source = SourceResolver.youtube("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+
+            candidates.forEach { candidate ->
+                val failure = expectUpdateFailure { manager.activate(candidate.id, source) }
+                assertEquals(EngineUpdateCode.UNCERTAIN_PROBE, failure.code)
+                assertEquals(active.id, manager.active().id)
+                assertTrue(manager.installations().any { it.id == candidate.id && it.healthy })
+            }
+        }
+    }
+
+    @Test
     fun realReleaseStageActivateAndRollbackSurvivesManagerRestart() = runBlocking {
         assumeTrue(
             "Pass sourcescribeEngineLiveUpdate=true and engineProbeSource=<URL> for live update evidence",
@@ -251,6 +376,41 @@ class EngineUpdateManagerTest {
     private fun newManager(harness: Harness): EngineUpdateManager =
         EngineUpdateManager(harness.storage, NativeRuntime(harness.storage))
 
+    private fun newManager(harness: Harness, calls: Call.Factory): EngineUpdateManager =
+        EngineUpdateManager(harness.storage, NativeRuntime(harness.storage), calls, ::writeBytes)
+
+    private fun fixtureCalls(response: (Request) -> Response): Call.Factory = OkHttpClient.Builder()
+        .addInterceptor { chain -> response(chain.request()) }
+        .build()
+
+    private fun response(request: Request, code: Int, header: Pair<String, String>? = null): Response =
+        Response.Builder()
+            .request(request)
+            .protocol(Protocol.HTTP_1_1)
+            .code(code)
+            .message("fixture")
+            .body(ByteArray(0).toResponseBody())
+            .apply { header?.let { addHeader(it.first, it.second) } }
+            .build()
+
+    private fun writeBytes(destination: File, bytes: ByteArray) {
+        destination.writeBytes(bytes)
+    }
+
+    private fun hashSlotNames(harness: Harness): Set<String> = File(harness.root, "engines")
+        .listFiles()
+        .orEmpty()
+        .filter { it.isDirectory && it.name.matches(Regex("[0-9a-f]{64}")) }
+        .mapTo(mutableSetOf(), File::getName)
+
+    private fun assertNoUpdateTemporaryDirectories(harness: Harness) {
+        assertTrue(
+            File(harness.root, "engines").listFiles().orEmpty().none {
+                it.name.startsWith(".staging-") || it.name.startsWith(".slot-")
+            },
+        )
+    }
+
     private suspend fun expectUpdateFailure(block: suspend () -> Unit): EngineUpdateException = try {
         block()
         throw AssertionError("Expected EngineUpdateException")
@@ -289,6 +449,32 @@ class EngineUpdateManagerTest {
         val slot = File(harness.root, "engines/${installation.id}")
         assertTrue(slot.mkdirs())
         File(slot, "yt-dlp").writeBytes(content)
+    }
+
+    private fun createScriptedCandidate(harness: Harness, stderr: String): EngineInstallation {
+        val temporary = File(harness.root, "scripted-${UUID.randomUUID()}.zip")
+        ZipOutputStream(temporary.outputStream()).use { output ->
+            output.putNextEntry(ZipEntry("__main__.py"))
+            output.write(
+                """
+                import sys
+                if "--version" in sys.argv:
+                    print("2026.08.19")
+                    raise SystemExit(0)
+                print(${JSONObject.quote(stderr)}, file=sys.stderr)
+                raise SystemExit(1)
+                """.trimIndent().toByteArray(),
+            )
+            output.closeEntry()
+            output.putNextEntry(ZipEntry("yt_dlp_ejs/__init__.py"))
+            output.write("version = \"0.8.0\"\n".toByteArray())
+            output.closeEntry()
+        }
+        val installation = fakeInstallation(sha256(temporary))
+        val slot = File(harness.root, "engines/${installation.id}")
+        assertTrue(slot.mkdirs())
+        Files.move(temporary.toPath(), File(slot, "yt-dlp").toPath())
+        return installation
     }
 
     private fun createSymlinkSlot(harness: Harness, installation: EngineInstallation) {
@@ -336,6 +522,10 @@ class EngineUpdateManagerTest {
         val manager: EngineUpdateManager,
         val root: File,
     )
+
+    private companion object {
+        const val STABLE_RELEASE_URL = "https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest"
+    }
 
     private class IsolatedStorageContext(base: Context, private val root: File) : ContextWrapper(base) {
         override fun getApplicationContext(): Context = this
