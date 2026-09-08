@@ -12,5 +12,9 @@
                 <action android:name="android.content.action.DOCUMENTS_PROVIDER" />
             </intent-filter>
         </provider>
+        <provider android:name="app.sourcescribe.data.ExportFixtureProvider$ControlProvider"
+            android:authorities="app.sourcescribe.test.documents.control"
+            android:exported="true"
+            android:permission="android.permission.ACCESS_CONTENT_PROVIDERS_EXTERNALLY" />
     </application>
 </manifest>

@@ -1,7 +1,7 @@
 package app.sourcescribe.data
 
 import android.content.Context
-import android.content.Intent
+import android.provider.DocumentsContract
 import androidx.core.net.toUri
 import androidx.room.Room
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -29,6 +29,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -39,17 +40,10 @@ class ExportStoreTest {
         get() = InstrumentationRegistry.getInstrumentation()
     private val context: Context
         get() = instrumentation.targetContext
-    private val providerContext: Context
-        get() = instrumentation.context
-    private val grantedTreeUris = mutableListOf<String>()
 
     @After
     fun tearDown() {
-        val grantFlags = Intent.FLAG_GRANT_READ_URI_PERMISSION or
-            Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-        grantedTreeUris.forEach { uri -> providerContext.revokeUriPermission(uri.toUri(), grantFlags) }
-        grantedTreeUris.clear()
-        ExportFixtureProvider.reset(providerContext)
+        providerAdmin { ExportFixtureProvider.reset(context) }
     }
 
     @Test
@@ -64,7 +58,7 @@ class ExportStoreTest {
             assertEquals(row, harness.store.reconcile(row.id))
             assertArrayEquals(
                 TranscriptExporter.render(harness.document, ExportFormat.MARKDOWN).toByteArray(),
-                ExportFixtureProvider.bytes(providerContext, requireNotNull(row.documentUri)),
+                providerAdmin { ExportFixtureProvider.bytes(context, requireNotNull(row.documentUri)) },
             )
         }
     }
@@ -82,15 +76,86 @@ class ExportStoreTest {
     }
 
     @Test
+    fun realTreeGrantRevocationKeepsArtifactAndRequiresPermissionAgain() = runBlocking {
+        withHarness(ExportFixtureProvider.Mode.SUCCESS) { harness ->
+            val exported = harness.store.export(harness.artifactId, ExportFormat.TEXT, harness.treeUri)
+            assertEquals(ExportState.EXPORTED, exported.state)
+            val documentUri = requireNotNull(exported.documentUri)
+
+            providerAdmin { ExportFixtureProvider.revokeTreeGrant(context, harness.treeUri) }
+
+            assertEquals(1, providerAdmin { ExportFixtureProvider.names(context) }.size)
+            assertArrayEquals(
+                TranscriptExporter.render(harness.document, ExportFormat.TEXT).toByteArray(),
+                providerAdmin { ExportFixtureProvider.bytes(context, documentUri) },
+            )
+            val reconciled = harness.store.reconcile(exported.id)
+            val repeated = harness.store.export(harness.artifactId, ExportFormat.TEXT, harness.treeUri)
+            assertEquals(ExportState.PERMISSION_REQUIRED, reconciled.state)
+            assertEquals("PERMISSION_REQUIRED", reconciled.error)
+            assertEquals(documentUri, reconciled.documentUri)
+            assertEquals(ExportState.PERMISSION_REQUIRED, repeated.state)
+            assertEquals("PERMISSION_REQUIRED", repeated.error)
+            assertNull(repeated.documentUri)
+            assertEquals(harness.document, harness.artifacts.read(harness.artifactId))
+        }
+    }
+
+    @Test
+    fun controlCallRequiresSeparateAdminPermissionAfterTreeGrant() {
+        val treeUri = configureProvider(ExportFixtureProvider.Mode.SUCCESS).toUri()
+        val rootUri = DocumentsContract.buildDocumentUriUsingTree(
+            treeUri,
+            DocumentsContract.getTreeDocumentId(treeUri),
+        )
+
+        context.contentResolver.query(
+            rootUri,
+            arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID),
+            null,
+            null,
+            null,
+        )!!.use { cursor -> assertTrue(cursor.moveToFirst()) }
+        assertThrows(SecurityException::class.java) { ExportFixtureProvider.names(context) }
+    }
+
+    @Test
     fun partialWriteCleansOnlyOwnedDocumentAndKeepsArtifact() = runBlocking {
         withHarness(ExportFixtureProvider.Mode.OUTPUT_FAILURE) { harness ->
-            ExportFixtureProvider.seed(providerContext, "keep.txt")
+            providerAdmin { ExportFixtureProvider.seed(context, "keep.txt") }
             val row = harness.store.export(harness.artifactId, ExportFormat.TEXT, harness.treeUri)
 
             assertEquals(ExportState.FAILED, row.state)
             assertEquals("IO_FAILURE", row.error)
+            assertTrue(
+                "partial-write fixture did not reach its second failing write",
+                providerAdmin { ExportFixtureProvider.outputFailureWriteAttempts(context) } >= 2,
+            )
             assertNull(row.documentUri)
-            assertEquals(listOf("keep.txt"), ExportFixtureProvider.names(providerContext))
+            assertEquals(listOf("keep.txt"), providerAdmin { ExportFixtureProvider.names(context) })
+            assertEquals(harness.document, harness.artifacts.read(harness.artifactId))
+        }
+    }
+
+    @Test
+    fun diskFullCleansOwnedDocumentAndKeepsSiblingAndArtifact() = runBlocking {
+        withHarness(ExportFixtureProvider.Mode.DISK_FULL) { harness ->
+            val siblingBytes = "unchanged sibling".toByteArray()
+            val siblingUri = providerAdmin {
+                ExportFixtureProvider.seedDocument(context, "keep.txt", siblingBytes)
+            }
+
+            val row = harness.store.export(harness.artifactId, ExportFormat.TEXT, harness.treeUri)
+
+            assertTrue(
+                "disk-full fixture did not execute its ENOSPC callback",
+                providerAdmin { ExportFixtureProvider.diskFullWriteAttempted(context) },
+            )
+            assertEquals(ExportState.FAILED, row.state)
+            assertEquals("IO_FAILURE", row.error)
+            assertNull(row.documentUri)
+            assertEquals(listOf("keep.txt"), providerAdmin { ExportFixtureProvider.names(context) })
+            assertArrayEquals(siblingBytes, providerAdmin { ExportFixtureProvider.bytes(context, siblingUri) })
             assertEquals(harness.document, harness.artifacts.read(harness.artifactId))
         }
     }
@@ -99,7 +164,7 @@ class ExportStoreTest {
     fun retryCreatesFreshRowAndDoesNotRerunTranscription() = runBlocking {
         withHarness(ExportFixtureProvider.Mode.PERMISSION_DENIED) { harness ->
             val failed = harness.store.export(harness.artifactId, ExportFormat.TEXT, harness.treeUri)
-            ExportFixtureProvider.setMode(providerContext, ExportFixtureProvider.Mode.SUCCESS)
+            providerAdmin { ExportFixtureProvider.setMode(context, ExportFixtureProvider.Mode.SUCCESS) }
 
             val retried = harness.store.retry(failed.id)
 
@@ -117,7 +182,7 @@ class ExportStoreTest {
             val exported = harness.store.export(harness.artifactId, ExportFormat.TEXT, harness.treeUri)
             val documentUri = requireNotNull(exported.documentUri)
 
-            assertEquals(1, context.contentResolver.delete(documentUri.toUri(), null, null))
+            assertTrue(DocumentsContract.deleteDocument(context.contentResolver, documentUri.toUri()))
 
             val reconciled = harness.store.reconcile(exported.id)
             assertEquals(ExportState.FAILED, reconciled.state)
@@ -131,7 +196,7 @@ class ExportStoreTest {
     fun reconcileMapsRevokedPermissionWithoutTouchingInternalArtifact() = runBlocking {
         withHarness(ExportFixtureProvider.Mode.SUCCESS) { harness ->
             val exported = harness.store.export(harness.artifactId, ExportFormat.TEXT, harness.treeUri)
-            ExportFixtureProvider.setMode(providerContext, ExportFixtureProvider.Mode.PERMISSION_DENIED)
+            providerAdmin { ExportFixtureProvider.setMode(context, ExportFixtureProvider.Mode.PERMISSION_DENIED) }
 
             val reconciled = harness.store.reconcile(exported.id)
             assertEquals(ExportState.PERMISSION_REQUIRED, reconciled.state)
@@ -195,6 +260,23 @@ class ExportStoreTest {
     }
 
     @Test
+    fun permissionDeniedReadbackKeepsWrittenDocumentAsUnverified() = runBlocking {
+        withHarness(ExportFixtureProvider.Mode.READBACK_PERMISSION_DENIED) { harness ->
+            val expected = TranscriptExporter.render(harness.document, ExportFormat.JSON).toByteArray()
+
+            val row = harness.store.export(harness.artifactId, ExportFormat.JSON, harness.treeUri)
+
+            assertEquals(ExportState.EXPORTED, row.state)
+            assertEquals("UNVERIFIED", row.verification)
+            assertArrayEquals(
+                expected,
+                providerAdmin { ExportFixtureProvider.bytes(context, requireNotNull(row.documentUri)) },
+            )
+            assertEquals(harness.document, harness.artifacts.read(harness.artifactId))
+        }
+    }
+
+    @Test
     fun readbackMismatchFailsAndCleansOwnedDocument() = runBlocking {
         withHarness(ExportFixtureProvider.Mode.READBACK_MISMATCH) { harness ->
             val row = harness.store.export(harness.artifactId, ExportFormat.TEXT, harness.treeUri)
@@ -202,7 +284,7 @@ class ExportStoreTest {
             assertEquals(ExportState.FAILED, row.state)
             assertEquals("MISMATCH", row.error)
             assertNull(row.documentUri)
-            assertTrue(ExportFixtureProvider.names(providerContext).isEmpty())
+            assertTrue(providerAdmin { ExportFixtureProvider.names(context) }.isEmpty())
         }
     }
 
@@ -216,10 +298,10 @@ class ExportStoreTest {
             assertEquals(ExportState.EXPORTED, second.state)
             assertNotEquals(first.id, second.id)
             assertNotEquals(first.documentUri, second.documentUri)
-            assertEquals(2, ExportFixtureProvider.names(providerContext).size)
+            assertEquals(2, providerAdmin { ExportFixtureProvider.names(context) }.size)
             assertArrayEquals(
-                ExportFixtureProvider.bytes(providerContext, requireNotNull(first.documentUri)),
-                ExportFixtureProvider.bytes(providerContext, requireNotNull(second.documentUri)),
+                providerAdmin { ExportFixtureProvider.bytes(context, requireNotNull(first.documentUri)) },
+                providerAdmin { ExportFixtureProvider.bytes(context, requireNotNull(second.documentUri)) },
             )
         }
     }
@@ -278,13 +360,20 @@ class ExportStoreTest {
     }
 
     private fun configureProvider(mode: ExportFixtureProvider.Mode): String {
-        val treeUri = ExportFixtureProvider.configure(providerContext, mode)
-        val grantFlags = Intent.FLAG_GRANT_READ_URI_PERMISSION or
-            Intent.FLAG_GRANT_WRITE_URI_PERMISSION or
-            Intent.FLAG_GRANT_PREFIX_URI_PERMISSION
-        providerContext.grantUriPermission(context.packageName, treeUri.toUri(), grantFlags)
-        grantedTreeUris += treeUri
-        return treeUri
+        return providerAdmin {
+            ExportFixtureProvider.configure(context, mode, context.packageName)
+        }
+    }
+
+    private inline fun <T> providerAdmin(operation: () -> T): T {
+        instrumentation.uiAutomation.adoptShellPermissionIdentity(
+            ExportFixtureProvider.CONTROL_PERMISSION,
+        )
+        return try {
+            operation()
+        } finally {
+            instrumentation.uiAutomation.dropShellPermissionIdentity()
+        }
     }
 
     private data class Harness(

@@ -37,8 +37,8 @@ deshalb bewusst separat im Asset-Verzeichnis versioniert.
 
 Die Versionen stehen in [`gradle/libs.versions.toml`](gradle/libs.versions.toml)
 und wurden aus dem lokalen Gradle-Cache gegen die aufgelösten POMs betrachtet.
-Die AndroidX-, Kotlin-/kotlinx-, OkHttp-, Hilt-, Room-, WorkManager-, DataStore-
-und DocumentFile-Komponenten werden über ihre jeweiligen Apache-2.0-
+Die AndroidX-, Kotlin-/kotlinx-, OkHttp-, Hilt-, Room-, WorkManager-
+und DataStore-Komponenten werden über ihre jeweiligen Apache-2.0-
 Upstreamhinweise geführt. Bouncy Castle (`bcpg` 1.85, `bcprov` 1.85.2) folgt der
 [Bouncy-Castle-Lizenz](https://www.bouncycastle.org/licence.html). JUnit 4.13.2
 ist test-only und folgt der [EPL 1.0](https://www.eclipse.org/legal/epl-v10.html).

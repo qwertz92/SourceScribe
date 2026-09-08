@@ -56,7 +56,6 @@ dependencies {
     implementation(libs.hilt.work)
     implementation(libs.work.runtime)
     implementation(libs.datastore)
-    implementation(libs.documentfile)
     ksp(libs.room.compiler)
     ksp(libs.hilt.compiler)
     ksp(libs.hilt.work.compiler)

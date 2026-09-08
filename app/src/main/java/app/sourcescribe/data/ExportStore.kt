@@ -2,8 +2,8 @@ package app.sourcescribe.data
 
 import android.content.Context
 import android.net.Uri
+import android.provider.DocumentsContract
 import androidx.core.net.toUri
-import androidx.documentfile.provider.DocumentFile
 import app.sourcescribe.core.ArtifactFiles
 import app.sourcescribe.core.ExportFormat
 import app.sourcescribe.core.ExportState
@@ -102,26 +102,29 @@ class ExportStore @Inject constructor(
     )?.use { cursor -> cursor.moveToFirst() } ?: false
 
     private suspend fun write(row: ExportRow, document: TranscriptDocument): ExportRow {
-        var createdDocument: DocumentFile? = null
         var documentUri: String? = null
         try {
             val format = ExportFormat.valueOf(row.format)
             val payload = payload(document, format)
-            val tree = DocumentFile.fromTreeUri(appContext, row.treeUri.toUri())
-                ?: throw IOException("export tree is unavailable")
-            if (!tree.isDirectory) throw IOException("export tree is not a directory")
+            val tree = row.treeUri.toUri()
+            require(DocumentsContract.isTreeUri(tree)) { "export target is not a tree URI" }
+            val parent = DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
+            val isDirectory = resolver.query(parent, arrayOf(DocumentsContract.Document.COLUMN_MIME_TYPE), null, null, null)?.use {
+                it.moveToFirst() && it.getString(0) == DocumentsContract.Document.MIME_TYPE_DIR
+            } ?: false
+            if (!isDirectory) throw IOException("export tree is not a directory")
 
             val fileName = collisionSafeFileName(document, format, row.id, payload.extension)
-            createdDocument = tree.createFile(payload.mimeType, fileName)
+            val createdDocument = DocumentsContract.createDocument(resolver, parent, payload.mimeType, fileName)
                 ?: throw IOException("export document could not be created")
-            documentUri = createdDocument.uri.toString()
+            documentUri = createdDocument.toString()
             val writing = row.copy(state = ExportState.WRITING, documentUri = documentUri, error = null, verification = null)
             dao.updateExport(writing)
 
-            val written = resolver.openOutputStream(createdDocument.uri, "w")
+            val written = resolver.openOutputStream(createdDocument, "w")
                 ?: throw IOException("export document could not be opened")
             val digest = writePayload(payload, written)
-            val verification = verifyReadback(createdDocument.uri, digest)
+            val verification = verifyReadback(createdDocument, digest)
             if (verification == VERIFICATION_MISMATCH) throw IOException(VERIFICATION_MISMATCH)
 
             val complete = writing.copy(
@@ -133,18 +136,18 @@ class ExportStore @Inject constructor(
             return complete
         } catch (cancelled: CancellationException) {
             withContext(NonCancellable) {
-                val remainingUri = cleanup(createdDocument, documentUri)
+                val remainingUri = cleanup(documentUri)
                 updateAfterFailure(row, ExportState.FAILED, ERROR_CANCELLED, remainingUri)
             }
             throw cancelled
         } catch (security: SecurityException) {
-            val remainingUri = cleanup(createdDocument, documentUri)
+            val remainingUri = cleanup(documentUri)
             return updateAfterFailure(row, ExportState.PERMISSION_REQUIRED, ERROR_PERMISSION_REQUIRED, remainingUri)
         } catch (failure: IOException) {
-            val remainingUri = cleanup(createdDocument, documentUri)
+            val remainingUri = cleanup(documentUri)
             return updateAfterFailure(row, ExportState.FAILED, failureCategory(failure), remainingUri)
         } catch (failure: IllegalArgumentException) {
-            val remainingUri = cleanup(createdDocument, documentUri)
+            val remainingUri = cleanup(documentUri)
             return updateAfterFailure(row, ExportState.FAILED, failureCategory(failure), remainingUri)
         }
     }
@@ -199,6 +202,9 @@ class ExportStore @Inject constructor(
             resolver.openInputStream(uri) ?: return VERIFICATION_UNVERIFIED
         } catch (_: IOException) {
             return VERIFICATION_UNVERIFIED
+        } catch (_: SecurityException) {
+            // A provider can permit writing without permitting a verification read.
+            return VERIFICATION_UNVERIFIED
         }
         return try {
             input.use { source ->
@@ -221,6 +227,8 @@ class ExportStore @Inject constructor(
             }
         } catch (_: IOException) {
             VERIFICATION_UNVERIFIED
+        } catch (_: SecurityException) {
+            VERIFICATION_UNVERIFIED
         }
     }
 
@@ -235,10 +243,12 @@ class ExportStore @Inject constructor(
         return failed
     }
 
-    private fun cleanup(document: DocumentFile?, uri: String?): String? {
-        if (document == null || uri == null) return uri
+    private fun cleanup(uri: String?): String? {
+        if (uri == null) return null
         return try {
-            if (document.delete()) null else uri
+            if (DocumentsContract.deleteDocument(resolver, uri.toUri())) null else uri
+        } catch (_: IOException) {
+            uri
         } catch (_: SecurityException) {
             uri
         } catch (_: RuntimeException) {

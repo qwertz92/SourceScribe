@@ -19,7 +19,6 @@ hilt = "2.60.1"
 work = "2.11.2"
 datastore = "1.2.1"
 androidx-hilt = "1.4.0"
-documentfile = "1.1.0"
 core-ktx = "1.19.0"
 
 [libraries]
@@ -56,7 +55,6 @@ hilt-work-compiler = { module = "androidx.hilt:hilt-compiler", version.ref = "an
 work-runtime = { module = "androidx.work:work-runtime-ktx", version.ref = "work" }
 work-testing = { module = "androidx.work:work-testing", version.ref = "work" }
 datastore = { module = "androidx.datastore:datastore-preferences", version.ref = "datastore" }
-documentfile = { module = "androidx.documentfile:documentfile", version.ref = "documentfile" }
 core-ktx = { module = "androidx.core:core-ktx", version.ref = "core-ktx" }
 
 [plugins]

@@ -1,13 +1,23 @@
 package app.sourcescribe.data;
 
+import android.content.ContentProvider;
+import android.content.ContentValues;
 import android.content.Context;
+import android.content.Intent;
 import android.database.Cursor;
 import android.database.MatrixCursor;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.CancellationSignal;
+import android.os.Handler;
+import android.os.HandlerThread;
 import android.os.ParcelFileDescriptor;
+import android.os.ProxyFileDescriptorCallback;
+import android.os.storage.StorageManager;
 import android.provider.DocumentsContract;
 import android.provider.DocumentsProvider;
+import android.system.ErrnoException;
+import android.system.OsConstants;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -26,21 +36,33 @@ import java.util.UUID;
 /** Test-only DocumentsProvider backed by a UUID-scoped cache directory. */
 public final class ExportFixtureProvider extends DocumentsProvider {
     public static final String AUTHORITY = "app.sourcescribe.test.documents";
+    public static final String CONTROL_AUTHORITY = AUTHORITY + ".control";
+    public static final String CONTROL_PERMISSION = "android.permission.ACCESS_CONTENT_PROVIDERS_EXTERNALLY";
 
     private static final String METHOD_CONFIGURE = "sourcescribe.configure";
     private static final String METHOD_SET_MODE = "sourcescribe.setMode";
     private static final String METHOD_SEED = "sourcescribe.seed";
     private static final String METHOD_BYTES = "sourcescribe.bytes";
+    private static final String METHOD_DISK_FULL_ATTEMPTED = "sourcescribe.diskFullAttempted";
+    private static final String METHOD_OUTPUT_FAILURE_ATTEMPTS = "sourcescribe.outputFailureAttempts";
     private static final String METHOD_NAMES = "sourcescribe.names";
+    private static final String METHOD_REVOKE_TREE = "sourcescribe.revokeTree";
     private static final String METHOD_RESET = "sourcescribe.reset";
     private static final String EXTRA_MODE = "mode";
     private static final String EXTRA_NAME = "name";
+    private static final String EXTRA_TARGET_PACKAGE = "targetPackage";
     private static final String EXTRA_BYTES = "bytes";
     private static final String EXTRA_URI = "uri";
     private static final String RESULT_TREE_URI = "treeUri";
     private static final String RESULT_BYTES = "bytes";
+    private static final String RESULT_DISK_FULL_ATTEMPTED = "diskFullAttempted";
+    private static final String RESULT_OUTPUT_FAILURE_ATTEMPTS = "outputFailureAttempts";
+    private static final String RESULT_DOCUMENT_URI = "documentUri";
     private static final String RESULT_NAMES = "names";
     private static final long FIXTURE_AVAILABLE_BYTES = 256L * 1024L * 1024L;
+    private static final int TREE_GRANT_FLAGS = Intent.FLAG_GRANT_READ_URI_PERMISSION
+            | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            | Intent.FLAG_GRANT_PREFIX_URI_PERMISSION;
 
     private static final Object LOCK = new Object();
     private static Fixture fixture;
@@ -55,20 +77,40 @@ public final class ExportFixtureProvider extends DocumentsProvider {
         return true;
     }
 
-    @Override
-    public Bundle call(String method, String arg, Bundle extras) {
+    private static Bundle controlCall(Context context, String method, Bundle extras) {
         synchronized (LOCK) {
             if (METHOD_CONFIGURE.equals(method)) {
                 if (fixture != null) {
+                    revokeTreePermission(context, fixture);
                     deleteRecursively(fixture.root);
                 }
-                configureLocked(attachedContext(), Mode.valueOf(stringExtra(extras, EXTRA_MODE)));
+                configureLocked(context, Mode.valueOf(stringExtra(extras, EXTRA_MODE)));
+                String treeUri = treeUri(fixture);
+                context.grantUriPermission(
+                        stringExtra(extras, EXTRA_TARGET_PACKAGE), Uri.parse(treeUri), TREE_GRANT_FLAGS);
                 Bundle result = new Bundle();
-                result.putString(RESULT_TREE_URI, treeUri(fixture));
+                result.putString(RESULT_TREE_URI, treeUri);
                 return result;
             }
 
+            if (METHOD_RESET.equals(method)) {
+                if (fixture != null) {
+                    revokeTreePermission(context, fixture);
+                    deleteRecursively(fixture.root);
+                    fixture = null;
+                }
+                return new Bundle();
+            }
+
             Fixture state = current();
+            if (METHOD_REVOKE_TREE.equals(method)) {
+                String requestedTreeUri = stringExtra(extras, EXTRA_URI);
+                if (!treeUri(state).equals(requestedTreeUri)) {
+                    throw new IllegalArgumentException("fixture tree does not match current state");
+                }
+                revokeTreePermission(context, state);
+                return new Bundle();
+            }
             if (METHOD_SET_MODE.equals(method)) {
                 state.mode = Mode.valueOf(stringExtra(extras, EXTRA_MODE));
                 return new Bundle();
@@ -77,8 +119,14 @@ public final class ExportFixtureProvider extends DocumentsProvider {
                 String name = stringExtra(extras, EXTRA_NAME);
                 byte[] bytes = byteExtra(extras, EXTRA_BYTES);
                 requireSafeName(name);
-                writeBytes(new File(state.root, name), bytes);
-                return new Bundle();
+                File file = new File(state.root, name);
+                writeBytes(file, bytes);
+                Bundle result = new Bundle();
+                result.putString(
+                        RESULT_DOCUMENT_URI,
+                        DocumentsContract.buildDocumentUriUsingTree(
+                                Uri.parse(treeUri(state)), state.documentIdFor(file)).toString());
+                return result;
             }
             if (METHOD_BYTES.equals(method)) {
                 String uriValue = stringExtra(extras, EXTRA_URI);
@@ -89,6 +137,16 @@ public final class ExportFixtureProvider extends DocumentsProvider {
                 } catch (FileNotFoundException failure) {
                     throw new IllegalStateException("fixture document is unavailable", failure);
                 }
+                return result;
+            }
+            if (METHOD_DISK_FULL_ATTEMPTED.equals(method)) {
+                Bundle result = new Bundle();
+                result.putBoolean(RESULT_DISK_FULL_ATTEMPTED, state.diskFullWriteAttempted);
+                return result;
+            }
+            if (METHOD_OUTPUT_FAILURE_ATTEMPTS.equals(method)) {
+                Bundle result = new Bundle();
+                result.putInt(RESULT_OUTPUT_FAILURE_ATTEMPTS, state.outputFailureWriteAttempts);
                 return result;
             }
             if (METHOD_NAMES.equals(method)) {
@@ -104,12 +162,7 @@ public final class ExportFixtureProvider extends DocumentsProvider {
                 result.putStringArrayList(RESULT_NAMES, names);
                 return result;
             }
-            if (METHOD_RESET.equals(method)) {
-                deleteRecursively(state.root);
-                fixture = null;
-                return new Bundle();
-            }
-            return super.call(method, arg, extras);
+            return null;
         }
     }
 
@@ -172,6 +225,20 @@ public final class ExportFixtureProvider extends DocumentsProvider {
     }
 
     @Override
+    public boolean isChildDocument(String parentDocumentId, String documentId) {
+        synchronized (LOCK) {
+            Fixture state = current();
+            try {
+                File parent = state.fileFor(parentDocumentId);
+                File document = state.fileFor(documentId);
+                return !parent.equals(document) && parent.equals(document.getParentFile());
+            } catch (FileNotFoundException ignored) {
+                return false;
+            }
+        }
+    }
+
+    @Override
     public String createDocument(String parentDocumentId, String mimeType, String displayName)
             throws FileNotFoundException {
         synchronized (LOCK) {
@@ -213,10 +280,16 @@ public final class ExportFixtureProvider extends DocumentsProvider {
                 throw new FileNotFoundException("fixture document missing");
             }
             if (state.mode == Mode.OUTPUT_FAILURE && canWrite(mode)) {
-                return failingWritePipe();
+                return partialWriteFileDescriptor(attachedContext(), state);
+            }
+            if (state.mode == Mode.DISK_FULL && canWrite(mode)) {
+                return diskFullFileDescriptor(attachedContext(), state);
             }
             if (state.mode == Mode.READBACK_UNAVAILABLE && !canWrite(mode)) {
                 throw new FileNotFoundException("fixture readback unavailable");
+            }
+            if (state.mode == Mode.READBACK_PERMISSION_DENIED && !canWrite(mode)) {
+                throw new SecurityException("fixture readback permission denied");
             }
             if (state.mode == Mode.READBACK_MISMATCH && !canWrite(mode)) {
                 return bytesPipe("mismatch".getBytes());
@@ -240,8 +313,10 @@ public final class ExportFixtureProvider extends DocumentsProvider {
         }
     }
 
-    public static String configure(Context context, Mode mode) {
-        Bundle result = call(context, METHOD_CONFIGURE, bundle(EXTRA_MODE, mode.name()));
+    public static String configure(Context context, Mode mode, String targetPackage) {
+        Bundle extras = bundle(EXTRA_MODE, mode.name());
+        extras.putString(EXTRA_TARGET_PACKAGE, targetPackage);
+        Bundle result = call(context, METHOD_CONFIGURE, extras);
         String tree = result.getString(RESULT_TREE_URI);
         if (tree == null) {
             throw new IllegalStateException("fixture provider returned no tree URI");
@@ -258,10 +333,18 @@ public final class ExportFixtureProvider extends DocumentsProvider {
     }
 
     public static void seed(Context context, String name, byte[] bytes) {
+        seedDocument(context, name, bytes);
+    }
+
+    public static String seedDocument(Context context, String name, byte[] bytes) {
         Bundle extras = new Bundle();
         extras.putString(EXTRA_NAME, name);
         extras.putByteArray(EXTRA_BYTES, bytes);
-        call(context, METHOD_SEED, extras);
+        String documentUri = call(context, METHOD_SEED, extras).getString(RESULT_DOCUMENT_URI);
+        if (documentUri == null) {
+            throw new IllegalStateException("fixture provider returned no document URI");
+        }
+        return documentUri;
     }
 
     public static byte[] bytes(Context context, String documentUri) {
@@ -279,6 +362,20 @@ public final class ExportFixtureProvider extends DocumentsProvider {
         return names == null ? new ArrayList<>() : names;
     }
 
+    public static boolean diskFullWriteAttempted(Context context) {
+        return call(context, METHOD_DISK_FULL_ATTEMPTED, null).getBoolean(RESULT_DISK_FULL_ATTEMPTED);
+    }
+
+    public static int outputFailureWriteAttempts(Context context) {
+        return call(context, METHOD_OUTPUT_FAILURE_ATTEMPTS, null).getInt(RESULT_OUTPUT_FAILURE_ATTEMPTS);
+    }
+
+    public static void revokeTreeGrant(Context context, String treeUri) {
+        Bundle extras = new Bundle();
+        extras.putString(EXTRA_URI, treeUri);
+        call(context, METHOD_REVOKE_TREE, extras);
+    }
+
     public static void reset(Context context) {
         call(context, METHOD_RESET, null);
     }
@@ -289,7 +386,7 @@ public final class ExportFixtureProvider extends DocumentsProvider {
             application = context;
         }
         Bundle result = application.getContentResolver().call(
-                android.net.Uri.parse("content://" + AUTHORITY), method, null, extras);
+                Uri.parse("content://" + CONTROL_AUTHORITY), method, null, extras);
         if (result == null) {
             throw new IllegalStateException("fixture provider returned no result");
         }
@@ -338,23 +435,94 @@ public final class ExportFixtureProvider extends DocumentsProvider {
         return mode.contains("w") || mode.contains("a") || mode.contains("+");
     }
 
-    private static ParcelFileDescriptor failingWritePipe() throws FileNotFoundException {
+    private static ParcelFileDescriptor partialWriteFileDescriptor(Context context, Fixture state) {
+        HandlerThread callbackThread = startProxyThread("sourcescribe-partial-write");
+        return openWriteProxy(
+                context,
+                callbackThread,
+                new ProxyFileDescriptorCallback() {
+                    @Override
+                    public long onGetSize() {
+                        return 0L;
+                    }
+
+                    @Override
+                    public int onWrite(long offset, int size, byte[] data) throws ErrnoException {
+                        state.outputFailureWriteAttempts++;
+                        if (state.outputFailureWriteAttempts == 1 && size > 0) {
+                            return 1;
+                        }
+                        throw new ErrnoException("write", OsConstants.EIO);
+                    }
+
+                    @Override
+                    public void onFsync() {
+                        // The fixture retains no data that needs flushing.
+                    }
+
+                    @Override
+                    public void onRelease() {
+                        callbackThread.quitSafely();
+                    }
+                },
+                "partial-write");
+    }
+
+    private static ParcelFileDescriptor diskFullFileDescriptor(Context context, Fixture state) {
+        HandlerThread callbackThread = startProxyThread("sourcescribe-disk-full");
+        return openWriteProxy(
+                context,
+                callbackThread,
+                new ProxyFileDescriptorCallback() {
+                    @Override
+                    public long onGetSize() {
+                        return 0L;
+                    }
+
+                    @Override
+                    public int onWrite(long offset, int size, byte[] data) throws ErrnoException {
+                        state.diskFullWriteAttempted = true;
+                        throw new ErrnoException("write", OsConstants.ENOSPC);
+                    }
+
+                    @Override
+                    public void onFsync() {
+                        // Every write fails, so there is no buffered data to flush.
+                    }
+
+                    @Override
+                    public void onRelease() {
+                        callbackThread.quitSafely();
+                    }
+                },
+                "disk-full");
+    }
+
+    private static HandlerThread startProxyThread(String name) {
+        HandlerThread thread = new HandlerThread(name);
+        thread.start();
+        return thread;
+    }
+
+    private static ParcelFileDescriptor openWriteProxy(
+            Context context,
+            HandlerThread callbackThread,
+            ProxyFileDescriptorCallback callback,
+            String fixtureName
+    ) {
+        StorageManager storage = context.getSystemService(StorageManager.class);
+        if (storage == null) {
+            callbackThread.quitSafely();
+            throw new AssertionError("storage manager unavailable for " + fixtureName + " fixture");
+        }
         try {
-            final ParcelFileDescriptor[] pipe = ParcelFileDescriptor.createPipe();
-            Thread thread = new Thread(() -> {
-                try (ParcelFileDescriptor.AutoCloseInputStream input =
-                             new ParcelFileDescriptor.AutoCloseInputStream(pipe[0])) {
-                    input.read();
-                } catch (IOException ignored) {
-                    // The fixture deliberately closes the reader after one byte.
-                }
-            });
-            thread.start();
-            return pipe[1];
+            return storage.openProxyFileDescriptor(
+                    ParcelFileDescriptor.MODE_WRITE_ONLY,
+                    callback,
+                    new Handler(callbackThread.getLooper()));
         } catch (IOException failure) {
-            FileNotFoundException error = new FileNotFoundException("fixture output pipe unavailable");
-            error.initCause(failure);
-            throw error;
+            callbackThread.quitSafely();
+            throw new AssertionError("proxy descriptor unavailable for " + fixtureName + " fixture", failure);
         }
     }
 
@@ -433,6 +601,12 @@ public final class ExportFixtureProvider extends DocumentsProvider {
         return DocumentsContract.buildTreeDocumentUri(AUTHORITY, state.rootId).toString();
     }
 
+    private static void revokeTreePermission(Context context, Fixture state) {
+        context.revokeUriPermission(
+                Uri.parse(treeUri(state)),
+                Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+    }
+
     private static void writeBytes(File file, byte[] bytes) {
         try (FileOutputStream output = new FileOutputStream(file)) {
             output.write(bytes);
@@ -472,12 +646,67 @@ public final class ExportFixtureProvider extends DocumentsProvider {
         }
     }
 
+    /** Privileged test-only control surface; document access still requires scoped URI grants. */
+    public static final class ControlProvider extends ContentProvider {
+        @Override
+        public boolean onCreate() {
+            return true;
+        }
+
+        @Override
+        public Bundle call(String method, String arg, Bundle extras) {
+            Context context = getContext();
+            if (context == null) {
+                throw new IllegalStateException("fixture control provider has no context");
+            }
+            context.enforceCallingPermission(CONTROL_PERMISSION, "fixture control permission required");
+            return controlCall(context, method, extras);
+        }
+
+        @Override
+        public Cursor query(
+                Uri uri,
+                String[] projection,
+                String selection,
+                String[] selectionArgs,
+                String sortOrder
+        ) {
+            throw unsupportedControlOperation();
+        }
+
+        @Override
+        public String getType(Uri uri) {
+            return null;
+        }
+
+        @Override
+        public Uri insert(Uri uri, ContentValues values) {
+            throw unsupportedControlOperation();
+        }
+
+        @Override
+        public int delete(Uri uri, String selection, String[] selectionArgs) {
+            throw unsupportedControlOperation();
+        }
+
+        @Override
+        public int update(Uri uri, ContentValues values, String selection, String[] selectionArgs) {
+            throw unsupportedControlOperation();
+        }
+
+        private static UnsupportedOperationException unsupportedControlOperation() {
+            return new UnsupportedOperationException("fixture control provider only supports calls");
+        }
+    }
+
     public enum Mode {
         SUCCESS,
         PERMISSION_DENIED,
         OUTPUT_FAILURE,
+        DISK_FULL,
         READBACK_MISMATCH,
         READBACK_UNAVAILABLE,
+        READBACK_PERMISSION_DENIED,
         NAME_COLLISION,
     }
 
@@ -505,6 +734,8 @@ public final class ExportFixtureProvider extends DocumentsProvider {
         private final File root;
         private final String rootId;
         private Mode mode;
+        private volatile boolean diskFullWriteAttempted;
+        private volatile int outputFailureWriteAttempts;
         private final Map<String, File> documents = new HashMap<>();
 
         private Fixture(File root, String rootId, Mode mode) {
