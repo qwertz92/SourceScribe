@@ -225,7 +225,7 @@ class ViewModelStateTest {
         val preservedPreviews = completed.previews
         onMain { viewModel.prepareAgain(UUID.randomUUID().toString(), requested) }
         val failed = withTimeout(TIMEOUT_MS) {
-            viewModel.screen.first { !it.busy && it.message == "LOCAL_OPERATION_FAILED" }
+            viewModel.screen.first { !it.busy && it.message == "LOCAL_PROCESSING_FAILED" }
         }
         assertEquals(selected, failed.draft)
         assertEquals(preservedPreviews, failed.previews)

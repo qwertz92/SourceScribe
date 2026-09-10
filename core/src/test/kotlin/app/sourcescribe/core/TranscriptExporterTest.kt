@@ -286,7 +286,8 @@ class TranscriptExporterTest {
     @Test
     fun windowsDeviceNamesAreNeutralisedEvenWhenSomethingFollowsTheDot() {
         val document = document()
-        for (name in listOf("AUX", "aux.notes", "CON.important", "com1.txt", "LPT9.a.b", "nul")) {
+        for (name in listOf("AUX", "aux.notes", "CON.important", "com1.txt", "LPT9.a.b", "nul",
+            "CONIN$", "conout$", "aux.", "aux ")) {
             val fileName = TranscriptExporter.fileName(document, ExportFormat.MARKDOWN, override = name)
             assertTrue(fileName, fileName.startsWith("_"))
         }

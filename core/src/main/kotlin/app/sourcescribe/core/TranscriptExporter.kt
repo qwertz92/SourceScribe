@@ -450,9 +450,11 @@ object TranscriptExporter {
             .let { takeBytes(it, maxBytes) }
             .trimEnd('.', ' ')
         if (cleaned.isEmpty()) return fallback
-        // Windows resolves a device name by the part before the first dot, so `AUX.notes` is `AUX` to it.
+        // These names are devices on Windows, where an exported file is likely to end up: writing to `aux`
+        // there reaches the device and leaves no file. Only the bare form was reproduced that way, but the
+        // part before the first dot is compared anyway, because a copy can be renamed to that bare form.
         val upper = cleaned.substringBefore('.').uppercase(Locale.ROOT)
-        val reserved = upper in setOf("CON", "PRN", "AUX", "NUL") ||
+        val reserved = upper in setOf("CON", "PRN", "AUX", "NUL", "CONIN$", "CONOUT$") ||
             (upper.length == 4 && upper.substring(0, 3) in setOf("COM", "LPT") && upper[3].isDigit())
         return if (reserved) "_$cleaned" else cleaned
     }

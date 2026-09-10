@@ -75,7 +75,7 @@
     <string name="theme_light">Light</string>
     <string name="theme_dark">Dark</string>
     <string name="parallel_jobs">Concurrent jobs</string>
-    <string name="storage_limit">App storage limit (MiB)</string>
+    <string name="storage_limit">App storage limit</string>
     <string name="engines">Extraction components</string>
     <string name="engine_activate">Check and activate</string>
     <string name="engine_rollback">Restore previous engine</string>
@@ -237,7 +237,7 @@
     <string name="help_bitrate_body">The data rate in kbit/s says how many bits per second of sound are used. Data rate and video length give the approximate file size.\n\nWhen the size is prefixed with “approx.”, the value is an estimate: either YouTube only reported an approximation, or the app derived it from data rate and length. The file actually downloaded can differ.</string>
 
     <string name="help_caption_track_title">Caption tracks</string>
-    <string name="help_caption_track_body">“Provided by the channel” means somebody uploaded or corrected the captions. These are usually the most accurate and contain punctuation.\n\n“Automatically generated” is YouTube’s own speech recognition. Usually usable, but without punctuation, without speakers and with errors on names and technical terms.\n\n“Automatically translated” is a machine translation of another track. SourceScribe leaves these out by default because they went through two machine steps and the errors add up. You can allow them under advanced options.</string>
+    <string name="help_caption_track_body">“YouTube · provided by channel” means somebody uploaded or corrected the captions. These are usually the most accurate and contain punctuation.\n\n“YouTube · auto-generated” is YouTube’s own speech recognition. Usually usable, but without punctuation, without speakers and with errors on names and technical terms.\n\n“Automatically translated” is a machine translation of another track. SourceScribe leaves these out by default because they went through two machine steps and the errors add up. You can allow them under advanced options.</string>
 
     <string name="help_provider_title">The three providers</string>
     <string name="help_provider_body">A provider is an external service that turns audio into text. SourceScribe has no server of its own; requests go straight from your device to the provider, with your own key and on your own bill.\n\nAssemblyAI works asynchronously: the app uploads the audio, receives a job id and polls for progress. Offers speaker separation and word timings.\n\nOpenAI and Groq work synchronously: the answer comes back on the request itself. Groq is usually cheap and fast.\n\nWhich options are actually possible depends on the chosen model, which is why unsupported switches are greyed out.</string>
@@ -261,7 +261,7 @@
     <string name="help_limits_body">The length limit is a guard against accidental cost: if the audio is longer than the configured value, the job stops before anything reaches the provider. The value applies per job and is part of the stored job configuration.\n\nThat is why the limit of a job that has already started cannot be raised afterwards. This is deliberate: a stored cost frame must not change by itself. To process a longer video, raise the limit before starting or prepare the job again with “Prepare again”.\n\nThe budget is a second, independent limit in US dollars. It is compared against the estimated cost of all submissions of the same job, including accepted and uncertain ones. Left blank, the app checks no cost limit.</string>
 
     <string name="help_cost_title">Cost estimate</string>
-    <string name="help_cost_body">The estimate shown is video length times the stored list price of the model, with the tariff date next to it. It is an orientation, not an invoice.\n\nIt contains no discounts, no minimum billing, no retries and no provider price changes. When it says “Price unknown”, SourceScribe has no verified tariff stored for that model; that is not an indication that it would be free. The provider invoice is always the binding one.</string>
+    <string name="help_cost_body">The estimate shown is video length times the stored list price of the model, with the tariff date next to it. It is an orientation, not an invoice.\n\nIt contains no discounts, no minimum billing, no retries and no provider price changes. When it says “Price unknown – no promise of free use”, SourceScribe has no verified tariff stored for that model; that is not an indication that it would be free. The provider invoice is always the binding one.</string>
 
     <string name="help_export_formats_title">Export formats</string>
     <string name="help_export_formats_body">The conversion is done by SourceScribe on the device, not by the provider. The provider only ever returns one transcript; every format is produced from it locally. Choosing several formats produces one file per format from the same result. Nothing is transcribed again and nothing extra is charged.\n\n• Markdown (.md): text with a heading and provenance fields. The default.\n• Plain text (.txt): the text only, without a header.\n• Structured data (.json): the complete result with times, speakers, provenance and warnings. For further processing.\n• Subtitles (.srt) and web subtitles (.vtt): numbered blocks with time codes for video players. Only possible when the result contains times.\n• “Original response (raw data)”: the unchanged provider answer. Only available when “Also keep raw data” is switched on.</string>
@@ -291,7 +291,7 @@
     <string name="help_diagnostics_body">“Redacted” means blacked out: all content has been removed from the report beforehand. It contains technical values only, namely app and component versions, device properties, counters per job state and known error codes.\n\nIt contains no links, no titles, no transcripts and no keys. You see the full text before deciding whether to share it; without your sharing it does not leave the device.</string>
 
     <string name="help_engines_title">Extraction components and channels</string>
-    <string name="help_engines_body">The extraction component is the tool that fetches YouTube metadata, captions and audio: yt-dlp together with a JavaScript helper. YouTube changes its pages regularly, which is why this tool is updated far more often than the app itself. That is why SourceScribe can update it separately.\n\n“Stable” is the regular release. “Nightly” is the day-to-day preview state: when YouTube has just changed something and the stable release has not caught up, nightly often already works, but it is less tested.\n\nSo when checking a source suddenly fails: check “Stable” first; if that does not help, check “Nightly”. When the app finds an update, put any public YouTube address into the field below. That makes the new version actually run before activation; it is only adopted when this functional test succeeds. Every version is additionally verified against its signature. “Restore previous engine” undoes an activation.\n\nPython, the JavaScript runtime and FFmpeg are fixed inside the app and need an app update. Running jobs keep the version they started with.</string>
+    <string name="help_engines_body">The extraction component is the tool that fetches YouTube metadata, captions and audio: yt-dlp together with a JavaScript helper. YouTube changes its pages regularly, which is why this tool is updated far more often than the app itself. That is why SourceScribe can update it separately.\n\n“Stable” is the regular release. “Nightly (preview)” is the day-to-day preview state: when YouTube has just changed something and the stable release has not caught up, nightly often already works, but it is less tested.\n\nSo when checking a source suddenly fails: check “Stable” first; if that does not help, check “Nightly (preview)”. When the app finds an update, put any public YouTube address into the field below. That makes the new version actually run before activation; it is only adopted when this functional test succeeds. Every version is additionally verified against its signature. “Restore previous engine” undoes an activation.\n\nPython, the JavaScript runtime and FFmpeg are fixed inside the app and need an app update. Running jobs keep the version they started with.</string>
 
     <string name="help_privacy_title">What leaves the device</string>
     <string name="help_privacy_body">In “YouTube only” mode, the only traffic leaving the device is the YouTube requests needed to load metadata and captions. No provider is involved.\n\nAs soon as an acquisition mode with STT is chosen and you start a job, the prepared audio file is transferred to the chosen provider. That never happens automatically and never without a chosen provider, model and key.\n\nThe app has no telemetry, no server of its own and no analytics. Keys stay on the device. A local cancel does not stop a request that already reached the provider.</string>
@@ -299,6 +299,7 @@
     <!-- Audio track, described in plain words -->
     <string name="audio_track_recommended">Recommended</string>
     <string name="audio_track_drc">Dynamic range compression</string>
+    <string name="audio_track_none_chosen">No audio track chosen yet – the choice decides language and size.</string>
     <string name="audio_track_original">Original audio</string>
     <string name="audio_track_size_approx">approx. %1$s</string>
     <string name="audio_track_size_unknown">Size unknown</string>
@@ -377,6 +378,7 @@
         <item quantity="one">%1$d passage</item>
         <item quantity="other">%1$d passages</item>
     </plurals>
+    <string name="segments_matching">%1$s of %2$s passages found</string>
     <string name="transcript_empty">This result contains no passages.</string>
     <string name="audio_track_description">Audio description</string>
     <string name="step_failure">%1$s: %2$s</string>
@@ -385,7 +387,6 @@
     <string name="step_import">While importing the file</string>
     <string name="step_audio">While obtaining the audio</string>
     <string name="step_engine">While updating the extraction component</string>
-    <string name="step_key">While using the API key</string>
     <string name="reason_network">No connection was made. Check the network and try again.</string>
     <string name="reason_rate_limit">Too many requests in a short time. The app waits and tries again later.</string>
     <string name="reason_invalid_response">The answer was not readable, so the job does not count as successful.</string>
@@ -409,6 +410,15 @@
     <string name="reason_import_invalid">This file is not an audio file the app can process.</string>
     <string name="reason_import_unavailable">The file can no longer be reached. It may have been moved or deleted.</string>
     <string name="reason_import_probe">The length and format of the file could not be determined.</string>
+    <string name="reason_audio_input_unusable">The downloaded audio file could not be read.</string>
+    <string name="reason_audio_probe">The length and format of the audio track could not be determined.</string>
+    <string name="reason_audio_conversion">The audio track could not be converted into the format the transfer needs.</string>
+    <string name="reason_audio_output_invalid">The converted audio file was unusable. Nothing was sent.</string>
+    <string name="reason_audio_too_large">The prepared audio track is larger than this job allows.</string>
+    <string name="reason_audio_out_of_range">The requested section lies outside the audio track.</string>
+    <string name="reason_audio_leftover">A file from an earlier attempt was still in place. Prepare the job again.</string>
+    <string name="reason_audio_workspace">The app’s internal working folder was not usable.</string>
+    <string name="checkpoint_damaged">The saved progress of this job can no longer be read. The job was stopped so that nothing is sent twice. Prepare the source again.</string>
     <string name="reason_import_corrupt">The file is damaged and could not be read in full.</string>
     <string name="source_not_a_video_link">That is not a link to a single YouTube video. Expected is an address such as https://www.youtube.com/watch?v=… or https://youtu.be/…</string>
     <string name="source_several_videos">The text contains several videos. Give exactly one link.</string>
@@ -421,10 +431,6 @@
     <string name="local_failed">A step on the device failed. Nothing was sent to a provider.</string>
     <string name="cleanup_failed">Cleaning up old files failed. Your transcripts are not affected.</string>
     <string name="help_stt_title">STT: speech to text</string>
-    <string name="help_stt_body">STT is short for speech to text. It means automatic transcription: a service receives an audio track and returns the spoken words as text.
-
-SourceScribe does not transcribe by itself. The app prepares the audio and sends it to a provider that you choose and pay for with your own key. That is why a provider, a model, a cost frame and a length limit appear wherever STT is involved.
-
-Captions are the opposite case. They already exist as finished text at YouTube, cost nothing, and leave your device only as a request to YouTube. That is why “YouTube only” is the mode without a provider, without a key and without cost.</string>
+    <string name="help_stt_body">STT is short for speech to text. It means automatic transcription: a service receives an audio track and returns the spoken words as text.\n\nSourceScribe does not transcribe by itself. The app prepares the audio and sends it to a provider that you choose and pay for with your own key. That is why a provider, a model, a cost frame and a length limit appear wherever STT is involved.\n\nCaptions are the opposite case. They already exist as finished text at YouTube, cost nothing, and leave your device only as a request to YouTube. That is why “YouTube only” is the mode without a provider, without a key and without cost.</string>
     <string name="limit_needs_new_job">Resuming and retrying do not change this job’s limits: they belong to it permanently and form the cost frame you confirmed when you started it. Choose “Prepare again” to start the same link as a new job with a higher limit.</string>
 </resources>

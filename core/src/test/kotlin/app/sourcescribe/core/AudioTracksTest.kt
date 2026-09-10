@@ -58,6 +58,27 @@ class AudioTracksTest {
         assertFalse(exact.bytesEstimated)
     }
 
+    @Test fun thePickerListsTheUsefulRenditionsBeforeTheDubbedCrowd() {
+        // A dubbed video hands over its languages in extractor order; the recommendation was landing
+        // somewhere in the middle of fifteen entries, which is what this order exists to prevent.
+        val tracks = listOf(
+            track("140-ru", "ru", bitrateKbps = 128),
+            track("140-desc", "en", bitrateKbps = 48, audioDescription = true),
+            track("140-hi", "hi", bitrateKbps = 128),
+            track("251-en", "en", isOriginal = true, bitrateKbps = 160),
+            track("140-de", "de", bitrateKbps = 128),
+            track("249-en", "en", isOriginal = true, bitrateKbps = 64),
+            track("249-drc-en", "en", isOriginal = true, bitrateKbps = 64, drc = true),
+        )
+        val order = AudioTracks.describe(tracks, 600_000).map { it.track.id }
+        // Recommendation, then the rest of the original language plain-before-compressed, then the dubs by
+        // language code, then the narration track.
+        assertEquals(listOf("249-en", "251-en", "249-drc-en", "140-de", "140-hi", "140-ru", "140-desc"), order)
+        assertTrue(AudioTracks.describe(tracks, 600_000).first().recommended)
+        // Same list, same order: the picker must not reshuffle itself between two resolves.
+        assertEquals(order, AudioTracks.describe(tracks.reversed(), 600_000).map { it.track.id })
+    }
+
     @Test fun sizeClassesOnlySeparateWhatIsActuallyDifferent() {
         val described = AudioTracks.describe(listOf(
             track("249", bitrateKbps = 64), track("250", bitrateKbps = 96), track("251", bitrateKbps = 160),

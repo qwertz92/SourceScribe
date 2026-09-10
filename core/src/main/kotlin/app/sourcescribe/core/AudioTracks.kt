@@ -35,6 +35,11 @@ object AudioTracks {
     /** Below this the rendition is a low-quality fallback rather than a normal speech stream. */
     private const val MINIMUM_USEFUL_KBPS = 24
 
+    /**
+     * Describes every rendition and returns them in reading order, not in the order the extractor happened
+     * to emit. A video dubbed into fifteen languages otherwise buries the recommendation somewhere in the
+     * middle of the list, which is where this order comes from.
+     */
     fun describe(tracks: List<AudioTrack>, durationMs: Long?): List<AudioTrackDescription> {
         val recommendedId = automatic(tracks)?.id
         val rates = tracks.mapNotNull { effectiveKbps(it) }
@@ -64,8 +69,26 @@ object AudioTracks {
                 },
                 recommended = track.id == recommendedId,
             )
-        }
+        }.sortedWith(readingOrder)
     }
+
+    /**
+     * The order the picker shows. The recommendation first, then the marked original, then the remaining
+     * spoken languages, then narration of the picture, which is almost never what someone wants transcribed.
+     * Inside one language the same preference decides as for the recommendation, so the plain, smallest
+     * usable rendition leads. Languages themselves are ordered by their code rather than by their translated
+     * name, so the list reads the same whichever language the app itself is set to.
+     */
+    private val readingOrder = compareBy<AudioTrackDescription>(
+        { if (it.recommended) 0 else 1 },
+        { if (it.audioDescription) 1 else 0 },
+        { if (it.isOriginal == true) 0 else 1 },
+        { normalizedLanguage(it.track.language) ?: "\uffff" },
+        { if (it.dynamicRangeCompressed) 1 else 0 },
+        { if (it.bitrateKbps?.let { rate -> rate < MINIMUM_USEFUL_KBPS } == true) 1 else 0 },
+        { it.bitrateKbps ?: Int.MAX_VALUE },
+        { it.track.id },
+    )
 
     /**
      * The rendition the app selects without asking. Returns null whenever the choice would silently

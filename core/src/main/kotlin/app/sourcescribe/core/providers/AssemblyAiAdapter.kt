@@ -513,13 +513,24 @@ class AssemblyAiAdapter(private val http: ProviderHttp = ProviderHttp()) : Provi
         )
     }
 
+    /**
+     * A language tag in the shapes a provider actually reports: `en`, `en_us`, `zh-CN`. The value is stored
+     * with the transcript and shown as its language, so it is bounded here instead of being taken at
+     * whatever length and character set an answer happens to carry.
+     */
+    private val reportedLanguage = Regex("[A-Za-z0-9]{1,8}([_-][A-Za-z0-9]{1,8}){0,3}")
+
     private fun parseReportedLanguages(
         objectValue: JsonObject,
         warnings: MutableList<String>,
     ): List<String> {
         val result = ArrayList<String>()
         val direct = optionalMetadataString(objectValue, "language_code", warnings)
-        if (direct != null) result += direct
+        when {
+            direct == null -> Unit
+            reportedLanguage.matches(direct) -> result += direct
+            else -> warnings += WARNING_REPORTED_LANGUAGES_MALFORMED
+        }
         val values = objectValue["language_codes"]
         when {
             values == null || values is JsonNull -> Unit
@@ -527,7 +538,7 @@ class AssemblyAiAdapter(private val http: ProviderHttp = ProviderHttp()) : Provi
                 val language = (value as? JsonPrimitive)
                     ?.takeIf { it.isString }
                     ?.content
-                    ?.takeIf { it.isNotBlank() }
+                    ?.takeIf { reportedLanguage.matches(it) }
                 if (language == null) warnings += "${WARNING_REPORTED_LANGUAGES_MALFORMED}_$index"
                 else result += language
             }

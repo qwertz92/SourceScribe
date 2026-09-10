@@ -391,22 +391,10 @@ class MainViewModel @Inject constructor(
                 return if (preview.resolved.audio.isEmpty()) "NO_AUDIO" else "CHOOSE_AUDIO_TRACK"
             }
             // The source length is already known here, so a doomed run is refused before it costs a download.
-            if (sttPossible && exceedsLengthLimit(preview.resolved.source.durationMs, config)) return "SOURCE_LONGER_THAN_LIMIT"
+            if (sttPossible && JobLimits.exceeds(preview.resolved.source.durationMs, config.maxAudioSeconds)) {
+                return "SOURCE_LONGER_THAN_LIMIT"
+            }
             return null
-        }
-
-        fun exceedsLengthLimit(durationMs: Long?, config: JobConfig): Boolean =
-            durationMs != null && config.maxAudioSeconds in 1..MAX_AUDIO_SECONDS &&
-                durationMs > config.maxAudioSeconds * 1000L
-
-        /**
-         * The smallest allowed limit that would admit this source, rounded up to whole minutes and padded a
-         * little. Null only when no allowed limit admits it, because the source is past the app's own ceiling.
-         */
-        fun suggestedLimitSeconds(durationMs: Long): Long? {
-            val needed = ((durationMs + 59_999) / 60_000) * 60
-            if (needed > MAX_AUDIO_SECONDS) return null
-            return minOf(needed + 5 * 60, MAX_AUDIO_SECONDS)
         }
 
         const val MAX_AUDIO_SECONDS = JobLimits.MAX_AUDIO_SECONDS

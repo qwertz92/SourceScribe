@@ -1,7 +1,9 @@
 # Tatsächlicher Projektstatus
 
-**Stand:** 8. September 2026. **Persönlicher Preview-Abschluss, danach PAUSE auf Nutzerwunsch.** **Freigabe:** Persönliche Preview; vollständige v1
-weiterhin blockiert. App-Quellstand `b631bbe`, CI-Diagnose `f9d4f8b`, lokales `main` und öffentliches
+**Stand:** 11. September 2026. **Freigabe:** Persönliche Preview; vollständige v1 weiterhin blockiert.
+Der Preview-Abschluss vom 8. September steht unten; seither ist die Nutzerrückmeldung vom
+10. September eingearbeitet, siehe den nächsten Abschnitt. App-Quellstand ist die Spitze von `main`,
+CI-Diagnose `f9d4f8b`, lokales `main` und öffentliches
 [GitHub-Repository](https://github.com/qwertz92/SourceScribe).
 
 Native Android-App mit Compose/Material 3, allen vier Beschaffungsmodi,
@@ -27,6 +29,35 @@ API-37-/x86_64-/16-KB-Emulator nachgewiesen. Keine echte STT-API aufgerufen.
 | P4 | IMPLEMENTED / TESTED_WITH_FIXTURES: Queue/Limits, Recovery, unsichere Submissions, Exportreparatur, Updatefehler | LIVE_VERIFIED: Android-Prozess-/Grantgrenzen, Reboot-Recovery mit Providerfixture, echtes signiertes Update/Rollback. T26 mit zwei laufenden Fixturejobs PASS r70. |
 | P5 | IMPLEMENTED: de/en-App-Sprache, System/Hell/Dunkel, überarbeitete Auswahlfelder/Navigation, Viewer/Suche/Kopieren/Share, Formate/Diagnose/Signierpfad | ADB-/Screenshotprüfungen einschließlich 200-%-Schrift und Querformat bestanden. Vollständige TalkBack-Bedienung BLOCKED; dauerhafte persönliche Release-Signatur und Installation PASS r81. |
 | P6 | Integrierte Regression und unabhängige Reviews ausgeführt; bestätigte Defekte samt Regression behoben | Vollständige Abnahme BLOCKED: Provider, physisches ARM64, TalkBack und öffentliche APK-Lizenz-/Quellbelege fehlen. |
+
+## Nutzerrückmeldung vom 10. September 2026 und zwei Reviewdurchgänge
+
+**Stand:** 11. September 2026. Der Nutzer hat die Preview am Gerät getestet und 20 Punkte gemeldet.
+17 davon sind umgesetzt und am Emulator oder durch Tests belegt; die drei offenen stehen mit Stelle und
+fehlendem Nachweis in [Bekannte Probleme](DEFECTS.md).
+
+Dazu kamen zwei vollständige Runden adversarischer Reviews mit je vier Sonnet-5-Agenten. Runde 1 lief über
+`782aef5`, Runde 2 über `5a6bfef`. Aus Runde 1 stammen unter anderem die Untertitelspur-Regression und die
+Vereinheitlichung der Längengrenze, aus Runde 2 ein Instrumentierungstest, der auf einen umbenannten
+Statuscode wartete, die fehlenden Fehlertexte der lokalen Audiovorbereitung, die falsch zugeordnete Meldung
+bei beschädigtem Zwischenstand und drei Glossarzitate, die nicht der Beschriftung auf dem Bildschirm
+entsprachen.
+
+Zusätzlich umgesetzt, weil am Gerät sichtbar geworden: Die Audiospurliste ist nach Lesereihenfolge sortiert
+(Empfehlung, Originalsprache, weitere Sprachen, Audiodeskription zuletzt), die Ergebnisansicht zeigt bei
+aktiver Suche die Trefferzahl statt der Gesamtzahl, und die Auswahlfelder reservieren die erklärende Zeile
+auch dann, wenn noch nichts gewählt ist.
+
+Gerätebelege vom 11. September 2026 auf `emulator-5556` (Pixel 10, API 37) mit
+`https://youtu.be/aircAruvnKk` (18:40): formatiertes Veröffentlichungsdatum, Untertitelspurauswahl in
+`CAPTIONS_THEN_STT`, Audiospur als „English · Original audio · 6.8 MB“ mit technischer Zeile, fertiger
+Untertitelauftrag mit 286 Abschnitten, Zustandschip mit Ergebnis darunter, Teilen direkt aus dem Verlauf,
+Scrollen am rechten Rand bis zum letzten Abschnitt bei 18:25, Volltextsuche bei offener Tastatur und
+Zurücknavigation ohne Appende.
+
+Gates auf diesem Stand: 124 JVM-Tests im Modul `core` ohne Fehler, alle vier Lintberichte (`:app` und
+`:extractor`, debug und release) ohne Befund. Die Instrumentierungstests sind aus WSL heraus nicht über
+Gradle startbar; der Grund und der gangbare Weg über `am instrument` stehen in [Bekannte Probleme](DEFECTS.md).
 
 ## UI-Feedback umgesetzt
 

@@ -130,8 +130,17 @@ internal fun TranscriptScreen(
                                 Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
                             InfoButton(HelpTopic.PROVENANCE, openHelp)
                         }
-                        Text(pluralStringResource(R.plurals.segments_count, document.segments.size, document.segments.size),
-                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        // While a search is running the total alone is misleading: the list underneath is
+                        // the filtered one, so the line says how much of the result is currently visible.
+                        Text(
+                            if (query.isBlank()) {
+                                pluralStringResource(R.plurals.segments_count, document.segments.size, document.segments.size)
+                            } else {
+                                stringResource(R.string.segments_matching,
+                                    numberText(segments.size), numberText(document.segments.size))
+                            },
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                         if (document.scope.technicallyComplete != true) Text(stringResource(R.string.technically_partial),
                             color = MaterialTheme.colorScheme.error)
                         if (document.warnings.isNotEmpty()) Text(document.warnings.joinToString(" · "),

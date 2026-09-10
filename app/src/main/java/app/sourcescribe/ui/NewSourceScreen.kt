@@ -187,7 +187,8 @@ private fun PreviewCard(
                     optionName = { audioTrackOption(it) },
                     enabled = !state.starting,
                     placeholder = stringResource(R.string.choose),
-                    supporting = described.firstOrNull { it.track.id == preview.config.audioTrackId }?.let { audioTrackDetail(it) },
+                    supporting = described.firstOrNull { it.track.id == preview.config.audioTrackId }
+                        ?.let { audioTrackDetail(it) } ?: stringResource(R.string.audio_track_none_chosen),
                     info = HelpTopic.AUDIO_TRACK,
                     openHelp = openHelp,
                 ) { onTrack(source.id, null, it.track.id) }
@@ -231,7 +232,7 @@ private fun LengthLimitWarning(
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(stringResource(R.string.source_longer_than_limit, duration(durationMs), limitDuration(config.maxAudioSeconds)),
             color = MaterialTheme.colorScheme.error)
-        val suggestion = MainViewModel.suggestedLimitSeconds(durationMs)
+        val suggestion = JobLimits.suggestedSeconds(durationMs)
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (suggestion != null) FilledTonalButton({ change(config.copy(maxAudioSeconds = suggestion)) },
                 Modifier.weight(1f), enabled = enabled) {

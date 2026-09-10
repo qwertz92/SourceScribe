@@ -20,10 +20,11 @@ belegt. Diese drei sind offen oder nur teilweise geschlossen:
   jetzt ein eigener Vollbildschirm mit `windowInsetsPadding(WindowInsets.safeDrawing)`, einer einzigen
   `LazyColumn` und einer festen Fußleiste. Damit sind feste Bruchteilhöhen und verdeckte Ränder als
   mögliche Ursachen weg.
-- **Was fehlt:** Der ursprünglich gemeldete Ablauf wurde nie nachgestellt, weil kein langes Transkript
-  auf dem Gerät vorlag. Der Umbau ist also eine begründete Änderung an der wahrscheinlichsten Ursache,
-  kein nachgewiesener Fix. Zum Schließen: ein Transkript mit mehreren hundert Abschnitten öffnen, am
-  linken und am rechten Rand wischen, bis zum Ende scrollen, in Quer- und Hochformat.
+- **Was inzwischen belegt ist:** Am 11. September 2026 auf `emulator-5556` mit einem echten Transkript
+  von 286 Abschnitten geprüft: Wischen am rechten Rand scrollt, und die Liste läuft bis zum letzten
+  Abschnitt bei 18:25 durch. Die Volltextsuche filtert dabei weiter korrekt, auch bei offener Tastatur.
+- **Was fehlt:** Querformat und ein zweites Gerät. Der ursprünglich gemeldete Ablauf wurde damit nicht
+  reproduziert; ob er auf dem Gerät des Nutzers noch auftritt, ist ungeprüft.
 
 ### 2. Untere Aktionsschaltfläche „könnte mehr Platz vertragen“
 
@@ -46,13 +47,13 @@ belegt. Diese drei sind offen oder nur teilweise geschlossen:
 
 ## Offene Reviewfunde
 
-### 4. Fehlercodes ohne eigenen Text (mittel)
+### 4. Interne Integritätscodes ohne eigenen Text (mittel)
 
 - **Stelle:** `app/src/main/java/app/sourcescribe/ui/Labels.kt`, `messageText`
-- **Stand:** Die Familien, die ein Nutzer im Alltag trifft, haben jetzt eigene Texte: ungültige Links,
-  Anbieterfehler (Schlüssel, Kontingent, Netz, Serverfehler), Extraktionsfehler, Engine-Updates,
-  Audioimport. Der `else`-Zweig zeigt weiterhin „Vorgang konnte nicht abgeschlossen werden“ plus den
-  technischen Status.
+- **Stand:** Die Familien, die ein Nutzer im Alltag trifft, haben eigene Texte: ungültige Links,
+  Anbieterfehler, Extraktionsfehler, Engine-Updates, Audioimport, und seit dem zweiten Reviewdurchgang
+  auch die zehn Codes der lokalen Audiovorbereitung (`AudioPreparationCode`). Der `else`-Zweig zeigt
+  weiterhin „Vorgang konnte nicht abgeschlossen werden“ plus den technischen Status.
 - **Was offen ist:** Rund 45 interne Integritätscodes fallen weiter in diesen Zweig, etwa
   `SUBMISSION_BINDING_MISMATCH`, `PREPARED_AUDIO_CHANGED`, `ARTIFACT_BINDING_MISMATCH`,
   `RAW_HASH_MISMATCH`, `PATH_ESCAPE`. Sie bedeuten alle „ein interner Bindungs- oder Prüfschritt hat
@@ -61,7 +62,8 @@ belegt. Diese drei sind offen oder nur teilweise geschlossen:
 
 ### 5. Vorabprüfung und tatsächliche Grenze messen zwei verschiedene Dauern (mittel, teilweise unbestätigt)
 
-- **Stelle:** `MainViewModel.exceedsLengthLimit` gegenüber `data/SttStep.kt` (`preparation.probe`)
+- **Stelle:** `core/.../JobLimits.exceeds` (Vorschau) gegenüber `app/.../data/SttStep.kt`
+  (`preparation.probe`)
 - **Voraussetzung:** Die Vorschau prüft die von yt-dlp gemeldete Videolänge; die eigentliche Grenze prüft
   die gemessene Länge der heruntergeladenen Tonspur. Beide vergleichen strikt mit `>` ohne Toleranz.
 - **Folge:** Weichen die beiden Werte um Millisekunden ab, kann ein Auftrag die Vorschau bestehen und
@@ -80,22 +82,64 @@ belegt. Diese drei sind offen oder nur teilweise geschlossen:
   Für den Einzelnutzerbetrieb ist das unkritisch, aber es ist eine bewusste Annahme, keine Garantie.
 - **Was fehlt:** Entweder mehr Bytes oder ein Test, der die Annahme dokumentiert.
 
-### 7. Englisches Glossar setzt Bedienelementnamen ohne Anführungszeichen (niedrig)
+### 7. Gelöschtes Exportdokument bleibt als belegter Name gezählt (niedrig)
 
-- **Stelle:** `app/src/main/res/values-en/strings.xml`, die `help_*_body`-Texte
-- **Stand:** Der deutsche Text schreibt „Stabil“, „Nightly“, „Neu vorbereiten“ in Anführungszeichen; der
-  englische schreibt dieselben Namen als normalen Fließtext. Damit fehlt im Englischen der Hinweis, dass
-  ein Wort den Namen einer Schaltfläche meint und keine Beschreibung ist.
-- **Was fehlt:** Die betroffenen englischen Texte durchgehen und dieselben Namen in `"…"` setzen.
+- **Stelle:** `app/src/main/java/app/sourcescribe/data/ExportStore.kt`, `reconcile` gegenüber der
+  `repeated`-Prüfung in `export`
+- **Voraussetzung:** Ein Export ist fehlgeschlagen oder sein Dokument wurde außerhalb der App gelöscht.
+  `reconcile` behält `documentUri` auf der `FAILED`-Zeile.
+- **Folge:** Die Wiederholungsprüfung zählt diese Zeile weiter als belegten Namen. Ein selbst vergebener
+  Name bekommt dann beim nächsten Export einen Unterscheidungszusatz, obwohl die Datei nachweislich weg
+  ist. Es entsteht keine Kollision und kein Datenverlust, nur ein unnötiger Zusatz im Dateinamen.
+- **Was fehlt:** Entscheidung, ob `reconcile` `documentUri` bei nachgewiesen fehlender Datei löschen
+  soll. Das berührt die Exportreparatur und braucht einen eigenen Test.
 
-### 8. Verlauf: `FINISHED` ohne Ergebnis passt zu keinem Filter außer „Alle“ (unbestätigt)
+### 8. AssemblyAI meldet Sprache und Modell ohne Längen- oder Zeichenprüfung (niedrig, unbestätigt)
 
-- **Stelle:** `app/src/main/java/app/sourcescribe/ui/HistoryScreen.kt`, `HistoryFilter.matches`
-- **Voraussetzung:** Ein Auftrag mit `ExecutionState.FINISHED` und `Outcome.NONE`.
-- **Unbestätigt:** Ob diese Kombination überhaupt entstehen kann, hängt von `JobCoordinator` ab und wurde
-  nicht nachverfolgt. Falls ja, verschwindet ein solcher Auftrag aus allen vier Sachfiltern.
+- **Stelle:** `core/src/main/kotlin/app/sourcescribe/core/providers/AssemblyAiAdapter.kt`,
+  `optionalMetadataString` für `speech_model_used`
+- **Stand:** Die gemeldete Sprache wird seit dem zweiten Reviewdurchgang auf eine Sprachkennung geprüft
+  (`en`, `en_us`, `zh-CN`). Für `speech_model_used` gilt weiterhin nur „nicht leer“: der Adapter
+  übernimmt jede Zeichenkette in beliebiger Länge nach `provenance.reportedModel`, wo sie angezeigt wird.
+  Zum Vergleich prüft `SyncTranscriptParser` (OpenAI, Groq) die gemeldete Sprache auf genau zwei
+  ASCII-Buchstaben.
+- **Unbestätigt:** Ob AssemblyAI je etwas anderes als einen kurzen Modellnamen zurückgibt. Ein echter
+  Anbieterlauf hat in diesem Projekt noch nicht stattgefunden.
+- **Was fehlt:** Eine Längenobergrenze mit Warnung statt stiller Übernahme, plus ein Contract-Test mit
+  einer überlangen Antwort.
+
+## Bewusste Entscheidungen, die wie Fehler aussehen
+
+### Nicht erreichbare `PROVIDER_`- und `RESPONSE_`-Zweige in `messageText`
+
+Ein Review hat gezeigt, dass die meisten `PROVIDER_*`- und `RESPONSE_*`-Zweige heute nicht erreichbar
+sind, weil `SttStep` die Anbietfehler in den einzelnen Phasen selbst behandelt und den nackten Code
+speichert. Die Zweige bleiben trotzdem stehen: Sie sind das Auffangnetz für einen `ProviderError`, der
+einer Phasenbehandlung entkommt, und die Schrittangabe („Beim Absenden an den Anbieter“) wäre in genau
+diesem Fall richtig. Anders lag der Fall bei den acht `AUDIO_*`-Zweigen, die nach `ExtractionFailure`
+modelliert waren: dort gab es keinen denkbaren Erzeuger, und sie sind entfernt.
 
 ## Wartungshinweise, die keine Defekte sind
+
+### Instrumentierungstests laufen nicht über Gradle aus WSL heraus
+
+Der Gradle-Lauf findet in WSL statt, der Emulator läuft unter Windows. Der Windows-`adb`-Server hört nur
+auf `127.0.0.1`, und WSL erreicht diese Adresse nicht (nachgemessen am 11. September 2026:
+`ADB_SERVER_SOCKET=tcp:172.20.112.1:5037` läuft in `Connection timed out`). `connectedDebugAndroidTest`
+ist deshalb lokal nicht ausführbar, ohne den Windows-`adb`-Server neu zu starten — was den Emulator des
+Nutzers mit abhängen würde. Der gangbare Weg ohne Eingriff in fremde Geräte:
+
+```bash
+bash tools/build-local.sh :app:assembleDebug :app:assembleDebugAndroidTest
+```
+
+Danach unter Windows beide APKs installieren und die Instrumentierung direkt starten:
+
+```powershell
+& $adb -s emulator-5556 install -r -t app/build/outputs/apk/debug/app-debug.apk
+& $adb -s emulator-5556 install -r -t app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+& $adb -s emulator-5556 shell am instrument -w -r app.sourcescribe.debug.test/androidx.test.runner.AndroidJUnitRunner
+```
 
 ### Abhängigkeitsprüfung nach jedem Versionswechsel neu erzeugen
 

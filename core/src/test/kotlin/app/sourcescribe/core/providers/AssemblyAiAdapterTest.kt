@@ -583,6 +583,39 @@ class AssemblyAiAdapterTest {
     }
 
     @Test
+    fun aReportedLanguageIsTakenOnlyWhereItLooksLikeALanguageTag() {
+        fun parsed(reported: String): Pair<String?, List<String>> {
+            val response = """
+                {
+                  "id":"0072a82b-aa22-4962-add2-6121c36c17c6",
+                  "status":"completed",
+                  "text":"one",
+                  "language_code":$reported,
+                  "words":[],
+                  "utterances":null
+                }
+            """.trimIndent()
+            val transcript = (adapter.parseSavedResponse(response.toByteArray(), request())
+                as SubmissionResult.Direct).transcript
+            return transcript.language to transcript.warnings
+        }
+
+        // The shapes AssemblyAI actually reports stay untouched.
+        assertEquals("en", parsed("\"en\"").first)
+        assertEquals("en_us", parsed("\"en_us\"").first)
+        assertEquals("zh-CN", parsed("\"zh-CN\"").first)
+
+        // Anything else is stored with the transcript and shown as its language, so it is refused loudly
+        // instead of taken at whatever length and character set an answer happens to carry.
+        val long = parsed("\"" + "x".repeat(400) + "\"")
+        assertNull(long.first)
+        assertTrue(long.second.toString(), "REPORTED_LANGUAGES_MALFORMED" in long.second)
+        val prose = parsed("\"English (United States)\"")
+        assertNull(prose.first)
+        assertTrue(prose.second.toString(), "REPORTED_LANGUAGES_MALFORMED" in prose.second)
+    }
+
+    @Test
     fun wordTimesAreMillisecondsAndChunkOffsetAppliesOnlyToEvidence() {
         val response = """
             {

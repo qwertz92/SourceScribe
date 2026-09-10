@@ -64,6 +64,9 @@ object ExtractorMetadata {
         val audio = (root["formats"] as? JsonArray).orEmpty().filterIsInstance<JsonObject>().mapNotNull { item ->
             fun value(key: String) = (item[key] as? JsonPrimitive)?.contentOrNull
             fun number(key: String) = (item[key] as? JsonPrimitive)?.doubleOrNull?.takeIf { it.isFinite() && it >= 0 }
+            // A key written as JSON null is a key without a value: `value()` and `number()` both return null
+            // for it, so the provenance line must not count it as a field this entry carried either.
+            fun carried(key: String) = (item[key] as? JsonPrimitive)?.contentOrNull != null
             val id = value("format_id") ?: return@mapNotNull null
             val acodec = value("acodec")
             if (!Regex("[A-Za-z0-9_.-]{1,80}").matches(id) || value("vcodec") != "none" || acodec in setOf(null, "none")) return@mapNotNull null
@@ -89,7 +92,7 @@ object ExtractorMetadata {
                 evidence = "yt-dlp:formats." + listOf(
                     "language", "language_preference", "format_note", "acodec", "vcodec", "ext",
                     "abr", "tbr", "filesize", "filesize_approx", "asr", "audio_channels",
-                ).filter { it in item }.joinToString(","),
+                ).filter(::carried).joinToString(","),
                 codec = acodec?.take(80),
                 container = value("ext")?.take(20),
                 bitrateKbps = (number("abr") ?: number("tbr"))?.takeIf { it in 1.0..10_000.0 }?.toInt(),

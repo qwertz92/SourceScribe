@@ -103,6 +103,18 @@ class ExtractorMetadataTest {
         assertEquals("251", TrackSelection.audio(ExtractorMetadata.parse(raw, source), null)?.id)
     }
 
+    @Test fun provenanceDoesNotNameAFieldThatWasWrittenAsNull() {
+        // yt-dlp writes a key it has no answer for as JSON null. That is not a field the entry carried,
+        // and an evidence line that named it would overstate what backed the record.
+        val raw = """{"id":"BaW_jenozKc","formats":[{"format_id":"140","vcodec":"none","acodec":"mp4a.40.2",
+            "ext":"m4a","abr":null,"asr":null,"filesize":null,"audio_channels":2}]}"""
+        val track = ExtractorMetadata.parse(raw, source).audio.single()
+        assertNull(track.bitrateKbps)
+        assertNull(track.sampleRateHz)
+        assertNull(track.bytes)
+        assertEquals("yt-dlp:formats.acodec,vcodec,ext,audio_channels", track.evidence)
+    }
+
     @Test fun absentLanguagePreferenceFallsBackOnlyToTheParenthesisedNote() {
         fun note(value: String) = ExtractorMetadata.parse(
             """{"id":"BaW_jenozKc","formats":[{"format_id":"140","vcodec":"none","acodec":"mp4a.40.2","format_note":"$value"}]}""",

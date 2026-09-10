@@ -7,6 +7,7 @@ import app.sourcescribe.BuildConfig
 import app.sourcescribe.core.ArtifactFilesException
 import app.sourcescribe.core.CaptionParseException
 import app.sourcescribe.core.ProviderErrorCode
+import app.sourcescribe.extractor.AudioPreparationCode
 import app.sourcescribe.extractor.EngineUpdateCode
 import app.sourcescribe.extractor.EngineUpdateManager
 import app.sourcescribe.extractor.ExtractionFailure
@@ -39,6 +40,7 @@ private val KNOWN_ERROR_CODES = buildSet {
             "INVALID_QUERY", "AMBIGUOUS_VIDEO", "EXPLICIT_VIDEO_REQUIRED", "INVALID_VIDEO_ID", "INPUT_TOO_LARGE",
             "TOO_MANY_VIDEOS", "INVALID_CAPTION_URL", "LIVE_OR_PLAYLIST_UNSUPPORTED", "INVALID_METADATA",
             "METADATA_TOO_LARGE", "INVALID_DURATION", "LOCAL_PROCESSING_FAILED", "CLEANUP_FAILED",
+            "CHECKPOINT_DAMAGED",
         ),
     )
     addAll(ProviderErrorCode.entries.map { it.name })
@@ -47,6 +49,7 @@ private val KNOWN_ERROR_CODES = buildSet {
     addAll(ExtractionFailure.entries.map { it.name })
     addAll(RuntimeFailureCode.entries.map { it.name })
     addAll(EngineUpdateCode.entries.map { "ENGINE_${it.name}" })
+    addAll(AudioPreparationCode.entries.map { "AUDIO_${it.name}" })
     addAll(
         listOf(
             ArtifactFilesException.INVALID_ARTIFACT_ID, ArtifactFilesException.INVALID_RAW_EXTENSION,

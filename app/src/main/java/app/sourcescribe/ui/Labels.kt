@@ -296,7 +296,8 @@ internal fun byteSize(bytes: Long): String {
     "AUDIO_DURATION_LIMIT" -> stringResource(R.string.invalid_duration)
     "AUDIO_LONGER_THAN_LIMIT", "SOURCE_LONGER_THAN_LIMIT" -> stringResource(R.string.audio_longer_than_limit)
     "AUDIO_DURATION_UNKNOWN" -> stringResource(R.string.audio_duration_unknown)
-    "UNSUPPORTED_OPTION", "PROVIDER_CAPABILITY_OR_CREDENTIAL_INVALID" -> stringResource(R.string.unsupported_options)
+    "UNSUPPORTED_OPTION", "PROVIDER_UNSUPPORTED_OPTION", "RESPONSE_UNSUPPORTED_OPTION",
+    "PROVIDER_CAPABILITY_OR_CREDENTIAL_INVALID" -> stringResource(R.string.unsupported_options)
     "PRICE_UNKNOWN" -> stringResource(R.string.price_unknown)
 
     // What the reader typed or shared could not be turned into exactly one finished video.
@@ -312,13 +313,13 @@ internal fun byteSize(bytes: Long): String {
     "INVALID_CAPTION_URL" -> stringResource(R.string.source_caption_url_rejected)
 
     // Reasons that can arise in more than one step; stepText names the step where the code carries one.
-    "NETWORK", "PROVIDER_NETWORK", "RESPONSE_NETWORK", "AUDIO_NETWORK", "ENGINE_NETWORK" ->
+    "NETWORK", "PROVIDER_NETWORK", "RESPONSE_NETWORK", "ENGINE_NETWORK" ->
         stepText(code, R.string.reason_network)
-    "RATE_LIMIT", "PROVIDER_RATE_LIMIT", "RESPONSE_RATE_LIMIT", "AUDIO_RATE_LIMIT", "ENGINE_RATE_LIMIT" ->
+    "RATE_LIMIT", "PROVIDER_RATE_LIMIT", "RESPONSE_RATE_LIMIT", "ENGINE_RATE_LIMIT" ->
         stepText(code, R.string.reason_rate_limit)
-    "INVALID_RESPONSE", "PROVIDER_INVALID_RESPONSE", "RESPONSE_INVALID_RESPONSE", "AUDIO_INVALID_RESPONSE" ->
+    "INVALID_RESPONSE", "PROVIDER_INVALID_RESPONSE", "RESPONSE_INVALID_RESPONSE" ->
         stepText(code, R.string.reason_invalid_response)
-    "STORAGE", "AUDIO_STORAGE", "ENGINE_STORAGE", "AUDIO_IMPORT_STORAGE",
+    "STORAGE", "AUDIO_STORAGE_FAILED", "ENGINE_STORAGE", "AUDIO_IMPORT_STORAGE",
     "RESPONSE_STORAGE", "PROVIDER_RESPONSE_STORAGE", "RESPONSE_RESPONSE_STORAGE" ->
         stepText(code, R.string.reason_storage)
 
@@ -335,10 +336,10 @@ internal fun byteSize(bytes: Long): String {
         stepText(code, R.string.reason_invalid_input)
 
     // Reasons only the YouTube extraction can give.
-    "SOURCE_UNAVAILABLE", "AUDIO_SOURCE_UNAVAILABLE" -> stepText(code, R.string.reason_source_unavailable)
-    "CHALLENGE_REQUIRED", "AUDIO_CHALLENGE_REQUIRED" -> stepText(code, R.string.reason_challenge_required)
-    "NO_CAPTIONS", "AUDIO_NO_CAPTIONS" -> stepText(code, R.string.reason_no_captions)
-    "NATIVE", "AUDIO_NATIVE" -> stepText(code, R.string.reason_native)
+    "SOURCE_UNAVAILABLE" -> stepText(code, R.string.reason_source_unavailable)
+    "CHALLENGE_REQUIRED" -> stepText(code, R.string.reason_challenge_required)
+    "NO_CAPTIONS" -> stepText(code, R.string.reason_no_captions)
+    "NATIVE" -> stepText(code, R.string.reason_native)
 
     "ENGINE_VERIFICATION" -> stepText(code, R.string.reason_engine_verification)
     "ENGINE_REQUIRES_APP_UPDATE" -> stepText(code, R.string.reason_engine_app_update)
@@ -348,11 +349,21 @@ internal fun byteSize(bytes: Long): String {
 
     "KEY_INVALID_INPUT", "CREDENTIAL_INVALID_INPUT" -> stringResource(R.string.key_invalid_input)
 
+    "AUDIO_INVALID_INPUT", "AUDIO_INPUT_NOT_FILE" -> stepText(code, R.string.reason_audio_input_unusable)
+    "AUDIO_INVALID_OUTPUT_DIRECTORY" -> stepText(code, R.string.reason_audio_workspace)
+    "AUDIO_OUTPUT_EXISTS" -> stepText(code, R.string.reason_audio_leftover)
+    "AUDIO_OUT_OF_RANGE" -> stepText(code, R.string.reason_audio_out_of_range)
+    "AUDIO_PROBE_FAILED" -> stepText(code, R.string.reason_audio_probe)
+    "AUDIO_CONVERSION_FAILED" -> stepText(code, R.string.reason_audio_conversion)
+    "AUDIO_OUTPUT_TOO_LARGE" -> stepText(code, R.string.reason_audio_too_large)
+    "AUDIO_OUTPUT_INVALID" -> stepText(code, R.string.reason_audio_output_invalid)
+
     "AUDIO_IMPORT_INVALID_INPUT" -> stepText(code, R.string.reason_import_invalid)
     "AUDIO_IMPORT_INPUT_UNAVAILABLE" -> stepText(code, R.string.reason_import_unavailable)
     "AUDIO_IMPORT_PROBE_FAILED" -> stepText(code, R.string.reason_import_probe)
     "AUDIO_IMPORT_CORRUPT" -> stepText(code, R.string.reason_import_corrupt)
 
+    "CHECKPOINT_DAMAGED" -> stringResource(R.string.checkpoint_damaged)
     "LOCAL_PROCESSING_FAILED" -> stringResource(R.string.local_failed)
     "CLEANUP_FAILED" -> stringResource(R.string.cleanup_failed)
     else -> stringResource(R.string.operation_failed) + "\n" + stringResource(R.string.error_detail, code)
@@ -370,7 +381,6 @@ private fun stepText(code: String, @StringRes reason: Int): String {
         code.startsWith("AUDIO_IMPORT_") -> R.string.step_import
         code.startsWith("AUDIO_") -> R.string.step_audio
         code.startsWith("ENGINE_") -> R.string.step_engine
-        code.startsWith("CREDENTIAL_") || code.startsWith("KEY_") -> R.string.step_key
         else -> return stringResource(reason)
     }
     return stringResource(R.string.step_failure, stringResource(step), stringResource(reason))

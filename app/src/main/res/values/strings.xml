@@ -77,7 +77,7 @@
     <string name="theme_light">Hell</string>
     <string name="theme_dark">Dunkel</string>
     <string name="parallel_jobs">Gleichzeitige Aufträge</string>
-    <string name="storage_limit">App-Speicherlimit (MiB)</string>
+    <string name="storage_limit">App-Speicherlimit</string>
     <string name="engines">Extraktionskomponenten</string>
     <string name="engine_activate">Prüfen und aktivieren</string>
     <string name="engine_rollback">Zur vorherigen Engine</string>
@@ -239,7 +239,7 @@
     <string name="help_bitrate_body">Die Datenrate in kbit/s sagt, wie viele Daten pro Sekunde Ton verwendet werden. Aus Datenrate und Videolänge ergibt sich die ungefähre Dateigröße.\n\nWenn neben der Größe „ca.“ steht, ist der Wert geschätzt: Entweder hat YouTube nur einen Näherungswert gemeldet, oder die App hat aus Datenrate und Länge gerechnet. Die tatsächlich geladene Datei kann davon abweichen.</string>
 
     <string name="help_caption_track_title">Untertitelspuren</string>
-    <string name="help_caption_track_body">„Vom Kanal bereitgestellt“ heißt, dass jemand die Untertitel hochgeladen oder korrigiert hat. Diese sind in der Regel die genauesten und enthalten Satzzeichen.\n\n„Automatisch erzeugt“ sind YouTubes eigene Spracherkennung. Sie sind meist brauchbar, aber ohne Satzzeichen, ohne Sprecher und mit Fehlern bei Namen und Fachbegriffen.\n\n„Automatisch übersetzt“ ist eine Maschinenübersetzung einer anderen Spur. SourceScribe lässt diese standardmäßig weg, weil sie zweimal maschinell verarbeitet wurde und Fehler sich addieren. Du kannst sie in den Expertenoptionen erlauben.</string>
+    <string name="help_caption_track_body">„YouTube · vom Kanal bereitgestellt“ heißt, dass jemand die Untertitel hochgeladen oder korrigiert hat. Diese sind in der Regel die genauesten und enthalten Satzzeichen.\n\n„YouTube · automatisch erzeugt“ steht für YouTubes eigene Spracherkennung. Diese Spuren sind meist brauchbar, aber ohne Satzzeichen, ohne Sprecher und mit Fehlern bei Namen und Fachbegriffen.\n\n„Automatisch übersetzt“ ist eine Maschinenübersetzung einer anderen Spur. SourceScribe lässt diese standardmäßig weg, weil sie zweimal maschinell verarbeitet wurde und Fehler sich addieren. Du kannst sie in den Expertenoptionen erlauben.</string>
 
     <string name="help_provider_title">Die drei Anbieter</string>
     <string name="help_provider_body">Ein Anbieter ist ein externer Dienst, der Audio zu Text macht. SourceScribe hat keinen eigenen Server; die Anfragen gehen direkt von deinem Gerät zum Anbieter, mit deinem eigenen Schlüssel und auf deine eigene Rechnung.\n\nAssemblyAI arbeitet asynchron: Die App lädt das Audio hoch, bekommt eine Auftragsnummer und fragt danach den Fortschritt ab. Bietet Sprechertrennung und Wortzeiten.\n\nOpenAI und Groq arbeiten synchron: Die Antwort kommt direkt auf die Anfrage. Groq ist meist günstig und schnell.\n\nWelche Optionen tatsächlich möglich sind, hängt vom gewählten Modell ab. Nicht unterstützte Schalter sind deshalb ausgegraut.</string>
@@ -263,10 +263,10 @@
     <string name="help_limits_body">Das Längenlimit ist eine Schutzgrenze gegen versehentliche Kosten: Ist das Audio länger als der eingestellte Wert, hält der Auftrag an, bevor etwas an den Anbieter geht. Der Wert gilt pro Auftrag und ist Teil der gespeicherten Auftragseinstellung.\n\nDeshalb lässt sich das Limit eines bereits gestarteten Auftrags nicht nachträglich anheben. Das ist Absicht: Ein gespeicherter Kostenrahmen darf sich nicht von selbst ändern. Wenn du ein längeres Video verarbeiten willst, hebe das Limit vor dem Start an oder bereite den Auftrag mit „Neu vorbereiten“ noch einmal vor.\n\nDas Budget ist eine zweite, unabhängige Grenze in US-Dollar. Sie wird gegen die geschätzten Kosten aller Übermittlungen desselben Auftrags gerechnet, einschließlich bereits angenommener und ungewisser. Bleibt das Feld leer, prüft die App keine Kostengrenze.</string>
 
     <string name="help_cost_title">Kostenschätzung</string>
-    <string name="help_cost_body">Die angezeigte Schätzung ist Videolänge mal hinterlegtem Listenpreis des Modells, mit dem Stand des Tarifs daneben. Sie ist eine Orientierung, keine Rechnung.\n\nSie enthält keine Rabatte, keine Mindestabrechnung, keine Wiederholungen und keine Preisänderungen des Anbieters. Steht „Preis unbekannt“, hat SourceScribe für dieses Modell keinen geprüften Tarif hinterlegt; das ist kein Hinweis darauf, dass es kostenlos wäre. Verbindlich ist immer die Abrechnung des Anbieters.</string>
+    <string name="help_cost_body">Die angezeigte Schätzung ist Videolänge mal hinterlegtem Listenpreis des Modells, mit dem Stand des Tarifs daneben. Sie ist eine Orientierung, keine Rechnung.\n\nSie enthält keine Rabatte, keine Mindestabrechnung, keine Wiederholungen und keine Preisänderungen des Anbieters. Steht „Preis unbekannt – kein kostenloses Versprechen“, hat SourceScribe für dieses Modell keinen geprüften Tarif hinterlegt; das ist kein Hinweis darauf, dass es kostenlos wäre. Verbindlich ist immer die Abrechnung des Anbieters.</string>
 
     <string name="help_export_formats_title">Exportformate</string>
-    <string name="help_export_formats_body">Die Umwandlung macht SourceScribe selbst auf dem Gerät, nicht der Anbieter. Vom Anbieter kommt immer nur ein Transkript; alle Formate werden daraus lokal erzeugt. Wählst du mehrere Formate, entsteht pro Format eine eigene Datei aus demselben Ergebnis. Es wird dafür nichts erneut transkribiert und nichts zusätzlich berechnet.\n\n• Markdown (.md): Text mit Überschrift und Herkunftsangaben. Die Voreinstellung.\n• Klartext (.txt): nur der Text, ohne Kopf.\n• Strukturierte Daten (.json): das vollständige Ergebnis mit Zeiten, Sprechern, Herkunft und Warnungen. Für Weiterverarbeitung.\n• Untertitel (.srt) und Web-Untertitel (.vtt): nummerierte Blöcke mit Zeitangaben für Videoplayer. Nur möglich, wenn das Ergebnis Zeiten enthält.\n• Originalantwort: die unveränderte Antwort des Anbieters. Nur verfügbar, wenn du „Originaldaten zusätzlich aufbewahren“ eingeschaltet hast.</string>
+    <string name="help_export_formats_body">Die Umwandlung macht SourceScribe selbst auf dem Gerät, nicht der Anbieter. Vom Anbieter kommt immer nur ein Transkript; alle Formate werden daraus lokal erzeugt. Wählst du mehrere Formate, entsteht pro Format eine eigene Datei aus demselben Ergebnis. Es wird dafür nichts erneut transkribiert und nichts zusätzlich berechnet.\n\n• Markdown (.md): Text mit Überschrift und Herkunftsangaben. Die Voreinstellung.\n• Klartext (.txt): nur der Text, ohne Kopf.\n• Strukturierte Daten (.json): das vollständige Ergebnis mit Zeiten, Sprechern, Herkunft und Warnungen. Für Weiterverarbeitung.\n• Untertitel (.srt) und Web-Untertitel (.vtt): nummerierte Blöcke mit Zeitangaben für Videoplayer. Nur möglich, wenn das Ergebnis Zeiten enthält.\n• „Originalantwort (Rohdaten)“: die unveränderte Antwort des Anbieters. Nur verfügbar, wenn du „Originaldaten zusätzlich aufbewahren“ eingeschaltet hast.</string>
 
     <string name="help_export_folder_title">Exportordner</string>
     <string name="help_export_folder_body">Der Exportordner ist ein Ordner deiner Wahl außerhalb der App, in den fertige Transkripte geschrieben werden. Android vergibt die Berechtigung dafür pro Ordner und merkt sie sich dauerhaft.\n\nDie Ergebnisse liegen unabhängig davon immer zuerst intern in der App. Ein fehlgeschlagener Export löscht also nie ein Ergebnis und löst nie eine neue kostenpflichtige Anfrage aus. Schlägt das Schreiben fehl, etwa weil der Ordner entfernt wurde, kannst du im Verlauf einen anderen Ordner wählen und erneut speichern.</string>
@@ -278,7 +278,7 @@
     <string name="help_presets_body">Beides speichert eine komplette Einstellungskombination: Beschaffungsart, Anbieter, Modell, Sprache, Optionen, Formate und Limits.\n\n„Als Vorgabe speichern“ setzt die aktuelle Kombination als Standard. Jede neue Quelle startet danach damit. Es gibt genau eine Vorgabe.\n\nEin Preset ist eine zusätzliche benannte Kombination, zum Beispiel „Podcast mit Sprechern“ oder „Schnell und gratis“. Presets ersetzen die Vorgabe nicht; du wählst sie bei einer neuen Quelle bewusst aus. Mitgespeichert wird nie eine Freigabe zum Hochladen: Die entsteht immer erst beim Start eines Auftrags.</string>
 
     <string name="help_states_title">Auftragszustände</string>
-    <string name="help_states_body">„Wartet auf Ausführung“: eingeplant, aber noch nicht an der Reihe.\n„In Arbeit“: läuft gerade auf dem Gerät.\n„Wartet auf Netzwerk“ oder „wegen Rate-Limit“: die App hält sich zurück und versucht es später erneut.\n„Provider verarbeitet“: das Audio liegt beim Anbieter, das Ergebnis steht noch aus.\n„Entscheidung erforderlich“: die App hält an, weil etwas nicht ohne dich entschieden werden kann, etwa ein fehlender Schlüssel oder ein überschrittenes Längenlimit. Der Text darunter nennt den Grund.\n„Übermittlung ungewiss“: die Anfrage ist abgegangen, aber die Antwort ging verloren. Der Anbieter kann sie angenommen haben und berechnen. SourceScribe wiederholt so etwas nie von selbst.</string>
+    <string name="help_states_body">„Wartet auf Ausführung“: eingeplant, aber noch nicht an der Reihe.\n„In Arbeit“: läuft gerade auf dem Gerät.\n„Wartet auf Netzwerk“ oder „Wartet wegen Rate-Limit“: die App hält sich zurück und versucht es später erneut.\n„Provider verarbeitet“: das Audio liegt beim Anbieter, das Ergebnis steht noch aus.\n„Entscheidung erforderlich“: die App hält an, weil etwas nicht ohne dich entschieden werden kann, etwa ein fehlender Schlüssel oder ein überschrittenes Längenlimit. Der Text darunter nennt den Grund.\n„Übermittlung ungewiss“: die Anfrage ist abgegangen, aber die Antwort ging verloren. Der Anbieter kann sie angenommen haben und berechnen. SourceScribe wiederholt so etwas nie von selbst.</string>
 
     <string name="help_provenance_title">Herkunft</string>
     <string name="help_provenance_body">Zu jedem Ergebnis speichert die App, woher es stammt: Quelle und Video-Kennung, ob es aus YouTube-Untertiteln oder aus einer externen Transkription kommt, welches Modell angefordert wurde und welches der Anbieter tatsächlich gemeldet hat, welche Audiospur verwendet wurde und ob übersetzt wurde.\n\nDas steht auch im Export. Sinn ist, dass du Monate später noch beurteilen kannst, wie belastbar ein Transkript ist, statt es für wörtlich zu halten.</string>
@@ -293,7 +293,7 @@
     <string name="help_diagnostics_body">„Redigiert“ bedeutet geschwärzt: Aus dem Bericht sind alle Inhalte vorher entfernt worden. Er enthält nur technische Angaben, nämlich App- und Komponentenversionen, Gerätemerkmale, Zähler pro Auftragszustand und bekannte Fehlercodes.\n\nEr enthält keine Links, keine Titel, keine Transkripte und keine Schlüssel. Du siehst den vollständigen Text, bevor du entscheidest, ob du ihn teilst; ohne dein Teilen verlässt er das Gerät nicht.</string>
 
     <string name="help_engines_title">Extraktionskomponenten und Kanäle</string>
-    <string name="help_engines_body">Die Extraktionskomponente ist das Werkzeug, das YouTube-Metadaten, Untertitel und Audio holt: yt-dlp zusammen mit einer JavaScript-Hilfskomponente. YouTube ändert seine Seiten regelmäßig, weshalb dieses Werkzeug häufiger aktualisiert wird als die App selbst. Deshalb kann SourceScribe es getrennt aktualisieren.\n\n„Stabil“ ist die reguläre Veröffentlichung. „Nightly“ ist der tagesaktuelle Vorschaustand: Wenn YouTube gerade etwas geändert hat und die stabile Fassung noch nicht nachgezogen ist, funktioniert Nightly oft schon, ist dafür aber weniger geprüft.\n\nSo gehst du vor, wenn das Prüfen einer Quelle plötzlich fehlschlägt: erst „Stabil“ prüfen; hilft das nicht, „Nightly“ prüfen. Findet die App ein Update, trägst du eine beliebige öffentliche YouTube-Adresse in das Feld darunter ein. Damit wird die neue Fassung vor der Aktivierung tatsächlich ausprobiert; nur wenn dieser Funktionstest gelingt, wird sie übernommen. Jede Fassung wird zusätzlich anhand ihrer Signatur geprüft. „Zur vorherigen Engine“ nimmt eine Aktivierung wieder zurück.\n\nPython, die JavaScript-Laufzeit und FFmpeg stecken fest in der App und brauchen ein App-Update. Laufende Aufträge behalten die Fassung, mit der sie begonnen haben.</string>
+    <string name="help_engines_body">Die Extraktionskomponente ist das Werkzeug, das YouTube-Metadaten, Untertitel und Audio holt: yt-dlp zusammen mit einer JavaScript-Hilfskomponente. YouTube ändert seine Seiten regelmäßig, weshalb dieses Werkzeug häufiger aktualisiert wird als die App selbst. Deshalb kann SourceScribe es getrennt aktualisieren.\n\n„Stabil“ ist die reguläre Veröffentlichung. „Nightly (Vorschau)“ ist der tagesaktuelle Vorschaustand: Wenn YouTube gerade etwas geändert hat und die stabile Fassung noch nicht nachgezogen ist, funktioniert Nightly oft schon, ist dafür aber weniger geprüft.\n\nSo gehst du vor, wenn das Prüfen einer Quelle plötzlich fehlschlägt: erst „Stabil“ prüfen; hilft das nicht, „Nightly (Vorschau)“ prüfen. Findet die App ein Update, trägst du eine beliebige öffentliche YouTube-Adresse in das Feld darunter ein. Damit wird die neue Fassung vor der Aktivierung tatsächlich ausprobiert; nur wenn dieser Funktionstest gelingt, wird sie übernommen. Jede Fassung wird zusätzlich anhand ihrer Signatur geprüft. „Zur vorherigen Engine“ nimmt eine Aktivierung wieder zurück.\n\nPython, die JavaScript-Laufzeit und FFmpeg stecken fest in der App und brauchen ein App-Update. Laufende Aufträge behalten die Fassung, mit der sie begonnen haben.</string>
 
     <string name="help_privacy_title">Was das Gerät verlässt</string>
     <string name="help_privacy_body">Bei „Nur YouTube“ verlassen nur die Abrufe an YouTube das Gerät, die zum Laden der Metadaten und Untertitel nötig sind. Kein Anbieter ist beteiligt.\n\nSobald eine Beschaffungsart mit STT gewählt ist und du einen Auftrag startest, wird die vorbereitete Audiodatei an den gewählten Anbieter übertragen. Das passiert nie automatisch und nie ohne gewählten Anbieter, Modell und Schlüssel.\n\nDie App hat keine Telemetrie, keinen eigenen Server und keine Analyse. Schlüssel bleiben auf dem Gerät. Ein lokaler Abbruch stoppt eine bereits abgeschickte Anfrage beim Anbieter nicht.</string>
@@ -301,6 +301,7 @@
     <!-- Audiospur, verständlich beschrieben -->
     <string name="audio_track_recommended">Empfohlen</string>
     <string name="audio_track_drc">Dynamikkompression</string>
+    <string name="audio_track_none_chosen">Noch keine Tonspur gewählt – die Auswahl bestimmt Sprache und Größe.</string>
     <string name="audio_track_original">Originalton</string>
     <string name="audio_track_size_approx">ca. %1$s</string>
     <string name="audio_track_size_unknown">Größe unbekannt</string>
@@ -379,6 +380,7 @@
         <item quantity="one">%1$d Abschnitt</item>
         <item quantity="other">%1$d Abschnitte</item>
     </plurals>
+    <string name="segments_matching">%1$s von %2$s Abschnitten gefunden</string>
     <string name="transcript_empty">Dieses Ergebnis enthält keine Abschnitte.</string>
     <string name="audio_track_description">Audiodeskription</string>
     <string name="step_failure">%1$s: %2$s</string>
@@ -387,7 +389,6 @@
     <string name="step_import">Beim Importieren der Datei</string>
     <string name="step_audio">Beim Beschaffen der Tonspur</string>
     <string name="step_engine">Beim Aktualisieren der Extraktionskomponente</string>
-    <string name="step_key">Beim Zugriff auf den API-Schlüssel</string>
     <string name="reason_network">Es kam keine Verbindung zustande. Prüfe das Netz und versuche es erneut.</string>
     <string name="reason_rate_limit">Zu viele Anfragen in kurzer Zeit. Die App wartet und versucht es später erneut.</string>
     <string name="reason_invalid_response">Die Antwort war nicht lesbar. Der Auftrag gilt deshalb nicht als erfolgreich.</string>
@@ -399,7 +400,7 @@
     <string name="reason_remote_failed">Der Anbieter hat den Auftrag abgebrochen.</string>
     <string name="reason_invalid_input">Der Anbieter hat die Anfrage abgelehnt. Meist passt eine gewählte Option nicht zum Modell.</string>
     <string name="reason_source_unavailable">Das Video ist nicht abrufbar: privat, gelöscht oder im aktuellen Land gesperrt.</string>
-    <string name="reason_challenge_required">YouTube verlangt eine Bestätigung, dass kein Automat zugreift, und liefert bis dahin nichts aus.</string>
+    <string name="reason_challenge_required">YouTube verlangt eine Bestätigung, dass kein automatisiertes Programm zugreift, und liefert bis dahin nichts aus.</string>
     <string name="reason_no_captions">Zu diesem Video gibt es keine Untertitel.</string>
     <string name="reason_native">Die Extraktionskomponente hat abgebrochen. Ein Wechsel der Komponente unter „Mehr“ kann helfen.</string>
     <string name="reason_engine_verification">Die Signatur des Downloads passte nicht. Die bisherige Komponente bleibt aktiv.</string>
@@ -411,6 +412,15 @@
     <string name="reason_import_invalid">Diese Datei ist keine Audiodatei, die die App verarbeiten kann.</string>
     <string name="reason_import_unavailable">Die Datei ist nicht mehr erreichbar. Möglicherweise wurde sie verschoben oder gelöscht.</string>
     <string name="reason_import_probe">Länge und Format der Datei ließen sich nicht bestimmen.</string>
+    <string name="reason_audio_input_unusable">Die heruntergeladene Tondatei war nicht lesbar.</string>
+    <string name="reason_audio_probe">Länge und Format der Tonspur ließen sich nicht bestimmen.</string>
+    <string name="reason_audio_conversion">Die Tonspur ließ sich nicht in das Format umwandeln, das für die Übertragung nötig ist.</string>
+    <string name="reason_audio_output_invalid">Die umgewandelte Tondatei war unbrauchbar. Es wurde nichts gesendet.</string>
+    <string name="reason_audio_too_large">Die vorbereitete Tonspur ist größer, als dieser Auftrag zulässt.</string>
+    <string name="reason_audio_out_of_range">Der angeforderte Ausschnitt liegt außerhalb der Tonspur.</string>
+    <string name="reason_audio_leftover">Am Ablageort lag noch eine Datei aus einem früheren Versuch. Bereite den Auftrag neu vor.</string>
+    <string name="reason_audio_workspace">Der interne Arbeitsordner der App war nicht benutzbar.</string>
+    <string name="checkpoint_damaged">Der gespeicherte Zwischenstand dieses Auftrags ist nicht mehr lesbar. Der Auftrag wurde angehalten, damit nichts doppelt gesendet wird. Bereite die Quelle neu vor.</string>
     <string name="reason_import_corrupt">Die Datei ist beschädigt und ließ sich nicht vollständig lesen.</string>
     <string name="source_not_a_video_link">Das ist kein Link auf ein einzelnes YouTube-Video. Erwartet wird eine Adresse wie https://www.youtube.com/watch?v=… oder https://youtu.be/…</string>
     <string name="source_several_videos">Der Text enthält mehrere Videos. Gib genau einen Link an.</string>
@@ -423,10 +433,6 @@
     <string name="local_failed">Ein Schritt auf dem Gerät ist fehlgeschlagen. An einen Anbieter wurde nichts gesendet.</string>
     <string name="cleanup_failed">Das Aufräumen alter Dateien ist fehlgeschlagen. Deine Transkripte sind davon nicht betroffen.</string>
     <string name="help_stt_title">STT: Sprache zu Text</string>
-    <string name="help_stt_body">STT ist die Abkürzung für „Speech to Text“, auf Deutsch „Sprache zu Text“. Gemeint ist die automatische Transkription: Ein Dienst bekommt eine Tonspur und gibt den gesprochenen Text zurück.
-
-SourceScribe transkribiert nicht selbst. Die App bereitet die Tonspur auf und schickt sie an einen Anbieter, den du selbst auswählst und mit deinem eigenen Schlüssel bezahlst. Deshalb steht überall dort, wo STT beteiligt ist, auch ein Anbieter, ein Modell, ein Kostenrahmen und eine Längengrenze.
-
-Der Gegensatz dazu sind Untertitel: Die liegen bei YouTube schon fertig als Text vor, kosten nichts und verlassen dein Gerät nur als Abruf bei YouTube. Deshalb ist „Nur YouTube“ der Modus ohne Anbieter, ohne Schlüssel und ohne Kosten.</string>
+    <string name="help_stt_body">STT ist die Abkürzung für „Speech to Text“, auf Deutsch „Sprache zu Text“. Gemeint ist die automatische Transkription: Ein Dienst bekommt eine Tonspur und gibt den gesprochenen Text zurück.\n\nSourceScribe transkribiert nicht selbst. Die App bereitet die Tonspur auf und schickt sie an einen Anbieter, den du selbst auswählst und mit deinem eigenen Schlüssel bezahlst. Deshalb steht überall dort, wo STT beteiligt ist, auch ein Anbieter, ein Modell, ein Kostenrahmen und eine Längengrenze.\n\nDer Gegensatz dazu sind Untertitel: Die liegen bei YouTube schon fertig als Text vor, kosten nichts und verlassen dein Gerät nur als Abruf bei YouTube. Deshalb ist „Nur YouTube“ der Modus ohne Anbieter, ohne Schlüssel und ohne Kosten.</string>
     <string name="limit_needs_new_job">Fortsetzen und Wiederholen ändern die Grenzen dieses Auftrags nicht: Sie gehören fest zu ihm und bilden den Kostenrahmen, den du beim Start bestätigt hast. Wähle „Neu vorbereiten“, um denselben Link mit einer höheren Grenze als neuen Auftrag zu starten.</string>
 </resources>

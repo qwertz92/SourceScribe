@@ -152,6 +152,8 @@ class SttStep @Inject constructor(
             waitForUser(currentRow(row, owner), owner, "CREDENTIAL_${failure.code.name}")
         } catch (failure: ArtifactFilesException) {
             waitForUser(currentRow(row, owner), owner, failure.reason)
+        } catch (_: CheckpointDamaged) {
+            waitForUser(currentRow(row, owner), owner, "CHECKPOINT_DAMAGED")
         } catch (failure: ProviderError) {
             waitForUser(currentRow(row, owner), owner, "PROVIDER_${failure.code.name}")
         }
@@ -1196,7 +1198,7 @@ class SttStep @Inject constructor(
         if (row.branch != Branch.STT) return false
         val persisted = try {
             checkpoint(row.checkpoint)
-        } catch (_: ProviderError) {
+        } catch (_: CheckpointDamaged) {
             return false
         }
         return persistedBindingMatches(config, persisted, document)
@@ -1765,11 +1767,17 @@ class SttStep @Inject constructor(
         source = source,
     )
 
+    /**
+     * A stored checkpoint that no longer parses is damaged local data. It carries its own type rather than
+     * a provider error, because a provider error tells the reader that a request was sent to a provider.
+     */
+    private class CheckpointDamaged : IllegalStateException("checkpoint unreadable")
+
     private fun checkpoint(value: String): SttCheckpoint = try {
         if (value.length > MAX_CHECKPOINT_BYTES) throw SerializationException("checkpoint too large")
         json.decodeFromString<SttCheckpoint>(value).also(::validateCheckpoint)
     } catch (_: Exception) {
-        throw ProviderError(ProviderErrorCode.INVALID_INPUT)
+        throw CheckpointDamaged()
     }
 
     private fun validateCheckpoint(checkpoint: SttCheckpoint) {

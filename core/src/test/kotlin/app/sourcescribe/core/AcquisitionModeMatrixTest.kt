@@ -1,6 +1,7 @@
 package app.sourcescribe.core
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Test
 
 class AcquisitionModeMatrixTest {
@@ -70,6 +71,23 @@ class AcquisitionModeMatrixTest {
                 CaptionAvailability.FETCH_ERROR,
             )
             assertEquals(withoutFallback, withFallback)
+        }
+    }
+
+    @Test
+    fun aFinishedJobAlwaysGetsAnOutcomeTheHistoryFiltersCanShow() {
+        val everySubset = listOf(
+            emptySet(), setOf(Branch.CAPTIONS), setOf(Branch.STT), setOf(Branch.CAPTIONS, Branch.STT),
+        )
+        for (mode in AcquisitionMode.entries) {
+            for (successful in everySubset) {
+                for (warnings in listOf(false, true)) {
+                    for (complete in listOf(false, true)) {
+                        val outcome = AcquisitionPlanner.outcome(mode, successful, warnings, complete)
+                        assertNotEquals("$mode/$successful/$warnings/$complete", Outcome.NONE, outcome)
+                    }
+                }
+            }
         }
     }
 }
