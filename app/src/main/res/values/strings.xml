@@ -89,7 +89,6 @@
     <string name="operation_failed">Vorgang konnte nicht abgeschlossen werden.</string>
     <string name="error_detail">Technischer Status: %1$s</string>
     <string name="export_tree">Exportordner auswählen</string>
-    <string name="export_saved">Exportversuch gespeichert</string>
     <string name="no_export_tree">Noch kein Exportordner gewählt</string>
     <string name="state_queued">Wartet auf Ausführung</string>
     <string name="state_running">In Arbeit</string>
@@ -97,6 +96,7 @@
     <string name="state_waiting_rate_limit">Wartet wegen Rate-Limit</string>
     <string name="state_waiting_user">Entscheidung erforderlich</string>
     <string name="state_waiting_remote">Provider verarbeitet</string>
+    <string name="state_submission_uncertain_short">Übermittlung ungewiss</string>
     <string name="state_submission_uncertain">Übermittlung ungewiss – nicht automatisch wiederholen</string>
     <string name="state_finished">Abgeschlossen</string>
     <string name="state_cancelled">Abgebrochen</string>
@@ -122,7 +122,6 @@
     <string name="audio_until_persisted">Bis zur Transkript-Sicherung</string>
     <string name="audio_keep">Dauerhaft behalten</string>
     <string name="missing_provider">STT erfordert einen Anbieter, ein Modell und einen passenden gespeicherten Schlüssel.</string>
-    <string name="choose_audio_help">Die gewählte Audioversion kann vom Original abweichen.</string>
     <string name="privacy">Keine Telemetrie. Schlüssel bleiben auf diesem Gerät. Externe STT beginnt erst, wenn du den Auftrag startest.</string>
     <string name="estimated_cost">Geschätzter Basispreis: %1$s USD · Tarifstand %2$s</string>
     <string name="price_unknown">Preis unbekannt – kein kostenloses Versprechen</string>
@@ -133,10 +132,10 @@
     <string name="export_permission_required">Das Transkript bleibt intern erhalten. Zum Export bitte einen beschreibbaren Ordner wählen.</string>
     <string name="invalid_budget">Bitte ein gültiges Kostenlimit eingeben oder das Feld leer lassen.</string>
     <string name="invalid_duration">Bitte eine maximale Audiodauer zwischen 1 und 600 Minuten eingeben.</string>
+    <string name="source_beyond_ceiling">Diese Quelle dauert %1$s. SourceScribe verarbeitet höchstens %2$s am Stück, deshalb hilft hier auch ein höheres Limit nicht.</string>
     <string name="unsupported_options">Die gewählten Optionen passen nicht zum Modell. Bitte die erweiterten Einstellungen prüfen.</string>
     <string name="retry_missing">Fehlenden Zweig neu ausführen</string>
     <string name="retry_all">Neue Ausführung</string>
-    <string name="other_provider">Mit anderem Anbieter vorbereiten</string>
     <string name="resume_job">Sicher fortsetzen</string>
     <string name="delete_job">Verlaufseintrag löschen</string>
     <string name="delete_pending">Löschung vorgemerkt. Lokale Verarbeitung wird zuerst beendet.</string>
@@ -212,7 +211,6 @@
 
     <!-- Hilfe und Glossar -->
     <string name="help">Hilfe</string>
-    <string name="help_title">Hilfe und Glossar</string>
     <string name="help_intro">Diese Seite erklärt die Begriffe, die in der App vorkommen. Tippe einen Eintrag an, um ihn aufzuklappen. Das Fragezeichen neben einem Bedienelement öffnet direkt den passenden Eintrag.</string>
     <string name="help_search">Im Glossar suchen</string>
     <string name="help_open">Erklärung öffnen</string>
@@ -309,11 +307,13 @@
     <string name="audio_track_format">Format %1$s</string>
     <string name="audio_track_smallest">kleinste Datei</string>
     <string name="audio_track_largest">größte Datei</string>
-    <string name="audio_track_bitrate">%1$d kbit/s</string>
+    <string name="audio_track_bitrate">%1$s kbit/s</string>
     <string name="audio_track_mono">Mono</string>
     <string name="audio_track_stereo">Stereo</string>
-    <string name="audio_track_channels">%1$d Kanäle</string>
-    <string name="audio_track_help">Für die Transkription reicht die kleinste Spur: Alles wird vor dem Versand ohnehin in Mono, 16 kHz und 64 kbit/s MP3 umgerechnet. Wichtig wird die Wahl nur, wenn ein Video mehrere Sprachfassungen hat.</string>
+    <plurals name="audio_track_channels">
+        <item quantity="one">%1$d Kanal</item>
+        <item quantity="other">%1$d Kanäle</item>
+    </plurals>
     <string name="audio_track_choose_language">Dieses Video bietet mehrere Sprachfassungen an. Bitte wähle selbst, welche Audiospur transkribiert werden soll.</string>
     <string name="language_value">Sprache %1$s</string>
 
@@ -341,7 +341,10 @@
     <string name="filter_failed">Fehlgeschlagen</string>
     <string name="expand_entry">Details anzeigen</string>
     <string name="collapse_entry">Details ausblenden</string>
-    <string name="history_count">%1$d von %2$d Einträgen</string>
+    <plurals name="history_count">
+        <item quantity="one">%1$d von %2$d Eintrag</item>
+        <item quantity="other">%1$d von %2$d Einträgen</item>
+    </plurals>
     <string name="no_filter_matches">Kein Eintrag passt zu diesem Filter.</string>
     <string name="job_actions">Aktionen für diesen Auftrag</string>
     <string name="share_result">Ergebnis teilen</string>
@@ -372,7 +375,58 @@
     <string name="file_name_saved">Dateiname gespeichert</string>
     <string name="apply">Übernehmen</string>
     <string name="close">Schließen</string>
-    <string name="segments_count">%1$d Abschnitte</string>
+    <plurals name="segments_count">
+        <item quantity="one">%1$d Abschnitt</item>
+        <item quantity="other">%1$d Abschnitte</item>
+    </plurals>
     <string name="transcript_empty">Dieses Ergebnis enthält keine Abschnitte.</string>
     <string name="audio_track_description">Audiodeskription</string>
+    <string name="step_failure">%1$s: %2$s</string>
+    <string name="step_submit">Beim Absenden an den Anbieter</string>
+    <string name="step_collect">Beim Abholen des Ergebnisses</string>
+    <string name="step_import">Beim Importieren der Datei</string>
+    <string name="step_audio">Beim Beschaffen der Tonspur</string>
+    <string name="step_engine">Beim Aktualisieren der Extraktionskomponente</string>
+    <string name="step_key">Beim Zugriff auf den API-Schlüssel</string>
+    <string name="reason_network">Es kam keine Verbindung zustande. Prüfe das Netz und versuche es erneut.</string>
+    <string name="reason_rate_limit">Zu viele Anfragen in kurzer Zeit. Die App wartet und versucht es später erneut.</string>
+    <string name="reason_invalid_response">Die Antwort war nicht lesbar. Der Auftrag gilt deshalb nicht als erfolgreich.</string>
+    <string name="reason_storage">Auf dem Gerät ließ sich nichts speichern. Schaffe Speicherplatz und versuche es erneut.</string>
+    <string name="reason_authentication">Der Anbieter hat den Schlüssel nicht akzeptiert. Prüfe ihn unter „Mehr“.</string>
+    <string name="reason_access_denied">Der Schlüssel darf diesen Dienst oder dieses Modell nicht nutzen.</string>
+    <string name="reason_quota">Das Guthaben oder Kontingent deines Kontos beim Anbieter ist aufgebraucht.</string>
+    <string name="reason_server">Der Anbieter hat einen eigenen Fehler gemeldet. Das liegt nicht an dieser App.</string>
+    <string name="reason_remote_failed">Der Anbieter hat den Auftrag abgebrochen.</string>
+    <string name="reason_invalid_input">Der Anbieter hat die Anfrage abgelehnt. Meist passt eine gewählte Option nicht zum Modell.</string>
+    <string name="reason_source_unavailable">Das Video ist nicht abrufbar: privat, gelöscht oder im aktuellen Land gesperrt.</string>
+    <string name="reason_challenge_required">YouTube verlangt eine Bestätigung, dass kein Automat zugreift, und liefert bis dahin nichts aus.</string>
+    <string name="reason_no_captions">Zu diesem Video gibt es keine Untertitel.</string>
+    <string name="reason_native">Die Extraktionskomponente hat abgebrochen. Ein Wechsel der Komponente unter „Mehr“ kann helfen.</string>
+    <string name="reason_engine_verification">Die Signatur des Downloads passte nicht. Die bisherige Komponente bleibt aktiv.</string>
+    <string name="reason_engine_app_update">Diese Komponente verlangt eine neuere Version der App.</string>
+    <string name="reason_engine_probe">Die neue Komponente hat den Selbsttest nicht bestanden. Die bisherige bleibt aktiv.</string>
+    <string name="reason_engine_probe_uncertain">Der Selbsttest blieb ohne klares Ergebnis. Die bisherige Komponente bleibt aktiv.</string>
+    <string name="reason_engine_no_previous">Es gibt keine frühere Komponente, zu der zurückgekehrt werden könnte.</string>
+    <string name="key_invalid_input">Der eingegebene Schlüssel hat nicht die erwartete Form. Kopiere ihn erneut aus deinem Anbieterkonto.</string>
+    <string name="reason_import_invalid">Diese Datei ist keine Audiodatei, die die App verarbeiten kann.</string>
+    <string name="reason_import_unavailable">Die Datei ist nicht mehr erreichbar. Möglicherweise wurde sie verschoben oder gelöscht.</string>
+    <string name="reason_import_probe">Länge und Format der Datei ließen sich nicht bestimmen.</string>
+    <string name="reason_import_corrupt">Die Datei ist beschädigt und ließ sich nicht vollständig lesen.</string>
+    <string name="source_not_a_video_link">Das ist kein Link auf ein einzelnes YouTube-Video. Erwartet wird eine Adresse wie https://www.youtube.com/watch?v=… oder https://youtu.be/…</string>
+    <string name="source_several_videos">Der Text enthält mehrere Videos. Gib genau einen Link an.</string>
+    <string name="source_needs_explicit_video">Dieser Link nennt kein bestimmtes Video. Öffne das Video und teile dessen eigenen Link.</string>
+    <string name="source_live_or_playlist">Livestreams und Playlists werden nicht verarbeitet. Gib den Link eines einzelnen, fertigen Videos an.</string>
+    <string name="source_input_too_large">Der eingefügte Text ist zu lang. Füge nur den Link ein.</string>
+    <string name="source_metadata_too_large">YouTube hat mehr Daten geliefert, als die App verarbeitet.</string>
+    <string name="source_metadata_unusable">Die Angaben von YouTube waren unbrauchbar. Prüfe den Link und versuche es erneut.</string>
+    <string name="source_caption_url_rejected">Die Untertiteladresse kam nicht von YouTube und wurde deshalb abgelehnt.</string>
+    <string name="local_failed">Ein Schritt auf dem Gerät ist fehlgeschlagen. An einen Anbieter wurde nichts gesendet.</string>
+    <string name="cleanup_failed">Das Aufräumen alter Dateien ist fehlgeschlagen. Deine Transkripte sind davon nicht betroffen.</string>
+    <string name="help_stt_title">STT: Sprache zu Text</string>
+    <string name="help_stt_body">STT ist die Abkürzung für „Speech to Text“, auf Deutsch „Sprache zu Text“. Gemeint ist die automatische Transkription: Ein Dienst bekommt eine Tonspur und gibt den gesprochenen Text zurück.
+
+SourceScribe transkribiert nicht selbst. Die App bereitet die Tonspur auf und schickt sie an einen Anbieter, den du selbst auswählst und mit deinem eigenen Schlüssel bezahlst. Deshalb steht überall dort, wo STT beteiligt ist, auch ein Anbieter, ein Modell, ein Kostenrahmen und eine Längengrenze.
+
+Der Gegensatz dazu sind Untertitel: Die liegen bei YouTube schon fertig als Text vor, kosten nichts und verlassen dein Gerät nur als Abruf bei YouTube. Deshalb ist „Nur YouTube“ der Modus ohne Anbieter, ohne Schlüssel und ohne Kosten.</string>
+    <string name="limit_needs_new_job">Fortsetzen und Wiederholen ändern die Grenzen dieses Auftrags nicht: Sie gehören fest zu ihm und bilden den Kostenrahmen, den du beim Start bestätigt hast. Wähle „Neu vorbereiten“, um denselben Link mit einer höheren Grenze als neuen Auftrag zu starten.</string>
 </resources>

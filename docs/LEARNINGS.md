@@ -44,3 +44,12 @@ Stand: 8. September 2026. Fehlversuche und Korrekturen im
 - **Handoff aktuell halten.** Keine widersprüchlichen Pausen aneinanderhängen;
   Historie gehört in Git/Berichte. SDK, Rohlogs, private Keys und Appdaten reisen
   nicht automatisch mit. Restabnahme ist kein rein kosmetischer Aufwand.
+- **Dexing-Fehler mit kleingeschriebenem Projektpfad ist veralteter Gradle-Zustand.**
+  `DexingNoClasspathTransform` meldete `The given file '/mnt/c/users/.../projects/sourcescribe/...'
+  is located outside the root directory '/mnt/c/Users/.../Projects/SourceScribe/...'`. Der Unterschied
+  ist ausschliesslich die Gross-/Kleinschreibung des Pfads, nicht die genannte Klasse: zwei Laeufe
+  nannten zwei verschiedene, teils unveraenderte Klassen. Behoben durch `rm -rf core/build` aus WSL
+  heraus und `--no-watch-fs`. Nicht nach der genannten Klasse suchen, sondern den Buildordner leeren.
+- **Nicht waehrend eines laufenden Builds im Repository editieren.** Eine Zeichenkette, die nach der
+  R-Generierung eingefuegt wurde, liess `compileDebugKotlin` an einer `Unresolved reference` scheitern,
+  die es zu diesem Zeitpunkt gar nicht mehr gab. Aenderungen sammeln und zwischen zwei Laeufen anwenden.

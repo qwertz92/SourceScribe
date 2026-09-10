@@ -37,6 +37,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -51,7 +52,8 @@ internal fun dialogMaxHeight(fraction: Float): androidx.compose.ui.unit.Dp =
 @Composable
 internal fun InfoButton(topic: HelpTopic, openHelp: (HelpTopic) -> Unit) {
     val label = stringResource(R.string.help_open) + ": " + stringResource(topic.title)
-    IconButton({ openHelp(topic) }, Modifier.size(40.dp)) {
+    // 48 dp is the smallest target a finger hits reliably; the icon inside stays small so rows stay compact.
+    IconButton({ openHelp(topic) }, Modifier.size(48.dp)) {
         Icon(painterResource(R.drawable.ic_help), contentDescription = label,
             modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }
@@ -73,6 +75,11 @@ internal fun <T> Choice(
     openHelp: (HelpTopic) -> Unit = {},
     /** Richer text for the open list; the closed control keeps the short value so its height stays small. */
     optionName: (@Composable (T) -> String)? = null,
+    /**
+     * The text shown while nothing is chosen. It is measured alongside the options even after a choice was
+     * made, because it is usually the longest of them and the control must not shrink the moment it goes away.
+     */
+    placeholder: String? = null,
     choose: (T) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -100,8 +107,8 @@ internal fun <T> Choice(
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                     BoxWithConstraints(Modifier.fillMaxWidth()) {
                         // Reserve the tallest option at the actual font/width so selection never moves its neighbours.
-                        val valueHeightPx = remember(valueNames, selected, valueStyle, constraints.maxWidth, textMeasurer) {
-                            (valueNames + selected).maxOf { value ->
+                        val valueHeightPx = remember(valueNames, selected, placeholder, valueStyle, constraints.maxWidth, textMeasurer) {
+                            (valueNames + selected + listOfNotNull(placeholder)).maxOf { value ->
                                 textMeasurer.measure(value, valueStyle, constraints = Constraints(maxWidth = constraints.maxWidth)).size.height
                             }
                         }
@@ -112,7 +119,10 @@ internal fun <T> Choice(
                 Icon(painterResource(R.drawable.ic_expand_more), contentDescription = null, modifier = Modifier.size(24.dp))
             }
         }
-        if (supporting != null) Text(supporting, Modifier.padding(horizontal = 4.dp),
+        // Two lines are always reserved: this caption grows and shrinks with the chosen value, and the
+        // cost estimate and buttons below it must not move when it does.
+        if (supporting != null) Text(supporting, Modifier.padding(horizontal = 4.dp), minLines = 2, maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
     if (expanded && enabled) Dialog({ expanded = false }) {
@@ -185,12 +195,15 @@ internal fun ConfirmationDialog(title: String, explanation: String, close: () ->
     }
 }
 
-/** A short status word on a coloured ground; height is fixed so a state change never reflows a card. */
+/**
+ * A short status word on a coloured ground. Its height is fixed, and callers place it so that nothing
+ * sits beside it: a job changes state while the list is on screen, and the word then changes width.
+ */
 @Composable
 internal fun StatusChip(text: String, container: androidx.compose.ui.graphics.Color, content: androidx.compose.ui.graphics.Color) {
     Surface(color = container, contentColor = content, shape = MaterialTheme.shapes.small) {
         Box(Modifier.heightIn(min = 28.dp).padding(horizontal = 10.dp), contentAlignment = Alignment.Center) {
-            Text(text, style = MaterialTheme.typography.labelLarge, maxLines = 1)
+            Text(text, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }

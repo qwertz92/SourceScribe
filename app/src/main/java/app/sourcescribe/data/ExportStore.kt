@@ -115,7 +115,12 @@ class ExportStore @Inject constructor(
             if (!isDirectory) throw IOException("export tree is not a directory")
 
             val chosenName = dao.artifact(row.artifactId)?.displayName
-            val fileName = collisionSafeFileName(document, format, row.id, payload.extension, chosenName)
+            // A chosen name belongs to the reader, so the first export into a given extension keeps it exactly.
+            // A second one would land on that same file, so only that one carries the per-export discriminator.
+            val repeated = dao.exports(row.artifactId).any {
+                it.id != row.id && it.documentUri != null && targetExtension(it)?.equals(payload.extension) != false
+            }
+            val fileName = collisionSafeFileName(document, format, row.id, payload.extension, chosenName, repeated)
             val createdDocument = DocumentsContract.createDocument(resolver, parent, payload.mimeType, fileName)
                 ?: throw IOException("export document could not be created")
             documentUri = createdDocument.toString()
@@ -281,8 +286,9 @@ class ExportStore @Inject constructor(
         private const val ERROR_TOO_LARGE = "TOO_LARGE"
 
         /**
-         * A chosen name is written as chosen; the storage layer separates a repeat of the same name.
-         * A generated name carries a per-export discriminator so two exports never collide silently.
+         * A generated name always carries a per-export discriminator, so two exports never collide silently.
+         * A chosen name keeps its exact wording and only takes the discriminator when this export would
+         * otherwise write the very same file name a previous export of this artifact already produced.
          */
         internal fun collisionSafeFileName(
             document: TranscriptDocument,
@@ -290,13 +296,23 @@ class ExportStore @Inject constructor(
             exportId: String,
             rawExtension: String? = null,
             override: String? = null,
+            repeated: Boolean = false,
         ): String = TranscriptExporter.fileName(
             document = document,
             format = format,
             override = override,
-            discriminator = exportId,
+            discriminator = exportId.takeIf { override == null || repeated },
             rawExtension = rawExtension,
         )
+
+        /**
+         * The extension an earlier export wrote. A raw export takes it from the retained provider file,
+         * which the export row does not record, so that case answers null and counts as a possible repeat.
+         */
+        private fun targetExtension(export: ExportRow): String? {
+            val format = runCatching { ExportFormat.valueOf(export.format) }.getOrNull() ?: return null
+            return if (format == ExportFormat.RAW) null else TranscriptExporter.extension(format)
+        }
 
         private fun extension(format: ExportFormat): String = when (format) {
             ExportFormat.MARKDOWN -> "md"

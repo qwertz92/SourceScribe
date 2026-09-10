@@ -41,6 +41,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -129,7 +130,7 @@ internal fun TranscriptScreen(
                                 Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
                             InfoButton(HelpTopic.PROVENANCE, openHelp)
                         }
-                        Text(stringResource(R.string.segments_count, document.segments.size),
+                        Text(pluralStringResource(R.plurals.segments_count, document.segments.size, document.segments.size),
                             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         if (document.scope.technicallyComplete != true) Text(stringResource(R.string.technically_partial),
                             color = MaterialTheme.colorScheme.error)

@@ -1,6 +1,8 @@
 package app.sourcescribe.ui
 
+import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import app.sourcescribe.R
 import app.sourcescribe.core.AcquisitionMode
@@ -20,6 +22,10 @@ import app.sourcescribe.core.Provider
 import app.sourcescribe.core.Region
 import app.sourcescribe.core.Translation
 import app.sourcescribe.extractor.EngineChannel
+import androidx.compose.ui.text.intl.Locale as ComposeLocale
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 import java.util.Locale
 
 internal fun providerName(value: Provider): String = when (value) {
@@ -70,6 +76,14 @@ internal fun modeLabel(mode: AcquisitionMode) = when (mode) {
     AudioRetention.KEEP -> R.string.audio_keep
 })
 
+/**
+ * The state as a chip caption. Only SUBMISSION_UNCERTAIN differs: its full label is a warning sentence,
+ * which belongs in the notification and in the message text, not in a word-sized chip.
+ */
+internal fun stateChipLabel(state: ExecutionState) =
+    if (state == ExecutionState.SUBMISSION_UNCERTAIN) R.string.state_submission_uncertain_short
+    else stateLabel(state)
+
 internal fun stateLabel(state: ExecutionState) = when (state) {
     ExecutionState.QUEUED -> R.string.state_queued
     ExecutionState.RUNNING -> R.string.state_running
@@ -113,12 +127,23 @@ internal fun duration(ms: Long): String {
     else String.format(Locale.getDefault(), "%d:%02d", minutes, seconds)
 }
 
+/**
+ * The extractor reports the upload day as the bare digits `20171005`. Nobody reads a date that way,
+ * so it becomes a date in the reader's own locale, and anything that is not eight digits stays untouched.
+ */
+internal fun publishedDate(value: String): String {
+    val parsed = runCatching { LocalDate.parse(value, DateTimeFormatter.BASIC_ISO_DATE) }.getOrNull() ?: return value
+    return parsed.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(Locale.getDefault()))
+}
+
 /** A configured limit, read as a duration rather than a raw minute count. */
 @Composable internal fun limitDuration(seconds: Long): String {
     val minutes = (seconds / 60).coerceAtLeast(0)
     return if (minutes >= 60) stringResource(R.string.duration_hours_minutes, minutes / 60, minutes % 60)
     else stringResource(R.string.duration_minutes, minutes)
 }
+
+internal fun numberText(value: Int): String = String.format(Locale.getDefault(), "%d", value)
 
 /** Download sizes in decimal units, the way a data plan counts them. */
 internal fun byteSize(bytes: Long): String {
@@ -157,12 +182,12 @@ internal fun byteSize(bytes: Long): String {
 @Composable internal fun audioTrackDetail(description: AudioTrackDescription): String {
     val parts = mutableListOf<String>()
     listOfNotNull(description.codecLabel, description.containerLabel).distinct().forEach { parts += it }
-    description.bitrateKbps?.let { parts += stringResource(R.string.audio_track_bitrate, it) }
+    description.bitrateKbps?.let { parts += stringResource(R.string.audio_track_bitrate, numberText(it)) }
     when (val channels = description.channels) {
         null -> Unit
         1 -> parts += stringResource(R.string.audio_track_mono)
         2 -> parts += stringResource(R.string.audio_track_stereo)
-        else -> parts += stringResource(R.string.audio_track_channels, channels)
+        else -> parts += pluralStringResource(R.plurals.audio_track_channels, channels, channels)
     }
     parts += stringResource(R.string.audio_track_format, description.track.id)
     return parts.joinToString(" · ")
@@ -191,8 +216,9 @@ internal fun byteSize(bytes: Long): String {
 
 @Composable internal fun languageText(code: String?): String {
     if (code.isNullOrBlank()) return stringResource(R.string.unknown)
-    val locale = Locale.forLanguageTag(code)
-    val display = locale.getDisplayName(Locale.getDefault())
+    // Read through Compose so switching the app language recomposes this name instead of leaving the old one.
+    val reader = Locale.forLanguageTag(ComposeLocale.current.toLanguageTag())
+    val display = Locale.forLanguageTag(code).getDisplayName(reader)
     return if (display.isBlank() || display.equals(code, ignoreCase = true)) {
         stringResource(R.string.language_value, code)
     } else {
@@ -272,5 +298,80 @@ internal fun byteSize(bytes: Long): String {
     "AUDIO_DURATION_UNKNOWN" -> stringResource(R.string.audio_duration_unknown)
     "UNSUPPORTED_OPTION", "PROVIDER_CAPABILITY_OR_CREDENTIAL_INVALID" -> stringResource(R.string.unsupported_options)
     "PRICE_UNKNOWN" -> stringResource(R.string.price_unknown)
+
+    // What the reader typed or shared could not be turned into exactly one finished video.
+    "INVALID_URL", "INVALID_HOST", "INVALID_PATH", "INVALID_QUERY", "INVALID_VIDEO_ID" ->
+        stringResource(R.string.source_not_a_video_link)
+    "AMBIGUOUS_VIDEO", "TOO_MANY_VIDEOS" -> stringResource(R.string.source_several_videos)
+    "EXPLICIT_VIDEO_REQUIRED" -> stringResource(R.string.source_needs_explicit_video)
+    "LIVE_OR_PLAYLIST_UNSUPPORTED" -> stringResource(R.string.source_live_or_playlist)
+    "INPUT_TOO_LARGE" -> stringResource(R.string.source_input_too_large)
+    "METADATA_TOO_LARGE" -> stringResource(R.string.source_metadata_too_large)
+    "INVALID_METADATA", "INVALID_DURATION", "SOURCE_ID_MISMATCH", "SOURCE_VALIDATION" ->
+        stringResource(R.string.source_metadata_unusable)
+    "INVALID_CAPTION_URL" -> stringResource(R.string.source_caption_url_rejected)
+
+    // Reasons that can arise in more than one step; stepText names the step where the code carries one.
+    "NETWORK", "PROVIDER_NETWORK", "RESPONSE_NETWORK", "AUDIO_NETWORK", "ENGINE_NETWORK" ->
+        stepText(code, R.string.reason_network)
+    "RATE_LIMIT", "PROVIDER_RATE_LIMIT", "RESPONSE_RATE_LIMIT", "AUDIO_RATE_LIMIT", "ENGINE_RATE_LIMIT" ->
+        stepText(code, R.string.reason_rate_limit)
+    "INVALID_RESPONSE", "PROVIDER_INVALID_RESPONSE", "RESPONSE_INVALID_RESPONSE", "AUDIO_INVALID_RESPONSE" ->
+        stepText(code, R.string.reason_invalid_response)
+    "STORAGE", "AUDIO_STORAGE", "ENGINE_STORAGE", "AUDIO_IMPORT_STORAGE",
+    "RESPONSE_STORAGE", "PROVIDER_RESPONSE_STORAGE", "RESPONSE_RESPONSE_STORAGE" ->
+        stepText(code, R.string.reason_storage)
+
+    // Reasons only a speech-to-text provider can give.
+    "AUTHENTICATION", "PROVIDER_AUTHENTICATION", "RESPONSE_AUTHENTICATION" ->
+        stepText(code, R.string.reason_authentication)
+    "ACCESS_DENIED", "PROVIDER_ACCESS_DENIED", "RESPONSE_ACCESS_DENIED" ->
+        stepText(code, R.string.reason_access_denied)
+    "QUOTA", "PROVIDER_QUOTA", "RESPONSE_QUOTA" -> stepText(code, R.string.reason_quota)
+    "SERVER", "PROVIDER_SERVER", "RESPONSE_SERVER" -> stepText(code, R.string.reason_server)
+    "REMOTE_FAILED", "PROVIDER_REMOTE_FAILED", "RESPONSE_REMOTE_FAILED" ->
+        stepText(code, R.string.reason_remote_failed)
+    "INVALID_INPUT", "PROVIDER_INVALID_INPUT", "RESPONSE_INVALID_INPUT" ->
+        stepText(code, R.string.reason_invalid_input)
+
+    // Reasons only the YouTube extraction can give.
+    "SOURCE_UNAVAILABLE", "AUDIO_SOURCE_UNAVAILABLE" -> stepText(code, R.string.reason_source_unavailable)
+    "CHALLENGE_REQUIRED", "AUDIO_CHALLENGE_REQUIRED" -> stepText(code, R.string.reason_challenge_required)
+    "NO_CAPTIONS", "AUDIO_NO_CAPTIONS" -> stepText(code, R.string.reason_no_captions)
+    "NATIVE", "AUDIO_NATIVE" -> stepText(code, R.string.reason_native)
+
+    "ENGINE_VERIFICATION" -> stepText(code, R.string.reason_engine_verification)
+    "ENGINE_REQUIRES_APP_UPDATE" -> stepText(code, R.string.reason_engine_app_update)
+    "ENGINE_PROBE_FAILED" -> stepText(code, R.string.reason_engine_probe)
+    "ENGINE_UNCERTAIN_PROBE" -> stepText(code, R.string.reason_engine_probe_uncertain)
+    "ENGINE_NO_PREVIOUS" -> stepText(code, R.string.reason_engine_no_previous)
+
+    "KEY_INVALID_INPUT", "CREDENTIAL_INVALID_INPUT" -> stringResource(R.string.key_invalid_input)
+
+    "AUDIO_IMPORT_INVALID_INPUT" -> stepText(code, R.string.reason_import_invalid)
+    "AUDIO_IMPORT_INPUT_UNAVAILABLE" -> stepText(code, R.string.reason_import_unavailable)
+    "AUDIO_IMPORT_PROBE_FAILED" -> stepText(code, R.string.reason_import_probe)
+    "AUDIO_IMPORT_CORRUPT" -> stepText(code, R.string.reason_import_corrupt)
+
+    "LOCAL_PROCESSING_FAILED" -> stringResource(R.string.local_failed)
+    "CLEANUP_FAILED" -> stringResource(R.string.cleanup_failed)
     else -> stringResource(R.string.operation_failed) + "\n" + stringResource(R.string.error_detail, code)
+}
+
+/**
+ * Several codes name the step they happened in with a prefix. The step becomes the first half of the
+ * sentence and the reason the second, so one wording per reason covers every step it can occur in.
+ */
+@Composable
+private fun stepText(code: String, @StringRes reason: Int): String {
+    val step = when {
+        code.startsWith("PROVIDER_") -> R.string.step_submit
+        code.startsWith("RESPONSE_") -> R.string.step_collect
+        code.startsWith("AUDIO_IMPORT_") -> R.string.step_import
+        code.startsWith("AUDIO_") -> R.string.step_audio
+        code.startsWith("ENGINE_") -> R.string.step_engine
+        code.startsWith("CREDENTIAL_") || code.startsWith("KEY_") -> R.string.step_key
+        else -> return stringResource(reason)
+    }
+    return stringResource(R.string.step_failure, stringResource(step), stringResource(reason))
 }

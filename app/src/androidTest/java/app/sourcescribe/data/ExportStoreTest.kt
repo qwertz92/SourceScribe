@@ -307,6 +307,25 @@ class ExportStoreTest {
     }
 
     @Test
+    fun aRenamedArtifactKeepsItsNameOnceAndIsStillExportableTwice() = runBlocking {
+        withHarness(ExportFixtureProvider.Mode.NAME_COLLISION) { harness ->
+            assertEquals(1, harness.dao.renameArtifact(harness.artifactId, "Folge 12 Interview"))
+
+            val first = harness.store.export(harness.artifactId, ExportFormat.TEXT, harness.treeUri)
+            val second = harness.store.export(harness.artifactId, ExportFormat.TEXT, harness.treeUri)
+
+            assertEquals(ExportState.EXPORTED, first.state)
+            assertEquals(ExportState.EXPORTED, second.state)
+            assertNotEquals(first.documentUri, second.documentUri)
+            val names = providerAdmin { ExportFixtureProvider.names(context) }
+            assertEquals(names.toString(), 2, names.size)
+            // The chosen wording is written exactly once; only the repeat carries the separating suffix.
+            assertTrue(names.toString(), names.contains("Folge_12_Interview.txt"))
+            assertTrue(names.toString(), names.any { it.startsWith("Folge_12_Interview-") && it.endsWith(".txt") })
+        }
+    }
+
+    @Test
     fun generatedNameSeparatesArtifactsAndExportsOfTheSameSource() {
         val firstArtifact = "ffffffff-ffff-ffff-ffff-ffffffffffff"
         val secondArtifact = "dddddddd-dddd-dddd-dddd-dddddddddddd"

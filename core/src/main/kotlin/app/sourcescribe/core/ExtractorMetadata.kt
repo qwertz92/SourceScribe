@@ -68,8 +68,8 @@ object ExtractorMetadata {
             val acodec = value("acodec")
             if (!Regex("[A-Za-z0-9_.-]{1,80}").matches(id) || value("vcodec") != "none" || acodec in setOf(null, "none")) return@mapNotNull null
             val note = value("format_note")?.take(500)
-            val exact = number("filesize")?.takeIf { it <= MAX_TRACK_BYTES }?.toLong()
-            val approximate = number("filesize_approx")?.takeIf { it <= MAX_TRACK_BYTES }?.toLong()
+            val exact = number("filesize")?.takeIf { it > 0 && it <= MAX_TRACK_BYTES }?.toLong()
+            val approximate = number("filesize_approx")?.takeIf { it > 0 && it <= MAX_TRACK_BYTES }?.toLong()
             // A DRC rendition is only ever marked by the extractor id suffix or its note; never inferred from bitrate.
             val compressed = id.endsWith("-drc", ignoreCase = true) || note?.contains("drc", ignoreCase = true) == true
             // yt-dlp encodes the track role numerically: 10 original, 5 default, -10 audio description.
@@ -83,10 +83,13 @@ object ExtractorMetadata {
                 isOriginal = when {
                     preference == ORIGINAL_LANGUAGE_PREFERENCE -> true
                     preference != null -> false
-                    note?.contains("original", ignoreCase = true) == true -> true
+                    note?.contains("(original)", ignoreCase = true) == true -> true
                     else -> null
                 },
-                evidence = "yt-dlp:formats.language,language_preference,format_note,acodec,ext,abr,filesize,asr,audio_channels",
+                evidence = "yt-dlp:formats." + listOf(
+                    "language", "language_preference", "format_note", "acodec", "vcodec", "ext",
+                    "abr", "tbr", "filesize", "filesize_approx", "asr", "audio_channels",
+                ).filter { it in item }.joinToString(","),
                 codec = acodec?.take(80),
                 container = value("ext")?.take(20),
                 bitrateKbps = (number("abr") ?: number("tbr"))?.takeIf { it in 1.0..10_000.0 }?.toInt(),

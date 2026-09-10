@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Button
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -39,6 +40,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
@@ -113,9 +115,12 @@ internal fun HistoryScreen(
         while (jobs.any { it.state == ExecutionState.WAITING_REMOTE }) { delay(1000); now = System.currentTimeMillis() }
     }
     val sourceNames = remember(sources) { sources.associate { it.id to it.title } }
+    // The date has to be searchable in the form the card shows it; the raw millisecond count matches nothing a reader types.
+    val dateFormat = remember { DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT) }
     val visible = jobs.filter { job ->
         filter.matches(job) &&
-            "${sourceNames[job.sourceId]} ${job.sourceId} ${job.createdAt} ${job.config}".contains(query, ignoreCase = true)
+            "${sourceNames[job.sourceId]} ${job.sourceId} ${dateFormat.format(Date(job.createdAt))} ${job.config}"
+                .contains(query, ignoreCase = true)
     }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item {
@@ -131,7 +136,7 @@ internal fun HistoryScreen(
             }
         }
         if (jobs.isNotEmpty()) item {
-            Text(stringResource(R.string.history_count, visible.size, jobs.size),
+            Text(pluralStringResource(R.plurals.history_count, jobs.size, visible.size, jobs.size),
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         if (notificationsDisabled && jobs.isNotEmpty()) item {
@@ -166,6 +171,10 @@ internal fun HistoryScreen(
         val job = jobs.firstOrNull { it.id == id }
         if (job == null) actionsFor = null else JobActionsDialog(
             job = job,
+            // A limit belongs to the job for good, so a repeat of this job would end at the same limit again.
+            limitReached = attempts.filter { it.jobId == job.id }
+                .groupBy { it.branch }.values.mapNotNull { rows -> rows.maxBy { it.number }.error }
+                .firstOrNull { it in setOf("AUDIO_LONGER_THAN_LIMIT", "AUDIO_DURATION_UNKNOWN") },
             remoteDeletionPossible = job.id in remoteDeletionJobIds,
             close = { actionsFor = null },
             openHelp = openHelp,
@@ -209,6 +218,7 @@ private fun JobCard(
 ) {
     val rotation by animateFloatAsState(if (open) 180f else 0f, label = "job-chevron")
     val savedConfig = remember(job.config) { decodeStoredJobConfig(job.config) }
+    val dateFormat = remember { DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT) }
     OutlinedCard(Modifier.fillMaxWidth()) {
         Column {
             Surface(onClick = toggle, color = MaterialTheme.colorScheme.surface,
@@ -218,7 +228,7 @@ private fun JobCard(
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
                         Text(listOfNotNull(
-                            DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(job.createdAt)),
+                            dateFormat.format(Date(job.createdAt)),
                             savedConfig?.provider?.let(::providerName)
                                 ?: stringResource(R.string.mode_captions_only).takeIf { savedConfig?.mode == AcquisitionMode.CAPTIONS_ONLY },
                         ).joinToString(" · "), style = MaterialTheme.typography.bodySmall,
@@ -310,8 +320,10 @@ private fun StatusRow(job: JobRow) {
             colors.errorContainer to colors.onErrorContainer
         else -> colors.surfaceVariant to colors.onSurfaceVariant
     }
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-        StatusChip(stringResource(stateLabel(job.state)), container, content)
+    // The chip's width follows its word, and its word changes while the list is open, so the outcome
+    // goes underneath instead of beside it and nothing moves sideways when a job progresses.
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        StatusChip(stringResource(stateChipLabel(job.state)), container, content)
         Text(stringResource(outcomeLabel(job.outcome)), style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
@@ -320,6 +332,7 @@ private fun StatusRow(job: JobRow) {
 @Composable
 private fun JobActionsDialog(
     job: JobRow,
+    limitReached: String?,
     remoteDeletionPossible: Boolean,
     close: () -> Unit,
     openHelp: (HelpTopic) -> Unit,
@@ -335,6 +348,16 @@ private fun JobActionsDialog(
             Column(Modifier.fillMaxWidth().heightIn(max = maximumHeight).padding(20.dp)) {
                 Text(stringResource(R.string.job_actions), style = MaterialTheme.typography.titleLarge)
                 LazyColumn(Modifier.weight(1f, fill = false), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    if (limitReached != null) item {
+                        Column(Modifier.padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(messageText(limitReached), color = MaterialTheme.colorScheme.error)
+                            Text(stringResource(R.string.limit_needs_new_job), style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Button(prepareAgain, Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
+                                Text(stringResource(R.string.prepare_again))
+                            }
+                        }
+                    }
                     if (job.state !in setOf(ExecutionState.FINISHED, ExecutionState.CANCELLED)) item {
                         TextButton(cancel, Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
                             Text(stringResource(R.string.cancel_job), Modifier.fillMaxWidth())

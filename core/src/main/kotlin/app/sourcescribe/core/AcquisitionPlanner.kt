@@ -11,6 +11,25 @@ object AcquisitionPlanner {
         AcquisitionMode.BOTH -> setOf(Branch.CAPTIONS, Branch.STT)
     }
 
+    /**
+     * The attempts a fresh job starts with. CAPTIONS_THEN_STT begins on captions alone and reaches
+     * speech-to-text only as a fallback, so it starts with one attempt while requesting both branches.
+     */
+    fun initialBranches(mode: AcquisitionMode): List<Branch> = when (mode) {
+        AcquisitionMode.STT_ONLY -> listOf(Branch.STT)
+        AcquisitionMode.BOTH -> listOf(Branch.CAPTIONS, Branch.STT)
+        AcquisitionMode.CAPTIONS_ONLY, AcquisitionMode.CAPTIONS_THEN_STT -> listOf(Branch.CAPTIONS)
+    }
+
+    /** True where a caption track is read, so which track that is stays the reader's choice. */
+    fun usesCaptions(mode: AcquisitionMode): Boolean = Branch.CAPTIONS in requestedBranches(mode)
+
+    /**
+     * True where speech-to-text can still happen, so audio track, provider, limits and cost belong to
+     * the decision. That includes CAPTIONS_THEN_STT, which reaches a provider when captions are missing.
+     */
+    fun mayUseSpeechToText(mode: AcquisitionMode): Boolean = Branch.STT in requestedBranches(mode)
+
     fun plan(config: JobConfig, captions: CaptionAvailability): Set<PlannedAction> {
         val captionAction = when (captions) {
             CaptionAvailability.NOT_CHECKED, CaptionAvailability.AVAILABLE -> PlannedAction.FETCH_CAPTIONS

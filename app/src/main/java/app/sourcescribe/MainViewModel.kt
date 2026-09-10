@@ -331,7 +331,8 @@ class MainViewModel @Inject constructor(
                     is ProviderError -> failure.code.name
                     is JobActionException -> failure.code
                     is AudioImportException -> "AUDIO_IMPORT_${failure.code.name}"
-                    else -> "LOCAL_OPERATION_FAILED"
+                    // Same wording as the coordinator uses, so one code covers the case everywhere.
+                    else -> "LOCAL_PROCESSING_FAILED"
                 }
                 if (revision == null || revision == previewRevision.get()) mutable.update { it.copy(message = code) }
             } finally {
@@ -398,14 +399,17 @@ class MainViewModel @Inject constructor(
             durationMs != null && config.maxAudioSeconds in 1..MAX_AUDIO_SECONDS &&
                 durationMs > config.maxAudioSeconds * 1000L
 
-        /** The smallest allowed limit that would admit this source, rounded up to whole minutes. */
+        /**
+         * The smallest allowed limit that would admit this source, rounded up to whole minutes and padded a
+         * little. Null only when no allowed limit admits it, because the source is past the app's own ceiling.
+         */
         fun suggestedLimitSeconds(durationMs: Long): Long? {
-            val minutes = (durationMs + 59_999) / 60_000
-            val padded = (minutes + 5) * 60
-            return padded.takeIf { it <= MAX_AUDIO_SECONDS }
+            val needed = ((durationMs + 59_999) / 60_000) * 60
+            if (needed > MAX_AUDIO_SECONDS) return null
+            return minOf(needed + 5 * 60, MAX_AUDIO_SECONDS)
         }
 
-        const val MAX_AUDIO_SECONDS = 36_000L
+        const val MAX_AUDIO_SECONDS = JobLimits.MAX_AUDIO_SECONDS
 
         fun configError(config: JobConfig): String? = when {
             config.maxAudioSeconds !in 1..MAX_AUDIO_SECONDS -> "AUDIO_DURATION_LIMIT"

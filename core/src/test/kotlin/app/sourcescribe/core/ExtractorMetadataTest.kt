@@ -1,8 +1,10 @@
 package app.sourcescribe.core
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ExtractorMetadataTest {
@@ -44,6 +46,71 @@ class ExtractorMetadataTest {
             val resolved = ExtractorMetadata.parse("""{"id":"BaW_jenozKc","subtitles":{"$language":[{"ext":"vtt","url":"https://www.youtube.com/api/timedtext?lang=en"}]}}""", source)
             assertEquals(0, resolved.captions.size)
         }
+    }
+
+    @Test fun audioFormatsAreReadWithTheirTechnicalFactsAndRoles() {
+        val raw = """{"id":"BaW_jenozKc","formats":[
+            {"format_id":"137","vcodec":"avc1.640028","acodec":"none","ext":"mp4"},
+            {"format_id":"18","vcodec":"avc1.42001E","acodec":"mp4a.40.2","ext":"mp4"},
+            {"format_id":"251","vcodec":"none","acodec":"opus","ext":"webm","abr":105.2,"filesize":15728640,
+             "asr":48000,"audio_channels":2,"language":"en","language_preference":10},
+            {"format_id":"251-drc","vcodec":"none","acodec":"opus","ext":"webm","tbr":105.2,
+             "filesize_approx":15728000,"language":"en","language_preference":10},
+            {"format_id":"140","vcodec":"none","acodec":"mp4a.40.2","ext":"m4a","abr":129.4,"filesize":0,
+             "language":"de","language_preference":5},
+            {"format_id":"233-desc","vcodec":"none","acodec":"mp4a.40.2","ext":"m4a","abr":48,
+             "language":"en","language_preference":-10}
+        ]}"""
+        val audio = ExtractorMetadata.parse(raw, source).audio.associateBy { it.id }
+        assertEquals(setOf("251", "251-drc", "140", "233-desc"), audio.keys)
+
+        val opus = audio.getValue("251")
+        assertEquals("opus", opus.codec)
+        assertEquals("webm", opus.container)
+        assertEquals(105, opus.bitrateKbps)
+        assertEquals(15_728_640L, opus.bytes)
+        assertEquals(false, opus.bytesEstimated)
+        assertEquals(48_000, opus.sampleRateHz)
+        assertEquals(2, opus.channels)
+        assertEquals(true, opus.isOriginal)
+        assertEquals(false, opus.audioDescription)
+        assertEquals(false, opus.dynamicRangeCompressed)
+        assertEquals("Opus", AudioTracks.describe(listOf(opus), 1_120_000).single().codecLabel)
+
+        val compressed = audio.getValue("251-drc")
+        assertEquals(true, compressed.dynamicRangeCompressed)
+        assertEquals(105, compressed.bitrateKbps)
+        assertEquals(15_728_000L, compressed.bytes)
+        assertEquals(true, compressed.bytesEstimated)
+
+        // A reported size of zero is not a size, and language_preference 5 marks a dubbed track, not the original.
+        val dubbed = audio.getValue("140")
+        assertNull(dubbed.bytes)
+        assertEquals(false, dubbed.isOriginal)
+        assertNull(dubbed.sampleRateHz)
+        assertNull(dubbed.channels)
+
+        val narration = audio.getValue("233-desc")
+        assertEquals(true, narration.audioDescription)
+        assertEquals(false, narration.isOriginal)
+
+        // Provenance names the fields this entry carried and stays silent about the ones it did not.
+        assertTrue(narration.evidence.contains("language_preference"))
+        assertFalse(narration.evidence.contains("filesize"))
+        assertTrue(opus.evidence.contains("audio_channels"))
+        assertFalse(opus.evidence.contains("tbr"))
+
+        assertEquals("251", TrackSelection.audio(ExtractorMetadata.parse(raw, source), null)?.id)
+    }
+
+    @Test fun absentLanguagePreferenceFallsBackOnlyToTheParenthesisedNote() {
+        fun note(value: String) = ExtractorMetadata.parse(
+            """{"id":"BaW_jenozKc","formats":[{"format_id":"140","vcodec":"none","acodec":"mp4a.40.2","format_note":"$value"}]}""",
+            source,
+        ).audio.single().isOriginal
+        assertEquals(true, note("English (original)"))
+        assertNull(note("not original, re-encoded"))
+        assertNull(note("low"))
     }
 
     @Test fun ambiguousAudioRequiresChoice() {

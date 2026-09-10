@@ -100,11 +100,7 @@ class JobCoordinator @Inject constructor(
             val id = UUID.randomUUID().toString()
             val now = System.currentTimeMillis()
             val engine = if (source.kind == SourceKind.YOUTUBE) engines.active() else null
-            val branches = when (config.mode) {
-                AcquisitionMode.STT_ONLY -> listOf(Branch.STT)
-                AcquisitionMode.BOTH -> listOf(Branch.CAPTIONS, Branch.STT)
-                else -> listOf(Branch.CAPTIONS)
-            }
+            val branches = AcquisitionPlanner.initialBranches(config.mode)
             val attempts = branches.map { branch ->
                 AttemptRow(
                     UUID.randomUUID().toString(),

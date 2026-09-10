@@ -140,7 +140,9 @@ private fun SourceScribeApp(incoming: String, shareSerial: Int, model: MainViewM
     LaunchedEffect(incoming, shareSerial) {
         if (incoming.isNotBlank() && shareSerial != consumedShare) {
             input = incoming
-            visited = listOf(Page.NEW.ordinal)
+            // Through go(), so a share that arrives while another page is open clears the keyboard and
+            // still leaves that page reachable with the back gesture.
+            go(Page.NEW)
             model.clearPreview()
             consumedShare = shareSerial
         }
@@ -194,6 +196,8 @@ private fun SourceScribeApp(incoming: String, shareSerial: Int, model: MainViewM
         state.information?.let { text ->
             InformationDialog(text, state.informationShareable, model::closeInformation, model::shareDiagnostics)
         }
+        // A full-screen result covers the page beneath it; a field left focused there would raise the keyboard.
+        LaunchedEffect(state.document != null, state.information != null) { focusManager.clearFocus(force = true) }
         state.document?.let { document ->
             TranscriptScreen(document, state.documentName, model::closeArtifact,
                 { model.shareArtifact(document.artifactId) },

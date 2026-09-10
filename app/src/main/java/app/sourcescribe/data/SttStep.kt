@@ -10,6 +10,7 @@ import app.sourcescribe.core.ExecutionState
 import app.sourcescribe.core.Generation
 import app.sourcescribe.core.Interval
 import app.sourcescribe.core.JobConfig
+import app.sourcescribe.core.JobLimits
 import app.sourcescribe.core.Origin
 import app.sourcescribe.core.Outcome
 import app.sourcescribe.core.Phase
@@ -2145,7 +2146,7 @@ class SttStep @Inject constructor(
 
     companion object {
         const val MAX_CHUNK_DURATION_MS = 600_000L
-        const val MAX_AUDIO_SECONDS = 36_000L
+        const val MAX_AUDIO_SECONDS = JobLimits.MAX_AUDIO_SECONDS
         const val MAX_AUDIO_DURATION_MS = MAX_AUDIO_SECONDS * 1000L
         const val MAX_CHUNK_BYTES = 24_000_000L
         const val MIN_REMOTE_RETRY_SECONDS = 30L

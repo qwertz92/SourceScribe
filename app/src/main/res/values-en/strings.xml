@@ -87,7 +87,6 @@
     <string name="operation_failed">The operation could not be completed.</string>
     <string name="error_detail">Technical status: %1$s</string>
     <string name="export_tree">Select export folder</string>
-    <string name="export_saved">Export attempt saved</string>
     <string name="no_export_tree">No export folder selected yet</string>
     <string name="state_queued">Queued</string>
     <string name="state_running">In progress</string>
@@ -95,6 +94,7 @@
     <string name="state_waiting_rate_limit">Waiting due to rate limit</string>
     <string name="state_waiting_user">Decision required</string>
     <string name="state_waiting_remote">Provider is processing</string>
+    <string name="state_submission_uncertain_short">Submission uncertain</string>
     <string name="state_submission_uncertain">Submission uncertain – do not retry automatically</string>
     <string name="state_finished">Completed</string>
     <string name="state_cancelled">Cancelled</string>
@@ -120,7 +120,6 @@
     <string name="audio_until_persisted">Until the transcript is saved</string>
     <string name="audio_keep">Keep permanently</string>
     <string name="missing_provider">STT requires a provider, model, and matching saved key.</string>
-    <string name="choose_audio_help">The selected audio version may differ from the original.</string>
     <string name="privacy">No telemetry. Keys remain on this device. External STT begins when you start the job.</string>
     <string name="estimated_cost">Estimated base price: %1$s USD · pricing as of %2$s</string>
     <string name="price_unknown">Price unknown – no promise of free use</string>
@@ -131,10 +130,10 @@
     <string name="export_permission_required">The transcript remains stored internally. Select a writable folder to export it.</string>
     <string name="invalid_budget">Enter a valid cost limit or leave the field blank.</string>
     <string name="invalid_duration">Enter a maximum audio duration between 1 and 600 minutes.</string>
+    <string name="source_beyond_ceiling">This source runs %1$s. SourceScribe processes at most %2$s in one go, so a higher limit will not help here.</string>
     <string name="unsupported_options">The selected options are not supported by the model. Check the advanced settings.</string>
     <string name="retry_missing">Retry missing branch</string>
     <string name="retry_all">New run</string>
-    <string name="other_provider">Prepare with another provider</string>
     <string name="resume_job">Resume safely</string>
     <string name="delete_job">Delete history entry</string>
     <string name="delete_pending">Deletion scheduled. Local processing will be stopped first.</string>
@@ -210,7 +209,6 @@
 
     <!-- Help and glossary -->
     <string name="help">Help</string>
-    <string name="help_title">Help and glossary</string>
     <string name="help_intro">This page explains the terms used in the app. Tap an entry to expand it. The question mark next to a control opens the matching entry directly.</string>
     <string name="help_search">Search the glossary</string>
     <string name="help_open">Open explanation</string>
@@ -221,10 +219,10 @@
     <string name="help_section_app">App and technology</string>
 
     <string name="help_workflow_title">How a job runs</string>
-    <string name="help_workflow_body">1. You paste a YouTube link or share a video with SourceScribe.\n2. Check source fetches the video metadata: title, length, available caption and audio tracks. Nothing is downloaded and nothing is sent to a provider yet.\n3. You review the selection and start the job. Only this start allows the app to transfer audio.\n4. The job continues in History even when you leave the app. The result is stored internally first and written to your export folder afterwards.</string>
+    <string name="help_workflow_body">1. You paste a YouTube link or share a video with SourceScribe.\n2. “Check source” fetches the video metadata: title, length, available caption and audio tracks. Nothing is downloaded and nothing is sent to a provider yet.\n3. You review the selection and start the job. Only this start allows the app to transfer audio.\n4. The job continues in History even when you leave the app. The result is stored internally first and written to your export folder afterwards.</string>
 
     <string name="help_modes_title">The four acquisition modes</string>
-    <string name="help_modes_body">YouTube only uses just the captions YouTube itself offers. That costs nothing, needs no provider and usually finishes in seconds. Not every video has them, and automatic captions carry no punctuation and no speakers.\n\nYouTube, otherwise STT takes the captions when they exist and only otherwise uploads the audio to a provider. This is the frugal default.\n\nSTT only skips captions and always has the provider transcribe. Useful when you need punctuation, speaker separation or better quality.\n\nBoth produces two separate results for comparison and therefore costs one provider run.</string>
+    <string name="help_modes_body">“YouTube only” uses just the captions YouTube itself offers. That costs nothing, needs no provider and usually finishes in seconds. Not every video has them, and automatic captions carry no punctuation and no speakers.\n\n“YouTube, then STT” takes the captions when they exist and only otherwise uploads the audio to a provider. This is the frugal default.\n\n“STT only” skips captions and always has the provider transcribe. Useful when you need punctuation, speaker separation or better quality.\n\n“Both” produces two separate results for comparison and therefore costs one provider run.</string>
 
     <string name="help_audio_track_title">Audio track: what the numbers mean</string>
     <string name="help_audio_track_body">YouTube offers the same video in several audio renditions. Numbers such as 139, 140, 141, 249, 250 or 251 are YouTube-internal format numbers, not quality grades. Each stands for one combination of codec and data rate:\n\n• The numbers 249, 250 and 251 are WebM files using the Opus codec.\n• The numbers 139, 140 and 141 are M4A files using the AAC codec.\n• Within one series the higher number means the higher data rate.\n\nWhat data rate and size a track actually has is decided by YouTube per video, and the values shift over the years. SourceScribe therefore claims no fixed numbers; it shows codec, reported data rate and file size in plain words and suggests one track.\n\nFor transcription the smallest track is almost always enough. The reason is mechanical: before sending anything, the app re-encodes the chosen track to mono, 16 kHz, 64 kbit/s MP3, because speech-to-text services work at that resolution. A larger track adds no further information after that step, but it does cost more data and more download time.\n\nThe choice only matters when a video offers several languages, for example a dubbed version. Then the track decides which language gets transcribed. In that case the app asks instead of choosing for you.\n\nSome videos also carry an audio description: a track in which a voice describes what happens on screen. SourceScribe marks it and never selects it on its own, because transcribing it would yield the picture description instead of the conversation.</string>
@@ -236,10 +234,10 @@
     <string name="help_codec_body">The codec describes how the sound was compressed: Opus is newer and slightly better than AAC at the same data rate. The container is the file form around it, so WebM or M4A.\n\nNeither matters for your result, because the app converts to MP3 before sending anyway. The values are shown so the choice stays traceable and can be recorded in the provenance.</string>
 
     <string name="help_bitrate_title">Data rate and file size</string>
-    <string name="help_bitrate_body">The data rate in kbit/s says how many bits per second of sound are used. Data rate and video length give the approximate file size.\n\nWhen the size is prefixed with approx., the value is an estimate: either YouTube only reported an approximation, or the app derived it from data rate and length. The file actually downloaded can differ.</string>
+    <string name="help_bitrate_body">The data rate in kbit/s says how many bits per second of sound are used. Data rate and video length give the approximate file size.\n\nWhen the size is prefixed with “approx.”, the value is an estimate: either YouTube only reported an approximation, or the app derived it from data rate and length. The file actually downloaded can differ.</string>
 
     <string name="help_caption_track_title">Caption tracks</string>
-    <string name="help_caption_track_body">Provided by the channel means somebody uploaded or corrected the captions. These are usually the most accurate and contain punctuation.\n\nAutomatically generated is YouTube own speech recognition. Usually usable, but without punctuation, without speakers and with errors on names and technical terms.\n\nAutomatically translated is a machine translation of another track. SourceScribe leaves these out by default because they went through two machine steps and the errors add up. You can allow them under advanced options.</string>
+    <string name="help_caption_track_body">“Provided by the channel” means somebody uploaded or corrected the captions. These are usually the most accurate and contain punctuation.\n\n“Automatically generated” is YouTube’s own speech recognition. Usually usable, but without punctuation, without speakers and with errors on names and technical terms.\n\n“Automatically translated” is a machine translation of another track. SourceScribe leaves these out by default because they went through two machine steps and the errors add up. You can allow them under advanced options.</string>
 
     <string name="help_provider_title">The three providers</string>
     <string name="help_provider_body">A provider is an external service that turns audio into text. SourceScribe has no server of its own; requests go straight from your device to the provider, with your own key and on your own bill.\n\nAssemblyAI works asynchronously: the app uploads the audio, receives a job id and polls for progress. Offers speaker separation and word timings.\n\nOpenAI and Groq work synchronously: the answer comes back on the request itself. Groq is usually cheap and fast.\n\nWhich options are actually possible depends on the chosen model, which is why unsupported switches are greyed out.</string>
@@ -251,7 +249,7 @@
     <string name="help_key_body">An API key is your personal password for a provider. You create it in the provider account and pay for usage through it.\n\nSourceScribe stores keys encrypted on this device, never shows them again in clear text and never writes them into logs, diagnostics or exports. A job only remembers the reference to the key. Deleting a key keeps old results, but waiting jobs need the key back.</string>
 
     <string name="help_diarization_title">Speaker separation</string>
-    <string name="help_diarization_body">Speaker separation, also called diarization, splits the transcript into passages per voice. The result then shows a label such as A or B in front of each passage.\n\nThis assigns voices, it does not identify people. The app invents no names. How reliable the separation is depends on the provider, the recording and the number of speakers. Not every model supports it.</string>
+    <string name="help_diarization_body">Speaker separation, also called diarization, splits the transcript into passages per voice. The result then shows a label such as “A” or “B” in front of each passage.\n\nThis assigns voices, it does not identify people. The app invents no names. How reliable the separation is depends on the provider, the recording and the number of speakers. Not every model supports it.</string>
 
     <string name="help_timestamps_title">Word and segment timings</string>
     <string name="help_timestamps_body">Segment timings state where each paragraph starts in the video. That is enough for subtitles and for jumping back.\n\nWord timings additionally give a time for every single word. That produces considerably more data and is only worth it if you want to cut or search word by word.\n\nWithout timings the SRT and VTT export formats are impossible, because subtitle files require times.</string>
@@ -260,43 +258,43 @@
     <string name="help_context_body">Enter words that occur in the audio and that speech recognition tends to spell wrong: proper names, company names, technical terms, abbreviations. The provider then prefers those spellings.\n\nOne line per term. This is a hint to the provider, not a guarantee. Not every model supports it.</string>
 
     <string name="help_limits_title">Length limit and budget</string>
-    <string name="help_limits_body">The length limit is a guard against accidental cost: if the audio is longer than the configured value, the job stops before anything reaches the provider. The value applies per job and is part of the stored job configuration.\n\nThat is why the limit of a job that has already started cannot be raised afterwards. This is deliberate: a stored cost frame must not change by itself. To process a longer video, raise the limit before starting or prepare the job again with Prepare again.\n\nThe budget is a second, independent limit in US dollars. It is compared against the estimated cost of all submissions of the same job, including accepted and uncertain ones. Left blank, the app checks no cost limit.</string>
+    <string name="help_limits_body">The length limit is a guard against accidental cost: if the audio is longer than the configured value, the job stops before anything reaches the provider. The value applies per job and is part of the stored job configuration.\n\nThat is why the limit of a job that has already started cannot be raised afterwards. This is deliberate: a stored cost frame must not change by itself. To process a longer video, raise the limit before starting or prepare the job again with “Prepare again”.\n\nThe budget is a second, independent limit in US dollars. It is compared against the estimated cost of all submissions of the same job, including accepted and uncertain ones. Left blank, the app checks no cost limit.</string>
 
     <string name="help_cost_title">Cost estimate</string>
-    <string name="help_cost_body">The estimate shown is video length times the stored list price of the model, with the tariff date next to it. It is an orientation, not an invoice.\n\nIt contains no discounts, no minimum billing, no retries and no provider price changes. When it says price unknown, SourceScribe has no verified tariff stored for that model; that is not an indication that it would be free. The provider invoice is always the binding one.</string>
+    <string name="help_cost_body">The estimate shown is video length times the stored list price of the model, with the tariff date next to it. It is an orientation, not an invoice.\n\nIt contains no discounts, no minimum billing, no retries and no provider price changes. When it says “Price unknown”, SourceScribe has no verified tariff stored for that model; that is not an indication that it would be free. The provider invoice is always the binding one.</string>
 
     <string name="help_export_formats_title">Export formats</string>
-    <string name="help_export_formats_body">The conversion is done by SourceScribe on the device, not by the provider. The provider only ever returns one transcript; every format is produced from it locally. Choosing several formats produces one file per format from the same result. Nothing is transcribed again and nothing extra is charged.\n\n• Markdown (.md): text with a heading and provenance fields. The default.\n• Plain text (.txt): the text only, without a header.\n• Structured data (.json): the complete result with times, speakers, provenance and warnings. For further processing.\n• Subtitles (.srt) and web subtitles (.vtt): numbered blocks with time codes for video players. Only possible when the result contains times.\n• Original response: the unchanged provider answer. Only available when Keep original data as well is switched on.</string>
+    <string name="help_export_formats_body">The conversion is done by SourceScribe on the device, not by the provider. The provider only ever returns one transcript; every format is produced from it locally. Choosing several formats produces one file per format from the same result. Nothing is transcribed again and nothing extra is charged.\n\n• Markdown (.md): text with a heading and provenance fields. The default.\n• Plain text (.txt): the text only, without a header.\n• Structured data (.json): the complete result with times, speakers, provenance and warnings. For further processing.\n• Subtitles (.srt) and web subtitles (.vtt): numbered blocks with time codes for video players. Only possible when the result contains times.\n• “Original response (raw data)”: the unchanged provider answer. Only available when “Also keep raw data” is switched on.</string>
 
     <string name="help_export_folder_title">Export folder</string>
     <string name="help_export_folder_body">The export folder is a folder of your choice outside the app that finished transcripts are written to. Android grants that permission per folder and remembers it permanently.\n\nIndependently of that, results always land inside the app first. A failed export therefore never deletes a result and never triggers a new billable request. If writing fails, for example because the folder was removed, you can pick another folder in History and save again.</string>
 
     <string name="help_filename_title">File names</string>
-    <string name="help_filename_body">Exported files are named after the video title, plus date, language and a short id so that two runs of the same source do not overwrite each other.\n\nYou can change the name in the result under Actions before exporting or sharing. Characters that file systems do not allow are replaced.</string>
+    <string name="help_filename_body">Exported files are named after the video title, plus date, language and a short id so that two runs of the same source do not overwrite each other.\n\nYou can change the name in the result under “Actions” before exporting or sharing. Characters that file systems do not allow are replaced.</string>
 
     <string name="help_presets_title">Defaults and presets</string>
-    <string name="help_presets_body">Both store a complete combination of settings: acquisition mode, provider, model, language, options, formats and limits.\n\nSave as default makes the current combination the standard. Every new source starts from it afterwards. There is exactly one default.\n\nA preset is an additional named combination, for example Podcast with speakers or Fast and free. Presets do not replace the default; you pick one deliberately on a new source. An upload approval is never stored with either: it is only created when you start a job.</string>
+    <string name="help_presets_body">Both store a complete combination of settings: acquisition mode, provider, model, language, options, formats and limits.\n\n“Save as default” makes the current combination the standard. Every new source starts from it afterwards. There is exactly one default.\n\nA preset is an additional named combination, for example “Podcast with speakers” or “Fast and free”. Presets do not replace the default; you pick one deliberately on a new source. An upload approval is never stored with either: it is only created when you start a job.</string>
 
     <string name="help_states_title">Job states</string>
-    <string name="help_states_body">Waiting to run: scheduled, but not its turn yet.\nRunning: currently working on the device.\nWaiting for network or rate limit: the app holds back and retries later.\nProvider processing: the audio is with the provider, the result is still pending.\nDecision required: the app stopped because something cannot be decided without you, for example a missing key or an exceeded length limit. The text underneath names the reason.\nSubmission uncertain: the request went out but the answer was lost. The provider may have accepted and billed it. SourceScribe never repeats such a request on its own.</string>
+    <string name="help_states_body">“Queued”: scheduled, but not its turn yet.\n“In progress”: currently working on the device.\n“Waiting for network” or “Waiting due to rate limit”: the app holds back and retries later.\n“Provider is processing”: the audio is with the provider, the result is still pending.\n“Decision required”: the app stopped because something cannot be decided without you, for example a missing key or an exceeded length limit. The text underneath names the reason.\n“Submission uncertain”: the request went out but the answer was lost. The provider may have accepted and billed it. SourceScribe never repeats such a request on its own.</string>
 
     <string name="help_provenance_title">Provenance</string>
     <string name="help_provenance_body">For every result the app stores where it came from: source and video id, whether it came from YouTube captions or an external transcription, which model was requested and which the provider actually reported, which audio track was used and whether translation happened.\n\nThis is part of the export as well. The point is that months later you can still judge how much a transcript can carry, instead of treating it as verbatim.</string>
 
     <string name="help_retention_title">Audio retention and original data</string>
-    <string name="help_retention_body">Only as technically needed deletes downloaded audio as soon as the step is done. The most frugal setting.\nUntil the transcript is stored keeps it until the result is persisted. The default, so an intermediate error does not force a new download.\nKeep permanently leaves the audio in app storage until you delete the history entry. This can take a lot of space.\n\nKeep original data as well stores the unchanged provider answer. Only then is the Original response export format possible.</string>
+    <string name="help_retention_body">“Only as technically required” deletes downloaded audio as soon as the step is done. The most frugal setting.\n“Until the transcript is saved” keeps it until the result is persisted. The default, so an intermediate error does not force a new download.\n“Keep permanently” leaves the audio in app storage until you delete the history entry. This can take a lot of space.\n\n“Also keep raw data” stores the unchanged provider answer. Only then is the “Original response (raw data)” export format possible.</string>
 
     <string name="help_storage_title">Storage limit and parallel jobs</string>
     <string name="help_storage_body">The storage limit is the ceiling SourceScribe imposes on itself in internal app storage: audio, intermediate files and results together. When it is reached the app stops the next step in a controlled way instead of filling the device. Results already stored are kept.\n\nParallel jobs decides how many sources are processed at the same time. More is not always faster: downloading and converting cost battery and CPU, and providers have rate limits of their own.</string>
 
     <string name="help_diagnostics_title">Redacted diagnostics</string>
-    <string name="help_diagnostics_body">Redacted means blacked out: all content has been removed from the report beforehand. It contains technical values only, namely app and component versions, device properties, counters per job state and known error codes.\n\nIt contains no links, no titles, no transcripts and no keys. You see the full text before deciding whether to share it; without your sharing it does not leave the device.</string>
+    <string name="help_diagnostics_body">“Redacted” means blacked out: all content has been removed from the report beforehand. It contains technical values only, namely app and component versions, device properties, counters per job state and known error codes.\n\nIt contains no links, no titles, no transcripts and no keys. You see the full text before deciding whether to share it; without your sharing it does not leave the device.</string>
 
     <string name="help_engines_title">Extraction components and channels</string>
-    <string name="help_engines_body">The extraction component is the tool that fetches YouTube metadata, captions and audio: yt-dlp together with a JavaScript helper. YouTube changes its pages regularly, which is why this tool is updated far more often than the app itself. That is why SourceScribe can update it separately.\n\nStable is the regular release. Nightly is the day-to-day preview state: when YouTube has just changed something and the stable release has not caught up, nightly often already works, but it is less tested.\n\nSo when checking a source suddenly fails: check Stable first; if that does not help, check Nightly. When the app finds an update, put any public YouTube address into the field below. That makes the new version actually run before activation; it is only adopted when this functional test succeeds. Every version is additionally verified against its signature. Previous engine undoes an activation.\n\nPython, the JavaScript runtime and FFmpeg are fixed inside the app and need an app update. Running jobs keep the version they started with.</string>
+    <string name="help_engines_body">The extraction component is the tool that fetches YouTube metadata, captions and audio: yt-dlp together with a JavaScript helper. YouTube changes its pages regularly, which is why this tool is updated far more often than the app itself. That is why SourceScribe can update it separately.\n\n“Stable” is the regular release. “Nightly” is the day-to-day preview state: when YouTube has just changed something and the stable release has not caught up, nightly often already works, but it is less tested.\n\nSo when checking a source suddenly fails: check “Stable” first; if that does not help, check “Nightly”. When the app finds an update, put any public YouTube address into the field below. That makes the new version actually run before activation; it is only adopted when this functional test succeeds. Every version is additionally verified against its signature. “Restore previous engine” undoes an activation.\n\nPython, the JavaScript runtime and FFmpeg are fixed inside the app and need an app update. Running jobs keep the version they started with.</string>
 
     <string name="help_privacy_title">What leaves the device</string>
-    <string name="help_privacy_body">In YouTube only mode, the only traffic leaving the device is the YouTube requests needed to load metadata and captions. No provider is involved.\n\nAs soon as an acquisition mode with STT is chosen and you start a job, the prepared audio file is transferred to the chosen provider. That never happens automatically and never without a chosen provider, model and key.\n\nThe app has no telemetry, no server of its own and no analytics. Keys stay on the device. A local cancel does not stop a request that already reached the provider.</string>
+    <string name="help_privacy_body">In “YouTube only” mode, the only traffic leaving the device is the YouTube requests needed to load metadata and captions. No provider is involved.\n\nAs soon as an acquisition mode with STT is chosen and you start a job, the prepared audio file is transferred to the chosen provider. That never happens automatically and never without a chosen provider, model and key.\n\nThe app has no telemetry, no server of its own and no analytics. Keys stay on the device. A local cancel does not stop a request that already reached the provider.</string>
 
     <!-- Audio track, described in plain words -->
     <string name="audio_track_recommended">Recommended</string>
@@ -307,11 +305,13 @@
     <string name="audio_track_format">Format %1$s</string>
     <string name="audio_track_smallest">smallest file</string>
     <string name="audio_track_largest">largest file</string>
-    <string name="audio_track_bitrate">%1$d kbit/s</string>
+    <string name="audio_track_bitrate">%1$s kbit/s</string>
     <string name="audio_track_mono">Mono</string>
     <string name="audio_track_stereo">Stereo</string>
-    <string name="audio_track_channels">%1$d channels</string>
-    <string name="audio_track_help">The smallest track is enough for transcription: everything is re-encoded to mono, 16 kHz, 64 kbit/s MP3 before it is sent anyway. The choice only matters when a video offers several language versions.</string>
+    <plurals name="audio_track_channels">
+        <item quantity="one">%1$d channel</item>
+        <item quantity="other">%1$d channels</item>
+    </plurals>
     <string name="audio_track_choose_language">This video offers several language versions. Please choose yourself which audio track should be transcribed.</string>
     <string name="language_value">Language %1$s</string>
 
@@ -339,7 +339,10 @@
     <string name="filter_failed">Failed</string>
     <string name="expand_entry">Show details</string>
     <string name="collapse_entry">Hide details</string>
-    <string name="history_count">%1$d of %2$d entries</string>
+    <plurals name="history_count">
+        <item quantity="one">%1$d of %2$d entry</item>
+        <item quantity="other">%1$d of %2$d entries</item>
+    </plurals>
     <string name="no_filter_matches">No entry matches this filter.</string>
     <string name="job_actions">Actions for this job</string>
     <string name="share_result">Share result</string>
@@ -370,7 +373,58 @@
     <string name="file_name_saved">File name saved</string>
     <string name="apply">Apply</string>
     <string name="close">Close</string>
-    <string name="segments_count">%1$d passages</string>
+    <plurals name="segments_count">
+        <item quantity="one">%1$d passage</item>
+        <item quantity="other">%1$d passages</item>
+    </plurals>
     <string name="transcript_empty">This result contains no passages.</string>
     <string name="audio_track_description">Audio description</string>
+    <string name="step_failure">%1$s: %2$s</string>
+    <string name="step_submit">While sending to the provider</string>
+    <string name="step_collect">While collecting the result</string>
+    <string name="step_import">While importing the file</string>
+    <string name="step_audio">While obtaining the audio</string>
+    <string name="step_engine">While updating the extraction component</string>
+    <string name="step_key">While using the API key</string>
+    <string name="reason_network">No connection was made. Check the network and try again.</string>
+    <string name="reason_rate_limit">Too many requests in a short time. The app waits and tries again later.</string>
+    <string name="reason_invalid_response">The answer was not readable, so the job does not count as successful.</string>
+    <string name="reason_storage">Nothing could be stored on the device. Free some space and try again.</string>
+    <string name="reason_authentication">The provider did not accept the key. Check it under “More”.</string>
+    <string name="reason_access_denied">This key is not allowed to use that service or that model.</string>
+    <string name="reason_quota">The credit or quota of your account at the provider is used up.</string>
+    <string name="reason_server">The provider reported a fault of its own. This is not caused by this app.</string>
+    <string name="reason_remote_failed">The provider cancelled the job.</string>
+    <string name="reason_invalid_input">The provider rejected the request. Usually one chosen option does not fit the model.</string>
+    <string name="reason_source_unavailable">The video cannot be retrieved: private, deleted, or blocked in this country.</string>
+    <string name="reason_challenge_required">YouTube asks for proof that no automated client is calling, and serves nothing until it gets it.</string>
+    <string name="reason_no_captions">This video has no captions.</string>
+    <string name="reason_native">The extraction component stopped. Switching the component under “More” can help.</string>
+    <string name="reason_engine_verification">The signature of the download did not match. The previous component stays active.</string>
+    <string name="reason_engine_app_update">This component requires a newer version of the app.</string>
+    <string name="reason_engine_probe">The new component failed its self-test. The previous one stays active.</string>
+    <string name="reason_engine_probe_uncertain">The self-test gave no clear result. The previous component stays active.</string>
+    <string name="reason_engine_no_previous">There is no earlier component to go back to.</string>
+    <string name="key_invalid_input">The key you entered does not have the expected shape. Copy it again from your provider account.</string>
+    <string name="reason_import_invalid">This file is not an audio file the app can process.</string>
+    <string name="reason_import_unavailable">The file can no longer be reached. It may have been moved or deleted.</string>
+    <string name="reason_import_probe">The length and format of the file could not be determined.</string>
+    <string name="reason_import_corrupt">The file is damaged and could not be read in full.</string>
+    <string name="source_not_a_video_link">That is not a link to a single YouTube video. Expected is an address such as https://www.youtube.com/watch?v=… or https://youtu.be/…</string>
+    <string name="source_several_videos">The text contains several videos. Give exactly one link.</string>
+    <string name="source_needs_explicit_video">This link does not name a particular video. Open the video and share its own link.</string>
+    <string name="source_live_or_playlist">Live streams and playlists are not processed. Give the link of a single finished video.</string>
+    <string name="source_input_too_large">The pasted text is too long. Paste the link only.</string>
+    <string name="source_metadata_too_large">YouTube returned more data than the app processes.</string>
+    <string name="source_metadata_unusable">What YouTube reported was unusable. Check the link and try again.</string>
+    <string name="source_caption_url_rejected">The caption address did not come from YouTube and was therefore rejected.</string>
+    <string name="local_failed">A step on the device failed. Nothing was sent to a provider.</string>
+    <string name="cleanup_failed">Cleaning up old files failed. Your transcripts are not affected.</string>
+    <string name="help_stt_title">STT: speech to text</string>
+    <string name="help_stt_body">STT is short for speech to text. It means automatic transcription: a service receives an audio track and returns the spoken words as text.
+
+SourceScribe does not transcribe by itself. The app prepares the audio and sends it to a provider that you choose and pay for with your own key. That is why a provider, a model, a cost frame and a length limit appear wherever STT is involved.
+
+Captions are the opposite case. They already exist as finished text at YouTube, cost nothing, and leave your device only as a request to YouTube. That is why “YouTube only” is the mode without a provider, without a key and without cost.</string>
+    <string name="limit_needs_new_job">Resuming and retrying do not change this job’s limits: they belong to it permanently and form the cost frame you confirmed when you started it. Choose “Prepare again” to start the same link as a new job with a higher limit.</string>
 </resources>

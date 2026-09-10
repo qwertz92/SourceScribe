@@ -268,6 +268,57 @@ class TranscriptExporterTest {
     }
 
     @Test
+    fun aRepeatedExportOfAChosenNameGetsItsOwnFile() {
+        val document = document()
+        val first = TranscriptExporter.fileName(document, ExportFormat.MARKDOWN, override = "Interview")
+        val second = TranscriptExporter.fileName(document, ExportFormat.MARKDOWN, override = "Interview",
+            discriminator = "export-2")
+        val third = TranscriptExporter.fileName(document, ExportFormat.MARKDOWN, override = "Interview",
+            discriminator = "export-3")
+
+        assertEquals("Interview.md", first)
+        assertNotEquals(first, second)
+        assertNotEquals(second, third)
+        assertTrue(second, second.startsWith("Interview-"))
+        assertTrue(second, second.endsWith(".md"))
+    }
+
+    @Test
+    fun windowsDeviceNamesAreNeutralisedEvenWhenSomethingFollowsTheDot() {
+        val document = document()
+        for (name in listOf("AUX", "aux.notes", "CON.important", "com1.txt", "LPT9.a.b", "nul")) {
+            val fileName = TranscriptExporter.fileName(document, ExportFormat.MARKDOWN, override = name)
+            assertTrue(fileName, fileName.startsWith("_"))
+        }
+        // A name that merely begins with those letters is a normal name and stays untouched.
+        for (name in listOf("Conference", "Auxiliary talk", "Nullhypothese", "COM10")) {
+            val fileName = TranscriptExporter.fileName(document, ExportFormat.MARKDOWN, override = name)
+            assertFalse(fileName, fileName.startsWith("_"))
+        }
+    }
+
+    @Test
+    fun nameBudgetsCountBytesAndNeverCutThroughACharacter() {
+        val document = document()
+        val japanese = TranscriptExporter.fileName(document, ExportFormat.MARKDOWN, override = "\u8b1b\u6f14".repeat(200))
+        assertTrue(japanese, japanese.toByteArray(Charsets.UTF_8).size <= 180)
+        assertFalse(japanese, japanese.contains('\uFFFD'))
+
+        val emoji = TranscriptExporter.fileName(document, ExportFormat.MARKDOWN, override = "A" + "\uD83D\uDE00".repeat(200))
+        assertTrue(emoji, emoji.toByteArray(Charsets.UTF_8).size <= 180)
+        for (index in emoji.indices) {
+            if (emoji[index].isHighSurrogate()) {
+                assertTrue(emoji, index + 1 < emoji.length && emoji[index + 1].isLowSurrogate())
+            }
+            assertFalse(emoji, emoji[index].isLowSurrogate() && (index == 0 || !emoji[index - 1].isHighSurrogate()))
+        }
+
+        val cyrillic = TranscriptExporter.fileName(document(title = "\u041f\u0440\u0438\u0432\u0435\u0442".repeat(80)), ExportFormat.MARKDOWN)
+        assertTrue(cyrillic, cyrillic.toByteArray(Charsets.UTF_8).size <= 180)
+        assertTrue(cyrillic, cyrillic.contains("youtube_BaW_jenozKc"))
+    }
+
+    @Test
     fun rawIsSeparateAndNeverRenderedFromCanonicalDocument() {
         val document = document()
 

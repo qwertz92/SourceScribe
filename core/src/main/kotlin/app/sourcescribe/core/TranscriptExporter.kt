@@ -16,10 +16,14 @@ class TranscriptExportException(val reason: String) : IllegalArgumentException(r
 }
 
 object TranscriptExporter {
-    private const val MAX_FILENAME_CHARS = 180
-    private const val MAX_FILENAME_PART_CHARS = 40
+    /**
+     * Budgets in UTF-8 bytes, because ext4, f2fs and FAT all cap a path component at 255 bytes rather than
+     * at 255 characters. A name written in Japanese or Cyrillic costs two to three bytes per character.
+     */
+    private const val MAX_FILENAME_BYTES = 180
+    private const val MAX_FILENAME_PART_BYTES = 40
     /** Leaves room for the longest extension a provider raw payload can carry. */
-    private const val MAX_FILENAME_STEM_CHARS = 160
+    private const val MAX_FILENAME_STEM_BYTES = 160
     private val json = Json {
         encodeDefaults = true
         explicitNulls = true
@@ -61,8 +65,13 @@ object TranscriptExporter {
 
     /** A user-chosen stem, sanitised. Provenance stays inside the document, so the name is the reader's. */
     fun customStem(value: String): String? =
-        safePart(value, "", MAX_FILENAME_STEM_CHARS).takeIf { it.isNotBlank() }
+        safePart(value, "", MAX_FILENAME_STEM_BYTES).takeIf { it.isNotBlank() }
 
+    /**
+     * The file name for one export. A discriminator, where given, separates this export from every other
+     * export of the same document, so the caller passes one exactly when a plain name would land on a file
+     * that already exists.
+     */
     fun fileName(
         document: TranscriptDocument,
         format: ExportFormat,
@@ -70,10 +79,14 @@ object TranscriptExporter {
         discriminator: String? = null,
         rawExtension: String? = null,
     ): String {
-        // A chosen name is used as given; a repeated export is separated by the storage layer.
-        val stem = override?.let(::customStem) ?: generatedStem(document, discriminator)
+        val chosen = override?.let(::customStem)
+        val stem = when {
+            chosen == null -> generatedStem(document, discriminator)
+            discriminator == null -> chosen
+            else -> compose(chosen, shortId(discriminator))
+        }
         val suffix = ".${rawExtension?.let { safePart(it, "raw", 12) } ?: extension(format)}"
-        return stem.take(MAX_FILENAME_CHARS - suffix.length).trimEnd('.', ' ', '-', '_') + suffix
+        return takeBytes(stem, MAX_FILENAME_BYTES - suffix.length).trimEnd('.', ' ', '-', '_') + suffix
     }
 
     private fun identitySuffix(document: TranscriptDocument): String {
@@ -95,8 +108,8 @@ object TranscriptExporter {
     /** Joins a readable head with a suffix that must survive, trimming only the head. */
     private fun compose(head: String, suffix: String): String {
         val tail = "-$suffix"
-        val budget = (MAX_FILENAME_STEM_CHARS - tail.length).coerceAtLeast(1)
-        val shortened = head.take(budget).trimEnd('.', ' ', '-', '_').ifBlank { "transcript" }
+        val budget = (MAX_FILENAME_STEM_BYTES - tail.length).coerceAtLeast(1)
+        val shortened = takeBytes(head, budget).trimEnd('.', ' ', '-', '_').ifBlank { "transcript" }
         return shortened + tail
     }
 
@@ -400,7 +413,28 @@ object TranscriptExporter {
         return "`".repeat(maxOf(3, longest + 1))
     }
 
-    private fun safePart(value: String, fallback: String, maxChars: Int = MAX_FILENAME_PART_CHARS): String {
+    /**
+     * Cuts a string down to a UTF-8 byte budget on a code-point boundary, so no truncation ever leaves half
+     * of a surrogate pair or half of a multi-byte character behind.
+     */
+    private fun takeBytes(value: String, maxBytes: Int): String {
+        if (maxBytes <= 0) return ""
+        if (value.toByteArray(StandardCharsets.UTF_8).size <= maxBytes) return value
+        val kept = StringBuilder()
+        var used = 0
+        var index = 0
+        while (index < value.length) {
+            val width = Character.charCount(value.codePointAt(index))
+            val size = value.substring(index, index + width).toByteArray(StandardCharsets.UTF_8).size
+            if (used + size > maxBytes) break
+            kept.append(value, index, index + width)
+            used += size
+            index += width
+        }
+        return kept.toString()
+    }
+
+    private fun safePart(value: String, fallback: String, maxBytes: Int = MAX_FILENAME_PART_BYTES): String {
         val cleaned = buildString {
             for (character in value.trim()) {
                 when {
@@ -413,10 +447,11 @@ object TranscriptExporter {
         }.trim('.', ' ')
             .replace(Regex("_+"), "_")
             .replace(Regex("\\.{2,}"), "_")
-            .take(maxChars)
+            .let { takeBytes(it, maxBytes) }
             .trimEnd('.', ' ')
         if (cleaned.isEmpty()) return fallback
-        val upper = cleaned.uppercase(Locale.ROOT)
+        // Windows resolves a device name by the part before the first dot, so `AUX.notes` is `AUX` to it.
+        val upper = cleaned.substringBefore('.').uppercase(Locale.ROOT)
         val reserved = upper in setOf("CON", "PRN", "AUX", "NUL") ||
             (upper.length == 4 && upper.substring(0, 3) in setOf("COM", "LPT") && upper[3].isDigit())
         return if (reserved) "_$cleaned" else cleaned

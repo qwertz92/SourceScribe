@@ -114,7 +114,7 @@ internal fun NewSourceScreen(
             }
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (state.previews.any { it.config.provider != null && it.config.mode != AcquisitionMode.CAPTIONS_ONLY }) {
+                    if (state.previews.any { it.config.provider != null && AcquisitionPlanner.mayUseSpeechToText(it.config.mode) }) {
                         Text(stringResource(R.string.upload_help), style = MaterialTheme.typography.bodySmall)
                     }
                     Button(onStart, Modifier.fillMaxWidth().heightIn(min = 52.dp), enabled = !state.busy && state.previews.all {
@@ -150,13 +150,13 @@ private fun PreviewCard(
             Text(listOf(
                 source.channel ?: stringResource(R.string.unknown),
                 source.durationMs?.let(::duration) ?: stringResource(R.string.unknown),
-                source.publishedDate ?: stringResource(R.string.unknown),
+                source.publishedDate?.let(::publishedDate) ?: stringResource(R.string.unknown),
             ).joinToString(" · "))
             Text(source.canonicalUrl.orEmpty(), style = MaterialTheme.typography.bodySmall)
             if (source.kind == SourceKind.YOUTUBE) Text(stringResource(R.string.whole_video), style = MaterialTheme.typography.labelLarge)
             if (preview.previousJob != null) Text(stringResource(R.string.duplicate_warning), color = MaterialTheme.colorScheme.error)
 
-            if (preview.config.mode != AcquisitionMode.CAPTIONS_ONLY) {
+            if (AcquisitionPlanner.usesCaptions(preview.config.mode)) {
                 val choices = TrackSelection.captions(preview.resolved, preview.config.copy(captionTrackId = null))
                 if (choices.isEmpty()) Text(stringResource(R.string.no_captions))
                 else Choice(
@@ -167,12 +167,13 @@ private fun PreviewCard(
                     name = { captionTrackTitle(it) },
                     optionName = { captionTrackOption(it) },
                     enabled = !state.starting,
+                    placeholder = stringResource(R.string.choose),
                     info = HelpTopic.CAPTION_TRACK,
                     openHelp = openHelp,
                 ) { onTrack(source.id, it.id, null) }
             }
 
-            if (preview.config.mode != AcquisitionMode.CAPTIONS_ONLY && source.kind == SourceKind.YOUTUBE) {
+            if (AcquisitionPlanner.mayUseSpeechToText(preview.config.mode) && source.kind == SourceKind.YOUTUBE) {
                 val described = remember(preview.resolved.audio, source.durationMs) {
                     AudioTracks.describe(preview.resolved.audio, source.durationMs)
                 }
@@ -185,13 +186,14 @@ private fun PreviewCard(
                     name = { audioTrackTitle(it) },
                     optionName = { audioTrackOption(it) },
                     enabled = !state.starting,
+                    placeholder = stringResource(R.string.choose),
                     supporting = described.firstOrNull { it.track.id == preview.config.audioTrackId }?.let { audioTrackDetail(it) },
                     info = HelpTopic.AUDIO_TRACK,
                     openHelp = openHelp,
                 ) { onTrack(source.id, null, it.track.id) }
             }
 
-            if (preview.config.mode != AcquisitionMode.CAPTIONS_ONLY) {
+            if (AcquisitionPlanner.mayUseSpeechToText(preview.config.mode)) {
                 val capability = MainViewModel.capabilities(preview.config)
                 val price = capability?.priceMicrousdPerHour
                 val durationMs = source.durationMs
@@ -235,7 +237,8 @@ private fun LengthLimitWarning(
                 Modifier.weight(1f), enabled = enabled) {
                 Text(stringResource(R.string.raise_limit, limitDuration(suggestion)))
             } else {
-                Text(stringResource(R.string.invalid_duration), Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+                Text(stringResource(R.string.source_beyond_ceiling, duration(durationMs), limitDuration(JobLimits.MAX_AUDIO_SECONDS)),
+                    Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
             }
             InfoButton(HelpTopic.LIMITS, openHelp)
         }
@@ -256,9 +259,10 @@ private fun ConfigControls(
         if (localAudio) Text(stringResource(R.string.local_stt_mode))
         else Choice(stringResource(R.string.mode), stringResource(modeLabel(config.mode)), AcquisitionMode.entries,
             { modeName(it) }, enabled = enabled, info = HelpTopic.MODES, openHelp = openHelp) { change(config.copy(mode = it)) }
-        if (config.mode != AcquisitionMode.CAPTIONS_ONLY) {
+        if (AcquisitionPlanner.mayUseSpeechToText(config.mode)) {
             Choice(stringResource(R.string.provider), config.provider?.let(::providerName) ?: stringResource(R.string.no_provider),
-                Provider.entries, { providerName(it) }, enabled = enabled, info = HelpTopic.PROVIDERS, openHelp = openHelp) { provider ->
+                Provider.entries, { providerName(it) }, enabled = enabled, info = HelpTopic.PROVIDERS, openHelp = openHelp,
+                placeholder = stringResource(R.string.no_provider)) { provider ->
                 val key = credentials.firstOrNull { it.second == provider }
                 change(MainViewModel.modelDefaults(config.copy(provider = provider, credentialId = key?.first,
                     region = key?.third ?: Region.US), MainViewModel.models(provider).first()))
@@ -271,7 +275,7 @@ private fun ConfigControls(
                     keys.firstOrNull { it.first == config.credentialId }?.let { "${regionName(it.third)} · ••••${it.first.takeLast(4)}" }
                         ?: stringResource(R.string.choose),
                     keys, { "${regionName(it.third)} · ••••${it.first.takeLast(4)}" }, enabled = enabled,
-                    info = HelpTopic.API_KEY, openHelp = openHelp) {
+                    info = HelpTopic.API_KEY, openHelp = openHelp, placeholder = stringResource(R.string.choose)) {
                     change(config.copy(credentialId = it.first, region = it.third, uploadApproved = false))
                 }
             }
@@ -280,15 +284,18 @@ private fun ConfigControls(
         }
         TextButton({ advanced = !advanced }, enabled = enabled) { Text(stringResource(R.string.advanced)) }
         if (advanced) {
-            Toggle(R.string.original_language, config.preferOriginalLanguage, enabled) { change(config.copy(preferOriginalLanguage = it)) }
-            Toggle(R.string.uploader_captions, config.allowUploaderCaptions, enabled,
-                info = HelpTopic.CAPTION_TRACK, openHelp = openHelp) { change(config.copy(allowUploaderCaptions = it)) }
-            Toggle(R.string.automatic_captions, config.allowAutomaticCaptions, enabled) { change(config.copy(allowAutomaticCaptions = it)) }
-            Toggle(R.string.translated_captions, config.allowTranslatedCaptions, enabled) { change(config.copy(allowTranslatedCaptions = it)) }
-            OutlinedTextField(config.preferredLanguages.joinToString(","),
-                { change(config.copy(preferredLanguages = it.split(',').map(String::trim).filter(String::isNotBlank))) },
-                Modifier.fillMaxWidth(), enabled = enabled, label = { Text(stringResource(R.string.languages)) })
-            if (config.mode != AcquisitionMode.CAPTIONS_ONLY) {
+            // These five only steer which caption track is read, so pure speech-to-text has no use for them.
+            if (AcquisitionPlanner.usesCaptions(config.mode)) {
+                Toggle(R.string.original_language, config.preferOriginalLanguage, enabled) { change(config.copy(preferOriginalLanguage = it)) }
+                Toggle(R.string.uploader_captions, config.allowUploaderCaptions, enabled,
+                    info = HelpTopic.CAPTION_TRACK, openHelp = openHelp) { change(config.copy(allowUploaderCaptions = it)) }
+                Toggle(R.string.automatic_captions, config.allowAutomaticCaptions, enabled) { change(config.copy(allowAutomaticCaptions = it)) }
+                Toggle(R.string.translated_captions, config.allowTranslatedCaptions, enabled) { change(config.copy(allowTranslatedCaptions = it)) }
+                OutlinedTextField(config.preferredLanguages.joinToString(","),
+                    { change(config.copy(preferredLanguages = it.split(',').map(String::trim).filter(String::isNotBlank))) },
+                    Modifier.fillMaxWidth(), enabled = enabled, label = { Text(stringResource(R.string.languages)) })
+            }
+            if (AcquisitionPlanner.mayUseSpeechToText(config.mode)) {
                 val cap = MainViewModel.capabilities(config)
                 Toggle(R.string.fallback_errors, config.fallbackOnCaptionError, enabled) { change(config.copy(fallbackOnCaptionError = it)) }
                 OutlinedTextField(config.language.orEmpty(), { change(config.copy(language = it.ifBlank { null })) },
@@ -350,8 +357,10 @@ private fun LimitFields(config: JobConfig, change: (JobConfig) -> Unit, openHelp
     var budget by rememberSaveable {
         mutableStateOf(config.maxCostMicrousd?.toBigDecimal()?.movePointLeft(6)?.stripTrailingZeros()?.toPlainString().orEmpty())
     }
+    // Both directions run through the same mapping. When they disagreed, an out-of-range entry was
+    // rewritten to "0" while the reader was still typing it.
     LaunchedEffect(config.maxAudioSeconds) {
-        if (config.maxAudioSeconds > 0 && minutes.toLongOrNull()?.times(60) != config.maxAudioSeconds) {
+        if (config.maxAudioSeconds > 0 && limitSeconds(minutes) != config.maxAudioSeconds) {
             minutes = (config.maxAudioSeconds / 60).toString()
         }
     }
@@ -365,8 +374,8 @@ private fun LimitFields(config: JobConfig, change: (JobConfig) -> Unit, openHelp
         InfoButton(HelpTopic.LIMITS, openHelp)
     }
     OutlinedTextField(minutes,
-        { text -> minutes = text; change(config.copy(maxAudioSeconds = text.toLongOrNull()?.takeIf { it in 1..600 }?.times(60) ?: 0)) },
-        Modifier.fillMaxWidth(), enabled = enabled, isError = config.maxAudioSeconds !in 1..36_000,
+        { text -> minutes = text; change(config.copy(maxAudioSeconds = limitSeconds(text) ?: 0)) },
+        Modifier.fillMaxWidth(), enabled = enabled, isError = config.maxAudioSeconds !in 1..JobLimits.MAX_AUDIO_SECONDS,
         label = { Text(stringResource(R.string.duration_limit)) },
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
     OutlinedTextField(budget, { text -> budget = text; change(config.copy(maxCostMicrousd = budgetValue(text))) },
@@ -374,6 +383,10 @@ private fun LimitFields(config: JobConfig, change: (JobConfig) -> Unit, openHelp
         label = { Text(stringResource(R.string.cost_limit)) },
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
 }
+
+/** Minutes as typed to seconds, or null when the entry is not a limit this app accepts. */
+private fun limitSeconds(text: String): Long? =
+    text.trim().toLongOrNull()?.takeIf { it in 1..JobLimits.MAX_AUDIO_MINUTES }?.times(60)
 
 private fun budgetValue(text: String): Long? = if (text.isBlank()) null else runCatching {
     text.replace(',', '.').toBigDecimal().takeIf { it.signum() >= 0 }?.movePointRight(6)?.longValueExact() ?: -1L

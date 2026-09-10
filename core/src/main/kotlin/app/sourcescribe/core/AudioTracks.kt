@@ -5,7 +5,9 @@ package app.sourcescribe.core
  *
  * The pipeline re-encodes every chosen rendition to mono 16 kHz MP3 at 64 kbit/s before any provider
  * sees it (see AudioPreparation), so a larger rendition adds download volume and time without adding
- * transcription detail. That is why the smallest rendition of the wanted language is the recommendation.
+ * transcription detail. The recommendation therefore takes the smallest rendition of the wanted language,
+ * with two exceptions that would cost transcription quality: a dynamic-range-compressed rendition loses
+ * to a plain one, and a rendition below MINIMUM_USEFUL_KBPS loses to any normal one.
  */
 enum class AudioSizeClass { SMALLEST, MEDIUM, LARGEST, UNKNOWN }
 
@@ -72,7 +74,9 @@ object AudioTracks {
     fun automatic(tracks: List<AudioTrack>): AudioTrack? {
         if (tracks.isEmpty()) return null
         // An audio-description track narrates the picture; it is never a silent stand-in for the dialogue.
-        val spoken = tracks.filterNot { it.audioDescription }.ifEmpty { tracks }
+        // When the extractor offers nothing else, transcribing it is a content decision and stays with the user.
+        val spoken = tracks.filterNot { it.audioDescription }
+        if (spoken.isEmpty()) return null
         val candidates = spoken.filter { it.isOriginal == true }.ifEmpty { spoken }
         if (candidates.map { normalizedLanguage(it.language) }.distinct().size > 1) return null
         return candidates.sortedWith(preference).firstOrNull()
@@ -91,8 +95,8 @@ object AudioTracks {
         { it.id },
     )
 
-    fun estimateBytes(kbps: Int, durationMs: Long): Long =
-        (kbps.toLong() * 1000L / 8L) * (durationMs / 1000L)
+    /** kbit/s is 125 bytes per second; the remainder below a full second is kept instead of truncated away. */
+    fun estimateBytes(kbps: Int, durationMs: Long): Long = kbps.toLong() * 125L * durationMs / 1000L
 
     private fun effectiveKbps(track: AudioTrack): Int? = track.bitrateKbps
 

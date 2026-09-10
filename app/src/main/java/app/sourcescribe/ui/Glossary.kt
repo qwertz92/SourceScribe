@@ -19,6 +19,7 @@ enum class HelpSection(@StringRes val title: Int) {
 enum class HelpTopic(val section: HelpSection, @StringRes val title: Int, @StringRes val body: Int) {
     WORKFLOW(HelpSection.BASICS, R.string.help_workflow_title, R.string.help_workflow_body),
     MODES(HelpSection.BASICS, R.string.help_modes_title, R.string.help_modes_body),
+    STT(HelpSection.BASICS, R.string.help_stt_title, R.string.help_stt_body),
     STATES(HelpSection.BASICS, R.string.help_states_title, R.string.help_states_body),
     PRIVACY(HelpSection.BASICS, R.string.help_privacy_title, R.string.help_privacy_body),
 

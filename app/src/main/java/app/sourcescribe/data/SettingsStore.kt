@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import app.sourcescribe.core.AppSettings
 import app.sourcescribe.core.JobConfig
+import app.sourcescribe.core.JobLimits
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -46,7 +47,7 @@ class SettingsStore @Inject constructor(@ApplicationContext context: Context) {
     }
 
     private fun validateConfig(config: JobConfig) {
-        require(config.maxAudioSeconds in 1..36_000)
+        require(config.maxAudioSeconds in 1..JobLimits.MAX_AUDIO_SECONDS)
         require(config.maxCostMicrousd.let { it == null || it >= 0 })
         require(config.preferredLanguages.size <= 20 && config.preferredLanguages.all { it.matches(Regex("[A-Za-z0-9-]{1,35}")) })
         require(config.contextTerms.size <= 1000 && config.contextTerms.all { it.length <= 500 && it.none(Char::isISOControl) })

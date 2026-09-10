@@ -13,6 +13,7 @@ OpenCode und Menschen. Keine zweite Kopie der Anforderungen in einem Agenten-Wik
 | [Preview-Prüfbericht](reports/2026-09-08-preview.md) | Aktuelle Tests, APK-Hashes, Gerätegrenzen und Restabnahme |
 | [Preview ausprobieren](TRY_PREVIEW.md) | Installation, Funktionen, erste Tests und TalkBack erklärt |
 | [Restarbeiten](NEXT_STEPS.md) | Priorisierte offene Schritte und Abschlussnachweise |
+| [Bekannte Probleme](DEFECTS.md) | Was nicht vollstaendig erledigt ist, mit Stelle und fehlendem Nachweis |
 | [Lernprotokoll](LEARNINGS.md) | Verifizierte Fallstricke und effiziente Wiederaufnahme |
 | [Build](BUILD.md) | Linux-/WSL-Bootstrap, Build, Geräteprüfung und persönliche Signatur |
 | [Architektur](ARCHITECTURE.md) | Gemeinsame Verträge und Persistenz |
