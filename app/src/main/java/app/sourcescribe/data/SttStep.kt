@@ -585,8 +585,10 @@ class SttStep @Inject constructor(
         if (checkpoint.durationMs == null || checkpoint.chunkCount == 0) {
             val info = withTimeout(PREPARE_TIMEOUT_MS) { preparation.probe(input) }
             val maxMs = maxDurationMs(config)
-            if (info.durationMs <= 0 || info.durationMs > maxMs || info.durationMs > MAX_AUDIO_DURATION_MS) {
-                return waitForUser(row, owner, "AUDIO_DURATION_LIMIT")
+            // The measured length and the configured cap fail for different reasons and need different answers.
+            if (info.durationMs <= 0) return waitForUser(row, owner, "AUDIO_DURATION_UNKNOWN")
+            if (info.durationMs > maxMs || info.durationMs > MAX_AUDIO_DURATION_MS) {
+                return waitForUser(row, owner, "AUDIO_LONGER_THAN_LIMIT")
             }
             checkpoint = checkpoint.copy(
                 durationMs = info.durationMs,

@@ -49,6 +49,10 @@ data class CaptionTrack(
     val evidence: String,
 )
 
+/**
+ * One selectable audio-only format of a source. The technical fields are recorded so the picker can
+ * describe a format in words instead of an extractor format id, and so provenance keeps what was fetched.
+ */
 @Serializable
 data class AudioTrack(
     val id: String,
@@ -57,6 +61,16 @@ data class AudioTrack(
     val name: String?,
     val isOriginal: Boolean?,
     val evidence: String,
+    val codec: String? = null,
+    val container: String? = null,
+    val bitrateKbps: Int? = null,
+    val bytes: Long? = null,
+    val bytesEstimated: Boolean = false,
+    val sampleRateHz: Int? = null,
+    val channels: Int? = null,
+    val dynamicRangeCompressed: Boolean = false,
+    /** A narration track describing what is on screen; transcribing it yields the description, not the dialogue. */
+    val audioDescription: Boolean = false,
 )
 
 @Serializable

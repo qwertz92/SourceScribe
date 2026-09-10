@@ -307,13 +307,19 @@ class ExportStoreTest {
     }
 
     @Test
-    fun generatedNameContainsFullArtifactAndExportIds() {
-        val artifactId = "ffffffff-ffff-ffff-ffff-ffffffffffff"
-        val exportId = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"
+    fun generatedNameSeparatesArtifactsAndExportsOfTheSameSource() {
+        val firstArtifact = "ffffffff-ffff-ffff-ffff-ffffffffffff"
+        val secondArtifact = "dddddddd-dddd-dddd-dddd-dddddddddddd"
+        val firstExport = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"
+        val secondExport = "cccccccc-cccc-cccc-cccc-cccccccccccc"
 
-        val name = ExportStore.collisionSafeFileName(document(artifactId), ExportFormat.MARKDOWN, exportId)
+        val name = ExportStore.collisionSafeFileName(document(firstArtifact), ExportFormat.MARKDOWN, firstExport)
 
-        assertTrue(name.endsWith("-$artifactId-$exportId.md"))
+        assertTrue(name, name.endsWith(".md"))
+        assertNotEquals(name,
+            ExportStore.collisionSafeFileName(document(secondArtifact), ExportFormat.MARKDOWN, firstExport))
+        assertNotEquals(name,
+            ExportStore.collisionSafeFileName(document(firstArtifact), ExportFormat.MARKDOWN, secondExport))
     }
 
     @Test
@@ -323,7 +329,20 @@ class ExportStoreTest {
 
         val name = ExportStore.collisionSafeFileName(document(artifactId), ExportFormat.RAW, exportId, "json3")
 
-        assertTrue(name.endsWith("-$artifactId-$exportId.json3"))
+        assertTrue(name, name.endsWith(".json3"))
+        assertNotEquals(name,
+            ExportStore.collisionSafeFileName(document(artifactId), ExportFormat.RAW, exportId, "json"))
+    }
+
+    @Test
+    fun aChosenExportNameReplacesTheGeneratedOneWithoutLosingItsExtension() {
+        val artifactId = "33333333-3333-3333-3333-333333333333"
+        val exportId = "44444444-4444-4444-4444-444444444444"
+
+        val name = ExportStore.collisionSafeFileName(
+            document(artifactId), ExportFormat.MARKDOWN, exportId, null, "Folge 12 Interview")
+
+        assertEquals("Folge_12_Interview.md", name)
     }
 
     private suspend fun withHarness(mode: ExportFixtureProvider.Mode, block: suspend (Harness) -> Unit) {

@@ -114,7 +114,8 @@ class ExportStore @Inject constructor(
             } ?: false
             if (!isDirectory) throw IOException("export tree is not a directory")
 
-            val fileName = collisionSafeFileName(document, format, row.id, payload.extension)
+            val chosenName = dao.artifact(row.artifactId)?.displayName
+            val fileName = collisionSafeFileName(document, format, row.id, payload.extension, chosenName)
             val createdDocument = DocumentsContract.createDocument(resolver, parent, payload.mimeType, fileName)
                 ?: throw IOException("export document could not be created")
             documentUri = createdDocument.toString()
@@ -279,18 +280,23 @@ class ExportStore @Inject constructor(
         private const val ERROR_RAW_NOT_RETAINED = "RAW_NOT_RETAINED"
         private const val ERROR_TOO_LARGE = "TOO_LARGE"
 
+        /**
+         * A chosen name is written as chosen; the storage layer separates a repeat of the same name.
+         * A generated name carries a per-export discriminator so two exports never collide silently.
+         */
         internal fun collisionSafeFileName(
             document: TranscriptDocument,
             format: ExportFormat,
             exportId: String,
             rawExtension: String? = null,
-        ): String {
-            val generated = TranscriptExporter.fileName(document, format)
-            val generatedExtension = generated.substringAfterLast('.', "")
-            val actualExtension = rawExtension ?: generatedExtension
-            val stem = generated.removeSuffix(".$generatedExtension")
-            return "$stem-${document.artifactId}-$exportId.$actualExtension"
-        }
+            override: String? = null,
+        ): String = TranscriptExporter.fileName(
+            document = document,
+            format = format,
+            override = override,
+            discriminator = exportId,
+            rawExtension = rawExtension,
+        )
 
         private fun extension(format: ExportFormat): String = when (format) {
             ExportFormat.MARKDOWN -> "md"

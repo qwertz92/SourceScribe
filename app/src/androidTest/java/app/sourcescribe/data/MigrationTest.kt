@@ -21,7 +21,7 @@ class MigrationTest {
     )
 
     @Test
-    fun migrateFromVersion1To3PreservesRowsAndAddsNullableSubmissionColumns() {
+    fun migrateFromVersion1To4PreservesRowsAndAddsNullableColumns() {
         val databaseName = "migration-${UUID.randomUUID()}.db"
         helper.createDatabase(databaseName, 1).apply {
             execSQL("INSERT INTO sources(id,snapshot,title,importedPath) VALUES ('source-v1','snapshot-v1','Migration source',NULL)")
@@ -37,10 +37,11 @@ class MigrationTest {
 
         val migrated = helper.runMigrationsAndValidate(
             databaseName,
-            3,
+            4,
             true,
             SourceScribeDatabase.MIGRATION_1_2,
             SourceScribeDatabase.MIGRATION_2_3,
+            SourceScribeDatabase.MIGRATION_3_4,
         )
         try {
             assertEquals(1, count(migrated, "sources"))
@@ -75,7 +76,7 @@ class MigrationTest {
                 assertEquals(1, cursor.getInt(3))
                 assertEquals("checkpoint-v1", cursor.getString(4))
             }
-            row(migrated, "SELECT id,jobId,attemptId,sha256,bytes,language,complete,warningCount FROM artifacts WHERE id = 'artifact-v1'") { cursor ->
+            row(migrated, "SELECT id,jobId,attemptId,sha256,bytes,language,complete,warningCount,displayName FROM artifacts WHERE id = 'artifact-v1'") { cursor ->
                 assertEquals("artifact-v1", cursor.getString(0))
                 assertEquals("job-v1", cursor.getString(1))
                 assertEquals("attempt-v1", cursor.getString(2))
@@ -84,6 +85,7 @@ class MigrationTest {
                 assertEquals("de", cursor.getString(5))
                 assertEquals(1, cursor.getInt(6))
                 assertEquals(2, cursor.getInt(7))
+                assertTrue("migrated artifacts keep no export name", cursor.isNull(8))
             }
             row(migrated, "SELECT id,attemptId,provider,credentialId,region,inputHash,configHash,state,estimatedMicrousd,remoteId,rawResponsePath,reusedFromId,rejectionCode FROM submissions WHERE id = 'submission-v1'") { cursor ->
                 assertEquals("submission-v1", cursor.getString(0))

@@ -5,6 +5,7 @@ import kotlinx.serialization.decodeFromString
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -196,10 +197,10 @@ class TranscriptExporterTest {
     }
 
     @Test
-    fun filenamesContainIdentityAndRejectWindowsTraversalInputs() {
+    fun generatedFilenamesLeadWithTheTitleAndStillCarryIdentity() {
         val document = document(
             sourceId = "youtube:abc/../CON",
-            title = "title does not define identity",
+            title = "title leads the name",
         ).copy(
             artifactId = "artifact/with\\separators",
             language = "de\n..",
@@ -211,14 +212,59 @@ class TranscriptExporterTest {
 
         val fileName = TranscriptExporter.fileName(document, ExportFormat.MARKDOWN)
 
-        assertTrue(fileName.endsWith(".md"))
-        assertTrue(fileName.contains("youtube_abc"))
-        assertTrue(fileName.contains("model_with"))
-        assertFalse(fileName.contains('/'))
-        assertFalse(fileName.contains('\\'))
-        assertFalse(fileName.contains(".."))
-        assertTrue(fileName.length <= 180)
-        assertNotEquals("title_does_not_define_identity.md", fileName)
+        assertTrue(fileName, fileName.endsWith(".md"))
+        assertTrue(fileName, fileName.startsWith("title_leads_the_name-"))
+        assertTrue(fileName, fileName.contains("youtube_abc"))
+        assertTrue(fileName, fileName.contains("1970-01-01"))
+        assertFalse(fileName, fileName.contains('/'))
+        assertFalse(fileName, fileName.contains('\\'))
+        assertFalse(fileName, fileName.contains(".."))
+        assertTrue(fileName, fileName.length <= 180)
+        assertNotEquals("title_leads_the_name.md", fileName)
+    }
+
+    @Test
+    fun twoArtifactsOfTheSameSourceNeverShareAGeneratedName() {
+        val first = document()
+        val second = first.copy(artifactId = "artifact-2")
+
+        assertNotEquals(
+            TranscriptExporter.fileName(first, ExportFormat.MARKDOWN),
+            TranscriptExporter.fileName(second, ExportFormat.MARKDOWN),
+        )
+    }
+
+    @Test
+    fun aVeryLongTitleYieldsSpaceInsteadOfTruncatingIdentityOrDiscriminator() {
+        val document = document(title = "T".repeat(400))
+
+        val fileName = TranscriptExporter.fileName(
+            document,
+            ExportFormat.MARKDOWN,
+            discriminator = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
+        )
+
+        assertTrue(fileName, fileName.length <= 180)
+        assertTrue(fileName, fileName.contains("youtube_BaW_jenozKc"))
+        assertTrue(fileName, fileName.endsWith(".md"))
+        assertTrue(fileName, fileName.startsWith("T".repeat(40)))
+    }
+
+    @Test
+    fun aChosenNameIsUsedAsChosenAndStillCannotEscapeItsDirectory() {
+        val document = document()
+
+        assertEquals(
+            "Folge_12_Interview.md",
+            TranscriptExporter.fileName(document, ExportFormat.MARKDOWN, override = "Folge 12 Interview"),
+        )
+        val hostile = TranscriptExporter.fileName(document, ExportFormat.MARKDOWN, override = "../../etc/passwd")
+        assertFalse(hostile, hostile.contains('/'))
+        assertFalse(hostile, hostile.contains(".."))
+        assertNull(TranscriptExporter.customStem("   "))
+        assertNull(TranscriptExporter.customStem("..."))
+        // A blank override falls back to the generated name instead of producing an extension-only file.
+        assertTrue(TranscriptExporter.fileName(document, ExportFormat.MARKDOWN, override = "   ").length > 4)
     }
 
     @Test

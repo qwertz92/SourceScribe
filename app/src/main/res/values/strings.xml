@@ -209,4 +209,170 @@
     <string name="job_config_invalid">Die gespeicherten Auftragseinstellungen sind beschädigt. Dieser Auftrag wird nicht automatisch fortgesetzt. Vorhandene Ergebnisse und andere Aufträge bleiben erhalten.</string>
     <string name="artifact_file_missing">Die intern gespeicherte Ergebnisdatei fehlt oder wurde nicht vollständig gesichert. Andere Ergebnisse bleiben erhalten. Es wird keine neue Transkription automatisch angefordert.</string>
     <string name="stt_configuration">STT-Vorgabe: %1$s</string>
+
+    <!-- Hilfe und Glossar -->
+    <string name="help">Hilfe</string>
+    <string name="help_title">Hilfe und Glossar</string>
+    <string name="help_intro">Diese Seite erklärt die Begriffe, die in der App vorkommen. Tippe einen Eintrag an, um ihn aufzuklappen. Das Fragezeichen neben einem Bedienelement öffnet direkt den passenden Eintrag.</string>
+    <string name="help_search">Im Glossar suchen</string>
+    <string name="help_open">Erklärung öffnen</string>
+    <string name="help_section_basics">Grundlagen</string>
+    <string name="help_section_audio">Audio und Untertitel</string>
+    <string name="help_section_provider">Anbieter und Kosten</string>
+    <string name="help_section_output">Ergebnis und Export</string>
+    <string name="help_section_app">App und Technik</string>
+
+    <string name="help_workflow_title">So läuft ein Auftrag ab</string>
+    <string name="help_workflow_body">1. Du gibst einen YouTube-Link ein oder teilst ein Video mit SourceScribe.\n2. „Quelle prüfen“ holt die Metadaten des Videos: Titel, Länge, verfügbare Untertitel- und Audiospuren. Dabei wird noch nichts heruntergeladen und nichts an einen Anbieter geschickt.\n3. Du kontrollierst die Auswahl und startest den Auftrag. Erst dieser Start erlaubt der App, Audio zu übertragen.\n4. Der Auftrag läuft im Verlauf weiter, auch wenn du die App verlässt. Das Ergebnis wird zuerst intern gespeichert und danach in deinen Exportordner geschrieben.</string>
+
+    <string name="help_modes_title">Die vier Beschaffungsarten</string>
+    <string name="help_modes_body">„Nur YouTube“ verwendet ausschließlich die Untertitel, die YouTube selbst anbietet. Das kostet nichts, braucht keinen Anbieter und ist meist in Sekunden fertig. Es gibt sie aber nicht zu jedem Video, und automatisch erzeugte Untertitel enthalten keine Satzzeichen und keine Sprecher.\n\n„YouTube, sonst STT“ nimmt die Untertitel, wenn es welche gibt, und lädt nur sonst das Audio zu einem Anbieter hoch. Das ist die sparsame Voreinstellung.\n\n„Nur STT“ überspringt die Untertitel und lässt immer den Anbieter transkribieren. Sinnvoll, wenn du Satzzeichen, Sprechertrennung oder eine bessere Qualität brauchst.\n\n„Beides“ erzeugt zwei getrennte Ergebnisse zum Vergleich und kostet entsprechend einmal Anbieterlaufzeit.</string>
+
+    <string name="help_audio_track_title">Audiospur: was die Zahlen bedeuten</string>
+    <string name="help_audio_track_body">YouTube liefert dasselbe Video in mehreren Audiofassungen. Die Zahlen wie 139, 140, 141, 249, 250 oder 251 sind YouTube-interne Formatnummern, keine Qualitätsnoten. Sie stehen für eine bestimmte Kombination aus Codec und Datenrate:\n\n• Die Nummern 249, 250 und 251 sind WebM-Dateien mit dem Codec Opus.\n• Die Nummern 139, 140 und 141 sind M4A-Dateien mit dem Codec AAC.\n• Innerhalb einer Reihe bedeutet die höhere Nummer die höhere Datenrate.\n\nWelche Datenrate und Größe eine Spur tatsächlich hat, legt YouTube pro Video fest, und die Werte verschieben sich über die Jahre. SourceScribe behauptet deshalb keine festen Zahlen, sondern zeigt Codec, gemeldete Datenrate und Dateigröße im Klartext an und schlägt eine Spur vor.\n\nFür die Transkription ist die kleinste Spur praktisch immer ausreichend. Der Grund ist technisch eindeutig: Die App rechnet jede gewählte Spur vor dem Versand ohnehin in Mono, 16 kHz und 64 kbit/s MP3 um, weil Sprach-zu-Text-Dienste genau damit arbeiten. Eine größere Spur bringt danach keine zusätzliche Information mehr, kostet aber mehr Datenvolumen und mehr Zeit beim Herunterladen.\n\nWichtig ist die Auswahl nur dann, wenn ein Video mehrere Sprachen anbietet, etwa eine Synchronfassung. Dann entscheidet die Spur, welche Sprache transkribiert wird. In diesem Fall fragt die App nach, statt selbst zu wählen.\n\nManche Videos enthalten zusätzlich eine Audiodeskription: eine Tonspur, in der eine Stimme beschreibt, was im Bild passiert. SourceScribe markiert sie und wählt sie nie von selbst aus, weil ihre Transkription die Bildbeschreibung statt des Gesprächs enthielte.</string>
+
+    <string name="help_drc_title">DRC (Dynamikkompression)</string>
+    <string name="help_drc_body">DRC steht für Dynamic Range Compression, also Dynamikkompression. YouTube stellt zu manchen Videos zusätzlich eine Fassung bereit, in der leise Stellen angehoben und laute abgesenkt sind. Das ist für das Hören in lauter Umgebung gedacht.\n\nFür die Transkription bringt eine DRC-Fassung keinen belegbaren Vorteil, kann aber Störgeräusche mit anheben. SourceScribe bevorzugt deshalb die normale Fassung und markiert DRC-Spuren ausdrücklich.</string>
+
+    <string name="help_codec_title">Codec und Container</string>
+    <string name="help_codec_body">Der Codec beschreibt, wie das Tonsignal komprimiert wurde: Opus ist neuer und bei gleicher Datenrate etwas besser als AAC. Der Container ist die Dateiform drumherum, also WebM oder M4A.\n\nBeides ist für dein Ergebnis unerheblich, weil die App vor dem Versand ohnehin in MP3 umwandelt. Die Angaben stehen nur da, damit die Auswahl nachvollziehbar bleibt und in der Herkunft protokolliert werden kann.</string>
+
+    <string name="help_bitrate_title">Datenrate und Dateigröße</string>
+    <string name="help_bitrate_body">Die Datenrate in kbit/s sagt, wie viele Daten pro Sekunde Ton verwendet werden. Aus Datenrate und Videolänge ergibt sich die ungefähre Dateigröße.\n\nWenn neben der Größe „ca.“ steht, ist der Wert geschätzt: Entweder hat YouTube nur einen Näherungswert gemeldet, oder die App hat aus Datenrate und Länge gerechnet. Die tatsächlich geladene Datei kann davon abweichen.</string>
+
+    <string name="help_caption_track_title">Untertitelspuren</string>
+    <string name="help_caption_track_body">„Vom Kanal bereitgestellt“ heißt, dass jemand die Untertitel hochgeladen oder korrigiert hat. Diese sind in der Regel die genauesten und enthalten Satzzeichen.\n\n„Automatisch erzeugt“ sind YouTubes eigene Spracherkennung. Sie sind meist brauchbar, aber ohne Satzzeichen, ohne Sprecher und mit Fehlern bei Namen und Fachbegriffen.\n\n„Automatisch übersetzt“ ist eine Maschinenübersetzung einer anderen Spur. SourceScribe lässt diese standardmäßig weg, weil sie zweimal maschinell verarbeitet wurde und Fehler sich addieren. Du kannst sie in den Expertenoptionen erlauben.</string>
+
+    <string name="help_provider_title">Die drei Anbieter</string>
+    <string name="help_provider_body">Ein Anbieter ist ein externer Dienst, der Audio zu Text macht. SourceScribe hat keinen eigenen Server; die Anfragen gehen direkt von deinem Gerät zum Anbieter, mit deinem eigenen Schlüssel und auf deine eigene Rechnung.\n\nAssemblyAI arbeitet asynchron: Die App lädt das Audio hoch, bekommt eine Auftragsnummer und fragt danach den Fortschritt ab. Bietet Sprechertrennung und Wortzeiten.\n\nOpenAI und Groq arbeiten synchron: Die Antwort kommt direkt auf die Anfrage. Groq ist meist günstig und schnell.\n\nWelche Optionen tatsächlich möglich sind, hängt vom gewählten Modell ab. Nicht unterstützte Schalter sind deshalb ausgegraut.</string>
+
+    <string name="help_region_title">AssemblyAI: EU oder USA</string>
+    <string name="help_region_body">AssemblyAI betreibt getrennte Standorte. Die Auswahl in SourceScribe bestimmt, an welche Adresse deine Anfrage geht, also in welchem Rechtsraum dein Audio verarbeitet und gespeichert wird. Sie ist keine reine Anzeige.\n\nEntscheidend ist: Ein Schlüssel gehört zu genau einem Konto und damit zu genau einem Standort. Ein Schlüssel, den du im EU-Konto erzeugt hast, funktioniert nicht gegen die US-Adresse und umgekehrt. Wähle daher hier denselben Standort, in dem du den Schlüssel erzeugt hast. Passt es nicht zusammen, lehnt der Anbieter die Anfrage mit einem Authentifizierungsfehler ab.\n\nSourceScribe merkt sich die Region fest beim Schlüssel und bindet sie an den Auftrag, damit ein späterer Wechsel keinen Auftrag unbemerkt in einen anderen Rechtsraum verschiebt. Angeboten werden hier die beiden Standorte, die SourceScribe unterstützt. Ob dein Konto weitere Standorte anbietet, steht in deinem AssemblyAI-Konto; SourceScribe kann das nicht abfragen.</string>
+
+    <string name="help_key_title">API-Schlüssel</string>
+    <string name="help_key_body">Ein API-Schlüssel ist dein persönliches Passwort für einen Anbieter. Du erzeugst ihn im Konto des Anbieters und bezahlst darüber die Nutzung.\n\nSourceScribe speichert Schlüssel verschlüsselt auf diesem Gerät, zeigt sie nie wieder im Klartext an und schreibt sie nicht in Logs, Diagnosen oder Exporte. Ein Auftrag merkt sich nur die Referenz auf den Schlüssel. Wenn du einen Schlüssel löschst, bleiben alte Ergebnisse erhalten, aber wartende Aufträge brauchen den Schlüssel wieder.</string>
+
+    <string name="help_diarization_title">Sprechertrennung</string>
+    <string name="help_diarization_body">Sprechertrennung, englisch Speaker Diarization, teilt das Transkript in Abschnitte pro Stimme auf. Im Ergebnis steht dann vor jedem Abschnitt eine Kennung wie „A“ oder „B“.\n\nDas ist eine Zuordnung von Stimmen, keine Erkennung von Personen. Die App erfindet keine Namen. Wie zuverlässig die Trennung ist, hängt vom Anbieter, der Aufnahme und der Zahl der Sprecher ab. Nicht jedes Modell unterstützt sie.</string>
+
+    <string name="help_timestamps_title">Wortzeiten und Segmentzeiten</string>
+    <string name="help_timestamps_body">Segmentzeiten geben für jeden Absatz an, wo er im Video beginnt. Das reicht für Untertitel und zum Zurückspringen.\n\nWortzeiten geben zusätzlich für jedes einzelne Wort eine Zeit an. Das erzeugt deutlich mehr Daten und ist nur sinnvoll, wenn du wortgenau schneiden oder suchen willst.\n\nOhne Zeiten sind die Exportformate SRT und VTT nicht möglich, weil Untertiteldateien Zeiten zwingend brauchen.</string>
+
+    <string name="help_context_title">Kontextbegriffe</string>
+    <string name="help_context_body">Hier trägst du Wörter ein, die im Audio vorkommen und die eine Spracherkennung erfahrungsgemäß falsch schreibt: Eigennamen, Firmennamen, Fachbegriffe, Abkürzungen. Der Anbieter bevorzugt diese Schreibweisen dann.\n\nEine Zeile pro Begriff. Das ist ein Hinweis an den Anbieter, keine Garantie. Nicht jedes Modell unterstützt es.</string>
+
+    <string name="help_limits_title">Längenlimit und Budget</string>
+    <string name="help_limits_body">Das Längenlimit ist eine Schutzgrenze gegen versehentliche Kosten: Ist das Audio länger als der eingestellte Wert, hält der Auftrag an, bevor etwas an den Anbieter geht. Der Wert gilt pro Auftrag und ist Teil der gespeicherten Auftragseinstellung.\n\nDeshalb lässt sich das Limit eines bereits gestarteten Auftrags nicht nachträglich anheben. Das ist Absicht: Ein gespeicherter Kostenrahmen darf sich nicht von selbst ändern. Wenn du ein längeres Video verarbeiten willst, hebe das Limit vor dem Start an oder bereite den Auftrag mit „Neu vorbereiten“ noch einmal vor.\n\nDas Budget ist eine zweite, unabhängige Grenze in US-Dollar. Sie wird gegen die geschätzten Kosten aller Übermittlungen desselben Auftrags gerechnet, einschließlich bereits angenommener und ungewisser. Bleibt das Feld leer, prüft die App keine Kostengrenze.</string>
+
+    <string name="help_cost_title">Kostenschätzung</string>
+    <string name="help_cost_body">Die angezeigte Schätzung ist Videolänge mal hinterlegtem Listenpreis des Modells, mit dem Stand des Tarifs daneben. Sie ist eine Orientierung, keine Rechnung.\n\nSie enthält keine Rabatte, keine Mindestabrechnung, keine Wiederholungen und keine Preisänderungen des Anbieters. Steht „Preis unbekannt“, hat SourceScribe für dieses Modell keinen geprüften Tarif hinterlegt; das ist kein Hinweis darauf, dass es kostenlos wäre. Verbindlich ist immer die Abrechnung des Anbieters.</string>
+
+    <string name="help_export_formats_title">Exportformate</string>
+    <string name="help_export_formats_body">Die Umwandlung macht SourceScribe selbst auf dem Gerät, nicht der Anbieter. Vom Anbieter kommt immer nur ein Transkript; alle Formate werden daraus lokal erzeugt. Wählst du mehrere Formate, entsteht pro Format eine eigene Datei aus demselben Ergebnis. Es wird dafür nichts erneut transkribiert und nichts zusätzlich berechnet.\n\n• Markdown (.md): Text mit Überschrift und Herkunftsangaben. Die Voreinstellung.\n• Klartext (.txt): nur der Text, ohne Kopf.\n• Strukturierte Daten (.json): das vollständige Ergebnis mit Zeiten, Sprechern, Herkunft und Warnungen. Für Weiterverarbeitung.\n• Untertitel (.srt) und Web-Untertitel (.vtt): nummerierte Blöcke mit Zeitangaben für Videoplayer. Nur möglich, wenn das Ergebnis Zeiten enthält.\n• Originalantwort: die unveränderte Antwort des Anbieters. Nur verfügbar, wenn du „Originaldaten zusätzlich aufbewahren“ eingeschaltet hast.</string>
+
+    <string name="help_export_folder_title">Exportordner</string>
+    <string name="help_export_folder_body">Der Exportordner ist ein Ordner deiner Wahl außerhalb der App, in den fertige Transkripte geschrieben werden. Android vergibt die Berechtigung dafür pro Ordner und merkt sie sich dauerhaft.\n\nDie Ergebnisse liegen unabhängig davon immer zuerst intern in der App. Ein fehlgeschlagener Export löscht also nie ein Ergebnis und löst nie eine neue kostenpflichtige Anfrage aus. Schlägt das Schreiben fehl, etwa weil der Ordner entfernt wurde, kannst du im Verlauf einen anderen Ordner wählen und erneut speichern.</string>
+
+    <string name="help_filename_title">Dateinamen</string>
+    <string name="help_filename_body">Exportierte Dateien werden nach dem Videotitel benannt, ergänzt um Datum, Sprache und eine kurze Kennung, damit zwei Läufe derselben Quelle sich nicht gegenseitig überschreiben.\n\nDu kannst den Namen im Ergebnis unter „Aktionen“ ändern, bevor du exportierst oder teilst. Zeichen, die Dateisysteme nicht erlauben, werden dabei ersetzt.</string>
+
+    <string name="help_presets_title">Vorgaben und Presets</string>
+    <string name="help_presets_body">Beides speichert eine komplette Einstellungskombination: Beschaffungsart, Anbieter, Modell, Sprache, Optionen, Formate und Limits.\n\n„Als Vorgabe speichern“ setzt die aktuelle Kombination als Standard. Jede neue Quelle startet danach damit. Es gibt genau eine Vorgabe.\n\nEin Preset ist eine zusätzliche benannte Kombination, zum Beispiel „Podcast mit Sprechern“ oder „Schnell und gratis“. Presets ersetzen die Vorgabe nicht; du wählst sie bei einer neuen Quelle bewusst aus. Mitgespeichert wird nie eine Freigabe zum Hochladen: Die entsteht immer erst beim Start eines Auftrags.</string>
+
+    <string name="help_states_title">Auftragszustände</string>
+    <string name="help_states_body">„Wartet auf Ausführung“: eingeplant, aber noch nicht an der Reihe.\n„In Arbeit“: läuft gerade auf dem Gerät.\n„Wartet auf Netzwerk“ oder „wegen Rate-Limit“: die App hält sich zurück und versucht es später erneut.\n„Provider verarbeitet“: das Audio liegt beim Anbieter, das Ergebnis steht noch aus.\n„Entscheidung erforderlich“: die App hält an, weil etwas nicht ohne dich entschieden werden kann, etwa ein fehlender Schlüssel oder ein überschrittenes Längenlimit. Der Text darunter nennt den Grund.\n„Übermittlung ungewiss“: die Anfrage ist abgegangen, aber die Antwort ging verloren. Der Anbieter kann sie angenommen haben und berechnen. SourceScribe wiederholt so etwas nie von selbst.</string>
+
+    <string name="help_provenance_title">Herkunft</string>
+    <string name="help_provenance_body">Zu jedem Ergebnis speichert die App, woher es stammt: Quelle und Video-Kennung, ob es aus YouTube-Untertiteln oder aus einer externen Transkription kommt, welches Modell angefordert wurde und welches der Anbieter tatsächlich gemeldet hat, welche Audiospur verwendet wurde und ob übersetzt wurde.\n\nDas steht auch im Export. Sinn ist, dass du Monate später noch beurteilen kannst, wie belastbar ein Transkript ist, statt es für wörtlich zu halten.</string>
+
+    <string name="help_retention_title">Audioaufbewahrung und Originaldaten</string>
+    <string name="help_retention_body">„Nur technisch notwendig“ löscht heruntergeladenes Audio, sobald der Schritt fertig ist. Sparsamste Einstellung.\n„Bis zur Transkript-Sicherung“ behält es, bis das Ergebnis dauerhaft gespeichert ist. Voreinstellung, damit ein Zwischenfehler keinen neuen Download erzwingt.\n„Dauerhaft behalten“ lässt das Audio im App-Speicher liegen, bis du den Verlaufseintrag löschst. Das kann viel Platz brauchen.\n\n„Originaldaten zusätzlich aufbewahren“ speichert die unveränderte Antwort des Anbieters. Nur damit ist das Exportformat Originalantwort möglich.</string>
+
+    <string name="help_storage_title">Speicherlimit und gleichzeitige Aufträge</string>
+    <string name="help_storage_body">Das Speicherlimit ist die Obergrenze, die sich SourceScribe im internen App-Speicher selbst setzt: Audio, Zwischendateien und Ergebnisse zusammen. Wird sie erreicht, hält die App den nächsten Schritt kontrolliert an, statt das Gerät vollzuschreiben. Bereits gesicherte Ergebnisse bleiben erhalten.\n\nGleichzeitige Aufträge legt fest, wie viele Quellen parallel verarbeitet werden. Mehr ist nicht immer schneller: Herunterladen und Umrechnen belasten Akku und CPU, und Anbieter haben eigene Ratengrenzen.</string>
+
+    <string name="help_diagnostics_title">Redigierte Diagnose</string>
+    <string name="help_diagnostics_body">„Redigiert“ bedeutet geschwärzt: Aus dem Bericht sind alle Inhalte vorher entfernt worden. Er enthält nur technische Angaben, nämlich App- und Komponentenversionen, Gerätemerkmale, Zähler pro Auftragszustand und bekannte Fehlercodes.\n\nEr enthält keine Links, keine Titel, keine Transkripte und keine Schlüssel. Du siehst den vollständigen Text, bevor du entscheidest, ob du ihn teilst; ohne dein Teilen verlässt er das Gerät nicht.</string>
+
+    <string name="help_engines_title">Extraktionskomponenten und Kanäle</string>
+    <string name="help_engines_body">Die Extraktionskomponente ist das Werkzeug, das YouTube-Metadaten, Untertitel und Audio holt: yt-dlp zusammen mit einer JavaScript-Hilfskomponente. YouTube ändert seine Seiten regelmäßig, weshalb dieses Werkzeug häufiger aktualisiert wird als die App selbst. Deshalb kann SourceScribe es getrennt aktualisieren.\n\n„Stabil“ ist die reguläre Veröffentlichung. „Nightly“ ist der tagesaktuelle Vorschaustand: Wenn YouTube gerade etwas geändert hat und die stabile Fassung noch nicht nachgezogen ist, funktioniert Nightly oft schon, ist dafür aber weniger geprüft.\n\nSo gehst du vor, wenn das Prüfen einer Quelle plötzlich fehlschlägt: erst „Stabil“ prüfen; hilft das nicht, „Nightly“ prüfen. Findet die App ein Update, trägst du eine beliebige öffentliche YouTube-Adresse in das Feld darunter ein. Damit wird die neue Fassung vor der Aktivierung tatsächlich ausprobiert; nur wenn dieser Funktionstest gelingt, wird sie übernommen. Jede Fassung wird zusätzlich anhand ihrer Signatur geprüft. „Zur vorherigen Engine“ nimmt eine Aktivierung wieder zurück.\n\nPython, die JavaScript-Laufzeit und FFmpeg stecken fest in der App und brauchen ein App-Update. Laufende Aufträge behalten die Fassung, mit der sie begonnen haben.</string>
+
+    <string name="help_privacy_title">Was das Gerät verlässt</string>
+    <string name="help_privacy_body">Bei „Nur YouTube“ verlassen nur die Abrufe an YouTube das Gerät, die zum Laden der Metadaten und Untertitel nötig sind. Kein Anbieter ist beteiligt.\n\nSobald eine Beschaffungsart mit STT gewählt ist und du einen Auftrag startest, wird die vorbereitete Audiodatei an den gewählten Anbieter übertragen. Das passiert nie automatisch und nie ohne gewählten Anbieter, Modell und Schlüssel.\n\nDie App hat keine Telemetrie, keinen eigenen Server und keine Analyse. Schlüssel bleiben auf dem Gerät. Ein lokaler Abbruch stoppt eine bereits abgeschickte Anfrage beim Anbieter nicht.</string>
+
+    <!-- Audiospur, verständlich beschrieben -->
+    <string name="audio_track_recommended">Empfohlen</string>
+    <string name="audio_track_drc">Dynamikkompression</string>
+    <string name="audio_track_original">Originalton</string>
+    <string name="audio_track_size_approx">ca. %1$s</string>
+    <string name="audio_track_size_unknown">Größe unbekannt</string>
+    <string name="audio_track_format">Format %1$s</string>
+    <string name="audio_track_smallest">kleinste Datei</string>
+    <string name="audio_track_largest">größte Datei</string>
+    <string name="audio_track_bitrate">%1$d kbit/s</string>
+    <string name="audio_track_mono">Mono</string>
+    <string name="audio_track_stereo">Stereo</string>
+    <string name="audio_track_channels">%1$d Kanäle</string>
+    <string name="audio_track_help">Für die Transkription reicht die kleinste Spur: Alles wird vor dem Versand ohnehin in Mono, 16 kHz und 64 kbit/s MP3 umgerechnet. Wichtig wird die Wahl nur, wenn ein Video mehrere Sprachfassungen hat.</string>
+    <string name="audio_track_choose_language">Dieses Video bietet mehrere Sprachfassungen an. Bitte wähle selbst, welche Audiospur transkribiert werden soll.</string>
+    <string name="language_value">Sprache %1$s</string>
+
+    <!-- Längenlimit und Budget -->
+    <string name="limits">Grenzen für diesen Auftrag</string>
+    <string name="limits_summary">Längenlimit %1$s · Budget %2$s</string>
+    <string name="budget_none">kein Budget</string>
+    <string name="duration_hours_minutes">%1$d h %2$d min</string>
+    <string name="duration_minutes">%1$d min</string>
+    <string name="source_longer_than_limit">Dieses Video ist %1$s lang. Dein Längenlimit für den Auftrag steht auf %2$s, deshalb würde die Transkription abbrechen, bevor etwas an den Anbieter geht.</string>
+    <string name="raise_limit">Längenlimit auf %1$s anheben</string>
+    <string name="audio_longer_than_limit">Das Audio ist länger als das Längenlimit, das für diesen Auftrag gespeichert wurde. Es wurde nichts an den Anbieter geschickt und nichts berechnet. Das gespeicherte Limit eines laufenden Auftrags wird bewusst nicht nachträglich verändert: Wähle „Neu vorbereiten“, hebe dort das Längenlimit an und starte die Ausführung erneut.</string>
+    <string name="audio_duration_unknown">Die Länge der Audiodatei konnte nicht bestimmt werden. Es wurde nichts an den Anbieter geschickt. Prüfe die Quelle erneut oder importiere die Datei neu.</string>
+
+    <!-- Eingabe -->
+    <string name="paste_clipboard">Aus Zwischenablage einfügen</string>
+    <string name="clipboard_empty">In der Zwischenablage steht kein Text.</string>
+    <string name="clear_input">Eingabe löschen</string>
+
+    <!-- Verlauf -->
+    <string name="filter_all">Alle</string>
+    <string name="filter_active">Läuft</string>
+    <string name="filter_attention">Braucht dich</string>
+    <string name="filter_success">Erfolgreich</string>
+    <string name="filter_failed">Fehlgeschlagen</string>
+    <string name="expand_entry">Details anzeigen</string>
+    <string name="collapse_entry">Details ausblenden</string>
+    <string name="history_count">%1$d von %2$d Einträgen</string>
+    <string name="no_filter_matches">Kein Eintrag passt zu diesem Filter.</string>
+    <string name="job_actions">Aktionen für diesen Auftrag</string>
+    <string name="share_result">Ergebnis teilen</string>
+    <string name="prepare_again">Neu vorbereiten</string>
+    <string name="prepare_again_help">Lädt Quelle und Einstellungen dieses Auftrags in die Auswahl unter „Neue Quelle“. Dort kannst du Anbieter, Modell und Grenzen ändern und den Auftrag danach ausdrücklich neu starten. Der bestehende Verlaufseintrag bleibt unverändert.</string>
+
+    <!-- Einstellungen -->
+    <string name="export_tree_current">Aktueller Exportordner</string>
+    <string name="export_tree_change">Anderen Ordner wählen</string>
+    <string name="export_tree_clear">Ordner nicht mehr verwenden</string>
+    <string name="defaults_help">Die Vorgabe ist die Einstellungskombination, mit der jede neue Quelle startet. Ein Preset ist eine zusätzliche benannte Kombination, die du bewusst auswählst.</string>
+    <string name="presets_saved">Gespeicherte Presets</string>
+    <string name="no_presets">Noch kein Preset gespeichert.</string>
+    <string name="delete_preset">Preset löschen</string>
+    <string name="preset_saved">Preset gespeichert</string>
+    <string name="defaults_saved">Vorgabe gespeichert</string>
+    <string name="credential_entry">%1$s · %2$s</string>
+    <string name="credential_key">Schlüssel ••••%1$s</string>
+    <string name="no_credentials">Noch kein Schlüssel gespeichert. Für „Nur YouTube“ brauchst du keinen.</string>
+    <string name="add_key">Schlüssel hinzufügen</string>
+    <string name="key_region_help">Wähle denselben Standort, in dem du diesen Schlüssel erzeugt hast. Ein EU-Schlüssel funktioniert nicht gegen die US-Adresse und umgekehrt.</string>
+
+    <!-- Ergebnis -->
+    <string name="file_name">Dateiname für Export und Teilen</string>
+    <string name="rename_file">Dateinamen ändern</string>
+    <string name="file_name_help">Ohne Endung eingeben. Unzulässige Zeichen werden ersetzt. Der Name gilt für dieses Ergebnis, auch beim nächsten Export.</string>
+    <string name="reset_file_name">Automatischen Namen verwenden</string>
+    <string name="file_name_saved">Dateiname gespeichert</string>
+    <string name="apply">Übernehmen</string>
+    <string name="close">Schließen</string>
+    <string name="segments_count">%1$d Abschnitte</string>
+    <string name="transcript_empty">Dieses Ergebnis enthält keine Abschnitte.</string>
+    <string name="audio_track_description">Audiodeskription</string>
 </resources>

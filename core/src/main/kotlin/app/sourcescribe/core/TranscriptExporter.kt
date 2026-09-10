@@ -2,6 +2,8 @@ package app.sourcescribe.core
 
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import java.nio.charset.StandardCharsets
+import java.security.MessageDigest
 import java.time.Instant
 import java.util.Locale
 
@@ -16,6 +18,8 @@ class TranscriptExportException(val reason: String) : IllegalArgumentException(r
 object TranscriptExporter {
     private const val MAX_FILENAME_CHARS = 180
     private const val MAX_FILENAME_PART_CHARS = 40
+    /** Leaves room for the longest extension a provider raw payload can carry. */
+    private const val MAX_FILENAME_STEM_CHARS = 160
     private val json = Json {
         encodeDefaults = true
         explicitNulls = true
@@ -32,27 +36,68 @@ object TranscriptExporter {
         ExportFormat.RAW -> throw TranscriptExportException(TranscriptExportException.RAW_REQUIRES_SEPARATE_FILE)
     }
 
-    fun fileName(document: TranscriptDocument, format: ExportFormat): String {
-        val source = safePart(document.source.id, "source")
-        val artifact = safePart(document.artifactId, "artifact")
-        val model = safePart(
-            listOfNotNull(document.provenance.requestedModel, document.provenance.reportedModel)
-                .distinct()
-                .joinToString("-")
-                .ifBlank { "model-unknown" },
-            "model-unknown",
+    fun extension(format: ExportFormat): String = when (format) {
+        ExportFormat.MARKDOWN -> "md"
+        ExportFormat.TEXT -> "txt"
+        ExportFormat.JSON -> "json"
+        ExportFormat.SRT -> "srt"
+        ExportFormat.VTT -> "vtt"
+        ExportFormat.RAW -> "raw"
+    }
+
+    /**
+     * The generated file stem: readable title first, then the parts that keep two runs of the same
+     * source apart. The identity part is never truncated; only the title yields when the budget runs out.
+     */
+    fun generatedStem(document: TranscriptDocument, discriminator: String? = null): String {
+        val title = safePart(
+            document.source.title ?: document.source.fileName ?: "transcript",
+            "transcript",
         )
+        val identity = identitySuffix(document) +
+            (discriminator?.let(::shortId)?.let { "-$it" } ?: "")
+        return compose(title, identity)
+    }
+
+    /** A user-chosen stem, sanitised. Provenance stays inside the document, so the name is the reader's. */
+    fun customStem(value: String): String? =
+        safePart(value, "", MAX_FILENAME_STEM_CHARS).takeIf { it.isNotBlank() }
+
+    fun fileName(
+        document: TranscriptDocument,
+        format: ExportFormat,
+        override: String? = null,
+        discriminator: String? = null,
+        rawExtension: String? = null,
+    ): String {
+        // A chosen name is used as given; a repeated export is separated by the storage layer.
+        val stem = override?.let(::customStem) ?: generatedStem(document, discriminator)
+        val suffix = ".${rawExtension?.let { safePart(it, "raw", 12) } ?: extension(format)}"
+        return stem.take(MAX_FILENAME_CHARS - suffix.length).trimEnd('.', ' ', '-', '_') + suffix
+    }
+
+    private fun identitySuffix(document: TranscriptDocument): String {
+        val source = safePart(document.source.id, "source")
         val language = safePart(document.language ?: document.source.originalLanguage ?: "lang-unknown", "lang-unknown")
-        val extension = when (format) {
-            ExportFormat.MARKDOWN -> "md"
-            ExportFormat.TEXT -> "txt"
-            ExportFormat.JSON -> "json"
-            ExportFormat.SRT -> "srt"
-            ExportFormat.VTT -> "vtt"
-            ExportFormat.RAW -> "raw"
-        }
-        val base = listOf("sourcescribe", source, artifact, model, language).joinToString("-")
-        return shorten("$base.$extension", extension)
+        val date = createdAtUtc(document.createdAt).take(10)
+        return listOf(date, language, source, shortId(document.artifactId)).joinToString("-")
+    }
+
+    /**
+     * Enough of an identifier to separate runs without turning the name into an identifier.
+     * A digest rather than a prefix, so two ids that merely share their opening characters still differ.
+     */
+    private fun shortId(value: String): String {
+        val digest = MessageDigest.getInstance("SHA-256").digest(value.toByteArray(StandardCharsets.UTF_8))
+        return buildString(8) { for (index in 0 until 4) append("%02x".format(digest[index])) }
+    }
+
+    /** Joins a readable head with a suffix that must survive, trimming only the head. */
+    private fun compose(head: String, suffix: String): String {
+        val tail = "-$suffix"
+        val budget = (MAX_FILENAME_STEM_CHARS - tail.length).coerceAtLeast(1)
+        val shortened = head.take(budget).trimEnd('.', ' ', '-', '_').ifBlank { "transcript" }
+        return shortened + tail
     }
 
     fun supports(document: TranscriptDocument, format: ExportFormat): Boolean = when (format) {
@@ -355,7 +400,7 @@ object TranscriptExporter {
         return "`".repeat(maxOf(3, longest + 1))
     }
 
-    private fun safePart(value: String, fallback: String): String {
+    private fun safePart(value: String, fallback: String, maxChars: Int = MAX_FILENAME_PART_CHARS): String {
         val cleaned = buildString {
             for (character in value.trim()) {
                 when {
@@ -368,7 +413,7 @@ object TranscriptExporter {
         }.trim('.', ' ')
             .replace(Regex("_+"), "_")
             .replace(Regex("\\.{2,}"), "_")
-            .take(MAX_FILENAME_PART_CHARS)
+            .take(maxChars)
             .trimEnd('.', ' ')
         if (cleaned.isEmpty()) return fallback
         val upper = cleaned.uppercase(Locale.ROOT)
@@ -377,9 +422,4 @@ object TranscriptExporter {
         return if (reserved) "_$cleaned" else cleaned
     }
 
-    private fun shorten(value: String, extension: String): String {
-        if (value.length <= MAX_FILENAME_CHARS) return value
-        val suffix = ".${extension.lowercase(Locale.ROOT)}"
-        return value.removeSuffix(suffix).take(MAX_FILENAME_CHARS - suffix.length).trimEnd('.', ' ', '-') + suffix
-    }
 }

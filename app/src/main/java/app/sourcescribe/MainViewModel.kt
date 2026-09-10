@@ -32,6 +32,8 @@ data class ScreenState(
     val message: String? = null,
     val previews: List<SourcePreview> = emptyList(),
     val document: TranscriptDocument? = null,
+    /** The stored export name of the open result, or null while it uses the generated one. */
+    val documentName: String? = null,
     val credentials: List<CredentialInfo> = emptyList(),
     val installations: List<EngineInstallation> = emptyList(),
     val update: AvailableEngine? = null,
@@ -168,6 +170,8 @@ class MainViewModel @Inject constructor(
 
     fun dismissMessage() { mutable.update { it.copy(message = null) } }
     fun exportPermissionError() { mutable.update { it.copy(message = "EXPORT_PERMISSION_REQUIRED") } }
+    /** Surfaces a local, non-exceptional outcome such as an empty clipboard. */
+    fun notice(code: String) { mutable.update { it.copy(message = code) } }
     fun exportArtifact(id: String, format: ExportFormat, treeUri: String) = action {
         val result = coordinator.exportArtifact(id, format, treeUri)
         mutable.update { it.copy(message = "EXPORT_${result.state.name}") }
@@ -179,8 +183,9 @@ class MainViewModel @Inject constructor(
     fun reconcileExports() = action { coordinator.reconcileExports() }
     fun shareArtifact(id: String) = action {
         val document = artifactFiles.read(id)
+        val chosen = records.artifact(id)?.displayName
         val directory = File(context.cacheDir, "shares").also { check(it.isDirectory || it.mkdirs()) }
-        val file = File(directory, TranscriptExporter.fileName(document, ExportFormat.MARKDOWN))
+        val file = File(directory, TranscriptExporter.fileName(document, ExportFormat.MARKDOWN, chosen))
         FileOutputStream(file).use { output -> output.write(TranscriptExporter.render(document, ExportFormat.MARKDOWN).toByteArray()); output.fd.sync() }
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", file)
         mutable.update { it.copy(shareUri = uri.toString(), shareMime = "text/markdown") }
@@ -220,8 +225,16 @@ class MainViewModel @Inject constructor(
         val source = coordinator.sourceForPreview(job.sourceId, previewOwner)
         val resolved = if (source.kind == SourceKind.YOUTUBE) coordinator.inspect(source)
             else ResolvedSource(source, emptyList(), emptyList(), emptyMap())
-        val selected = config.copy(mode = AcquisitionMode.STT_ONLY, provider = null, model = null, credentialId = null, uploadApproved = false, captionTrackId = null,
-            audioTrackId = TrackSelection.audio(resolved, null)?.id)
+        // Re-preparing reuses what the job was configured with, so limits and options can be adjusted in place.
+        val stored = decodeStoredJobConfig(job.config) ?: config
+        val base = stored.copy(
+            mode = if (source.kind == SourceKind.LOCAL_AUDIO) AcquisitionMode.STT_ONLY else stored.mode,
+            uploadApproved = false, captionTrackId = null, audioTrackId = null,
+        )
+        val selected = base.copy(
+            captionTrackId = TrackSelection.captions(resolved, base).firstOrNull()?.id,
+            audioTrackId = TrackSelection.audio(resolved, null)?.id,
+        )
         if (revision == previewRevision.get()) {
             abandonCurrentImports()
             mutable.update { it.copy(draft = selected, previews = listOf(SourcePreview(resolved, selected, jobId))) }
@@ -230,10 +243,31 @@ class MainViewModel @Inject constructor(
         }
         }
     }
-    fun openArtifact(id: String) = action { mutable.update { it.copy(document = artifactFiles.read(id)) } }
-    fun closeArtifact() { mutable.update { it.copy(document = null) } }
-    fun saveDefaults(config: JobConfig) = action { settingsStore.update { it.copy(defaults = config.copy(uploadApproved = false)) } }
-    fun savePreset(name: String, config: JobConfig) = action { settingsStore.update { it.copy(presets = it.presets + (name to config.copy(uploadApproved = false))) } }
+    fun openArtifact(id: String) = action {
+        val document = artifactFiles.read(id)
+        val name = records.artifact(id)?.displayName
+        mutable.update { it.copy(document = document, documentName = name) }
+    }
+    fun closeArtifact() { mutable.update { it.copy(document = null, documentName = null) } }
+
+    /** Stores a reader-chosen export name for one result, or clears it back to the generated name. */
+    fun renameArtifact(id: String, name: String?) = action {
+        val stored = name?.let(TranscriptExporter::customStem)
+        check(records.renameArtifact(id, stored) == 1)
+        mutable.update { state ->
+            if (state.document?.artifactId == id) state.copy(documentName = stored, message = "FILE_NAME_SAVED")
+            else state.copy(message = "FILE_NAME_SAVED")
+        }
+    }
+    fun saveDefaults(config: JobConfig) = action {
+        settingsStore.update { it.copy(defaults = config.copy(uploadApproved = false)) }
+        mutable.update { it.copy(message = "DEFAULTS_SAVED") }
+    }
+    fun savePreset(name: String, config: JobConfig) = action {
+        settingsStore.update { it.copy(presets = it.presets + (name to config.copy(uploadApproved = false))) }
+        mutable.update { it.copy(message = "PRESET_SAVED") }
+    }
+    fun deletePreset(name: String) = action { settingsStore.update { it.copy(presets = it.presets - name) } }
     fun changeSettings(change: (AppSettings) -> AppSettings) = action { settingsStore.update(change) }
     fun saveCredential(provider: Provider, region: Region, key: String) = action {
         val id = credentialStore.save(provider, region, key)
@@ -349,15 +383,32 @@ class MainViewModel @Inject constructor(
                 if (!availableKey) return "CREDENTIAL_REQUIRED"
                 configError(config)?.let { return it }
             }
-            if ((requiresStt || config.mode == AcquisitionMode.CAPTIONS_THEN_STT && captions.isEmpty() && config.uploadApproved && availableKey) &&
-                preview.resolved.source.kind == SourceKind.YOUTUBE && TrackSelection.audio(preview.resolved, config.audioTrackId) == null) {
+            val sttPossible = requiresStt ||
+                config.mode == AcquisitionMode.CAPTIONS_THEN_STT && captions.isEmpty() && config.uploadApproved && availableKey
+            if (sttPossible && preview.resolved.source.kind == SourceKind.YOUTUBE &&
+                TrackSelection.audio(preview.resolved, config.audioTrackId) == null) {
                 return if (preview.resolved.audio.isEmpty()) "NO_AUDIO" else "CHOOSE_AUDIO_TRACK"
             }
+            // The source length is already known here, so a doomed run is refused before it costs a download.
+            if (sttPossible && exceedsLengthLimit(preview.resolved.source.durationMs, config)) return "SOURCE_LONGER_THAN_LIMIT"
             return null
         }
 
+        fun exceedsLengthLimit(durationMs: Long?, config: JobConfig): Boolean =
+            durationMs != null && config.maxAudioSeconds in 1..MAX_AUDIO_SECONDS &&
+                durationMs > config.maxAudioSeconds * 1000L
+
+        /** The smallest allowed limit that would admit this source, rounded up to whole minutes. */
+        fun suggestedLimitSeconds(durationMs: Long): Long? {
+            val minutes = (durationMs + 59_999) / 60_000
+            val padded = (minutes + 5) * 60
+            return padded.takeIf { it <= MAX_AUDIO_SECONDS }
+        }
+
+        const val MAX_AUDIO_SECONDS = 36_000L
+
         fun configError(config: JobConfig): String? = when {
-            config.maxAudioSeconds !in 1..36_000 -> "AUDIO_DURATION_LIMIT"
+            config.maxAudioSeconds !in 1..MAX_AUDIO_SECONDS -> "AUDIO_DURATION_LIMIT"
             config.maxCostMicrousd?.let { it < 0 } == true -> "BUDGET_INVALID"
             config.mode == AcquisitionMode.CAPTIONS_ONLY -> null
             config.provider == null || config.model == null -> "PROVIDER_REQUIRED"

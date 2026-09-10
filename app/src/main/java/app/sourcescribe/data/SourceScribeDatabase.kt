@@ -78,6 +78,8 @@ data class ArtifactRow(
     val providerModel: String?,
     val complete: Boolean?,
     val warningCount: Int,
+    /** Optional user-chosen export file stem; null keeps the generated name. */
+    val displayName: String? = null,
 )
 
 @Entity(tableName = "submissions", foreignKeys = [ForeignKey(entity = AttemptRow::class, parentColumns = ["id"], childColumns = ["attemptId"], onDelete = ForeignKey.RESTRICT)], indices = [Index("attemptId"), Index(value = ["attemptId", "chunkIndex"], unique = true)])
@@ -157,6 +159,7 @@ abstract class SourceScribeDao {
     @Query("SELECT * FROM attempts WHERE state IN ('QUEUED','WAITING_NETWORK','WAITING_RATE_LIMIT','WAITING_REMOTE') ORDER BY nextAt,createdAt") abstract suspend fun scheduled(): List<AttemptRow>
     @Query("SELECT * FROM artifacts WHERE id = :id") abstract suspend fun artifact(id: String): ArtifactRow?
     @Query("SELECT * FROM artifacts WHERE jobId = :jobId") abstract suspend fun artifacts(jobId: String): List<ArtifactRow>
+    @Query("UPDATE artifacts SET displayName = :name WHERE id = :id") abstract suspend fun renameArtifact(id: String, name: String?): Int
     @Query("SELECT * FROM submissions WHERE attemptId = :attemptId ORDER BY chunkIndex") abstract suspend fun submissions(attemptId: String): List<SubmissionRow>
     @Query("SELECT submissions.* FROM submissions INNER JOIN attempts ON submissions.attemptId = attempts.id WHERE attempts.jobId = :jobId") abstract suspend fun submissionsForJob(jobId: String): List<SubmissionRow>
     @Query("SELECT * FROM exports WHERE artifactId = :artifactId ORDER BY createdAt DESC") abstract suspend fun exports(artifactId: String): List<ExportRow>
@@ -286,11 +289,16 @@ class DatabaseTypes {
     @TypeConverter fun submission(value: String): SubmissionState = SubmissionState.valueOf(value)
 }
 
-@Database(entities = [SourceRow::class, JobRow::class, AttemptRow::class, ArtifactRow::class, SubmissionRow::class, ExportRow::class, ResourceLease::class, EngineRow::class], version = 3, exportSchema = true)
+@Database(entities = [SourceRow::class, JobRow::class, AttemptRow::class, ArtifactRow::class, SubmissionRow::class, ExportRow::class, ResourceLease::class, EngineRow::class], version = 4, exportSchema = true)
 @TypeConverters(DatabaseTypes::class)
 abstract class SourceScribeDatabase : RoomDatabase() {
     abstract fun records(): SourceScribeDao
     companion object {
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE artifacts ADD COLUMN displayName TEXT")
+            }
+        }
         val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE submissions ADD COLUMN reusedFromId TEXT")

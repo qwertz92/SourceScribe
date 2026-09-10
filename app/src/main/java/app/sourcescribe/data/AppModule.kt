@@ -21,7 +21,7 @@ object AppModule {
     @Provides @Singleton
     fun database(@ApplicationContext context: Context): SourceScribeDatabase =
         Room.databaseBuilder(context, SourceScribeDatabase::class.java, "sourcescribe.db")
-            .addMigrations(SourceScribeDatabase.MIGRATION_1_2, SourceScribeDatabase.MIGRATION_2_3).build()
+            .addMigrations(SourceScribeDatabase.MIGRATION_1_2, SourceScribeDatabase.MIGRATION_2_3, SourceScribeDatabase.MIGRATION_3_4).build()
 
     @Provides fun records(database: SourceScribeDatabase): SourceScribeDao = database.records()
     @Provides @Singleton fun runtime(@ApplicationContext context: Context): NativeRuntime = NativeRuntime(context)

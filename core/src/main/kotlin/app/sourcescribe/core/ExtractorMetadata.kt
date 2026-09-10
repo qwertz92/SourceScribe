@@ -17,6 +17,9 @@ data class ResolvedSource(
 )
 
 object ExtractorMetadata {
+    private const val MAX_TRACK_BYTES = 64.0 * 1024 * 1024 * 1024
+    private const val ORIGINAL_LANGUAGE_PREFERENCE = 10
+    private const val AUDIO_DESCRIPTION_PREFERENCE = -10
     private val json = Json { ignoreUnknownKeys = true }
 
     fun parse(raw: String, requested: Source): ResolvedSource {
@@ -60,12 +63,41 @@ object ExtractorMetadata {
         }
         val audio = (root["formats"] as? JsonArray).orEmpty().filterIsInstance<JsonObject>().mapNotNull { item ->
             fun value(key: String) = (item[key] as? JsonPrimitive)?.contentOrNull
+            fun number(key: String) = (item[key] as? JsonPrimitive)?.doubleOrNull?.takeIf { it.isFinite() && it >= 0 }
             val id = value("format_id") ?: return@mapNotNull null
-            if (!Regex("[A-Za-z0-9_.-]{1,80}").matches(id) || value("vcodec") != "none" || value("acodec") in setOf(null, "none")) return@mapNotNull null
+            val acodec = value("acodec")
+            if (!Regex("[A-Za-z0-9_.-]{1,80}").matches(id) || value("vcodec") != "none" || acodec in setOf(null, "none")) return@mapNotNull null
             val note = value("format_note")?.take(500)
-            AudioTrack(id, requireNotNull(source.videoId), value("language"), note,
-                if (note?.contains("(original)", ignoreCase = true) == true) true else null,
-                "yt-dlp:formats.language,format_note")
+            val exact = number("filesize")?.takeIf { it <= MAX_TRACK_BYTES }?.toLong()
+            val approximate = number("filesize_approx")?.takeIf { it <= MAX_TRACK_BYTES }?.toLong()
+            // A DRC rendition is only ever marked by the extractor id suffix or its note; never inferred from bitrate.
+            val compressed = id.endsWith("-drc", ignoreCase = true) || note?.contains("drc", ignoreCase = true) == true
+            // yt-dlp encodes the track role numerically: 10 original, 5 default, -10 audio description.
+            val preference = (item["language_preference"] as? JsonPrimitive)?.doubleOrNull
+                ?.takeIf { it.isFinite() }?.toInt()
+            AudioTrack(
+                id = id,
+                sourceVideoId = requireNotNull(source.videoId),
+                language = value("language"),
+                name = note,
+                isOriginal = when {
+                    preference == ORIGINAL_LANGUAGE_PREFERENCE -> true
+                    preference != null -> false
+                    note?.contains("original", ignoreCase = true) == true -> true
+                    else -> null
+                },
+                evidence = "yt-dlp:formats.language,language_preference,format_note,acodec,ext,abr,filesize,asr,audio_channels",
+                codec = acodec?.take(80),
+                container = value("ext")?.take(20),
+                bitrateKbps = (number("abr") ?: number("tbr"))?.takeIf { it in 1.0..10_000.0 }?.toInt(),
+                bytes = exact ?: approximate,
+                bytesEstimated = exact == null && approximate != null,
+                sampleRateHz = number("asr")?.takeIf { it in 1.0..768_000.0 }?.toInt(),
+                channels = number("audio_channels")?.takeIf { it in 1.0..64.0 }?.toInt(),
+                dynamicRangeCompressed = compressed,
+                audioDescription = preference == AUDIO_DESCRIPTION_PREFERENCE ||
+                    value("language")?.endsWith("-desc", ignoreCase = true) == true,
+            )
         }.distinctBy { it.id }
         return ResolvedSource(source, tracks, audio, urls)
     }
@@ -120,10 +152,6 @@ object TrackSelection {
 
     fun audio(resolved: ResolvedSource, selectedId: String?): AudioTrack? {
         if (selectedId != null) return resolved.audio.singleOrNull { it.id == selectedId }
-        val originals = resolved.audio.filter { it.isOriginal == true }
-        val candidates = originals.ifEmpty { resolved.audio }
-        // Same language/note codecs are formats of one observed track, not separate voices.
-        if (candidates.map { it.language to it.name?.replace(Regex("(?i)(tiny|low|medium|high)"), "")?.trim() }.distinct().size > 1) return null
-        return candidates.firstOrNull()
+        return AudioTracks.automatic(resolved.audio)
     }
 }
