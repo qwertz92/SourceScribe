@@ -531,26 +531,28 @@ Korrektur dieser Runde zurücknimmt, lässt fünf Tests fallen.
 
 ### Runde 12
 
-**Der teuerste Fund dieser Runde lag außerhalb des Diffs, den der Reviewer lesen sollte.** Er hatte den
-Auftrag, die acht Preise gegen die Seiten der Anbieter nachzulesen. Dabei fiel ihm nicht eine falsche Zahl
-auf, sondern eine falsch angewandte: Der Zuschlag von fünf Cent je Stunde für eine Fachbegriffsliste wurde
-nur berechnet, wenn das Modell `universal-3-5-pro` heißt. AssemblyAI verlangt ihn für beide Modelle — die
-Seite unterscheidet sie nur darin, wie viele Begriffe sie annehmen, tausend gegen zweihundert — und die
-App schickt die Liste ohnehin für beide mit. Wer `universal-2` mit Fachbegriffen wählte, bekam eine
-Schätzung von 150 000 statt 200 000 Mikro-Dollar je Stunde: ein Viertel unter dem, was die App selbst als
-Preis hinterlegt hat.
+Commits: `41d9eb7` (Zuschlag und Zahlenliste), `c12b7ee` (Kostenschau), `b239673` (Archivwache),
+`f9be165` (Repositoryprüfung) und `bd4d2f5` (Dokumentation). Einzeln benannt, weil eine
+Runde ohne ihre Hashes nicht nachprüfbar ist — Runde 11 hatte dieselbe Auslassung, und Runde 12 hat sie
+zuerst wiederholt und dann in Runde 13 korrigiert.
 
-Das ist keine Anzeigeungenauigkeit. Dieselbe Zahl entscheidet in `AssemblyAiAdapter`, ob eine Anfrage gegen
-das vom Nutzer gesetzte Budget überhaupt hinausgeht. Eine Anfrage, die der Nutzer unter seinem Deckel
-glaubte, wurde abgeschickt und darüber abgerechnet — gegen die Invariante, dass der gewählte Kostenrahmen
-auch bei Fehlern gilt.
+**Der als teuerster Fund dieser Runde gemeldete Punkt war falsch; Runde 13 hat ihn zurückgenommen.** Der
+Reviewer hatte den Auftrag, die acht Preise gegen die Seiten der Anbieter nachzulesen, und meldete keine
+falsche Zahl, sondern eine falsch angewandte: Der Zuschlag von fünf Cent je Stunde für eine
+Fachbegriffsliste werde nur berechnet, wenn das Modell `universal-3-5-pro` heißt, AssemblyAI verlange ihn
+aber für beide. Ich habe das übernommen und die Bedingung entfernt. Die Zusatztabelle der Anbieterseite hat
+eine Spalte je Modell, und die Zeile für Fachbegriffe liest sich „$0.05 /hr“ unter Universal-3.5 Pro und
+**„Included“** unter Universal-2 — der Code war vorher richtig, und die Korrektur hat ihn falsch gemacht.
+Der Rest dieses Absatzes bleibt als Protokoll stehen; was tatsächlich gilt und wie der Fehler zustande kam,
+steht in der Runde-13-Passage.
 
-**Beim Nachziehen fand ich zwei weitere Stellen, die der Reviewer nicht sehen konnte.** `SttStep` im Modul
-`app` rechnet dieselbe Summe ein zweites Mal, mit derselben Modellbedingung und demselben Fehler; das ist
-die Stelle, die beim Lauf tatsächlich gegen das Budget prüft. Und die Zahl, die der Nutzer vor dem Start
-sieht, kam aus einer dritten Rechnung in `NewSourceScreen`: Länge mal Stundenpreis, ohne jeden Zuschlag und
-ohne Groqs Mindestabrechnung. Wer sein Budget nach der angezeigten Zahl wählte, konnte es von einer
-Prüfung abgelehnt bekommen, die anders gerechnet hatte.
+**Beim Nachziehen fand ich zwei weitere Stellen.** Die erste trug denselben zurückgenommenen Fehler:
+`SttStep` im Modul `app` rechnet dieselbe Summe ein zweites Mal, und das ist die Stelle, die beim Lauf
+tatsächlich gegen das Budget prüft. Die zweite ist unabhängig davon und bleibt ein echter Fund: Die Zahl,
+die der Nutzer vor dem Start sieht, kam aus einer dritten Rechnung in `NewSourceScreen` — Länge mal
+Stundenpreis, ohne jeden Zuschlag, ohne Groqs Mindestabrechnung und ohne die Abschnittsteilung, nach der
+abgerechnet wird. Wer sein Budget nach der angezeigten Zahl wählte, konnte es von einer Prüfung abgelehnt
+bekommen, die anders gerechnet hatte.
 
 Alle drei sind jetzt eine Rechnung. `MainViewModel.estimatedCostMicrousd` summiert über denselben
 Abschnittsplan, den der Lauf verwendet, und die Anzeige liest sie; die Hilfe sagt jetzt, was drinsteht, und
@@ -593,7 +595,7 @@ Compiler sagt dazu nichts, auch mit `allWarningsAsErrors` nicht: Eine nicht-priv
 Modulschnittstelle, und ob die jemand benutzt, weiß er nicht.
 
 **Das Gegenstück dazu fand ich in `tools/check-repository.py`**, das in der CI läuft und `PASS repository
-checks` schreibt. Es entschied an einer Liste von achtzehn Dateiendungen, welche Datei es überhaupt
+checks` schreibt. Es entschied an einer Liste von neunzehn Dateiendungen, welche Datei es überhaupt
 öffnet. Alles ohne Endung fiel durch: `gradlew`, `LICENSE`, `.gitignore`, `.gitattributes`, dazu jede
 `.pem`, `.env` oder `.asc`, die jemand angelegt hätte. 34 verfolgte Dateien liefen so an der
 Geheimnisprüfung vorbei, während der Lauf wie eine Prüfung des Repositorys aussah; fünfzehn davon sind
@@ -624,10 +626,14 @@ ließ 7 Tests fallen. Die drei Exporttests, die `SHORT_ID_BYTES` lesen, blieben 
 Beleg dafür, dass sie über diese Zahl nie etwas gesagt haben.
 
 Diese Gegenprobe lief im Modul `core`. Die beiden Stellen im Modul `app` sind **nicht** einzeln
-zurückgenommen worden — das hätte zwei vollständige APK-Bauten gekostet. Was dafür belegt ist: Der
-angepasste `SttStepTest` hat auf dem Gerät ausgeführt und bestanden, und er nagelt für `universal-2` mit
-Fachbegriffen 200 000 fest, was ohne den Zuschlag 150 000 wäre. Das ist eine einzelne Rechnung, keine
-Annahme darüber, welche von mehreren Wachen greift.
+zurückgenommen worden — das hätte zwei vollständige APK-Bauten gekostet. Was dafür belegt war: Der
+angepasste `SttStepTest` hat auf dem Gerät ausgeführt und bestanden, und er nagelte für `universal-2` mit
+Fachbegriffen 200 000 fest.
+
+**Und genau daran ist zu sehen, was eine Gegenprobe leistet und was nicht.** Sie belegt, dass ein Test die
+Zahl im Code festhält — nicht, dass die Zahl stimmt. 200 000 war falsch; der Anbieter verlangt auf diesem
+Modell 150 000, und Runde 13 hat die Zeile auf 150 000 zurückgesetzt. Eine grüne Gegenprobe über einer
+falschen Anbieterangabe sieht genauso aus wie eine über einer richtigen.
 
 **Dokumentation:** In der Runde-11-Passage stand eine laufende Summe „zwölf seit Runde 9“, die sich aus
 dem Dokument heraus nicht nachrechnen ließ; drei Nachzählungen kamen auf drei Ergebnisse. Sie ist
@@ -646,12 +652,137 @@ Stufen, 0 Fehler — und **39** im Modul `extractor` — 35 bestanden, 0 Fehler.
 400 ausgeführt. Von den sechs übrigen brauchen fünf eine echte Quelle oder ein echtes Release; die
 sechste, `UiFixtureTest`, bleibt mit Absicht aus, weil sie kein Test ist, sondern ein Saatgenerator.
 
-**Die Schleife ist nicht konvergiert.** Zwölf Runden, keine davon leer. Solange eine Runde noch etwas
-findet, ist die nächste fällig — gerade weil die Funde der Runden 3 bis 12 jeweils in den Korrekturen der
+### Runde 13
+
+Commits: `d6a773c` (Zuschlag), `dd371f5` (Zahlenprüfung), `0c30bde` (UTF-16), `f5cc8c5`
+(Kostenzeile) und der Dokumentationscommit, der diesen Absatz trägt. Einzeln benannt, nicht als
+Bereich, weil `a..b` den Anfangscommit auslässt.
+
+**Der teuerste Fund der zwölften Runde war ein Fehler, und diese Runde hat ihn gefunden.** Der lesende
+Code-Reviewer sollte die vier Commits der Vorrunde prüfen und hat dabei die AssemblyAI-Preisseite noch
+einmal geholt. Deren Zusatztabelle hat eine Spalte je Modell. Die Zeile „Keyterms Prompting“ liest sich
+„$0.05 /hr“ unter Universal-3.5 Pro und **„Included“** unter Universal-2: Auf dem günstigeren Modell ist die
+Fachbegriffsliste im Stundenpreis enthalten. Genau das stand vor Runde 12 im Code, und Runde 12 hat es
+herausgenommen.
+
+Ich habe das nicht der Zusammenfassung des Reviewers geglaubt, sondern die Seite selbst geholt und ihre
+Tabellen ausgelesen. Die Kopfzeile lautet `Add-on features | Universal-3.5 Pro | Universal-2`, die Zeile
+darunter `Keyterms Prompting | $0.05 /hr | Included`. Die Zeile „Speaker Diarization“ daneben sagt für beide
+Spalten `$0.02 /hr` — dort stimmt die Annahme „gleicher Aufschlag für beide“ tatsächlich, und dass die
+beiden Zeilen sich unterscheiden, ist der ganze Punkt.
+
+**Wie es dazu kam, ist der eigentliche Ertrag dieser Runde.** Ich habe die Seite heute zusätzlich über
+denselben zusammenfassenden Abruf geholt, den ich am 11. September benutzt habe: ein Werkzeug, das eine
+Seite an ein kleines Modell gibt und dessen Antwort zurückreicht. Auf die Frage nach genau diesen beiden
+Spalten antwortet es „**+$0.05/hr** für beide Modelle“. Das Wort „Included“ in der Tabellenzelle ist auf dem
+Weg zu einem Preis geworden. Der Fehler lag also nicht im Nachlesen, sondern darin, eine Zusammenfassung
+als Quelle zu nehmen, wo der Auszug aus dem Markup nötig gewesen wäre. Für kostenrelevante Zahlen steht das
+jetzt als Regel im Projektgedächtnis.
+
+Die Folge war keine Überziehung, sondern das Gegenteil, und beides ist ein Defekt: Eine
+Universal-2-Anfrage mit Fachbegriffen wurde um ein Drittel zu teuer geschätzt — 83 335 statt 62 500
+Mikro-Dollar für eine 25-Minuten-Quelle — und konnte an einem Budget scheitern, das der Anbieter
+eingehalten hätte. Zurückgenommen ist die Bedingung an zwei rechnenden Stellen (`AssemblyAiAdapter`,
+`SttStep`) und an drei behauptenden: dem Test, den Runde 12 dafür angelegt hat, der Zeile in `SttStepTest`,
+die 200 000 festnagelte, und dem Kommentar in `StatedNumbersTest`. Die dritte war nur zu finden, weil sie
+im Instrumentierungslauf liegt — `:core:test` erreicht sie nicht. Der neue Test nagelt **beide** Spalten
+fest, damit die Asymmetrie nicht ein zweites Mal wie ein Versehen aussieht.
+
+**Die Vollständigkeitsprüfung aus Runde 12 ließ sich mit gewöhnlichem Kotlin umgehen.** Sie las den
+Quelltext zeilenweise und verlangte, dass eine Zeile mit `const val` beginnt. Damit entgingen ihr drei
+Formen, von denen keine ungewöhnlich ist: eine Deklaration, deren Wert auf der nächsten Zeile steht, weil
+die erste zu lang wurde; eine mit einer Annotation davor — `@Suppress("MagicNumber") const val …` ist genau
+die Gestalt einer unterdrückten Lint-Warnung; und zwei gleichnamige Konstanten in einer Datei, die im
+`Set` zu einem Eintrag verschmolzen. Die Prüfung liest jetzt die Datei als Ganzes, nimmt Annotationen und
+Modifizierer vom Zeilenanfang mit, folgt dem `=` über den Zeilenumbruch und meldet Namenskollisionen
+getrennt. Am heutigen Baum ändert das nichts — dieselben 33 Konstanten —, und genau deswegen prüft ein
+eigener Test die Prüfung an Textbeispielen: Ein Test, der nur den Baum liest, wäre vorher wie nachher grün
+gewesen.
+
+**`tools/check-repository.py` überspringt UTF-16-Dateien vollständig.** Die Text-oder-Binär-Entscheidung aus
+Runde 12 sucht ein Nullbyte am Dateianfang. In UTF-16 wird jedes ASCII-Zeichen als zwei Bytes abgelegt, von
+denen eines Null ist — der erste Buchstabe einer solchen Datei löst die Heuristik aus, und die ganze Datei
+bleibt ungelesen. Auf einer Windows-Maschine ist das keine Exotik: Notepads „Unicode“-Option und ältere
+PowerShell-Umleitungen schreiben es. Im Baum liegt heute keine solche Datei: Von den 221 versionierten
+tragen genau 19 ein Nullbyte in den ersten 8192 Bytes — fünf PNG-Screenshots, zehn `.so`-Bibliotheken,
+die gepackte Extraktor-Engine, zwei Signaturdateien und das Wrapper-JAR —, und eine
+Byte-Reihenfolge-Markierung trägt keine einzige. Ein Schlüssel in einer UTF-16-Datei wäre trotzdem an
+der Prüfung vorbeigelaufen, die `PASS repository checks` schreibt. Jetzt wird
+eine Byte-Reihenfolge-Markierung vor der Nullbyte-Probe gelesen; ohne Markierung bleibt UTF-16 von
+Binärdaten ununterscheidbar, und das steht als Grenze dieser Prüfung im Code. Der Selbsttest enthält die
+Datei jetzt, und seine Zählerzusicherung ist von „mindestens fünf“ auf eine genaue Zahl umgestellt — eine
+Untergrenze ist auch dann erfüllt, wenn eine Datei ungelesen bleibt, also gerade in dem Fall, den der
+Zähler sichtbar machen soll.
+
+**Die Kostenzeile nannte einen Preis für eine Quelle, die derselbe Bildschirm eine Zeile tiefer ablehnt.**
+Runde 12 hat richtig erkannt, dass über der Höchstdauer kein Preis stehen darf — aber gegen die absolute
+Obergrenze der App geprüft, 36 000 Sekunden, während die Warnung darunter gegen das *pro Auftrag* gesetzte
+Längenlimit prüft. Bei einem Limit von einer Stunde und einer zweistündigen Quelle stand dort „Geschätzte
+Kosten: 0.3000 USD“ und direkt darunter, dass die Transkription abbrechen würde, bevor etwas an den
+Anbieter geht. Geprüft wird jetzt gegen beide Grenzen, und der Text sagt „länger, als dieser Auftrag
+zulässt“ statt „überschreitet die Höchstdauer“, weil die Zeile darunter ohnehin sagt, welche der beiden
+Grenzen es ist und was dagegen zu tun ist. Kein Geldrisiko — `SttStep.prepare()` weist dieselbe Quelle
+unabhängig ab —, aber eine Zahl, der man nicht glauben kann.
+
+**Dabei ist mir ein eigener Fund aufgefallen, den der Reviewer nicht hatte:** Diese Zeile wechselt zwischen
+einem kurzen Preis und einem ganzen Satz, ohne Höhe zu reservieren. Wer den Knopf „Limit anheben“ drückt,
+hätte den Rest des Bildschirms unter dem Finger nach oben rutschen sehen. Sie steht jetzt auf zwei Zeilen,
+wie es die beiden anderen wechselnden Textzeilen dieses Bildschirms schon tun.
+
+**Die Summe, die der Nutzer sieht, hatte keinen Test.** Runde 12 hat die Anzeige auf denselben
+Abschnittsplan und dieselbe Funktion gelegt, die der Lauf verwendet — und dann nichts davon geprüft.
+Getestet war die Einzelrechnung für einen Abschnitt, nicht das Aufsummieren über den Plan, und genau in
+diesem Aufsummieren lagen die Funde der Runden 3 bis 12. Der neue Test nagelt vier Fälle fest, darunter
+den, der die Bauart erklärt: Mit Sprechertrennung ergibt die abschnittsweise Rechnung 70 835 Mikro-Dollar
+und eine ungeteilte 70 834 — ein Mikro-Dollar Unterschied, weil jeder Abschnitt einzeln aufgerundet und
+einzeln abgerechnet wird.
+
+**Zwei kleinere Punkte.** Die Preisseite von OpenAI, auf die Runde 12 umgestellt hat, nennt `whisper-1`
+nirgends: Der Name kommt auf der ganzen Seite nicht vor, die Zeile mit den 0,006 Dollar je Minute heißt
+„Whisper“ und steht hinter dem Aufklappen der Tabelle. Die Zahl stimmt, den letzten Schritt muss der Leser
+selbst machen — das steht jetzt im Kommentar daneben statt als stille Annahme. Und
+`SyncProviderSupport.validateOptions` ist eine vierte Stelle, die eine Dauer in Geld umrechnet, als einzige
+ohne Zuschläge. Das ist für die zwei Anbieter, die sie heute erreichen, richtig — Groq bietet keine
+Sprechertrennung an, und OpenAIs diarisierendes Modell hat keinen veröffentlichten Preis und wird eine
+Zeile weiter abgelehnt —, wäre aber am Tag falsch, an dem einer von beiden einen bepreisten Zusatz bekommt.
+Der Kommentar sagt das jetzt; als Vorprüfung bleibt sie ungefährlich, weil `SttStep.submit` mit den
+Zuschlägen und über den ganzen Plan prüft, bevor etwas hinausgeht.
+
+**Gegenprobe.** Jede Korrektur zurückgenommen, in zwei Läufen, weil die beiden Module getrennt gebaut
+werden. Im Modul `core` und im Prüfwerkzeug fielen drei Prüfungen: der neue Adaptertest, sobald der
+Zuschlag wieder auf beiden Modellen liegt; der neue Scannertest, sobald die Zahlenprüfung wieder
+zeilenweise liest; und der Selbsttest von `check-repository.py`, sobald die Markierungsprüfung fehlt.
+
+**Eine Prüfung fiel dabei ausdrücklich nicht, und das ist der Beleg, auf den es ankommt.**
+`everyNumberThisModuleStatesHasALineInThisFile` blieb mit dem zurückgenommenen Scanner grün — weil im
+heutigen Baum keine der drei umgehbaren Formen vorkommt. Ein Test, der nur den Baum liest, hätte die
+Lücke weder vorher noch nachher angezeigt. Genau deswegen prüft der neue Test die Prüfung an
+Textbeispielen.
+
+**Und die Gegenprobe im Modul `app`, die Runde 12 ausgelassen hat, ist nachgeholt.** Sie kostet einen
+eigenen APK-Bau, weshalb sie beim letzten Mal unterblieb — und genau dort lag diesmal eine der drei
+falschen Behauptungen. Drei Tests fielen: der 150-000-Assert in `SttStepTest`, sobald der Zuschlag wieder auf
+beiden Modellen liegt; der neue Summentest, sobald die Anzeige wieder in einem Stück rechnet statt
+abschnittsweise; und `aSourceLongerThanThisJobAllowsIsNotPriced`, sobald die Längenregel wieder nur die
+Obergrenze der App kennt. Zusammen mit den drei im Modul `core` fielen sechs Prüfungen.
+
+Gates nach Runde 13: **177 JVM-Tests** im Modul `core` ohne Fehler (176 vorher: einer für die
+Prüfung der Zahlenprüfung), alle vier Lintberichte ohne Befund, der unsignierte Release-Build gebaut,
+`tools/check-repository.py` mit Selbsttest bestanden (202 Dateien gelesen, 19 als binär übersprungen),
+**193 Instrumentierungstests** im Modul `app` — 187 im gemeinsamen Lauf, 4 weitere einzeln über ihre
+Stufen, 0 Fehler — und **39** im Modul `extractor` — 35 bestanden, 4 per Annahme übersprungen, 0 Fehler.
+Von 409 Tests sind damit 403 ausgeführt, drei mehr als nach Runde 12 in beiden Zahlen. Von den sechs
+übrigen brauchen fünf eine echte Quelle oder ein echtes Release; die sechste, `UiFixtureTest`, bleibt mit
+Absicht aus, weil sie kein Test ist, sondern ein Saatgenerator.
+
+**Die Schleife ist nicht konvergiert.** Dreizehn Runden, keine davon leer. Solange eine Runde noch etwas
+findet, ist die nächste fällig — gerade weil die Funde der Runden 3 bis 13 jeweils in den Korrekturen der
 Vorrunde lagen. Runde 10 war der deutlichste Beleg dafür, dass eine Korrektur einen Fehler verschieben
 statt beheben kann; Runde 11 dafür, dass auch die Messung selbst geprüft gehört; Runde 12 dafür, dass ein
 Reviewer, der über den zugewiesenen Diff hinaussieht, den teuersten Fund macht — und dass zwei Listen, die
-von Sorgfalt abhingen, beide dieselbe Lücke hatten.
+von Sorgfalt abhingen, beide dieselbe Lücke hatten. Runde 13 ist der bislang deutlichste Fall: Der teuerste
+Fund einer Runde kann selbst der Fehler sein. Eine Korrektur, die eine Anbieteraussage ändert, ist erst
+belegt, wenn die Anbieterseite im Original gelesen wurde und nicht in einer Zusammenfassung.
 
 ## UI-Feedback umgesetzt
 

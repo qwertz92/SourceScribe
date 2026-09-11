@@ -2,65 +2,80 @@
 
 ## Wiederaufnahme: hier weitermachen
 
-Geschrieben am 11. September 2026, zuletzt nach der zwölften Reviewrunde nachgeführt, damit die
+Geschrieben am 11. September 2026, zuletzt nach der dreizehnten Reviewrunde nachgeführt, damit die
 Arbeit ohne Wiedereinlesen der ganzen Sitzung weitergehen kann. Reihenfolge ist Absicht.
 
 **Wo der Stand steht:** Die Reviewrunden und was sie gefunden haben, stehen in
 [STATUS.md](STATUS.md); was offen ist, mit Stelle und fehlendem Nachweis, in
 [DEFECTS.md](DEFECTS.md). Die Punktnummern unten sind die Nummern dort.
 
-### 1. Dreizehnte Reviewrunde über die Korrekturen der zwölften
+### 1. Vierzehnte Reviewrunde über die Korrekturen der dreizehnten
 
-Runden 3 bis 12 haben ihren wichtigsten Fund jeweils in den Korrekturen der Vorrunde gehabt. Runde 12 war
-die erste, deren schwerster Fund echtes Geld betraf: Der Zuschlag für Fachbegriffe wurde nur für eines
-der beiden AssemblyAI-Modelle berechnet, obwohl die Anfrage ihn für beide mitschickt und der Anbieter ihn
-für beide verlangt — an drei Stellen, und keine davon lag im Diff, den der Reviewer lesen sollte. Die
-Commits der zwölften Runde stehen unten in der Runde-12-Passage von [STATUS.md](STATUS.md); einzeln
-benennen, nicht als Bereich, weil `a..b` den Anfangscommit auslässt.
+Runden 3 bis 13 haben ihren wichtigsten Fund jeweils in den Korrekturen der Vorrunde gehabt. Runde 13 ist
+der schärfste Fall davon: **Der teuerste Fund der Vorrunde war selbst der Fehler.** Runde 12 hatte gemeldet,
+AssemblyAI verlange den Zuschlag für Fachbegriffe für beide Modelle, und die richtige Modellbedingung
+entfernt. Die Zusatztabelle des Anbieters hat eine Spalte je Modell: „$0.05 /hr“ unter Universal-3.5 Pro,
+**„Included“** unter Universal-2. Die Bedingung ist zurück, und ein Test nagelt jetzt beide Spalten fest.
+Commits der dreizehnten Runde sind `d6a773c` (Zuschlag), `dd371f5` (Zahlenprüfung), `0c30bde` (UTF-16),
+`f5cc8c5` (Kostenzeile) und der Dokumentationscommit, der diesen Absatz trägt; einzeln benennen, nicht als
+Bereich, weil `a..b` den
+Anfangscommit auslässt.
 
-Zwei rein lesende Reviewer zuerst, der verändernde danach allein. Sechs Lehren gehören in den Auftrag:
+Zwei rein lesende Reviewer zuerst, der verändernde danach allein. Sieben Lehren gehören in den Auftrag:
 
 - Ein Fund, den der Reviewer nicht ausführen konnte, gilt erst nach einer Gegenprobe als lebender Fehler.
 - **Eine Gegenprobe muss jede Stelle abschalten, die eine Regel durchsetzt, nicht die erstbeste.** Runde 11
   fand so eine dritte, unbekannte Durchsetzungsstelle; Runde 12 fand eine vierte, weil ein neuer Test
   eine andere Meldung bekam als die, auf die er gewartet hatte. Beides heißt dasselbe: Die Annahme
   darüber, welche Wache greift, ist der Teil, der geprüft gehört.
-- **Ein Fund außerhalb des zugewiesenen Diffs ist ein Fund.** Der teuerste dieser Runde kam so zustande:
-  Der Reviewer prüfte die Preise, die ihm genannt waren, und sah dabei, dass einer davon falsch angewandt
-  wurde. Der Auftrag soll das ausdrücklich erlauben.
+- **Eine grüne Gegenprobe über einer falschen Zahl sieht aus wie eine über einer richtigen.** Runde 12 hat
+  belegt, dass ein Test 200 000 festhält — nicht, dass 200 000 stimmt. Die Gegenprobe prüft die Kopplung
+  zwischen Test und Code, nie die Aussage über die Welt.
+- **Eine Anbieterangabe wird aus dem Markup der Seite gelesen, nicht aus einer Zusammenfassung.** Genau
+  daran ist Runde 12 gescheitert: Das zusammenfassende Abrufwerkzeug machte aus der Tabellenzelle
+  „Included“ einen Preis. Der Befehl und das Vorgehen stehen als Wartungshinweis in
+  [DEFECTS.md](DEFECTS.md).
+- **Ein Fund außerhalb des zugewiesenen Diffs ist ein Fund.** Der teuerste Fund der Runden 12 und 13 kam
+  beide Male so zustande. Der Auftrag soll das ausdrücklich erlauben.
 - Jede Zahl wird nachgezählt und nennt den Stand, für den sie gilt. Eine laufende Summe, die sich nicht
   aus dem Dokument heraus nachrechnen lässt, gehört gestrichen statt korrigiert.
-- Jeder Symbolname in einem Auftrag wird vorher gegen den Baum geprüft.
-- Ein Reviewer, der für Gegenproben Dateien verändert, läuft nicht neben einem, der liest.
+- Ein Reviewer, der für Gegenproben Dateien verändert, läuft nicht neben einem, der liest. Jeder
+  Symbolname im Auftrag wird vorher gegen den Baum geprüft.
 
 Die Jagdliste:
 
-- **Die Module `app` und `extractor` haben keine Zahlenliste.** Aus der Jagdliste von Runde 12
-  übriggeblieben: Welche Zahlen behaupten sie, und hängt an einer davon ein Test, der mit ihr
-  mitwandert? `SttStep` allein hält Zeitlimits, Kettenlängen und Chunkgrößen. Und die schärfere Frage:
-  `StatedNumbersTest.everyNumberThisModuleStatesHasALineInThisFile` liest den Quelltext von `core` und
-  vergleicht die gefundenen Namen gegen eine Liste — taugt dieselbe Bauart für ein Androidmodul, dessen
-  Tests auf dem Gerät laufen und den Quelltext dort nicht sehen?
-- **Die Kostenschau ist neu verdrahtet.** `NewSourceScreen` zeigt jetzt die Summe aus
-  `MainViewModel.estimatedCostMicrousd`, die über `SttStep.chunkPlan` pro Abschnitt rechnet, statt Länge
-  mal Stundenpreis. Stimmt sie mit dem überein, was `SttStep` beim Lauf tatsächlich aufsummiert und gegen
-  `maxCostMicrousd` prüft — bei einem Auftrag mit mehreren Abschnitten, bei Groqs Mindestabrechnung und
-  bei einer Quelle ohne bekannte Dauer? Ein Test dafür fehlt: `SttStepTest` prüft die Einzelrechnung,
-  nichts prüft die Summe.
-- **Der Aufschlag wurde an drei Stellen berechnet und an zwei Stellen falsch.** Gibt es eine vierte? Und
-  allgemeiner: Welche Rechnung dieses Programms steht mehr als einmal im Baum? Der Fund lag nicht in einer
-  falschen Zahl, sondern in ihrer Anwendung, und keine Zahlenliste fängt das.
-- **`tools/check-repository.py` liest seit Runde 12 202 statt 18 Dateiendungen.** Die Entscheidung fällt
-  jetzt an den Bytes. Was fällt damit trotzdem noch durch — eine Datei über einem Mebibyte, ein Verzeichnis
-  in `SKIP_PARTS`, ein Muster, das es gar nicht gibt? Und die Gegenrichtung: Findet die neue Abdeckung
-  etwas, das in `docs/` steht und dort nicht stehen sollte?
+- **Die Zahlenprüfung ist jetzt ein regulärer Ausdruck über die ganze Datei.** Sie nimmt Annotationen und
+  Modifizierer vom Zeilenanfang mit und folgt dem `=` über den Zeilenumbruch. Was sieht sie immer noch
+  nicht — ein `const val` in einem Blockkommentar, ein Wert, der eine Funktion mit Ziffern im Namen
+  aufruft, eine Deklaration hinter einem Zeilenumbruch *vor* dem `=`? `theScannerSeesTheDeclarationsThat
+  UsedToSlipPastIt` ist der Ort für die Antwort.
+- **Die Module `app` und `extractor` haben keine Zahlenliste.** Aus den Jagdlisten von Runde 12 und 13
+  übriggeblieben: Welche Zahlen behaupten sie, und hängt an einer davon ein Test, der mit ihr mitwandert?
+  `SttStep` allein hält Zeitlimits, Kettenlängen und Chunkgrößen. Die schärfere Frage bleibt: Taugt die
+  Bauart aus `core` für ein Androidmodul, dessen Tests auf dem Gerät laufen und den Quelltext dort nicht
+  sehen?
+- **Die Kostenzeile prüft jetzt zwei Längengrenzen.** `JobLimits.MAX_AUDIO_SECONDS` und
+  `config.maxAudioSeconds`. Gibt es eine dritte Stelle, die einen Lauf an der Länge scheitern lässt und
+  die diese Zeile nicht kennt — in `prepare()`, im Planer, beim Anbieter?
+- **Vier Stellen rechnen eine Dauer in Geld um** (DEFECTS 27). Runde 13 hat die vierte benannt und als
+  heute folgenlos belegt. Bleibt die allgemeine Frage aus Runde 12 unbeantwortet: Welche *andere* Rechnung
+  dieses Programms steht mehr als einmal im Baum?
+- **Was `tools/check-repository.py` nicht liest, steht jetzt in DEFECTS 28.** UTF-16 ohne Markierung, alles
+  über einem Mebibyte, unversionierte Workflow-Dateien beim Geheimnisscan. Und die Gegenrichtung, weiter
+  offen: Findet die neue Abdeckung etwas, das in `docs/` steht und dort nicht stehen sollte?
 - **`Source.originalLanguage` hat kein Gegenstück zu `AudioTrack.languageRefused`.** Aus Runde 12
   übriggeblieben, von niemandem geprüft: Ein verworfener Wert sieht dort wie ein nie genannter aus. Such,
   wer dieses Feld liest, und ob eine dieser Lesestellen still entscheidet.
 - **`ProviderCapabilities.pricingSource` erreicht niemanden** (DEFECTS 24). Der Nutzer sieht einen Preis und
   einen Stichtag, aber nie die Seite, gegen die der Stichtag gilt. Gibt es einen Weg dahin, der die Adresse
-  nicht ein zweites Mal behauptet?
-- Und die Doku: Jede Zahl der Runde-12-Passage nachzählen, mit dem Stand, für den sie gilt.
+  nicht ein zweites Mal behauptet? Seit Runde 13 hängt DEFECTS 29 mit dran: Die Seite für OpenAI nennt
+  `whisper-1` gar nicht.
+- **Nicht mehr offen, damit es niemand ein zweites Mal aufmacht:** Alle acht Preiszahlen sind am
+  12. September 2026 aus dem Markup der drei Anbieterseiten nachgelesen worden, nicht aus einer
+  Zusammenfassung — AssemblyAI 0,21/0,15 je Stunde, Sprechertrennung 0,02 in beiden Spalten, Fachbegriffe
+  0,05 nur in der Spalte Universal-3.5 Pro; Groq 0,111 und 0,04 je Stunde, Mindestabrechnung zehn
+  Sekunden, 25 MB gegen 100 MB; OpenAI 0,0045 und 0,006 je Minute. Alle acht stimmen mit dem Code überein.
+- Und die Doku: Jede Zahl der Runde-13-Passage nachzählen, mit dem Stand, für den sie gilt.
 
 ### 2. Warncodes lesbar machen (DEFECTS 9) — erledigt
 
@@ -130,6 +145,14 @@ Prüfsumme, Slotwechsel, Rückrollung, beschädigter aktiver Slot. Ohne den Scha
 21 bestanden und 18 übersprungen, mit ihm 35 bestanden und 4 übersprungen. Die verbleibenden vier
 brauchen eine echte Quelle beziehungsweise ein echtes Release und bleiben `BLOCKED/NOT_RUN`.
 
+**Einer dieser vier braucht drei Flaggen, nicht eine.**
+`EngineUpdateManagerTest.realReleaseStageActivateAndRollbackSurvivesManagerRestart` verlangt zuerst
+`-e sourcescribeEngineLiveUpdate true`, dann `-e engineProbeSource <URL>`, und erst danach läuft es in
+`withIsolatedManager`, das `-e sourcescribeEngineUpdate true` verlangt. Die ersten beiden Namen sind bis
+Runde 13 in keinem lebenden Dokument vorgekommen — nur in einem datierten Bericht vom 7. September — und
+`sourcescribeEngineLiveUpdate` unterscheidet sich von `sourcescribeEngineUpdate` um ein Wort. Wer nur die
+letzte setzt, sieht den Test übersprungen und keinen Hinweis darauf, warum.
+
 **Die App-Suite hat dieselbe Art Schranke, und vier ihrer sechs Übersprungenen sind ausführbar.**
 `ProcessRecoveryTest` stellt den Prozesstod über einen Neustart hinweg nach und verlangt pro Lauf genau
 eine Stufe; mit mehreren Stufen gleichzeitig fallen die übrigen drei, sie werden also nicht übersprungen,
@@ -164,7 +187,7 @@ Keine automatische Arbeitsfreigabe nach Preview-Abschluss; Nutzerfeedback abwart
 | 1 — drei Live-Provider, BLOCKED | Nutzer testet selbst oder erteilt je Anbieter Zugang, freigegebene Datei und Kostenrahmen. Mit kurzer eigener Aufnahme starten; Modellzugang, Sprache/Zeiten/Sprecher, Provenienz und Export prüfen. | Je AssemblyAI, OpenAI und Groq ein echter dokumentierter Lauf. Keine Schlüssel/Transkripte veröffentlichen; Modelllisten/Fixtures genügen nicht. |
 | 1 — öffentliche APK, BLOCKED | FFmpeg-/x264-/VMAF-/SVT-AV1-Quellen und Notices der enthaltenen Versionen zuordnen. Falls nicht belastbar möglich, gezielten reproduzierbaren Native-Neubau erwägen. | Passende Source-/Lizenzbelege nach [Lizenzbericht](reports/2026-09-07-licenses.md), finaler APK-/ABI-Audit. Erst danach APK als Release-Asset. |
 | 2 — TalkBack, BLOCKED | Fokusnavigation/Aktivierung mit geeigneter echter Eingabe oder menschlichem Tester. Sprachausgabe ankündigen, Einstellungen restaurieren. | Hauptflächen einschließlich Trackdialog, Viewer, Export und Fehleransicht bedienbar; Labels/Reihenfolge tatsächlich geprüft. Semantiktests bereits PASS. |
-| 2 — sechs übersprungene Tests, BLOCKED/NOT_RUN | Vier davon brauchen eine echte Videoquelle (`ExtractionChainTest` zwei, `NativeRuntimeTest` einer über `publicSourceUrl`) oder ein echtes Engine-Release (`EngineUpdateManagerTest.realReleaseStageActivateAndRollbackSurvivesManagerRestart`, `EngineJobPinningTest` über `sourcescribeEngineJobPinning` **und** `engineProbeSource`). `UiFixtureTest` bleibt mit Absicht aus: Es ist ein Saatgenerator, der synthetische Daten in die App-Datenbank des Geräts schreibt, kein Test. | Je ein dokumentierter Lauf mit echter Quelle beziehungsweise echtem Release. Gefunden in Runde 11, als auffiel, dass `am instrument` auch dann `OK` schreibt, wenn eine Annahme übersprungen wurde. |
+| 2 — sechs übersprungene Tests, BLOCKED/NOT_RUN | **Fünf** davon brauchen eine echte Videoquelle (`ExtractionChainTest` zwei, `NativeRuntimeTest` einer über `publicSourceUrl`) oder ein echtes Engine-Release: `EngineJobPinningTest` über `sourcescribeEngineJobPinning` **und** `engineProbeSource`, und `EngineUpdateManagerTest.realReleaseStageActivateAndRollbackSurvivesManagerRestart` über **drei** Flaggen — `sourcescribeEngineLiveUpdate`, `engineProbeSource` und `sourcescribeEngineUpdate`, letztere über `withIsolatedManager`. `UiFixtureTest` bleibt mit Absicht aus: Es ist ein Saatgenerator, der synthetische Daten in die App-Datenbank des Geräts schreibt, kein Test. | Je ein dokumentierter Lauf mit echter Quelle beziehungsweise echtem Release. Gefunden in Runde 11, als auffiel, dass `am instrument` auch dann `OK` schreibt, wenn eine Annahme übersprungen wurde. |
 | 2 — persönliche Updates, teilweise NOT_RUN | Privaten Signing-Key separat sichern/übertragen. Bei nächster App-Änderung VersionCode erhöhen, bestehende persönliche Installation mit demselben Key aktualisieren. | Verlauf bleibt nach signiertem App-Update erhalten. Signing/Erstinstallation PASS, Upgrade dieser Installation noch NOT_RUN. |
 | 2 — Nutzerfeedback, ausstehend | Gerät/Version, Schritte, erwartetes/tatsächliches Verhalten und Screenshot erfassen. Reproduzierbare Defekte eng fixen. | Regression und unabhängige Gegenprüfung im betroffenen Bedienpfad; keine pauschale Kosmetikschleife. |
 | 3 — frischer Clone, NOT_RUN | BUILD auf zweitem Rechner oder isoliertem Linux-System ohne vorhandene Projektcaches ausführen. | Wrapper-/Dependency-Verifikation, Build und passende Tests erfolgreich. Privater Key/SDK/Appdaten separat. |

@@ -1,6 +1,6 @@
 # Bekannte Probleme und offene Punkte
 
-**Stand:** 11. September 2026, nach zwölf Runden adversarischer Reviews. Diese Datei ist für den
+**Stand:** 12. September 2026, nach dreizehn Runden adversarischer Reviews. Diese Datei ist für den
 nächsten Agenten gedacht und listet, was **nicht** vollständig erledigt ist. Ein geschlossener Punkt
 behält seine Nummer und einen kurzen Vermerk, damit Verweise aus anderen Dokumenten gültig bleiben. Was hier nicht steht, ist entweder erledigt oder in
 [STATUS.md](STATUS.md) beschrieben.
@@ -420,6 +420,55 @@ Gewinn und deshalb nicht gemacht.
   einem kostenpflichtigen Aufruf. Als Vermutung gekennzeichnet, nicht als Fund. Aufgeworfen vom lesenden
   Reviewer in Runde 12 und von ihm selbst ausdrücklich als nicht ausgeführt markiert.
 
+### 27. Eine vierte Kostenrechnung, als einzige ohne Zuschläge (niedrig, heute folgenlos)
+
+- **Stelle:** `SyncProviderSupport.validateOptions` in
+  `core/src/main/kotlin/app/sourcescribe/core/providers/SyncTranscriptParser.kt`, verwendet von
+  `GroqAdapter` und `OpenAiAdapter`.
+- **Voraussetzung:** Ein Groq- oder OpenAI-Modell, das einen bepreisten Zusatz bekommt —
+  Sprechertrennung oder eine Fachbegriffsliste mit eigenem Stundensatz. Heute gibt es keins.
+- **Erwartet gegen tatsächlich:** Vier Stellen dieses Programms rechnen eine Dauer in Geld um. Drei
+  addieren die Zuschläge, diese nicht. Dass das heute nichts ändert, ist geprüft und nicht vermutet: Groq
+  meldet `diarization = false` für jedes Modell, und OpenAIs einziges diarisierendes Modell hat
+  `priceMicrousdPerHour = null` und wird eine Zeile weiter abgelehnt, statt geschätzt zu werden.
+- **Warum es offen bleibt:** Die Zuschläge stehen nicht in `ProviderCapabilities`, sondern beim jeweiligen
+  Adapter; sie hier einzurechnen hieße, sie in den Vertrag aufzunehmen. Das ist eine Vertragsänderung und
+  keine Zeile. Als Vorprüfung bleibt die Stelle ungefährlich — was bindet, ist `SttStep.submit`, das mit
+  den Zuschlägen und über den ganzen Abschnittsplan prüft. Seit Runde 13 sagt der Kommentar beides.
+  Gefunden vom lesenden Reviewer in Runde 13 auf die Frage, welche Rechnung mehr als einmal im Baum steht.
+
+### 28. Was `tools/check-repository.py` weiterhin nicht liest (niedrig)
+
+- **Stelle:** `_read_text` und `_check_actions` in `tools/check-repository.py`.
+- **Voraussetzung:** Je nach Fall: eine UTF-16-Datei ohne Byte-Reihenfolge-Markierung, eine Textdatei über
+  einem Mebibyte, oder eine noch nicht versionierte Datei unter `.github/workflows/`.
+- **Erwartet gegen tatsächlich:** Drei Reste, nachdem Runde 13 UTF-16 **mit** Markierung geschlossen hat.
+  Ohne Markierung ist UTF-16 an den Bytes nicht von einer Binärdatei zu unterscheiden und fällt weiter
+  durch. Eine Textdatei über `MAX_SCAN_BYTES` wird bei 1 048 576 Byte gekappt; ein Geheimnis dahinter wird
+  nicht gefunden, und der Abschlusszeile ist die Kappung anzusehen (`… read only to 1048576 bytes`), dem
+  Exitcode nicht. Und `_check_actions` durchsucht das Dateisystem statt `git ls-files`, prüft eine
+  unversionierte Workflow-Datei also auf ungepinnte Actions, während der Geheimnisscan sie nie sieht.
+- **Warum es offen bleibt:** Alle drei sind heute leer — keine UTF-16-Datei im Baum, die einzige Datei
+  über einem Mebibyte ist die gepackte Extraktor-Engine und echt binär, und `.github/workflows/` enthält
+  nur Versioniertes. Die Reihenfolge ist Absicht: Die weitere Richtung — mehr prüfen, nicht weniger — ist
+  bei der Actions-Prüfung die sichere. Gefunden vom lesenden Reviewer in Runde 13, der die Funktionen
+  außerhalb des Repositorys gegen gebaute Dateien laufen ließ.
+
+### 29. Die Preisseite von OpenAI nennt `whisper-1` nicht (niedrig)
+
+- **Stelle:** `OpenAiAdapter.PRICING_SOURCE` und `PRICE_WHISPER_MICRO_USD_PER_HOUR` in
+  `core/src/main/kotlin/app/sourcescribe/core/providers/OpenAiAdapter.kt`.
+- **Voraussetzung:** Jemand folgt der Adresse, um die Zahl neben dem Stichtag nachzuprüfen.
+- **Erwartet gegen tatsächlich:** Die Zahl stimmt — 0,006 Dollar je Minute sind genau 360 000 Mikro-Dollar
+  je Stunde. Die Zeichenfolge `whisper-1` kommt auf der Seite aber überhaupt nicht vor (am 12. September
+  2026 im Markup nachgezählt: null Treffer); die Zeile mit diesem Preis heißt „Whisper“ und steht in der
+  eingeklappten Hälfte der Tabelle. Wer `whisper-1` sucht, findet nur `gpt-realtime-whisper`, ein anderes
+  Modell zu einem anderen Preis. Für `gpt-transcribe` steht die Zeile offen in der Tabelle.
+- **Warum es offen bleibt:** Die Seite gehört dem Anbieter. Was dieses Projekt tun kann, ist den letzten
+  Schritt auszusprechen statt ihn anzunehmen — das steht seit Runde 13 im Kommentar neben der Zahl.
+  Hängt an Punkt 24 weiter oben in dieser Datei:
+  Solange die Adresse niemanden erreicht, erreicht auch diese Einschränkung niemanden.
+
 ## Bewusste Entscheidungen, die wie Fehler aussehen
 
 ### Ein gewöhnlicher Start-Tap nach „Neu vorbereiten“ genügt für die Freigabe
@@ -480,6 +529,25 @@ modelliert waren: dort gab es keinen denkbaren Erzeuger, und sie sind entfernt.
 
 ## Wartungshinweise, die keine Defekte sind
 
+### Eine Anbieterzahl wird aus dem Markup gelesen, nicht aus einer Zusammenfassung
+
+Runde 12 hat eine richtige Preisbedingung entfernt, weil die Preisseite über ein zusammenfassendes
+Abrufwerkzeug gelesen wurde: Es gibt die Seite an ein kleines Modell und reicht dessen Antwort zurück. Die
+Zusatztabelle von AssemblyAI hat eine Spalte je Modell, und in der Zeile „Keyterms Prompting“ steht unter
+Universal-2 das Wort **„Included“**. Die Zusammenfassung machte daraus „+$0.05/hr für beide Modelle“ — am
+12. September 2026 mit demselben Werkzeug reproduziert, um auszuschließen, dass sich die Seite geändert
+hatte.
+
+Wer eine Zahl ändert, die Geld betrifft, holt die Seite selbst und liest ihre Tabelle aus:
+
+```bash
+curl -sL --max-time 60 -A "Mozilla/5.0" https://www.assemblyai.com/pricing -o page.html
+```
+
+Danach die `<table>`-Blöcke mit Kopfzeile und Zellen ausgeben, statt nach der Zahl allein zu suchen —
+welche Spalte eine Zelle trägt, ist hier die ganze Frage. Ein Wort wie „Included“ steht an derselben
+Stelle, an der sonst ein Preis steht, und geht in jeder Zusammenfassung als Preis durch.
+
 ### Instrumentierungstests laufen nicht über Gradle aus WSL heraus
 
 Der Gradle-Lauf findet in WSL statt, der Emulator läuft unter Windows. Der Windows-`adb`-Server hört nur
@@ -511,7 +579,10 @@ Instrumentierungstests; die Reviewrunden 6 bis 10 haben nur die 191 des Moduls `
 Zahl als das Gate berichtet. Ohne `-e sourcescribeEngineUpdate true` überspringt die zweite Suite vierzehn
 Tests von `EngineUpdateManagerTest` per Annahme und sieht mit 21 bestanden trotzdem grün aus; mit der
 Flagge sind es 35 bestanden, 4 übersprungen, 0 Fehler. Die vier brauchen eine echte Quelle beziehungsweise
-ein echtes Release und bleiben `BLOCKED/NOT_RUN`.
+ein echtes Release und bleiben `BLOCKED/NOT_RUN`. Einer von ihnen,
+`EngineUpdateManagerTest.realReleaseStageActivateAndRollbackSurvivesManagerRestart`, braucht dazu noch
+`-e sourcescribeEngineLiveUpdate true` und `-e engineProbeSource <URL>`; der Ablauf in
+[NEXT_STEPS.md](NEXT_STEPS.md) nennt alle drei.
 
 ### Abhängigkeitsprüfung nach jedem Versionswechsel neu erzeugen
 
