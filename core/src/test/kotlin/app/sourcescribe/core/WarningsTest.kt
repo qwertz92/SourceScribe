@@ -1,4 +1,4 @@
-package app.sourcescribe.core.providers
+package app.sourcescribe.core
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

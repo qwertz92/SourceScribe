@@ -1,4 +1,4 @@
-package app.sourcescribe.core.providers
+package app.sourcescribe.core
 
 /**
  * Warnings are recorded per malformed entry, and one answer may carry hundreds of thousands of entries:
@@ -6,6 +6,9 @@ package app.sourcescribe.core.providers
  * problems, and a single deliberately broken answer could fill the heap of a phone that way. Only
  * [LIMIT] distinct warnings are kept. Once that many are recorded a single [TRUNCATED] marker is added,
  * so a shortened list is never mistaken for the whole picture.
+ *
+ * The caption parser shares this because it had the same cap without the marker, which left a shortened
+ * caption warning list indistinguishable from a complete one.
  */
 internal class Warnings {
     private val recorded = LinkedHashSet<String>()

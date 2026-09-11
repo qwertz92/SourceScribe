@@ -13,6 +13,7 @@ import app.sourcescribe.core.Segment
 import app.sourcescribe.core.SubmissionResult
 import app.sourcescribe.core.TimeEvidence
 import app.sourcescribe.core.TranscriptionRequest
+import app.sourcescribe.core.Warnings
 import java.io.File
 import java.util.Collections
 import kotlinx.coroutines.runBlocking

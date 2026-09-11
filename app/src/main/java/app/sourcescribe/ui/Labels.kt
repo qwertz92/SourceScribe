@@ -391,6 +391,7 @@ internal fun warningTexts(warnings: List<String>): List<String> {
 @StringRes
 private fun warningResource(group: WarningGroup): Int = when (group) {
     WarningGroup.COVERAGE -> R.string.warning_coverage
+    WarningGroup.SECTION_ALIGNMENT -> R.string.warning_section_alignment
     WarningGroup.SECTION_LOST_STORAGE -> R.string.warning_section_lost_storage
     WarningGroup.SECTION_LOST_PROVIDER -> R.string.warning_section_lost_provider
     WarningGroup.RESULT_SHORTENED -> R.string.warning_result_shortened

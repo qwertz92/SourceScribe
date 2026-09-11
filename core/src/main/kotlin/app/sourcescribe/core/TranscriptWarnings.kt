@@ -7,6 +7,7 @@ package app.sourcescribe.core
  */
 enum class WarningGroup {
     COVERAGE,
+    SECTION_ALIGNMENT,
     SECTION_LOST_STORAGE,
     SECTION_LOST_PROVIDER,
     RESULT_SHORTENED,
@@ -38,8 +39,10 @@ object TranscriptWarnings {
         val groups = LinkedHashSet<WarningGroup>()
         val unknown = LinkedHashSet<String>()
         for (warning in warnings) {
-            val family = family(warning)
-            if (family.isEmpty()) continue
+            // A code that is nothing but a chunk prefix leaves no family behind. It still has to be
+            // reported, so it falls back to what was actually recorded rather than being dropped.
+            val family = family(warning).ifEmpty { warning }
+            if (family.isBlank()) continue
             val group = group(family)
             if (group == null) unknown += family else groups += group
         }
@@ -53,9 +56,14 @@ object TranscriptWarnings {
     fun looksLikeCode(value: String): Boolean = CODE.matches(value)
 
     /**
-     * `CHUNK_3_WORD_TIMESTAMPS_MALFORMED_OFFSET_17` and `MISSING_CHUNKS:2,3` both name one family. The
-     * index is stripped repeatedly because a caption warning can carry two of them, one for the event and
-     * one for the segment inside it.
+     * `CHUNK_3_MALFORMED_SEGMENT_12_4` and `MISSING_CHUNKS:2,3` both name one family. A trailing number is
+     * the only thing stripped, repeatedly, because a caption warning can carry two of them, one for the
+     * event and one for the segment inside it.
+     *
+     * A word in front of that number, as in `WORD_TIMESTAMPS_MALFORMED_OFFSET_17`, stays part of the family
+     * name. Stripping it would have to guess where the name ends, and the guess took the last word of every
+     * family that happens to end in the same word: `MISSING_SPEAKER_7` became `MISSING` and
+     * `INVALID_CHUNK_OFFSET_5` became `INVALID_CHUNK`, so neither could ever be recognised.
      */
     internal fun family(code: String): String {
         if (!looksLikeCode(code)) return code
@@ -68,21 +76,30 @@ object TranscriptWarnings {
     }
 
     private fun group(family: String): WarningGroup? = when (family) {
-        "WORD_TIMESTAMPS_MISSING", "WORD_TIMESTAMPS_MALFORMED", "WORD_TIMESTAMPS_OUT_OF_RANGE",
-        "MALFORMED_WORD", "INVALID_WORD_TIMESTAMP", "OUT_OF_RANGE_WORD_TIMESTAMP",
+        // `MALFORMED_WORD` and `MISSING_WORD_TEXT` cost the word list an entry, and that list carries the
+        // times per word; the text a reader sees comes from the segments. So they belong here rather than
+        // with the missing passages, unlike their segment counterparts below.
+        "WORD_TIMESTAMPS_MISSING", "WORD_TIMESTAMPS_MALFORMED", "WORD_TIMESTAMPS_MALFORMED_SPEAKER",
+        "WORD_TIMESTAMPS_MALFORMED_OFFSET", "WORD_TIMESTAMPS_OUT_OF_RANGE", "MALFORMED_WORD",
+        "MISSING_WORD_TEXT", "INVALID_WORD_TIMESTAMP", "OUT_OF_RANGE_WORD_TIMESTAMP",
         "NON_MONOTONIC_WORD_TIMESTAMP", "MALFORMED_WORDS", "MISSING_WORD_TIMESTAMPS",
         "INCOMPLETE_WORD_TIMESTAMPS" -> WarningGroup.WORD_TIMES
 
-        "SEGMENT_TIMESTAMPS_MISSING", "MALFORMED_SEGMENT", "MALFORMED_SEGMENTS",
-        "INVALID_SEGMENT_TIMESTAMP", "OUT_OF_RANGE_SEGMENT_TIMESTAMP", "NON_MONOTONIC_SEGMENT_TIMESTAMP",
-        "MISSING_SEGMENT_TIMESTAMPS", "INCOMPLETE_SEGMENT_TIMESTAMPS" -> WarningGroup.SEGMENT_TIMES
+        // Every family here keeps its text and loses only its place on the timeline. `INVALID_CHUNK_OFFSET`
+        // belongs with them: the entry is still written, its start and end are dropped.
+        "SEGMENT_TIMESTAMPS_MISSING", "MALFORMED_SEGMENTS", "INVALID_SEGMENT_TIMESTAMP",
+        "OUT_OF_RANGE_SEGMENT_TIMESTAMP", "NON_MONOTONIC_SEGMENT_TIMESTAMP", "MISSING_SEGMENT_TIMESTAMPS",
+        "INCOMPLETE_SEGMENT_TIMESTAMPS", "INVALID_CHUNK_OFFSET" -> WarningGroup.SEGMENT_TIMES
 
-        "MISSING_WORD_TEXT", "MISSING_SEGMENT_TEXT", "EMPTY_CUE_LINE", "EMPTY_EVENT" ->
-            WarningGroup.MISSING_TEXT
+        // An entry that could not be read at all is skipped whole, so its text never reaches the transcript.
+        // That is a missing passage and not a missing timestamp, which is what the group above is for.
+        "MALFORMED_SEGMENT", "MALFORMED_CAPTION_SEGMENT", "MALFORMED_CAPTION_SEGMENTS",
+        "MISSING_SEGMENT_TEXT", "EMPTY_CUE_LINE", "EMPTY_EVENT" -> WarningGroup.MISSING_TEXT
 
-        "DIARIZATION_MISSING", "DIARIZATION_MALFORMED", "DIARIZATION_OUT_OF_RANGE",
-        "DIARIZATION_SPEAKER_MISSING", "MALFORMED_DIARIZED_SEGMENTS", "MISSING_DIARIZED_SEGMENTS",
-        "MISSING_DIARIZED_SPEAKER", "MISSING_SPEAKER" -> WarningGroup.SPEAKERS
+        "DIARIZATION_MISSING", "DIARIZATION_MALFORMED", "DIARIZATION_MALFORMED_OFFSET",
+        "DIARIZATION_OUT_OF_RANGE", "DIARIZATION_SPEAKER_MISSING", "MALFORMED_DIARIZED_SEGMENTS",
+        "MISSING_DIARIZED_SEGMENTS", "MISSING_DIARIZED_SPEAKER", "MISSING_SPEAKER" ->
+            WarningGroup.SPEAKERS
 
         "WORD_LIMIT_REACHED", "SEGMENT_LIMIT_REACHED", "EVENT_LIMIT_REACHED" ->
             WarningGroup.RESULT_SHORTENED
@@ -93,8 +110,11 @@ object TranscriptWarnings {
         "REPORTED_MODEL_MALFORMED", "REPORTED_MODEL_TOO_LONG", "MULTIPLE_REPORTED_MODELS" ->
             WarningGroup.PROVIDER_MODEL
 
-        "MISSING_CHUNKS", "AUDIO_INTERVAL_GAP_OR_OVERLAP", "INVALID_CHUNK_OFFSET" ->
-            WarningGroup.COVERAGE
+        "MISSING_CHUNKS" -> WarningGroup.COVERAGE
+
+        // The check behind this one fires for a gap and for an overlap alike, and cannot tell them apart.
+        // Saying a part is missing would claim more than was established.
+        "AUDIO_INTERVAL_GAP_OR_OVERLAP" -> WarningGroup.SECTION_ALIGNMENT
 
         // These look like a storage problem and are not one: every place that records them drops the whole
         // section from the transcript in the same step, so they belong with what is missing, not with what
@@ -116,5 +136,5 @@ object TranscriptWarnings {
 
     private val CODE = Regex("[A-Z0-9_]+(:[0-9,]*)?")
     private val CHUNK_PREFIX = Regex("^CHUNK_\\d+_")
-    private val INDEX_SUFFIX = Regex("(_(SPEAKER|OFFSET))?_\\d+$")
+    private val INDEX_SUFFIX = Regex("_\\d+$")
 }

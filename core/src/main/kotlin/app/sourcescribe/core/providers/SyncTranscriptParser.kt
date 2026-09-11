@@ -11,6 +11,7 @@ import app.sourcescribe.core.ProviderTranscript
 import app.sourcescribe.core.Segment
 import app.sourcescribe.core.TimeEvidence
 import app.sourcescribe.core.TranscriptionRequest
+import app.sourcescribe.core.Warnings
 import java.nio.charset.StandardCharsets
 import java.util.Locale
 import kotlin.math.roundToLong

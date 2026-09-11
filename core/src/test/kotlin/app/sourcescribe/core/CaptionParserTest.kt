@@ -92,7 +92,7 @@ class CaptionParserTest {
         val parsed = CaptionParser.parse(raw, "json3")
 
         assertEquals(listOf("kept"), parsed.segments.map { it.text })
-        assertTrue(parsed.warnings.any { it.startsWith("MALFORMED_SEGMENT_0_") })
+        assertTrue(parsed.warnings.any { it.startsWith("MALFORMED_CAPTION_SEGMENT_0_") })
         assertFalse(parsed.technicallyComplete)
     }
 

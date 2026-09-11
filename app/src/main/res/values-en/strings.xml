@@ -382,10 +382,11 @@
     <string name="transcript_empty">This result contains no passages.</string>
     <string name="audio_track_description">Audio description</string>
     <string name="warning_coverage">The result does not cover the whole audio.</string>
+    <string name="warning_section_alignment">The processed sections do not add up to the audio without gaps. Something may be missing or present twice.</string>
     <string name="warning_section_lost_storage">A section is missing from the result because its saved answer was no longer readable or too large.</string>
     <string name="warning_section_lost_provider">A section is missing from the result because the provider did not deliver it complete.</string>
-    <string name="warning_result_shortened">The answer was larger than this app processes. The rest is missing from the result.</string>
-    <string name="warning_missing_text">Some entries in the answer carried no text and are missing from the result.</string>
+    <string name="warning_result_shortened">More data arrived than this app processes. The rest is missing from the result.</string>
+    <string name="warning_missing_text">Some places were unreadable or carried no text and are missing from the result.</string>
     <string name="warning_segment_times">Reliable timestamps are missing for part of the text.</string>
     <string name="warning_word_times">Reliable per-word times are missing for part of the text.</string>
     <string name="warning_speakers">The speaker labelling is incomplete.</string>

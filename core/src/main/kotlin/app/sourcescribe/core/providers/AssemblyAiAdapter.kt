@@ -17,6 +17,7 @@ import app.sourcescribe.core.Segment
 import app.sourcescribe.core.SubmissionResult
 import app.sourcescribe.core.TimeEvidence
 import app.sourcescribe.core.TranscriptionRequest
+import app.sourcescribe.core.Warnings
 import java.util.UUID
 import java.util.Locale
 import kotlinx.serialization.json.Json

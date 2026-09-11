@@ -201,13 +201,15 @@ object CaptionParser {
                     val primitive = segmentObject?.get("utf8") as? JsonPrimitive
                     val text = primitive?.takeIf { it.isString }?.contentOrNull
                     if (segmentObject == null || text == null) {
-                        result.warn("MALFORMED_SEGMENT_${eventIndex}_$segmentIndex")
+                        result.warn("MALFORMED_CAPTION_SEGMENT_${eventIndex}_$segmentIndex")
                     }
                     text
                 }.joinToString(separator = "")
                 null -> ""
                 else -> {
-                    result.warn("MALFORMED_SEGMENTS_$eventIndex")
+                    // Not the provider code of the same name: there a malformed segment list costs the
+                    // timestamps, here it costs this cue its text and the cue is dropped below.
+                    result.warn("MALFORMED_CAPTION_SEGMENTS_$eventIndex")
                     ""
                 }
             }
@@ -428,7 +430,7 @@ object CaptionParser {
 
     private class Accumulator {
         val segments = ArrayList<Segment>()
-        val warnings = ArrayList<String>()
+        private val warnings = Warnings()
         var complete = true
 
         fun add(segment: Segment): Int? {
@@ -447,14 +449,15 @@ object CaptionParser {
 
         fun warn(code: String) {
             complete = false
-            if (warnings.size < MAX_WARNINGS && code !in warnings) warnings += code
+            warnings += code
         }
 
         fun finish(): ParsedCaptions {
+            val recorded = warnings.toList()
             if (segments.isEmpty()) {
-                throw CaptionParseException(if (warnings.isEmpty()) CaptionParseException.NO_SEGMENTS else CaptionParseException.MALFORMED_INPUT)
+                throw CaptionParseException(if (recorded.isEmpty()) CaptionParseException.NO_SEGMENTS else CaptionParseException.MALFORMED_INPUT)
             }
-            return ParsedCaptions(segments.toList(), warnings.toList(), complete)
+            return ParsedCaptions(segments.toList(), recorded, complete)
         }
     }
 
@@ -468,7 +471,6 @@ object CaptionParser {
     )
     private enum class Format { SRT, VTT }
 
-    private const val MAX_WARNINGS = 256
     private const val MAX_TAG_CHARS = 256
     private const val MAX_ENTITY_CHARS = 16
     private val CUE_INDEX = Regex("\\d+")

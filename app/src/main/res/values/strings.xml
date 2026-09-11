@@ -384,10 +384,11 @@
     <string name="transcript_empty">Dieses Ergebnis enthält keine Abschnitte.</string>
     <string name="audio_track_description">Audiodeskription</string>
     <string name="warning_coverage">Nicht die ganze Tonspur steckt im Ergebnis.</string>
+    <string name="warning_section_alignment">Die verarbeiteten Abschnitte ergeben die Tonspur nicht lückenlos. Es kann etwas fehlen oder doppelt vorkommen.</string>
     <string name="warning_section_lost_storage">Ein Abschnitt fehlt im Ergebnis, weil seine gespeicherte Antwort nicht mehr lesbar oder zu groß war.</string>
     <string name="warning_section_lost_provider">Ein Abschnitt fehlt im Ergebnis, weil der Anbieter ihn nicht fertig geliefert hat.</string>
-    <string name="warning_result_shortened">Die Antwort war größer, als diese App verarbeitet. Der Rest fehlt im Ergebnis.</string>
-    <string name="warning_missing_text">Einzelne Stellen der Antwort trugen keinen Text und fehlen im Ergebnis.</string>
+    <string name="warning_result_shortened">Es kamen mehr Daten an, als diese App verarbeitet. Der Rest fehlt im Ergebnis.</string>
+    <string name="warning_missing_text">Einzelne Stellen waren unlesbar oder trugen keinen Text und fehlen im Ergebnis.</string>
     <string name="warning_segment_times">Für einen Teil des Textes fehlen verlässliche Zeitmarken.</string>
     <string name="warning_word_times">Für einen Teil des Textes fehlen verlässliche Zeiten je Wort.</string>
     <string name="warning_speakers">Die Sprecherzuordnung ist unvollständig.</string>
