@@ -38,10 +38,19 @@ class StatedNumbersTest {
      * came from. The date is shown to the reader beside the figure; the page is not shown anywhere at all,
      * which is recorded as an open point rather than quietly tolerated here.
      *
-     * All eight were re-read on 2026-09-11 and all eight matched. One of the three source pages did not:
-     * OpenAI's pointed at its speech-to-text guide, which carries no prices, so a reader following it to
-     * check the figure beside it would have found nothing to check it against. It now names the pricing
-     * page, where $0.0045 and $0.006 a minute are the two figures below.
+     * All eight were re-read on 2026-09-11, and the reading of one of them was wrong. AssemblyAI's add-on
+     * table carries a column per model, and its keyterms row reads "$0.05 /hr" under Universal-3.5 Pro and
+     * "Included" under Universal-2. Round 12 recorded five cents an hour for both and removed the condition
+     * that had been right, which made every Universal-2 estimate with a term list a third too high and
+     * could refuse a job the provider would have billed within budget. Read again on 2026-09-12 from the
+     * page's own markup rather than from a summary of it — a summarising fetch is what turned the word
+     * "Included" into a price — and the condition is back.
+     *
+     * One of the three source pages was wrong in the other direction. OpenAI's pointed at its speech-to-text
+     * guide, which carries no prices; it now names the pricing page. That page shows $0.0045 a minute for
+     * `gpt-transcribe` in its table, but the row for the second figure is labelled "Whisper", sits behind
+     * the table's show-more control, and the string `whisper-1` does not appear on the page at all. The
+     * figure below is right; a reader checking it has to make that last step themselves.
      */
     @Test fun theMoneyFiguresBehindEveryEstimateTheReaderIsShown() {
         // All of these are micro-USD per hour, so 210_000 is twenty-one cents an hour.
@@ -49,9 +58,10 @@ class StatedNumbersTest {
         assertEquals(210_000L, AssemblyAiAdapter.PRICE_U35_MICRO_USD_PER_HOUR)
         assertEquals(150_000L, AssemblyAiAdapter.PRICE_U2_MICRO_USD_PER_HOUR)
         assertEquals(20_000L, AssemblyAiAdapter.SPEAKER_LABELS_MICRO_USD_PER_HOUR)
-        // Five cents an hour on both models, which is why the name no longer says one of them. The page
-        // differs between them only in how many terms each accepts: a thousand and two hundred.
-        assertEquals(50_000L, AssemblyAiAdapter.KEYTERMS_MICRO_USD_PER_HOUR)
+        // Five cents an hour on Universal-3.5 Pro only: the same row of the same table reads "Included"
+        // under Universal-2, where the prompt is part of the fifteen cents an hour above. The name says
+        // which model carries it because round 12 dropped that condition and charged both.
+        assertEquals(50_000L, AssemblyAiAdapter.KEYTERMS_U35_MICRO_USD_PER_HOUR)
         assertEquals("2026-09-07", AssemblyAiAdapter.PRICING_DATE)
         assertEquals("https://www.assemblyai.com/pricing/", AssemblyAiAdapter.PRICING_SOURCE)
 
@@ -254,7 +264,7 @@ class StatedNumbersTest {
             "AssemblyAiAdapter.MIN_DURATION_MS", "AssemblyAiAdapter.PRICE_U35_MICRO_USD_PER_HOUR",
             "AssemblyAiAdapter.PRICE_U2_MICRO_USD_PER_HOUR",
             "AssemblyAiAdapter.SPEAKER_LABELS_MICRO_USD_PER_HOUR",
-            "AssemblyAiAdapter.KEYTERMS_MICRO_USD_PER_HOUR",
+            "AssemblyAiAdapter.KEYTERMS_U35_MICRO_USD_PER_HOUR",
             "CaptionParser.MAX_INPUT_CHARS", "CaptionParser.MAX_SEGMENTS",
             "EngineVerifier.MAX_CHECKSUM_BYTES", "EngineVerifier.MAX_SIGNATURE_BYTES",
             "EngineVerifier.MAX_ARTIFACT_BYTES", "EngineVerifier.MAX_ARCHIVE_ENTRIES",

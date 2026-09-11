@@ -91,6 +91,12 @@ internal object SyncProviderSupport {
         }
         if (request.durationMs > maxDurationMs) invalidInput()
         if (request.chunkStartMs > Long.MAX_VALUE - request.durationMs) invalidInput()
+        // A fourth place in this program that turns a duration into money, and the only one with no
+        // surcharge in it. That is right for the two providers reaching this function today — Groq offers
+        // no diarization at all, and OpenAI's one diarizing model has no published price, so it is refused
+        // a line below rather than estimated — but it would be wrong the day either gains a priced add-on.
+        // This is a pre-check; what binds is `SttStep.submit`, which adds the surcharges and measures the
+        // whole plan against the budget before anything is sent.
         request.config.maxCostMicrousd?.let { budget ->
             if (budget < 0) invalidInput()
             val hourly = capabilities.priceMicrousdPerHour ?: unsupported()

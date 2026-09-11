@@ -63,12 +63,13 @@ class SttStepTest {
             ),
         )
 
-        // The same prompt on the cheaper model costs the same five cents an hour. Until round 12 the
-        // surcharge was tied to `universal-3-5-pro`, so this line read 150 000 and the budget the user set
-        // was measured against a figure the provider would not have honoured.
+        // The same prompt on the cheaper model costs nothing extra: the provider's add-on table reads
+        // "Included" in the Universal-2 column of the keyterms row. Round 12 read that cell as five cents
+        // an hour, wrote 200 000 here, and made every such estimate a third too high — which can refuse a
+        // job the provider would have billed inside the budget the user set.
         val universal2 = assemblyConfig.copy(model = AssemblyAiAdapter.MODEL_U2, diarization = false)
         assertEquals(
-            200_000L,
+            150_000L,
             SttStep.estimateCostMicrousd(
                 assembly.capabilities(AssemblyAiAdapter.MODEL_U2),
                 universal2,
