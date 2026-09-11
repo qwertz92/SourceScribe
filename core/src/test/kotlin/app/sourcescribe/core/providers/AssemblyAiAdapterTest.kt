@@ -583,6 +583,37 @@ class AssemblyAiAdapterTest {
     }
 
     @Test
+    fun anAnswerFullOfBrokenEntriesCannotGrowTheWarningListWithIt() {
+        // The cap itself has its own unit test; this one covers the wiring, because a warning list that is
+        // collected in the adapter and capped somewhere else would look correct in both places on its own.
+        // Two hundred unusable language entries produce two hundred distinct warnings before the cap.
+        val languages = List(200) { "0" }.joinToString(",")
+        val transcript = (adapter.parseSavedResponse(
+            """
+                {
+                  "id":"0072a82b-aa22-4962-add2-6121c36c17c6",
+                  "status":"completed",
+                  "text":"one two",
+                  "language_codes":[$languages]
+                }
+            """.trimIndent().toByteArray(),
+            request(config = baseConfig(wordTimestamps = true, segmentTimestamps = false)),
+        ) as SubmissionResult.Direct).transcript
+
+        assertEquals(Warnings.LIMIT + 1, transcript.warnings.size)
+        assertEquals("REPORTED_LANGUAGES_MALFORMED_0", transcript.warnings.first())
+        assertEquals(Warnings.TRUNCATED, transcript.warnings.last())
+        assertFalse(transcript.warnings.contains("REPORTED_LANGUAGES_MALFORMED_${Warnings.LIMIT}"))
+        // The marker is what keeps a shortened list honest: the missing word timestamps of this answer did
+        // not fit into it any more, and without the marker the list would read as the whole picture.
+        assertFalse(transcript.warnings.contains("WORD_TIMESTAMPS_MISSING"))
+        // Completeness is decided separately from the warning list, so the cap cannot talk a partial
+        // result into looking complete.
+        assertFalse(transcript.technicallyComplete)
+        assertEquals(emptyList<String>(), transcript.reportedLanguages)
+    }
+
+    @Test
     fun aReportedLanguageIsTakenOnlyWhereItLooksLikeALanguageTag() {
         fun parsed(reported: String): Pair<String?, List<String>> {
             val response = """

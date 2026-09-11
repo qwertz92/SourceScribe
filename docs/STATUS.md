@@ -30,14 +30,15 @@ API-37-/x86_64-/16-KB-Emulator nachgewiesen. Keine echte STT-API aufgerufen.
 | P5 | IMPLEMENTED: de/en-App-Sprache, System/Hell/Dunkel, überarbeitete Auswahlfelder/Navigation, Viewer/Suche/Kopieren/Share, Formate/Diagnose/Signierpfad | ADB-/Screenshotprüfungen einschließlich 200-%-Schrift und Querformat bestanden. Vollständige TalkBack-Bedienung BLOCKED; dauerhafte persönliche Release-Signatur und Installation PASS r81. |
 | P6 | Integrierte Regression und unabhängige Reviews ausgeführt; bestätigte Defekte samt Regression behoben | Vollständige Abnahme BLOCKED: Provider, physisches ARM64, TalkBack und öffentliche APK-Lizenz-/Quellbelege fehlen. |
 
-## Nutzerrückmeldung vom 10. September 2026 und drei Reviewdurchgänge
+## Nutzerrückmeldung vom 10. September 2026 und vier Reviewdurchgänge
 
 **Stand:** 11. September 2026. Der Nutzer hat die Preview am Gerät getestet und 20 Punkte gemeldet.
 17 davon sind umgesetzt und am Emulator oder durch Tests belegt; die drei offenen stehen mit Stelle und
 fehlendem Nachweis in [Bekannte Probleme](DEFECTS.md).
 
-Dazu kamen drei vollständige Runden adversarischer Reviews mit je vier Sonnet-5-Agenten, jede Runde über
-die Korrekturen der vorherigen: Runde 1 über `782aef5`, Runde 2 über `5a6bfef`, Runde 3 über `42f723e`.
+Dazu kamen vier vollständige Runden adversarischer Reviews mit je vier Sonnet-5-Agenten, jede Runde über
+die Korrekturen der vorherigen: Runde 1 über `782aef5`, Runde 2 über `5a6bfef`, Runde 3 über `42f723e`,
+Runde 4 über `7da4cdf`.
 Aus Runde 1 stammen unter anderem die Untertitelspur-Regression und die Vereinheitlichung der
 Längengrenze, aus Runde 2 ein Instrumentierungstest, der auf einen umbenannten Statuscode wartete, die
 fehlenden Fehlertexte der lokalen Audiovorbereitung, die falsch zugeordnete Meldung bei beschädigtem
@@ -53,6 +54,23 @@ verwirft, die Schrittangabe der Audiovorbereitung trug noch das Verb des Herunte
 Textbausteine wichen vom Wortschatz des übrigen Programms ab. Zwei Funde derselben Runde sind nicht
 geschlossen, sondern als Punkt 9 und 10 in [Bekannte Probleme](DEFECTS.md) aufgenommen.
 
+**Runde 4 hat die Begründung wiederholt**, diesmal an zwei Stellen zugleich. Erstens schloss die
+Korrektur aus Runde 3 an der Herkunftszeile nur die halbe Lücke: Ein Feld, das statt einer Zahl ein Wort
+trug, wurde nicht mehr genannt, ein Feld mit einer Zahl außerhalb ihres Wertebereichs dagegen weiter —
+während Kommentar und Commit-Nachricht behaupteten, jedes Feld werde mit seinem tatsächlichen Leser
+geprüft. Der Beleg lag in einer Testfixtur, die seit längerem `"filesize":0` enthält und die
+Herkunftszeile nie geprüft hat. Zwei der vier Reviewer fanden das unabhängig voneinander. Zweitens war
+die Zeile „Keine Treffer“ in der Ergebnisansicht nicht mitgezogen worden: Sie las noch die laufende
+Eingabe, während die Liste unter ihr bereits dem mitgetragenen Ergebnis folgte, sodass beim Löschen
+einer ergebnislosen Suche für einen Moment weder Hinweis noch Liste dastand. Beide Male dieselbe
+Fehlerklasse, die dieselbe Korrektur gerade beseitigt hatte, an der jeweils benachbarten Stelle.
+
+Die Herkunftszeile wird deshalb nicht mehr aus einer zweiten Prüfmenge neben den Werten gebildet,
+sondern aus den Werten selbst: Es gibt pro Feld nur noch eine Stelle, die auseinanderlaufen könnte.
+Ein dritter Fund der Runde war eine richtige Beobachtung mit falscher Einordnung und ist als bewusste
+Entscheidung in [Bekannte Probleme](DEFECTS.md) festgehalten, damit sie nicht erneut gemeldet wird.
+Zwei weitere Funde stehen dort als Punkt 11 und 12.
+
 Zusätzlich umgesetzt, weil am Gerät sichtbar geworden: Die Audiospurliste ist nach Lesereihenfolge sortiert
 (Empfehlung, Originalsprache, weitere Sprachen, Audiodeskription zuletzt), die Ergebnisansicht zeigt bei
 aktiver Suche die Trefferzahl statt der Gesamtzahl, und die Auswahlfelder reservieren die erklärende Zeile
@@ -65,15 +83,21 @@ Untertitelauftrag mit 286 Abschnitten, Zustandschip mit Ergebnis darunter, Teile
 Scrollen am rechten Rand bis zum letzten Abschnitt bei 18:25, Volltextsuche bei offener Tastatur und
 Zurücknavigation ohne Appende.
 
-Gates nach Runde 3: 129 JVM-Tests im Modul `core` ohne Fehler (124 vorher, fünf neu für die Funde dieser
-Runde), alle vier Lintberichte (`:app` und `:extractor`, debug und release) ohne Befund. Die
+Gates nach Runde 4: 133 JVM-Tests im Modul `core` ohne Fehler (124 vor Runde 3, dann fünf und vier neue
+für die Funde der beiden Runden), alle vier Lintberichte (`:app` und `:extractor`, debug und release)
+ohne Befund; Lint ist auf `abortOnError` und `warningsAsErrors` gestellt, ein Befund hätte den Build
+abgebrochen. Die
 Instrumentierungstests sind aus WSL heraus nicht über Gradle startbar; der Grund und der gangbare Weg
-über `am instrument` stehen in [Bekannte Probleme](DEFECTS.md). Über diesen Weg am 11. September 2026
-auf `emulator-5556` gelaufen: 188 Instrumentierungstests, 182 bestanden, 6 per Annahme übersprungen
-(die ausdrücklich opt-in gestellten Inszenierungstests, nach `AGENTS.md` als `NOT_RUN` zu führen),
-0 Fehlschläge. Damit ist auch der einzige Fehlschlag des vorherigen Stands geschlossen: Er lag nicht am
-Code, sondern an einem Test, der noch den Vertrag vor `782aef5` verlangte. Der Wiederaufnahmeplan für
-die vierte Runde steht in [Restarbeiten](NEXT_STEPS.md).
+über `am instrument` stehen in [Bekannte Probleme](DEFECTS.md). Über diesen Weg zuletzt am
+11. September 2026 nach Runde 4 auf `emulator-5556` gelaufen: 188 Instrumentierungstests, 182
+bestanden, 6 per Annahme übersprungen (die ausdrücklich opt-in gestellten Inszenierungstests, nach
+`AGENTS.md` als `NOT_RUN` zu führen), 0 Fehlschläge. Damit ist auch der einzige Fehlschlag des Stands
+vor Runde 3 geschlossen: Er lag nicht am Code, sondern an einem Test, der noch den Vertrag vor
+`782aef5` verlangte. Der Plan für die Fortsetzung steht in [Restarbeiten](NEXT_STEPS.md).
+
+**Die Schleife ist nicht konvergiert.** Vier Runden, keine davon leer. Solange eine Runde noch etwas
+findet, ist die nächste fällig — gerade weil die Funde der Runden 3 und 4 jeweils in den Korrekturen
+der Vorrunde lagen.
 
 ## UI-Feedback umgesetzt
 

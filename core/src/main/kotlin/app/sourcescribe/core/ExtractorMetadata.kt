@@ -65,28 +65,49 @@ object ExtractorMetadata {
             fun value(key: String) = (item[key] as? JsonPrimitive)?.contentOrNull
             fun signedNumber(key: String) = (item[key] as? JsonPrimitive)?.doubleOrNull?.takeIf { it.isFinite() }
             fun number(key: String) = signedNumber(key)?.takeIf { it >= 0 }
-            // The provenance line must name only the fields this entry really carried a value in, so each
-            // field is tested with the reader that consumes it below. A key written as JSON null, as an
-            // empty string, or as a word where a number belongs yields nothing and is not carried either.
-            fun carried(key: String) = when (key) {
-                "language_preference" -> signedNumber(key) != null
-                "abr", "tbr", "filesize", "filesize_approx", "asr", "audio_channels" -> number(key) != null
-                else -> value(key) != null
-            }
             val id = value("format_id") ?: return@mapNotNull null
             val acodec = value("acodec")
-            if (!Regex("[A-Za-z0-9_.-]{1,80}").matches(id) || value("vcodec") != "none" || acodec in setOf(null, "none")) return@mapNotNull null
+            val vcodec = value("vcodec")
+            if (!Regex("[A-Za-z0-9_.-]{1,80}").matches(id) || vcodec != "none" || acodec in setOf(null, "none")) return@mapNotNull null
+            val language = value("language")
             val note = value("format_note")?.take(500)
+            val container = value("ext")?.take(20)
             val exact = number("filesize")?.takeIf { it > 0 && it <= MAX_TRACK_BYTES }?.toLong()
             val approximate = number("filesize_approx")?.takeIf { it > 0 && it <= MAX_TRACK_BYTES }?.toLong()
+            val sampleRate = number("asr")?.takeIf { it in 1.0..768_000.0 }?.toInt()
+            val channelCount = number("audio_channels")?.takeIf { it in 1.0..64.0 }?.toInt()
+            // `abr` wins over `tbr` as soon as it holds a number at all, even where that number is then
+            // rejected as implausible. That selection is left exactly as it was: which field supplies a
+            // bitrate is a data change and does not belong inside a fix to the provenance line.
+            val rateKey = if (number("abr") != null) "abr" else if (number("tbr") != null) "tbr" else null
+            val rate = (number("abr") ?: number("tbr"))?.takeIf { it in 1.0..10_000.0 }?.toInt()
             // A DRC rendition is only ever marked by the extractor id suffix or its note; never inferred from bitrate.
             val compressed = id.endsWith("-drc", ignoreCase = true) || note?.contains("drc", ignoreCase = true) == true
             // yt-dlp encodes the track role numerically: 10 original, 5 default, -10 audio description.
             val preference = signedNumber("language_preference")?.toInt()
+            // Provenance is built from the values themselves instead of from a second set of checks beside
+            // them: a field is named exactly when what it carried survived into this record. A key written as
+            // JSON null, as an empty string, as a word where a number belongs, as a size of zero, or as a rate
+            // outside the plausible range backed nothing. Where two keys can supply one fact, the one that did
+            // not supply it stays unnamed.
+            val backing = linkedMapOf(
+                "language" to language,
+                "language_preference" to preference,
+                "format_note" to note,
+                "acodec" to acodec,
+                "vcodec" to vcodec,
+                "ext" to container,
+                "abr" to rate?.takeIf { rateKey == "abr" },
+                "tbr" to rate?.takeIf { rateKey == "tbr" },
+                "filesize" to exact,
+                "filesize_approx" to approximate?.takeIf { exact == null },
+                "asr" to sampleRate,
+                "audio_channels" to channelCount,
+            )
             AudioTrack(
                 id = id,
                 sourceVideoId = requireNotNull(source.videoId),
-                language = value("language"),
+                language = language,
                 name = note,
                 isOriginal = when {
                     preference == ORIGINAL_LANGUAGE_PREFERENCE -> true
@@ -94,20 +115,17 @@ object ExtractorMetadata {
                     note?.contains("(original)", ignoreCase = true) == true -> true
                     else -> null
                 },
-                evidence = "yt-dlp:formats." + listOf(
-                    "language", "language_preference", "format_note", "acodec", "vcodec", "ext",
-                    "abr", "tbr", "filesize", "filesize_approx", "asr", "audio_channels",
-                ).filter(::carried).joinToString(","),
+                evidence = "yt-dlp:formats." + backing.filterValues { it != null }.keys.joinToString(","),
                 codec = acodec?.take(80),
-                container = value("ext")?.take(20),
-                bitrateKbps = (number("abr") ?: number("tbr"))?.takeIf { it in 1.0..10_000.0 }?.toInt(),
+                container = container,
+                bitrateKbps = rate,
                 bytes = exact ?: approximate,
                 bytesEstimated = exact == null && approximate != null,
-                sampleRateHz = number("asr")?.takeIf { it in 1.0..768_000.0 }?.toInt(),
-                channels = number("audio_channels")?.takeIf { it in 1.0..64.0 }?.toInt(),
+                sampleRateHz = sampleRate,
+                channels = channelCount,
                 dynamicRangeCompressed = compressed,
                 audioDescription = preference == AUDIO_DESCRIPTION_PREFERENCE ||
-                    value("language")?.endsWith("-desc", ignoreCase = true) == true,
+                    language?.endsWith("-desc", ignoreCase = true) == true,
             )
         }.distinctBy { it.id }
         return ResolvedSource(source, tracks, audio, urls)

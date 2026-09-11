@@ -204,7 +204,13 @@ class ViewModelStateTest {
     @Test
     fun prepareAgainCarriesTheSettingsButNeverTheUploadApproval() = withFixture {
         awaitInitialization()
-        val requested = approvedConfig()
+        // A real registered key, not a random id: the approval at Start is granted by matching the
+        // configuration against the stored keys, so a fixture without one would test the wrong refusal.
+        onMain { viewModel.saveCredential(Provider.GROQ, Region.US, UUID.randomUUID().toString()) }
+        val stored = withTimeout(TIMEOUT_MS) {
+            viewModel.screen.first { !it.busy && it.credentials.size == 1 }
+        }.credentials.single()
+        val requested = approvedConfig().copy(credentialId = stored.id)
         val jobId = seedRetainedLocalJob(requested)
 
         onMain { viewModel.prepareAgain(jobId, requested) }
@@ -224,11 +230,24 @@ class ViewModelStateTest {
         // A track id from the previous run is not reused; the tracks are resolved again for this preview.
         assertNull(selected.captionTrackId)
         assertNull(selected.audioTrackId)
-        // What is never carried is the approval to upload. Without a fresh, deliberate Start the
-        // configuration is refused, so re-preparing alone can never cost anything.
+        // The approval itself is not carried, so the draft as it comes back is refused.
         assertFalse(selected.uploadApproved)
         assertEquals("UPLOAD_APPROVAL_REQUIRED", MainViewModel.configError(selected))
         assertEquals(selected, completed.draft)
+
+        // What Start then does with it decides whether anything can cost money, so it is pinned here
+        // rather than left to be inferred. The approval is recomputed from mode, model and a matching
+        // stored key, and the previous value is never read: a re-prepared job is therefore startable by
+        // the ordinary Start action, which is exactly the point of re-preparing. That action is a
+        // deliberate tap; re-preparing on its own reaches no provider.
+        val atStart = MainViewModel.configurationForStart(selected, completed.credentials)
+        assertTrue(atStart.uploadApproved)
+        assertNull(MainViewModel.previewError(completed.previews.single().copy(config = atStart), completed.credentials))
+        // And the key is what carries it: without a stored key that matches, Start grants nothing and the
+        // configuration stays refused however often it is re-prepared.
+        val withoutKey = MainViewModel.configurationForStart(selected, emptyList())
+        assertFalse(withoutKey.uploadApproved)
+        assertEquals("UPLOAD_APPROVAL_REQUIRED", MainViewModel.configError(withoutKey))
 
         val preservedPreviews = completed.previews
         onMain { viewModel.prepareAgain(UUID.randomUUID().toString(), requested) }

@@ -284,7 +284,7 @@
     <string name="help_provenance_body">Zu jedem Ergebnis speichert die App, woher es stammt: Quelle und Video-Kennung, ob es aus YouTube-Untertiteln oder aus einer externen Transkription kommt, welches Modell angefordert wurde und welches der Anbieter tatsächlich gemeldet hat, welche Audiospur verwendet wurde und ob übersetzt wurde.\n\nDas steht auch im Export. Sinn ist, dass du Monate später noch beurteilen kannst, wie belastbar ein Transkript ist, statt es für wörtlich zu halten.</string>
 
     <string name="help_retention_title">Audioaufbewahrung und Originaldaten</string>
-    <string name="help_retention_body">„Nur technisch notwendig“ löscht heruntergeladenes Audio, sobald der Schritt fertig ist. Sparsamste Einstellung.\n„Bis zur Transkript-Sicherung“ behält es, bis das Ergebnis dauerhaft gespeichert ist. Voreinstellung, damit ein Zwischenfehler keinen neuen Download erzwingt.\n„Dauerhaft behalten“ lässt das Audio im App-Speicher liegen, bis du den Verlaufseintrag löschst. Das kann viel Platz brauchen.\n\n„Originaldaten zusätzlich aufbewahren“ speichert die unveränderte Antwort des Anbieters. Nur damit ist das Exportformat Originalantwort möglich.</string>
+    <string name="help_retention_body">„Nur technisch notwendig“ löscht heruntergeladenes Audio, sobald der Schritt fertig ist. Sparsamste Einstellung.\n„Bis zur Transkript-Sicherung“ behält es, bis das Ergebnis dauerhaft gespeichert ist. Voreinstellung, damit ein Zwischenfehler keinen neuen Download erzwingt.\n„Dauerhaft behalten“ lässt das Audio im App-Speicher liegen, bis du den Verlaufseintrag löschst. Das kann viel Platz brauchen.\n\n„Originaldaten zusätzlich aufbewahren“ speichert die unveränderte Antwort des Anbieters. Nur damit ist das Exportformat „Originalantwort (Rohdaten)“ möglich.</string>
 
     <string name="help_storage_title">Speicherlimit und gleichzeitige Aufträge</string>
     <string name="help_storage_body">Das Speicherlimit ist die Obergrenze, die sich SourceScribe im internen App-Speicher selbst setzt: Audio, Zwischendateien und Ergebnisse zusammen. Wird sie erreicht, hält die App den nächsten Schritt kontrolliert an, statt das Gerät vollzuschreiben. Bereits gesicherte Ergebnisse bleiben erhalten.\n\nGleichzeitige Aufträge legt fest, wie viele Quellen parallel verarbeitet werden. Mehr ist nicht immer schneller: Herunterladen und Umrechnen belasten Akku und CPU, und Anbieter haben eigene Ratengrenzen.</string>
@@ -301,7 +301,7 @@
     <!-- Audiospur, verständlich beschrieben -->
     <string name="audio_track_recommended">Empfohlen</string>
     <string name="audio_track_drc">Dynamikkompression</string>
-    <string name="audio_track_none_chosen">Noch keine Tonspur gewählt – die Auswahl bestimmt Sprache und Größe.</string>
+    <string name="audio_track_none_chosen">Noch keine Audiospur gewählt – die Auswahl bestimmt Sprache und Größe.</string>
     <string name="audio_track_original">Originalton</string>
     <string name="audio_track_size_approx">ca. %1$s</string>
     <string name="audio_track_size_unknown">Größe unbekannt</string>

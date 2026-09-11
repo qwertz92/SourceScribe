@@ -99,6 +99,13 @@ class ExtractorMetadataTest {
         assertFalse(narration.evidence.contains("filesize"))
         assertTrue(opus.evidence.contains("audio_channels"))
         assertFalse(opus.evidence.contains("tbr"))
+        // The dubbed entry reports a size of zero. That is a number, but not a size, so `bytes` stays
+        // null above and the provenance line must not name `filesize` as something that backed it.
+        assertEquals("yt-dlp:formats.language,language_preference,acodec,vcodec,ext,abr", dubbed.evidence)
+        // Only the key that actually supplied the bitrate is named: this entry has `tbr`, not `abr`.
+        assertTrue(compressed.evidence.contains("tbr"))
+        assertFalse(compressed.evidence.contains("abr"))
+        assertTrue(compressed.evidence.contains("filesize_approx"))
 
         assertEquals("251", TrackSelection.audio(ExtractorMetadata.parse(raw, source), null)?.id)
     }
@@ -128,6 +135,23 @@ class ExtractorMetadataTest {
         assertEquals("yt-dlp:formats.language_preference,acodec,vcodec,ext,tbr", track.evidence)
         // A negative role number is a value language_preference really carries, so it stays named.
         assertTrue(track.audioDescription)
+    }
+
+    @Test fun provenanceDoesNotNameANumberFieldWhoseValueWasRejectedAsImplausible() {
+        // The second half of the same overclaim: a key can hold a perfectly good number that the field it
+        // feeds then refuses, because zero channels, a rate of 40 Mbit/s or a size of zero are not facts
+        // about audio. Such a key backed nothing either and must not appear in the provenance line.
+        val raw = """{"id":"BaW_jenozKc","formats":[{"format_id":"140","vcodec":"none","acodec":"mp4a.40.2",
+            "ext":"m4a","audio_channels":0,"asr":0,"filesize":0,"filesize_approx":0,"abr":40000,"tbr":128}]}"""
+        val track = ExtractorMetadata.parse(raw, source).audio.single()
+        assertNull(track.channels)
+        assertNull(track.sampleRateHz)
+        assertNull(track.bytes)
+        // `abr` holds a number, so it still wins the selection over `tbr` and the rejected value leaves no
+        // bitrate at all. That selection is deliberately unchanged; the provenance line must not pretend
+        // either key contributed.
+        assertNull(track.bitrateKbps)
+        assertEquals("yt-dlp:formats.acodec,vcodec,ext", track.evidence)
     }
 
     @Test fun absentLanguagePreferenceFallsBackOnlyToTheParenthesisedNote() {

@@ -27,6 +27,17 @@ class WarningsTest {
         assertFalse(recorded.contains("MALFORMED_SEGMENT_${Warnings.LIMIT}"))
     }
 
+    @Test fun theListKeepsTheOrderTheProblemsWereFoundIn() {
+        // The order is the order of discovery, not the alphabet: a reader looks for the first thing that
+        // went wrong. Without a case whose insertion order differs from its sorted order, a later switch
+        // to a sorted collection would pass unnoticed.
+        val warnings = Warnings()
+        warnings += "ZEBRA_MISSING"
+        warnings += "APPLE_MALFORMED"
+        warnings += "MIDDLE_UNCERTAIN"
+        assertEquals(listOf("ZEBRA_MISSING", "APPLE_MALFORMED", "MIDDLE_UNCERTAIN"), warnings.toList())
+    }
+
     @Test fun aListThatFitsCarriesNoTruncationMarker() {
         val warnings = Warnings()
         repeat(Warnings.LIMIT) { warnings += "MALFORMED_SEGMENT_$it" }

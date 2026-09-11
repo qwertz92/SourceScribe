@@ -385,7 +385,7 @@
     <string name="step_submit">While sending to the provider</string>
     <string name="step_collect">While collecting the result</string>
     <string name="step_import">While importing the file</string>
-    <string name="step_prepare_audio">While preparing the audio</string>
+    <string name="step_prepare_audio">While preparing the audio track</string>
     <string name="step_engine">While updating the extraction component</string>
     <string name="reason_network">No connection was made. Check the network and try again.</string>
     <string name="reason_rate_limit">Too many requests in a short time. The app waits and tries again later.</string>

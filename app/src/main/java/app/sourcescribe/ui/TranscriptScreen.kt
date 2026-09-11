@@ -190,7 +190,10 @@ internal fun TranscriptScreen(
                     }
                 }
                 if (document.segments.isEmpty()) item { Text(stringResource(R.string.transcript_empty)) }
-                else if (query.isNotBlank() && segments.isEmpty()) item { Text(stringResource(R.string.no_matches)) }
+                // Read from the same state the list below is built from, not from the live search text:
+                // those two disagree for as long as the filter is still running, and asking the live text
+                // here would drop this line while the list is still empty, collapsing the area to nothing.
+                else if (filtered.query.isNotBlank() && segments.isEmpty()) item { Text(stringResource(R.string.no_matches)) }
                 items(segments.size) { index ->
                     val segment = segments[index]
                     Column {

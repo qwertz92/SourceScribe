@@ -102,6 +102,21 @@ class AudioTracksTest {
         ).last().track.id)
     }
 
+    @Test fun aLanguageThatLooksLikeTheOldSortingPlaceholderStaysAheadOfAMissingOne() {
+        // The reading order used to stand a missing language in for the highest character there is. That
+        // only works as long as no track ever carries it, and `language` is passed through from the
+        // extractor unchecked. This is the one input that told the two versions apart: with the old
+        // placeholder the real language and the missing one compared equal and the tie fell to the id,
+        // which put the track without a language first.
+        val tracks = listOf(
+            track("140-none", null, bitrateKbps = 128),
+            track("141-max", "\uffff", bitrateKbps = 128),
+        )
+        val order = AudioTracks.describe(tracks, 600_000).map { it.track.id }
+        assertEquals(listOf("141-max", "140-none"), order)
+        assertEquals(order, AudioTracks.describe(tracks.reversed(), 600_000).map { it.track.id })
+    }
+
     @Test fun sizeClassesOnlySeparateWhatIsActuallyDifferent() {
         val described = AudioTracks.describe(listOf(
             track("249", bitrateKbps = 64), track("250", bitrateKbps = 96), track("251", bitrateKbps = 160),

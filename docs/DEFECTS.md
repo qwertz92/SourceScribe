@@ -1,6 +1,6 @@
 # Bekannte Probleme und offene Punkte
 
-**Stand:** 11. September 2026, nach drei Runden adversarischer Reviews. Diese Datei ist für den
+**Stand:** 11. September 2026, nach vier Runden adversarischer Reviews. Diese Datei ist für den
 nächsten Agenten gedacht und listet ausschließlich, was **nicht** vollständig erledigt ist. Was hier nicht steht, ist entweder erledigt oder in
 [STATUS.md](STATUS.md) beschrieben.
 
@@ -53,7 +53,7 @@ belegt. Diese drei sind offen oder nur teilweise geschlossen:
 - **Stand:** Die Familien, die ein Nutzer im Alltag trifft, haben eigene Texte: ungültige Links,
   Anbieterfehler, Extraktionsfehler, Engine-Updates, Audioimport, und seit dem zweiten Reviewdurchgang
   neun der zehn Codes der lokalen Audiovorbereitung (`AudioPreparationCode`). Der zehnte,
-  `AUDIO_STORAGE_FAILED`, teilt weiter den Sammeltext `reason_storage` mit sieben anderen Präfixen;
+  `AUDIO_STORAGE_FAILED`, teilt weiter den Sammeltext `reason_storage` mit sechs anderen Präfixen;
   das ist tragbar, weil ein Speicherfehler in jedem dieser Fälle die Ursache benennt. Der
   `else`-Zweig zeigt
   weiterhin „Vorgang konnte nicht abgeschlossen werden“ plus den technischen Status.
@@ -126,10 +126,24 @@ belegt. Diese drei sind offen oder nur teilweise geschlossen:
 - **Tatsächlich:** Die rohen Codes stehen im Text der Ansicht, etwa
   `WORD_TIMESTAMPS_MALFORMED_17 · DIARIZATION_SPEAKER_MISSING_3 · WARNINGS_TRUNCATED`. Genau solche
   unerklärten Kürzel hat der Nutzer am 10. September 2026 an anderer Stelle gemeldet.
-- **Was fehlt:** Eine Zuordnung Warncode zu Satz, analog zu `messageText`, mit einer Behandlung für
-  den Indexanhang (`_17`) und für `WARNINGS_TRUNCATED`. Der Umfang sind rund 25 Codes in
-  `AssemblyAiAdapter` und `SyncTranscriptParser`. Vorsicht: Dieselben Codes stehen auch in der
-  Diagnose, dort müssen sie technisch bleiben.
+- **Umfang, am 11. September 2026 vollständig ausgezählt:** über 50 Codefamilien aus **vier**
+  Quellen, nicht zwei — `providers/SyncTranscriptParser.kt` (OpenAI und Groq),
+  `providers/AssemblyAiAdapter.kt`, `CaptionParser.kt` und die Zusammenführung der Chunks in
+  `data/SttStep.kt`. Letztere stellt jeder Anbieterwarnung `CHUNK_<index>_` voran, weshalb ein
+  Auftrag mit bis zu 60 Chunks bis zu 3900 Einträge tragen kann. Die Anzeige muss deshalb
+  zusammenfassen, nicht aufzählen.
+- **Was fehlt:** Eine Zuordnung Codefamilie zu Satz, analog zu `messageText`: führendes
+  `CHUNK_<n>_` und die Indexanhänge (`_17`, `_SPEAKER_3`, `_OFFSET_5`) abschneiden, gleiche
+  Aussagen zu einem Satz zusammenfassen, unbekannte Codes weiterhin technisch anzeigen statt sie zu
+  verschlucken. Vorsicht: `document.warnings` darf sich dabei nicht ändern — drei Stellen leiten
+  daraus `Outcome.SUCCESS_WITH_WARNINGS` ab. Die Diagnose enthält diese Codes nicht, dort ist
+  nichts anzupassen.
+- **Beim Formulieren aufgepasst:** Die Familie um `RESPONSE_STORAGE`,
+  `RAW_RESPONSE_TOO_LARGE` und `CANONICAL_TRANSCRIPT_AGGREGATE_TOO_LARGE` klingt nach einem reinen
+  Aufbewahrungsproblem, ist aber keines: jede dieser Stellen in `SttStep.kt` setzt zugleich
+  `missing += chunk.index`, der Abschnitt fällt also komplett aus dem Transkript. Ein beruhigender
+  Satz wäre hier ein Verstoß gegen „ein Teilergebnis darf nicht als vollständiger Erfolg
+  erscheinen“.
 
 ### 10. Ein Fehlertext deckt zwei verschiedene Ursachen ab (niedrig, unbestätigt)
 
@@ -144,7 +158,67 @@ belegt. Diese drei sind offen oder nur teilweise geschlossen:
 - **Was fehlt:** Entweder ein eigener Text in der Familie der internen Integritätscodes (Punkt 4) oder
   der Nachweis, dass der Code nie beim Nutzer ankommt.
 
+### 11. Eine Änderung an der Warnungserzeugung sperrt die Wiederverwendung bezahlter Abschnitte (niedrig)
+
+- **Stelle:** `app/src/main/java/app/sourcescribe/data/SttStep.kt`, `prepareMissingRetry()`,
+  Zeile 236 (`artifact.warningCount != partial.warnings.size`) und Zeile 336-338
+- **Voraussetzung:** Ein Auftrag steht auf `PARTIAL_SUCCESS`. Für einen bereits bezahlten Abschnitt
+  hatte die Antwort mehr als 64 verschiedene Warnungen. Danach wird die App auf einen Stand mit der
+  Warndeckelung aktualisiert.
+- **Ablauf:** „Nur fehlende Abschnitte erneut versuchen“ parst die gespeicherten Rohdaten neu und
+  vergleicht das Ergebnis mit dem, was beim ersten Lauf gespeichert wurde. Die neue Fassung liefert
+  65 Einträge statt der alten Zahl, der Vergleich schlägt fehl, und der Weg wird mit
+  `MISSING_RETRY_DATA` dauerhaft verweigert.
+- **Was daran schon in Ordnung ist:** Der Ausfall ist sicher, nicht heimlich. `JobCoordinator.retry`
+  fängt den Fehler vor der Transaktion ab, es entstehen keine Kosten und keine stille Wiederholung,
+  und der Teilstand bleibt erhalten. `SttMissingRetryTest.retainedProviderWarningsMustMatchPartialArtifact`
+  deckt genau diesen Mechanismus mit `assertEquals(0, requestAttempts.get())` ab.
+- **Heute nicht erreichbar:** In diesem Projekt hat noch kein echter Anbieterlauf stattgefunden (siehe
+  Punkt 8), es gibt also keinen gespeicherten Teilstand mit Anbieterwarnungen. Erreichbar wird es,
+  sobald echte Läufe existieren und danach die Warnungserzeugung erneut verändert wird.
+- **Was fehlt:** `TranscriptDocument.normalizationVersion` (`core/.../Domain.kt:163`) steht fest auf
+  `"1"`, wird nirgends erhöht und nirgends geprüft — nur im Export angezeigt. Es ist offenbar genau
+  für diesen Fall gedacht. Zum Schließen: einen kurzen Architekturentscheid schreiben, was ein
+  Versionsunterschied bedeuten soll (Vergleich überspringen? Teilstand neu normalisieren?), dann
+  umsetzen. Das berührt die Job-Semantik und darf nicht nebenbei in einem anderen Fix passieren.
+
+### 12. `abr` verdrängt `tbr`, auch wenn sein Wert dann verworfen wird (niedrig)
+
+- **Stelle:** `core/src/main/kotlin/app/sourcescribe/core/ExtractorMetadata.kt`, `rate`
+- **Voraussetzung:** Ein Format trägt in `abr` eine Zahl außerhalb von 1..10000 und in `tbr` eine
+  brauchbare.
+- **Erwartet gegen tatsächlich:** Erwartet wäre, dass die brauchbare Angabe gewinnt. Tatsächlich
+  gewinnt `abr` bereits dadurch, dass überhaupt eine Zahl darin steht; scheitert sie dann an der
+  Bereichsprüfung, bleibt `bitrateKbps` leer, obwohl `tbr` gereicht hätte. Folge: keine
+  Größenschätzung für diese Spur.
+- **Warum es so steht:** Aufgefallen beim Schließen der Herkunftsangabe in Runde 4. Welche Angabe
+  eine Bitrate liefert, ist eine Datenänderung; sie gehört nicht in einen Fix für die
+  Herkunftszeile und ist deshalb hier festgehalten statt nebenbei geändert.
+- **Was fehlt:** Entscheidung, ob die Auswahl auf „erste brauchbare Angabe“ umgestellt wird, plus
+  Test. Der neue Test `provenanceDoesNotNameANumberFieldWhoseValueWasRejectedAsImplausible` hält das
+  heutige Verhalten fest und würde bei einer Umstellung bewusst angepasst.
+
 ## Bewusste Entscheidungen, die wie Fehler aussehen
+
+### Ein gewöhnlicher Start-Tap nach „Neu vorbereiten“ genügt für die Freigabe
+
+Ein Review der vierten Runde hat gemeldet, dass ein wieder vorbereiteter Auftrag mit einem einzigen
+Antippen von „Start“ kostenpflichtig losläuft, weil `configurationForStart` die Freigabe aus Modus,
+Modell und passendem gespeichertem Schlüssel neu berechnet und den bisherigen Wert nie liest. Der
+Mechanismus stimmt, die Einordnung als Defekt nicht.
+
+So ist es gewollt, und zwar app-weit, nicht nur beim erneuten Vorbereiten: Das Antippen von „Start“
+**ist** die bewusste Freigabe, gebunden an genau diese Konfiguration. `ViewRulesTest.
+deliberateStartBindsApprovalToModeCredentialProviderAndRegionWithoutChangingTheDraft` hält das seit
+längerem fest. Genau darauf beruht die Behebung des blockierenden Nutzerfehlers vom 10. September:
+Ein Auftrag, der an seiner eigenen Längengrenze hängen geblieben ist, soll mit einem geänderten Wert
+wieder startbar sein, ohne Anbieter und Schlüssel erneut auszuwählen. Die Invariante verlangt keine
+zusätzliche Hürde, sondern dass nichts **still** wiederholt wird — ein Tap ist nicht still.
+
+Was an der Meldung berechtigt war: Der Test prüfte nur den Entwurf vor diesem Tor, und sein Kommentar
+ließ sich so lesen, als brauchte es mehr als das gewöhnliche Antippen. Beides ist korrigiert; der Test
+prüft jetzt mit einem wirklich registrierten Schlüssel, was am Tor passiert, und zusätzlich, dass ohne
+passenden Schlüssel gar nichts freigegeben wird.
 
 ### Nicht erreichbare `PROVIDER_`- und `RESPONSE_`-Zweige in `messageText`
 

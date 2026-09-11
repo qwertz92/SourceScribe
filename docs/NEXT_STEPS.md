@@ -1,6 +1,6 @@
 # Restarbeiten
 
-## Wiederaufnahme: hier morgen anfangen
+## Wiederaufnahme: hier weitermachen
 
 Geschrieben am 11. September 2026 am Ende der dritten Reviewrunde, auf Bitte des Nutzers, damit die
 Arbeit ohne Wiedereinlesen der ganzen Sitzung weitergehen kann. Reihenfolge ist Absicht.
@@ -18,11 +18,12 @@ die Reviewer ist `42f723e..HEAD`. Vier Sonnet-5-Agenten, dieselbe Aufteilung wie
 App-Logik, UI, Ressourcen und Doku. Die Auftragstexte der dritten Runde lassen sich
 übernehmen; nur die Jagdliste wechselt auf die neuen Stellen:
 
-- `core/.../providers/Warnings.kt` ist neu und wird von beiden Antwortparsern benutzt. Kann durch die
-  Deckelung eine Warnung verschwinden, die eine Abnahmeprüfung braucht? Schon geprüft und nicht
-  nötig: eine Allowlist-Ergänzung für `WARNINGS_TRUNCATED` (Transkriptwarnungen gehen gar nicht in
-  den Diagnosebericht, `Diagnostics.kt` kennt sie nicht) und ein Contract-Test mit mehr als 64
-  verschiedenen Warnungen (kein bestehender kommt dem nahe, alle 129 core-Tests sind grün).
+- `core/.../providers/Warnings.kt`: in Runde 4 geprüft. Eine Allowlist-Ergänzung für
+  `WARNINGS_TRUNCATED` ist nicht nötig, weil Transkriptwarnungen gar nicht in den Diagnosebericht
+  gehen. Der Contract-Test am echten Adapter fehlte und ist nachgetragen
+  (`AssemblyAiAdapterTest.anAnswerFullOfBrokenEntriesCannotGrowTheWarningListWithIt`). Offen bleibt
+  Punkt 11 in [DEFECTS.md](DEFECTS.md): die Deckelung kann die Wiederverwendung bezahlter Abschnitte
+  nach einem App-Update sperren.
 - `ExtractorMetadata.carried` prüft Zahlenfelder jetzt mit dem Zahlenleser. Gibt es ein Feld, das
   dadurch aus `evidence` verschwindet, obwohl es weiterhin ausgewertet wird?
 - `TranscriptScreen`: Reserviert die gemessene Höhe wirklich beide Fassungen, auch bei 200 %
