@@ -314,6 +314,21 @@ class TranscriptExporterTest {
     }
 
     @Test
+    fun aPartMadeOnlyOfCharactersANameCannotCarryFallsBackInsteadOfBecomingAnUnderscore() {
+        // Those characters are each replaced by an underscore and the runs are then folded into one, so the
+        // result is never empty and the emptiness test did not catch it. A retained provider file whose
+        // extension was `???` therefore ended in `_` and named no format at all.
+        val raw = TranscriptExporter.fileName(document(), ExportFormat.RAW, rawExtension = "???")
+        assertTrue(raw, raw.endsWith(".raw"))
+
+        // A name the reader chose that says nothing usable gives way to the generated one rather than
+        // becoming a file called `_`.
+        val chosen = TranscriptExporter.fileName(document(), ExportFormat.MARKDOWN, override = "///")
+        assertFalse(chosen, chosen.startsWith("_."))
+        assertTrue(chosen, chosen.endsWith(".md"))
+    }
+
+    @Test
     fun windowsDeviceNamesAreNeutralisedEvenWhenSomethingFollowsTheDot() {
         val document = document()
         for (name in listOf("AUX", "aux.notes", "CON.important", "com1.txt", "LPT9.a.b", "nul",

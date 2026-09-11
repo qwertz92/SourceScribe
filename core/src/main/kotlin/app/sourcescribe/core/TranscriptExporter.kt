@@ -473,7 +473,11 @@ object TranscriptExporter {
             .replace(Regex("\\.{2,}"), "_")
             .let { takeBytes(it, maxBytes) }
             .trimEnd('.', ' ')
-        if (cleaned.isEmpty()) return fallback
+        // A value made only of characters a name cannot carry does not collapse to nothing: the runs of
+        // replacements fold into a single underscore. An extension of `???` therefore became `_`, and the
+        // file was named after a format it did not state. Both cases mean the same thing — nothing usable
+        // was given — so both take the fallback.
+        if (cleaned.isEmpty() || cleaned.all { it == '_' }) return fallback
         // These names are devices on Windows, where an exported file is likely to end up: writing to `aux`
         // there reaches the device and leaves no file. Only the bare form was reproduced that way, but the
         // part before the first dot is compared anyway, because a copy can be renamed to that bare form.
