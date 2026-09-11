@@ -672,6 +672,14 @@ class AssemblyAiAdapterTest {
         assertEquals("universal-2", parsed("\"universal-2\"").first)
         assertEquals("x".repeat(128), parsed("\"" + "x".repeat(128) + "\"").first)
 
+        // The bound counts characters and not the bytes they take. An ASCII fixture cannot tell those apart,
+        // so a switch to bytes would pass here unnoticed while breaking the agreement with the only other
+        // parser that reads this field, which measures the same way against the same number.
+        assertEquals("ä".repeat(128), parsed("\"" + "ä".repeat(128) + "\"").first)
+        val longer = parsed("\"" + "ä".repeat(129) + "\"")
+        assertEquals(null, longer.first)
+        assertTrue(longer.second.toString(), longer.second.contains("REPORTED_MODEL_TOO_LONG"))
+
         // One character more is refused loudly. It is not shortened: a cut name would be a value nobody
         // reported, and this string is shown to a reader as the model that produced the transcript.
         val long = parsed("\"" + "x".repeat(129) + "\"")

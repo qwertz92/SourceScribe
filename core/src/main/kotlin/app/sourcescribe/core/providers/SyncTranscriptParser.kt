@@ -162,12 +162,7 @@ object SyncTranscriptParser {
         if (text == null || text.isBlank()) invalidResponse()
 
         val warnings = Warnings()
-        val rawModelReported = string(objectRoot["model"])
-        if (rawModelReported != null && rawModelReported.length > MAX_REPORTED_MODEL_LENGTH) {
-            warnings += "REPORTED_MODEL_TOO_LONG"
-        }
-        val modelReported = rawModelReported
-            ?.takeIf { it.isNotBlank() && it.length <= MAX_REPORTED_MODEL_LENGTH }
+        val modelReported = reportedModel(objectRoot["model"], warnings)
         val (reportedLanguages, language) = responseLanguages(objectRoot, warnings)
         val parsed = when {
             model == "gpt-transcribe" -> ParsedParts(
@@ -413,6 +408,27 @@ object SyncTranscriptParser {
         val reported = values.toList()
         if (reported.size > 1) warnings += "MULTIPLE_LANGUAGES"
         return reported to reported.singleOrNull()
+    }
+
+    /**
+     * The model the provider says it used, with the same limit as the AssemblyAI adapter, which is the only
+     * other place that reads this field. Refused in the same order as well: a value that is present but
+     * names nothing is reported as malformed even when it is also over-long, because the reason a reader is
+     * given has to be the reason the value was actually refused. A key that is absent says nothing and is
+     * therefore not a finding; a key that is there and unusable is.
+     */
+    private fun reportedModel(element: JsonElement?, warnings: Warnings): String? {
+        if (element == null || element is JsonNull) return null
+        val value = string(element)?.takeIf { it.isNotBlank() }
+        if (value == null) {
+            warnings += "REPORTED_MODEL_MALFORMED"
+            return null
+        }
+        if (value.length > MAX_REPORTED_MODEL_LENGTH) {
+            warnings += "REPORTED_MODEL_TOO_LONG"
+            return null
+        }
+        return value
     }
 
     private fun string(element: JsonElement?): String? =

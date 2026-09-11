@@ -197,6 +197,38 @@ class ExtractorMetadataTest {
         assertNull(resolved.publishedDate)
     }
 
+    @Test fun aCaptionTrackNameWrittenAsAnEmptyStringIsAbsentRatherThanEmpty() {
+        // The record prints `name=unknown` for a track that reports no name. An empty string is not absent,
+        // so it printed `name=` and read as a name the extractor had been handed and passed on.
+        val raw = """{"id":"BaW_jenozKc","subtitles":{"de":[{"ext":"vtt","name":"",
+            "url":"https://www.youtube.com/api/timedtext?lang=de"}]},
+            "automatic_captions":{"en":[{"ext":"json3","name":"   ",
+            "url":"https://www.youtube.com/api/timedtext?lang=en"}]}}"""
+        val captions = ExtractorMetadata.parse(raw, source).captions
+        assertEquals(2, captions.size)
+        assertNull(captions.first().name)
+        assertNull(captions.last().name)
+    }
+
+    @Test fun aFormatFieldHoldingNothingButSpacesNamesNothingEither() {
+        // `""` and `"   "` have to fall to the same rule. Only the empty case was covered, so a change from
+        // blank to empty would have kept a note made of spaces and offered it as a reported value.
+        val raw = """{"id":"BaW_jenozKc","formats":[{"format_id":"140","vcodec":"none",
+            "acodec":"mp4a.40.2","ext":"   ","format_note":" ","language":"  "}]}"""
+        val audio = ExtractorMetadata.parse(raw, source).audio.single()
+        assertNull(audio.name)
+        assertNull(audio.container)
+        assertNull(audio.language)
+        assertEquals("yt-dlp:formats.acodec,vcodec", audio.evidence)
+    }
+
+    @Test fun anEndlessLanguageTagIsBoundedLikeTheTitleBesideIt() {
+        // It is read back into a file name, where the identity part has 40 bytes for the whole language and
+        // an unbounded value would spend every one of them before the name even reaches the digest.
+        val raw = """{"id":"BaW_jenozKc","language":"${"d".repeat(5000)}"}"""
+        assertEquals(100, ExtractorMetadata.parse(raw, source).source.originalLanguage?.length)
+    }
+
     @Test fun absentLanguagePreferenceFallsBackOnlyToTheParenthesisedNote() {
         fun note(value: String) = ExtractorMetadata.parse(
             """{"id":"BaW_jenozKc","formats":[{"format_id":"140","vcodec":"none","acodec":"mp4a.40.2","format_note":"$value"}]}""",

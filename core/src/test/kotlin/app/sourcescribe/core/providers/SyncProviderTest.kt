@@ -336,6 +336,40 @@ class SyncProviderTest {
     }
 
     @Test
+    fun aModelFieldThatNamesNothingIsReportedAsMalformedAndNotAsTooLong() {
+        fun warnings(model: String): List<String> {
+            val result = OpenAiAdapter().parseSavedResponse(
+                "{\"text\":\"hello\",\"model\":$model}".toByteArray(StandardCharsets.UTF_8),
+                request(Provider.OPENAI, OpenAiAdapter.MODEL_GPT_TRANSCRIBE, segmentTimestamps = false),
+            ) as SubmissionResult.Direct
+            assertNull(result.transcript.reportedModel)
+            return result.transcript.warnings
+        }
+
+        // A blank value that is also over-long was reported as too long, which named the wrong reason: it
+        // was refused for saying nothing, and no shortening would have made it usable.
+        val blankAndLong = warnings("\"" + " ".repeat(200) + "\"")
+        assertTrue(blankAndLong.toString(), blankAndLong.contains("REPORTED_MODEL_MALFORMED"))
+        assertFalse(blankAndLong.toString(), blankAndLong.contains("REPORTED_MODEL_TOO_LONG"))
+
+        // A key that is present and unusable is a finding here as much as in the AssemblyAI adapter, the
+        // only other reader of this field. Anything short and blank used to pass in silence.
+        for (unusable in listOf("\"\"", "\"   \"", "7", "true", "[]")) {
+            assertTrue(unusable, warnings(unusable).contains("REPORTED_MODEL_MALFORMED"))
+        }
+
+        // An absent key and an explicit null say nothing about a model, so neither is a finding.
+        for (silent in listOf("{\"text\":\"hello\"}", "{\"text\":\"hello\",\"model\":null}")) {
+            val result = OpenAiAdapter().parseSavedResponse(
+                silent.toByteArray(StandardCharsets.UTF_8),
+                request(Provider.OPENAI, OpenAiAdapter.MODEL_GPT_TRANSCRIBE, segmentTimestamps = false),
+            ) as SubmissionResult.Direct
+            assertNull(result.transcript.reportedModel)
+            assertFalse(silent, result.transcript.warnings.any { it.startsWith("REPORTED_MODEL") })
+        }
+    }
+
+    @Test
     fun invalidTimestampExtentAndOrderPreserveTextButMarkResultIncomplete() {
         val result = GroqAdapter().parseSavedResponse(
             """

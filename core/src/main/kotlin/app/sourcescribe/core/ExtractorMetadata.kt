@@ -38,7 +38,11 @@ object ExtractorMetadata {
         val source = requested.copy(
             title = string("title")?.take(2000), channel = string("channel")?.take(1000),
             durationMs = duration?.times(1000)?.toLong(), publishedDate = string("upload_date"),
-            thumbnailUrl = string("thumbnail")?.takeIf { validImageUrl(it) }, originalLanguage = string("language"),
+            // A language tag is a handful of characters. Bounded like the title and the channel next to it,
+            // because this one is also read back into a file name, where an unbounded value would spend the
+            // whole budget of the identity part.
+            thumbnailUrl = string("thumbnail")?.takeIf { validImageUrl(it) },
+            originalLanguage = string("language")?.take(100),
         )
         val tracks = mutableListOf<CaptionTrack>()
         val urls = mutableMapOf<String, String>()
@@ -56,8 +60,11 @@ object ExtractorMetadata {
                 val segmented = URI(url).host == "manifest.googlevideo.com"
                 val translated = "tlang" in captionParameters(url)
                 val id = "$key:$language:$format"
-                tracks += CaptionTrack(id, requireNotNull(source.videoId), language,
-                    (selected["name"] as? JsonPrimitive)?.contentOrNull?.take(1000), format,
+                // The same rule as `string` above, and for the same reason: a name kept as "" is printed as
+                // the reported name of the track, where the absent case prints `unknown` instead.
+                val trackName = (selected["name"] as? JsonPrimitive)?.contentOrNull
+                    ?.takeIf { it.isNotBlank() }?.take(1000)
+                tracks += CaptionTrack(id, requireNotNull(source.videoId), language, trackName, format,
                     generation, if (translated) Translation.AUTOMATIC else Translation.NONE,
                     "yt-dlp:$key;timedtext:tlang=${if (translated) "present" else "absent"}${if (segmented) ";hls-vtt-assembled" else ""}")
                 urls[id] = url
