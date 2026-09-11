@@ -2,46 +2,46 @@
 
 ## Wiederaufnahme: hier weitermachen
 
-Geschrieben am 11. September 2026, zuletzt nach der sechsten Reviewrunde nachgeführt, damit die
+Geschrieben am 11. September 2026, zuletzt nach der achten Reviewrunde nachgeführt, damit die
 Arbeit ohne Wiedereinlesen der ganzen Sitzung weitergehen kann. Reihenfolge ist Absicht.
 
 **Wo der Stand steht:** Die Reviewrunden und was sie gefunden haben, stehen in
 [STATUS.md](STATUS.md); was offen ist, mit Stelle und fehlendem Nachweis, in
 [DEFECTS.md](DEFECTS.md). Die Punktnummern unten sind die Nummern dort.
 
-### 1. Achte Reviewrunde über die Korrekturen der siebten
+### 1. Neunte Reviewrunde über die Korrekturen der achten
 
-Runden 3 bis 7 haben ihren wichtigsten Fund jeweils in den Korrekturen der Vorrunde gehabt. Der
-Commitbereich beginnt hinter `d6af9fd`. Drei Sonnet-5-Reviewer: core, Texte und Doku, und einer über die
-Korrekturen selbst. Zwei Lehren aus den Vorrunden, die für die Auftragsformulierung gelten: der Bereich muss
-**alle** Commits der Vorrunde abdecken, nicht nur den sichtbarsten; und ein Fund, den der Reviewer nicht
-ausführen konnte, braucht eine Gegenprobe mit wieder eingebautem Fehler, bevor er als lebender Fehler gilt —
-Runde 7 hat so einen hohen Fund entkräftet und dabei einen grünen, aber wirkungslosen eigenen Test gefunden.
-Die Jagdliste:
+Runden 3 bis 8 haben ihren wichtigsten Fund jeweils in den Korrekturen der Vorrunde gehabt. Die Commits der
+achten Runde einzeln benennen, nicht als Bereich — die Bereichsschreibweise lag in Runde 7 schon einmal
+daneben, weil `a..b` den Anfangscommit auslässt und ältere Fixes Vorfahren davon sind. Drei Sonnet-5-Reviewer:
+core, Texte und Doku, und einer über die Korrekturen selbst. Zwei Lehren, die in den Auftrag gehören: ein
+Fund, den der Reviewer nicht ausführen konnte, gilt erst nach einer Gegenprobe mit wieder eingebautem Fehler
+als lebender Fehler; und jede Zahl in der Doku wird nachgezählt, weil in den Runden 7 und 8 je eine falsche
+darin stand, beide von mir. Die Jagdliste:
 
-- `Warnings` hat jetzt eine harte Obergrenze auf die Zahl der Arten. Was passiert bei genau `KIND_LIMIT`
-  Arten, und was bei genau `LIMIT` Einträgen mit genau `KIND_LIMIT` Arten? Trägt die Kürzungsmarke in jedem
-  Pfad, der jetzt früh aussteigt? Wächst `kinds` wirklich in keinem Pfad über die Decke?
-- Die Zuordnung ist von einem `when` in `GROUPED_FAMILIES` überführt. Ist jeder Name dort noch genau der
-  Name, den der Erzeuger schreibt? Gibt es umgekehrt einen real erzeugten Code, dessen Familie in keiner
-  Liste steht und der dem Leser deshalb als unerklärter Code erscheint? Prüfe gegen `CaptionParser`,
-  `SyncTranscriptParser`, `AssemblyAiAdapter` und `SttStep`, Erzeugungsstelle für Erzeugungsstelle.
-- `GROUPED_FAMILIES` verweist für `MORE_NOTES` auf `Warnings.TRUNCATED` statt auf ein Literal. Bleibt die
-  Sichtbarkeit sauber, und entsteht daraus eine Initialisierungsreihenfolge zwischen zwei Typen, die sich
-  gegenseitig brauchen?
-- `TranscriptExporter.byteSize` ersetzt zwei Zeichenzählungen. Steht in derselben Datei noch irgendwo eine
-  Zeichenzahl gegen eine Bytegrenze? Und hält die Schrankenprobe auch für einen Namen ohne Bindestrich, für
-  `customStem` mit Bindestrich am Ende und für `ExportFormat.RAW` ohne `rawExtension`?
-- `ExtractorMetadata` begrenzt die Originalsprache auf 100 Zeichen und verwirft einen leeren Spurnamen.
-  Gibt es ein weiteres Wurzelfeld ohne Grenze, und ändert die Grenze die Bedeutung eines Feldes statt es
-  nur zu beschneiden?
-- `SyncTranscriptParser.reportedModel` meldet jetzt für ein vorhandenes, unbrauchbares Feld. Welche
-  gespeicherten Antworten bekommen dadurch eine Warnung mehr, und welche Pfade vergleichen Warnzahlen?
-  Punkt 11 der bekannten Probleme ist der bekannte; gibt es einen zweiten?
+- Der Familientest hat jetzt eine zweite, von Hand aus den Erzeugern abgeschriebene Liste. Stimmt jeder der
+  59 Einträge mit der Zeile überein, die ihn wirklich schreibt — besonders die elf, die dort nur aus Teilen
+  zusammengesetzt entstehen? Ein falsch abgeschriebener Eintrag verlangt einen Namen, den nie jemand
+  erzeugt, und niemand merkt es, solange die Zuordnung denselben Fehler trägt.
+- Beide Listen stehen jetzt nebeneinander, und die eine prüft die andere. Kann jemand einen Namen ändern,
+  ohne dass irgendein Test fällt? Wenn ja, wo?
+- `ExtractorMetadata` begrenzt jetzt Datum, Originalsprache und Formatsprache auf 100 Zeichen und lehnt eine
+  zu lange Bildadresse ab. Gibt es ein weiteres Feld ohne Grenze — auch in `CaptionTrack` und `AudioTrack`,
+  nicht nur in `Source`? Ändert eine der Grenzen die Bedeutung eines Feldes, statt es nur zu beschneiden?
+  Und ist die Ablehnung der Adresse wirklich eine Ablehnung, oder verschwindet dabei still ein Vorschaubild,
+  das vorher da war?
+- `safePart` fällt jetzt auch dann auf den Ersatzwert zurück, wenn nur Unterstriche übrig bleiben. Gibt es
+  einen Wert, der dadurch seinen Ersatzwert bekommt, obwohl er etwas benannt hat? Was ist mit einem Namen,
+  der absichtlich aus Unterstrichen besteht?
+- Die Gegenprobe selbst: Sie stellt Fehler wieder her und erwartet fallende Tests. Prüfe die
+  Wiederherstellungsskripte im Ablageordner nicht — prüfe stattdessen, ob die Behauptung in STATUS, welcher
+  Test wobei fällt, mit dem Baum übereinstimmt.
+- Und die Doku: Jede Zahl der Runde-8-Passage nachzählen. In Runde 7 war es „46" statt 34, in Runde 8 hätte
+  „164" statt 162 dringestanden, wenn ich nicht vor dem Commit nachgezählt hätte.
 
 ### 2. Warncodes lesbar machen (DEFECTS 9) — erledigt
 
-Umgesetzt am 11. September 2026. Dreizehn Sätze statt über 50 Codefamilien, Zuordnung in
+Umgesetzt am 11. September 2026. Dreizehn Sätze statt 59 Codefamilien, Zuordnung in
 `core/.../TranscriptWarnings.kt`, rohe Codes unter den Details. Am Gerät angesehen und die
 Sprungfreiheit der Kopfzeilen über drei Suchzustände nachgemessen.
 

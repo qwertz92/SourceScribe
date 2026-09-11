@@ -182,8 +182,15 @@ desselben Artefakts, weil die Regel für RAW-Geschwister bisher nur im Namensbau
 
 ### Runde 7
 
-Drei Reviewer über `2296fe5..d6af9fd`, also über alle Commits der Runden 5 und 6. Vier Funde, drei bestätigt,
-einer beim Nachrechnen entkräftet.
+Drei Reviewer. Der für die übrige Codeänderung bekam `2296fe5`, `7c913ca` und `08947bc` einzeln benannt,
+der für Texte und Doku den Bereich `029a53f..f0f6884`, der für die Kernmechanik die Korrekturen der sechsten
+Runde. Vier Funde, drei bestätigt, einer beim Nachrechnen entkräftet.
+
+Diese Passage nannte zunächst pauschal „`2296fe5..d6af9fd`, also alle Commits der Runden 5 und 6". Das war
+als Zusammenfassung falsch: Diese Schreibweise lässt `2296fe5` selbst aus, und die drei Fix-Commits der
+fünften Runde sind Vorfahren davon, liegen also gar nicht darin. Abgedeckt waren sie trotzdem, weil die
+Aufträge sie einzeln beziehungsweise über den zweiten Bereich benannten — die Zusammenfassung stimmte nicht,
+die Abdeckung schon.
 
 **Der wichtigste lag wieder in der Vorrunde, und wieder in ihrem nützlichsten Teil.** Runde 6 hatte die
 Deckelung der Warnliste so erweitert, dass die erste Warnung einer noch nicht gemeldeten Art auch jenseits
@@ -199,8 +206,16 @@ plus `KIND_LIMIT` Einträge, wie ein Aufrufer seine Codes auch benennt. Damit di
 und nicht zur Arbeitsgrenze wird, ist die Zuordnung von Codefamilien zu Gruppen von einem `when` in Daten
 überführt — `TranscriptWarnings.GROUPED_FAMILIES`. Die Namen sind dadurch zählbar, ein Test hält die Zahl
 der selbst benannten Arten mit doppeltem Abstand unter der Decke, und derselbe Umbau schließt eine zweite
-Lücke aus Runde 5: von 59 Familiennamen war je einer pro Gruppe geprüft, die übrigen 46 von nichts. Jeder
-wird jetzt in fünf Schreibweisen durch die Zusammenfassung geführt.
+Lücke aus Runde 5: von 59 Familiennamen kamen 34 in überhaupt keinem Test vor. Jeder wird jetzt in fünf
+Schreibweisen durch die Zusammenfassung geführt.
+
+Die Zahl stand hier zuerst als 46, gerechnet als 59 minus die dreizehn Namen der Ein-Beispiel-pro-Gruppe-
+Liste. Das war zu hoch: Andere Tests in denselben beiden Dateien nennen weitere Namen nebenbei. Nachgezählt
+über den Stand `d6af9fd` sind 25 Namen dort irgendwo genannt und 34 nirgends.
+
+Ausgeliefert wurde in derselben Runde noch eine Begrenzung, die keiner der Funde verlangt hat: Die
+gemeldete Originalsprache wird auf 100 Zeichen gekürzt, weil sie als einziges Wurzelfeld gar keine Grenze
+trug — was, wie Runde 8 gezeigt hat, so nicht stimmte.
 
 Weiter bestätigt: `CaptionTrack.name` folgte der Leerstringregel nicht, die Runde 6 für die übrigen
 Quellfelder eingezogen hatte — ein als `""` gemeldeter Spurname erschien in der Herkunftszeile als `name=`,
@@ -224,10 +239,15 @@ Regressionsprobe, sondern eine Schrankenprobe über 648 Namenskombinationen; Cod
 
 **Die Gegenprobe hat auch einen Fehler in meinem eigenen Test gefunden.** Ich habe alle Korrekturen dieser
 Runde vorübergehend zurückgenommen und die Tests laufen lassen, um zu sehen, welcher neue Test wirklich
-greift. Sechs fielen, einer nicht: Er setzte die Quelle mit `document().source.copy(...)` neu und ersetzte
-damit den langen Titel durch den kurzen Standardwert, sodass gar keine Kürzung ausgelöst wurde. Ohne diesen
-Durchlauf wäre er als grüner Test durchgegangen, der nichts prüft — und der entkräftete Fund wäre als
-behoben gemeldet worden, obwohl nichts ihn belegt hätte. Die Gegenprobe gehört ab jetzt zur Runde.
+greift. Sechs fielen, einer nicht. Dieser eine, damals noch als Regressionsprobe für den gemeldeten Fund
+geschrieben, setzte die Quelle mit `document().source.copy(...)` neu und ersetzte damit den langen Titel
+durch den kurzen Standardwert. Nach der Korrektur dieses Aufbaufehlers fiel er immer noch nicht — und das
+war der Beleg, der den Fund entkräftet hat, weil damit die Titelschranke als Ursache übrig blieb. Der Test
+ist daraufhin durch die Schrankenprobe ersetzt worden, die jetzt im Baum steht; im heutigen Code ist der
+Aufbaufehler also nicht mehr zu finden.
+
+Ohne den Durchlauf wäre der erste Test als grüner Test durchgegangen, der nichts prüft, und der Fund wäre
+als behoben gemeldet worden, obwohl nichts ihn belegt hätte. Die Gegenprobe gehört ab jetzt zur Runde.
 
 Aus der Doku-Prüfung: „zwölf Sätze“ stand an zwei Stellen, obwohl `SECTION_ALIGNMENT` schon in Runde 5 die
 dreizehnte Gruppe war; der Pfad `providers/Warnings.kt` in der Runde-3-Passage zeigte seit Runde 5 auf
@@ -239,9 +259,60 @@ Gates nach Runde 7: 160 JVM-Tests im Modul `core` ohne Fehler, alle vier Lintber
 191 Instrumentierungstests auf `emulator-5556` — 185 bestanden, 6 per Annahme übersprungen, 0 Fehler.
 Die neun neuen JVM-Tests sind die aus dieser Runde.
 
-**Die Schleife ist nicht konvergiert.** Sieben Runden, keine davon leer. Solange eine Runde noch etwas findet,
-ist die nächste fällig — gerade weil die Funde der Runden 3 bis 7 jeweils in den Korrekturen der Vorrunde
-lagen.
+### Runde 8
+
+Drei Reviewer über die vier Commits der siebten Runde, einzeln benannt statt als Bereich, nachdem die
+Bereichsschreibweise in der Vorrunde schon einmal daneben lag. Neun Funde, alle bestätigt, keiner in der
+Produktionslogik der Vorrunde selbst — dafür zwei in dem, was ich über sie geschrieben habe.
+
+**Der wichtigste betrifft einen Test aus Runde 7 und ist wieder dasselbe Muster.** Der neue Test, der jeden
+Familiennamen durch die Zusammenfassung führt, verspricht in seinem Kommentar Schutz gegen „einen Namen, der
+gegenüber seinem Erzeuger falsch geschrieben ist". Das kann er nicht halten: Er nimmt Eingabe und Erwartung
+aus derselben Zuordnung, also stimmen die beiden miteinander überein, was immer dort steht. Eine Zusage, die
+weiter trägt als das, was der Code prüft — diesmal im Kommentar eines Tests statt in dem einer Klasse.
+
+Geschlossen ist das mit einer zweiten Quelle statt mit einer Korrektur des Kommentars allein:
+`everyGroupIsReachableFromACodeSomeParserActuallyWrites` führt jetzt nicht mehr ein Beispiel pro Gruppe,
+sondern einen Eintrag pro Familie, abgeschrieben aus den vier Dateien, die Warnungen aufzeichnen, in der
+Form, die die aufzeichnende Zeile wirklich erzeugt. Eine Umbenennung nur auf einer der beiden Seiten fällt
+damit auf. Der Grund, warum es diese zweite Quelle von Hand braucht: Elf der 59 Namen kommen in den
+Erzeugern als Zeichenkette überhaupt nicht vor, weil die Zeile sie aus Teilen zusammensetzt
+(`"MISSING_${"$"}{if (word) "WORD" else "SEGMENT"}_TEXT_${"$"}index"` und ähnlich). Weder eine Suche noch ein Leser
+findet sie dort.
+
+**Der zweite große Fund widerlegt eine Behauptung aus meiner eigenen Commit-Nachricht.** Sie sagte, die
+Originalsprache sei „als einziges Wurzelfeld" ohne Längengrenze gewesen. Sie war es nicht: Das Datum hatte
+ebenfalls keine, die Adresse des Vorschaubilds auch nicht, und die Sprache eines Audioformats steht zwischen
+einer Notiz und einem Container, die beide begrenzt sind. Genau die halb geschlossene Lücke, die diese
+Schleife inzwischen viermal gefunden hat, diesmal in meiner Begründung statt in meinem Code. Datum und
+Formatsprache werden jetzt wie ihre Nachbarn auf 100 Zeichen gekürzt; die Adresse wird abgelehnt statt
+gekürzt, an derselben Grenze wie die Untertiteladresse, weil eine halbe Adresse keine kürzere ist, sondern
+eine falsche.
+
+Dazu ein Fehler, den ein Reviewer beim Durchspielen einer Testlücke gefunden hat und der älter ist als diese
+Runden: Eine Dateiendung aus lauter Zeichen, die ein Name nicht tragen kann, fällt nicht auf den Ersatzwert
+zurück. Die Zeichen werden einzeln durch Unterstriche ersetzt und die Folge dann zu einem einzigen
+zusammengefasst, das Ergebnis ist also nie leer, und der Test auf Leere griff nicht. Eine Endung `???` wurde
+damit zu `_`, und die Datei nannte gar kein Format mehr.
+
+Aus der Doku-Prüfung, alle drei nachgezählt und bestätigt: die Zahl 46 war zu hoch (richtig sind 34, siehe
+oben); die Bereichsangabe für die Reviewer der Vorrunde stimmte nicht mit der Git-Semantik überein; und zwei
+Standzeilen waren bei „sechs Runden" stehengeblieben, obwohl derselbe Commit die siebte beschrieb. Dazu ein
+Pfad in Punkt 18, dem seit Runde 5 das Segment `providers/` fehlt.
+
+**Auch in dieser Runde hat die Gegenprobe gearbeitet.** Vier Tests fallen mit wieder eingebauten Fehlern:
+die drei neu geschriebenen und der umgebaute Familientest, also auch der Tippfehler-Fall, für den die zweite
+Quelle gebaut wurde. Was diese Runde sonst an Zusicherungen ergänzt hat, hält bestehendes Verhalten fest und
+soll nicht fallen. Zwei neue Testmethoden kommen dazu, von 160 auf 162; die dritte hat eine bestehende
+ersetzt.
+
+Gates nach Runde 8: 162 JVM-Tests im Modul `core` ohne Fehler, alle vier Lintberichte ohne Befund,
+191 Instrumentierungstests auf `emulator-5556` — 185 bestanden, 6 per Annahme übersprungen, 0 Fehler.
+
+**Die Schleife ist nicht konvergiert.** Acht Runden, keine davon leer. Solange eine Runde noch etwas findet,
+ist die nächste fällig — gerade weil die Funde der Runden 3 bis 8 jeweils in den Korrekturen der Vorrunde
+lagen, in dieser Runde zum ersten Mal überwiegend in deren Tests und deren Beschreibung statt in deren
+Produktionscode.
 
 ## UI-Feedback umgesetzt
 
