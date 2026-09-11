@@ -113,6 +113,14 @@ class GroqAdapter(private val http: ProviderHttp = ProviderHttp()) : ProviderAda
         const val MODEL_V3 = "whisper-large-v3"
         const val MODEL_TURBO = "whisper-large-v3-turbo"
         const val DEFAULT_MODEL = MODEL_TURBO
+        /**
+         * The lower of Groq's two documented ceilings: 25 MB on the free tier, 100 MB on the developer tier
+         * (re-read 2026-09-11). A key carries its tier and this app never learns which one it holds, so it
+         * holds everyone to the smaller figure. That refuses some uploads a paying key would be allowed, and
+         * the alternative is worse: sending a file the other tier rejects turns a local refusal into a remote
+         * failure. It is this program's choice, not the provider's number, which is why it is listed among
+         * the budgets rather than among the provider limits.
+         */
         const val MAX_UPLOAD_BYTES = 25_000_000L
         const val PRICE_V3_MICRO_USD_PER_HOUR = 111_000L
         const val PRICE_TURBO_MICRO_USD_PER_HOUR = 40_000L

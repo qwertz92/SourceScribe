@@ -606,9 +606,11 @@ class AssemblyAiAdapter(private val http: ProviderHttp = ProviderHttp()) : Provi
             MODEL_U2 -> PRICE_U2_MICRO_USD_PER_HOUR
             else -> unsupported()
         } + if (request.diarization) SPEAKER_LABELS_MICRO_USD_PER_HOUR else 0
-        val withTerms = if (request.model == MODEL_U35 && request.contextTerms.isNotEmpty()) {
-            hourly + KEYTERMS_U35_MICRO_USD_PER_HOUR
-        } else hourly
+        // The surcharge is the same five cents an hour for both models this adapter supports; what differs
+        // between them is how many terms they accept, and `validateTerms` already enforces that. Asking the
+        // model here charged Universal-2 nothing for a prompt the request above sends it anyway, which put
+        // a request under a budget the provider would then bill past.
+        val withTerms = if (request.contextTerms.isNotEmpty()) hourly + KEYTERMS_MICRO_USD_PER_HOUR else hourly
         return (durationMs * withTerms + MILLIS_PER_HOUR - 1) / MILLIS_PER_HOUR
     }
 
@@ -656,7 +658,7 @@ class AssemblyAiAdapter(private val http: ProviderHttp = ProviderHttp()) : Provi
         const val PRICE_U35_MICRO_USD_PER_HOUR = 210_000L
         const val PRICE_U2_MICRO_USD_PER_HOUR = 150_000L
         const val SPEAKER_LABELS_MICRO_USD_PER_HOUR = 20_000L
-        const val KEYTERMS_U35_MICRO_USD_PER_HOUR = 50_000L
+        const val KEYTERMS_MICRO_USD_PER_HOUR = 50_000L
         const val PRICING_DATE = "2026-09-07"
         const val PRICING_SOURCE = "https://www.assemblyai.com/pricing/"
 

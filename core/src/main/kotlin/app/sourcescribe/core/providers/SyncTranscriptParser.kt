@@ -25,7 +25,14 @@ import kotlinx.serialization.json.contentOrNull
 
 /** Shared request validation and response parsing for direct transcription APIs. */
 internal object SyncProviderSupport {
-    const val MAX_UPLOAD_BYTES = 25_000_000L
+    /**
+     * A UTF-8 byte budget standing in for OpenAI's documented 224-**token** prompt limit (re-read
+     * 2026-09-11: "For `whisper-1`, prompts have a 224-token limit"). Nothing here tokenises anything; the
+     * substitution is safe only because a byte-level BPE never turns n bytes into more than n tokens, so
+     * this refuses some prompts the provider would have accepted and never the other way round. The number
+     * is therefore the provider's, while what it counts is this program's choice — no provider page states
+     * a 224-byte limit, and re-reading their documentation cannot confirm this value as written.
+     */
     const val MAX_PROMPT_BYTES = 224
 
     fun model(config: JobConfig): String = config.model?.takeIf { it.isNotBlank() }
@@ -113,9 +120,7 @@ internal object SyncProviderSupport {
             result.append(value)
             byteCount += separatorBytes + valueBytes
         }
-        val text = result.toString().trim().takeIf { it.isNotEmpty() } ?: return null
-        // Conservative UTF-8 byte budget for the documented 224-token prompt limit; this is not a tokenizer.
-        return text
+        return result.toString().trim().takeIf { it.isNotEmpty() }
     }
 
     fun contextKeywords(terms: List<String>): List<String> = terms

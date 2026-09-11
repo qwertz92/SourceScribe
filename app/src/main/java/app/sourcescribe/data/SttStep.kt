@@ -2213,8 +2213,10 @@ class SttStep @Inject constructor(
             if (capabilities.provider == Provider.ASSEMBLYAI && config.diarization) {
                 hourly = saturatedAdd(hourly, app.sourcescribe.core.providers.AssemblyAiAdapter.SPEAKER_LABELS_MICRO_USD_PER_HOUR)
             }
-            if (capabilities.provider == Provider.ASSEMBLYAI && config.model == app.sourcescribe.core.providers.AssemblyAiAdapter.MODEL_U35 && config.contextTerms.isNotEmpty()) {
-                hourly = saturatedAdd(hourly, app.sourcescribe.core.providers.AssemblyAiAdapter.KEYTERMS_U35_MICRO_USD_PER_HOUR)
+            // Both AssemblyAI models carry the same surcharge for a keyterms prompt; only the number of terms
+            // they accept differs. Naming one model here charged the other nothing for a prompt it is sent.
+            if (capabilities.provider == Provider.ASSEMBLYAI && config.contextTerms.isNotEmpty()) {
+                hourly = saturatedAdd(hourly, app.sourcescribe.core.providers.AssemblyAiAdapter.KEYTERMS_MICRO_USD_PER_HOUR)
             }
             val minimum = capabilities.minimumBilledSeconds.toLong().coerceAtLeast(0) * 1000L
             val billedMs = maxOf(durationMs, minimum)

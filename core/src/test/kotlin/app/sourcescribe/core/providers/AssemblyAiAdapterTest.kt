@@ -788,6 +788,35 @@ class AssemblyAiAdapterTest {
         assertEquals(1, saved.size)
     }
 
+    @Test
+    fun aKeytermsPromptCostsTheSameOnBothModelsAndTheBudgetIsMeasuredAgainstThat() {
+        // Half an hour of Universal-2 with terms: 75 000 micro-USD for the audio and 25 000 for the prompt.
+        // A budget holding only the first is not enough for the request that is actually sent, because the
+        // prompt goes out whatever the model is. Until round 12 the surcharge was added for
+        // `universal-3-5-pro` alone, so this submission passed the budget gate and was billed past it.
+        val terms = listOf("Kubernetes")
+        val halfAnHour = 1_800_000L
+        val audioOnly = baseConfig(model = AssemblyAiAdapter.MODEL_U2, contextTerms = terms)
+            .copy(maxCostMicrousd = 75_000L)
+        val refused = assertThrows(ProviderError::class.java) {
+            runBlocking {
+                adapter.submit(request(config = audioOnly, durationMs = halfAnHour), "raw-test-key", ResponseSpool {})
+            }
+        }
+        assertEquals(ProviderErrorCode.INVALID_INPUT, refused.code)
+        assertEquals(0, server.requestCount)
+
+        // The other side of the same boundary, so that this reads as a price and not as a refusal: the exact
+        // sum of both parts is enough, and the submission reaches the provider.
+        enqueueFixture("upload.json")
+        enqueueFixture("submit_completed.json")
+        val bothParts = audioOnly.copy(maxCostMicrousd = 100_000L)
+        runBlocking {
+            adapter.submit(request(config = bothParts, durationMs = halfAnHour), "raw-test-key", ResponseSpool {})
+        }
+        assertEquals(2, server.requestCount)
+    }
+
     private fun request(
         config: JobConfig = baseConfig(),
         chunkIndex: Int = 0,

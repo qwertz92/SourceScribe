@@ -63,6 +63,19 @@ class SttStepTest {
             ),
         )
 
+        // The same prompt on the cheaper model costs the same five cents an hour. Until round 12 the
+        // surcharge was tied to `universal-3-5-pro`, so this line read 150 000 and the budget the user set
+        // was measured against a figure the provider would not have honoured.
+        val universal2 = assemblyConfig.copy(model = AssemblyAiAdapter.MODEL_U2, diarization = false)
+        assertEquals(
+            200_000L,
+            SttStep.estimateCostMicrousd(
+                assembly.capabilities(AssemblyAiAdapter.MODEL_U2),
+                universal2,
+                3_600_000L,
+            ),
+        )
+
         val groq = GroqAdapter()
         val groqConfig = JobConfig(provider = Provider.GROQ, model = GroqAdapter.MODEL_TURBO)
         assertEquals(

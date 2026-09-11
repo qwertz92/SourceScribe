@@ -137,8 +137,14 @@ class OpenAiAdapter(private val http: ProviderHttp = ProviderHttp()) : ProviderA
         const val MAX_UPLOAD_BYTES = 25_000_000L
         const val PRICE_GPT_TRANSCRIBE_MICRO_USD_PER_HOUR = 270_000L
         const val PRICE_WHISPER_MICRO_USD_PER_HOUR = 360_000L
+        /**
+         * The length above which OpenAI asks the caller to choose a chunking strategy: "For audio longer
+         * than 30 seconds, set `chunking_strategy` to `\"auto\"` or a voice activity detection
+         * configuration" (re-read 2026-09-11). It is a threshold, not a chunk size — `auto` lets the
+         * provider cut on speech activity, so nothing here says the pieces are thirty seconds long.
+         */
         const val DIARIZATION_AUTO_CHUNKING_MS = 30_000L
         const val PRICE_AS_OF = "2026-09-07"
-        const val PRICING_SOURCE = "https://developers.openai.com/api/docs/guides/speech-to-text"
+        const val PRICING_SOURCE = "https://developers.openai.com/api/docs/pricing"
     }
 }
