@@ -42,24 +42,95 @@ class TranscriptWarningsTest {
     }
 
     @Test fun everyGroupIsReachableFromACodeSomeParserActuallyWrites() {
-        val examples = mapOf(
-            WarningGroup.COVERAGE to "MISSING_CHUNKS:2,3",
-            WarningGroup.SECTION_ALIGNMENT to "AUDIO_INTERVAL_GAP_OR_OVERLAP",
-            WarningGroup.SECTION_LOST_STORAGE to "CHUNK_2_RESPONSE_STORAGE",
-            WarningGroup.SECTION_LOST_PROVIDER to "CHUNK_5_REMOTE_NOT_COMPLETE",
-            WarningGroup.RESULT_SHORTENED to "EVENT_LIMIT_REACHED",
-            WarningGroup.MISSING_TEXT to "MALFORMED_CAPTION_SEGMENT_3_1",
-            WarningGroup.SEGMENT_TIMES to "CHUNK_1_INVALID_SEGMENT_TIMESTAMP_4",
-            WarningGroup.WORD_TIMES to "CHUNK_1_WORD_TIMESTAMPS_MALFORMED_SPEAKER_4",
-            WarningGroup.SPEAKERS to "CHUNK_1_DIARIZATION_MALFORMED_OFFSET_4",
-            WarningGroup.PROVIDER_LANGUAGE to "MULTIPLE_LANGUAGES",
-            WarningGroup.PROVIDER_MODEL to "MULTIPLE_REPORTED_MODELS",
-            WarningGroup.CAPTION_SOURCE to "MALFORMED_CUE_LINE_12",
-            WarningGroup.MORE_NOTES to "WARNINGS_TRUNCATED",
+        // Written out from the four files that record warnings, one entry per family, in the shape the
+        // recording line actually produces. That makes this list and the mapping in `TranscriptWarnings`
+        // two sources for the same names, which is the point: the test that walks the mapping compares it
+        // with itself and cannot see a name misspelt against the parser that writes it. Here a name that
+        // exists in only one of the two lists fails.
+        //
+        // Eleven of these names appear nowhere in the parsers as a literal, because the line assembles them
+        // from pieces — `"MISSING_${"$"}{if (word) "WORD" else "SEGMENT"}_TEXT_${"$"}index"` and its kin. Neither a
+        // search nor a reader finds them there, which is exactly why they are spelled out once here.
+        val written = listOf(
+            // CaptionParser
+            "MALFORMED_CUE_LINE_12" to WarningGroup.CAPTION_SOURCE,
+            "INVALID_TIMING_LINE_12" to WarningGroup.CAPTION_SOURCE,
+            "UNKNOWN_VTT_SETTING_12" to WarningGroup.CAPTION_SOURCE,
+            "EMPTY_CUE_LINE_12" to WarningGroup.MISSING_TEXT,
+            "EVENT_LIMIT_REACHED" to WarningGroup.RESULT_SHORTENED,
+            "MALFORMED_EVENT_3" to WarningGroup.CAPTION_SOURCE,
+            "MALFORMED_CAPTION_SEGMENT_3_1" to WarningGroup.MISSING_TEXT,
+            "MALFORMED_CAPTION_SEGMENTS_3" to WarningGroup.MISSING_TEXT,
+            "EMPTY_EVENT_3" to WarningGroup.MISSING_TEXT,
+            "MISSING_OR_INVALID_TIMING_EVENT_3" to WarningGroup.CAPTION_SOURCE,
+            "STRUCTURAL_ROLLUP_UNCERTAIN" to WarningGroup.CAPTION_SOURCE,
+            "SEGMENT_LIMIT_REACHED" to WarningGroup.RESULT_SHORTENED,
+
+            // SyncTranscriptParser, which serves OpenAI and Groq
+            "WORD_LIMIT_REACHED" to WarningGroup.RESULT_SHORTENED,
+            "MALFORMED_WORD_5" to WarningGroup.WORD_TIMES,
+            "MALFORMED_SEGMENT_5" to WarningGroup.MISSING_TEXT,
+            "MISSING_WORD_TEXT_5" to WarningGroup.WORD_TIMES,
+            "MISSING_SEGMENT_TEXT_5" to WarningGroup.MISSING_TEXT,
+            "INVALID_WORD_TIMESTAMP_5" to WarningGroup.WORD_TIMES,
+            "INVALID_SEGMENT_TIMESTAMP_5" to WarningGroup.SEGMENT_TIMES,
+            "OUT_OF_RANGE_WORD_TIMESTAMP_5" to WarningGroup.WORD_TIMES,
+            "OUT_OF_RANGE_SEGMENT_TIMESTAMP_5" to WarningGroup.SEGMENT_TIMES,
+            "NON_MONOTONIC_WORD_TIMESTAMP_5" to WarningGroup.WORD_TIMES,
+            "NON_MONOTONIC_SEGMENT_TIMESTAMP_5" to WarningGroup.SEGMENT_TIMES,
+            "MISSING_SPEAKER_5" to WarningGroup.SPEAKERS,
+            "INVALID_CHUNK_OFFSET_5" to WarningGroup.SEGMENT_TIMES,
+            "MALFORMED_DIARIZED_SEGMENTS" to WarningGroup.SPEAKERS,
+            "MISSING_DIARIZED_SEGMENTS" to WarningGroup.SPEAKERS,
+            "MISSING_DIARIZED_SPEAKER" to WarningGroup.SPEAKERS,
+            "MALFORMED_SEGMENTS" to WarningGroup.SEGMENT_TIMES,
+            "MISSING_SEGMENT_TIMESTAMPS" to WarningGroup.SEGMENT_TIMES,
+            "INCOMPLETE_SEGMENT_TIMESTAMPS" to WarningGroup.SEGMENT_TIMES,
+            "MALFORMED_WORDS" to WarningGroup.WORD_TIMES,
+            "MISSING_WORD_TIMESTAMPS" to WarningGroup.WORD_TIMES,
+            "INCOMPLETE_WORD_TIMESTAMPS" to WarningGroup.WORD_TIMES,
+            "LANGUAGE_LIMIT_REACHED" to WarningGroup.PROVIDER_LANGUAGE,
+            "MULTIPLE_LANGUAGES" to WarningGroup.PROVIDER_LANGUAGE,
+            "REPORTED_MODEL_MALFORMED" to WarningGroup.PROVIDER_MODEL,
+            "REPORTED_MODEL_TOO_LONG" to WarningGroup.PROVIDER_MODEL,
+
+            // AssemblyAiAdapter
+            "WORD_TIMESTAMPS_MISSING" to WarningGroup.WORD_TIMES,
+            "DIARIZATION_MISSING" to WarningGroup.SPEAKERS,
+            "SEGMENT_TIMESTAMPS_MISSING" to WarningGroup.SEGMENT_TIMES,
+            "WORD_TIMESTAMPS_MALFORMED_9" to WarningGroup.WORD_TIMES,
+            "WORD_TIMESTAMPS_MALFORMED_SPEAKER_9" to WarningGroup.WORD_TIMES,
+            "WORD_TIMESTAMPS_MALFORMED_OFFSET_9" to WarningGroup.WORD_TIMES,
+            "WORD_TIMESTAMPS_OUT_OF_RANGE_9" to WarningGroup.WORD_TIMES,
+            "DIARIZATION_MALFORMED_9" to WarningGroup.SPEAKERS,
+            "DIARIZATION_MALFORMED_OFFSET_9" to WarningGroup.SPEAKERS,
+            "DIARIZATION_SPEAKER_MISSING_9" to WarningGroup.SPEAKERS,
+            "DIARIZATION_OUT_OF_RANGE_9" to WarningGroup.SPEAKERS,
+            "REPORTED_LANGUAGES_MALFORMED_9" to WarningGroup.PROVIDER_LANGUAGE,
+
+            // SttStep, which puts the sections back together
+            "CHUNK_4_RESPONSE_STORAGE" to WarningGroup.SECTION_LOST_STORAGE,
+            "CHUNK_4_RAW_RESPONSE_TOO_LARGE" to WarningGroup.SECTION_LOST_STORAGE,
+            "CHUNK_4_RAW_RESPONSE_AGGREGATE_TOO_LARGE" to WarningGroup.SECTION_LOST_STORAGE,
+            "CHUNK_4_CANONICAL_TRANSCRIPT_AGGREGATE_TOO_LARGE" to WarningGroup.SECTION_LOST_STORAGE,
+            "CHUNK_4_REMOTE_NOT_COMPLETE" to WarningGroup.SECTION_LOST_PROVIDER,
+            "MISSING_CHUNKS:2,3" to WarningGroup.COVERAGE,
+            "AUDIO_INTERVAL_GAP_OR_OVERLAP" to WarningGroup.SECTION_ALIGNMENT,
+            "MULTIPLE_REPORTED_MODELS" to WarningGroup.PROVIDER_MODEL,
+
+            // The list's own note about itself, added by `Warnings` rather than by a parser.
+            Warnings.TRUNCATED to WarningGroup.MORE_NOTES,
+        )
+
+        // Every family has to stand here, or a name could be changed on both sides of the mapping at once
+        // and never be held against a parser again.
+        assertEquals(
+            TranscriptWarnings.FAMILIES.keys,
+            written.map { TranscriptWarnings.family(it.first) }.toSet(),
         )
         // A group added without a code that reaches it would be a sentence nobody can ever see.
-        assertEquals(WarningGroup.entries.toSet(), examples.keys)
-        for ((group, code) in examples) {
+        assertEquals(WarningGroup.entries.toSet(), written.map { it.second }.toSet())
+        for ((code, group) in written) {
             val summary = TranscriptWarnings.summarize(listOf(code))
             assertEquals("$code should be reported as $group", listOf(group), summary.groups)
             assertTrue("$code should not be reported as unexplained", summary.unknown.isEmpty())
@@ -167,8 +238,11 @@ class TranscriptWarningsTest {
 
     @Test fun everyFamilyThisProgramNamesIsRecognisedInEveryShapeItIsRecordedIn() {
         // One example per group used to stand in for all of them, which left most of these names covered by
-        // nothing: a name misspelt against its producer, or one that the family reduction shortens before
-        // the lookup ever sees it, would have been reported as an unexplained code to the reader.
+        // nothing. Two things this does catch: a name that the family reduction shortens before the lookup
+        // ever sees it, which could then never be matched; and a shape a parser writes that the mapping has
+        // no answer for. One thing it cannot: a name misspelt against the parser that writes it. Input and
+        // expectation both come from the mapping here, so the two agree with each other whatever either of
+        // them says. `everyGroupIsReachableFromACodeSomeParserActuallyWrites` is the second source.
         for ((group, families) in TranscriptWarnings.GROUPED_FAMILIES) {
             for (family in families) {
                 assertEquals("$family is not its own family name", family, TranscriptWarnings.family(family))
@@ -195,6 +269,11 @@ class TranscriptWarningsTest {
             WarningGroup.entries.toSet(),
             TranscriptWarnings.GROUPED_FAMILIES.map { it.first }.toSet(),
         )
+        // A group listed with an empty list is present as a key and reachable through nothing, and the
+        // comparison above answers only for the keys.
+        for ((group, families) in TranscriptWarnings.GROUPED_FAMILIES) {
+            assertTrue("$group is listed without a family of its own", families.isNotEmpty())
+        }
         assertEquals(
             TranscriptWarnings.GROUPED_FAMILIES.sumOf { it.second.size },
             TranscriptWarnings.FAMILIES.size,
