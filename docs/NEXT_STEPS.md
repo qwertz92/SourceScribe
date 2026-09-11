@@ -13,7 +13,8 @@ Arbeit ohne Wiedereinlesen der ganzen Sitzung weitergehen kann. Reihenfolge ist 
 
 Runden 3 bis 10 haben ihren wichtigsten Fund jeweils in den Korrekturen der Vorrunde gehabt. Runde 10 am
 deutlichsten: Die Korrektur der Vorrunde hatte ihren Fehler nicht behoben, sondern verschoben und seinen
-Auslöser verbreitert. Die Commits der zehnten Runde einzeln benennen, nicht als Bereich — die
+Auslöser verbreitert. Die Commits der zehnten Runde sind `db8a6d2` (Code) und `c795ab0` (Doku); die der
+elften stehen darunter, sobald sie geschrieben sind. Einzeln benennen, nicht als Bereich — die
 Bereichsschreibweise lag in Runde 7 schon einmal daneben, weil `a..b` den Anfangscommit auslässt und
 ältere Fixes Vorfahren davon sind. Drei Sonnet-5-Reviewer: core, Doku, und einer quer durchs Repository.
 Vier Lehren gehören in den Auftrag:
@@ -46,11 +47,13 @@ Die Jagdliste:
 - Die Regel „Tragen ist begrenzt, Fragen nicht“ gilt jetzt in `ExtractorMetadata`. Wird anderswo eine Frage
   an eine gekürzte Kopie gestellt? `CaptionParser`, `SttStep`, `Diagnostics`, `Labels` sind die Stellen mit
   `contains(`, `startsWith(` oder `endsWith(` auf einem Wert, der vorher durch `take(` gelaufen ist.
-- **Die vier neu ausgeschriebenen Grenzen: Ist die festgenagelte Zahl die richtige?** Eine Grenze
+- **Die fünf neu ausgeschriebenen Grenzen: Ist die festgenagelte Zahl die richtige?** Eine Grenze
   festzunageln hält sie fest, auch wenn sie von Anfang an falsch war. `MAX_CANONICAL_BYTES` (32 MiB),
-  `MAX_AUDIO_SECONDS` (36 000), `Warnings.LIMIT` (64), `MAX_DURATION_MS` (36 000 000). Für die zweite ist
-  die Probe leicht: Der Text `invalid_duration` nennt in beiden Sprachen 600 Minuten, ohne sie von dort zu
-  lesen. Für die vierte gilt sie gegen die aktuelle Anbieterdokumentation.
+  `MAX_AUDIO_SECONDS` (36 000), `Warnings.LIMIT` (64), `Warnings.KIND_LIMIT` (160), `MAX_DURATION_MS`
+  (36 000 000). Zwei davon sind in Runde 11 gegen eine zweite Quelle bestätigt worden: `MAX_AUDIO_SECONDS`
+  gegen die 600 Minuten, die der Text `invalid_duration` in beiden Sprachen nennt, und `MAX_DURATION_MS`
+  gegen AssemblyAIs eigene Dokumentation. Für die übrigen drei gibt es keine zweite Quelle im Repository —
+  das ist eine Lücke im Beweis, kein Fehler, und wer sie schließen kann, soll es sagen.
 - Die Sichtbarkeit war die Ursache: Ein Test greift nach einer Konstante, wenn er sie sehen kann. Welche
   `internal` oder `public` Konstanten gibt es sonst noch, und hängt an einer davon ein Test, der mit ihr
   mitwandert? Die Suche geht über alle drei Module, nicht nur über `core`.
@@ -101,6 +104,27 @@ Instrumentierung läuft **nicht** über Gradle aus WSL heraus; der Grund und der
 [DEFECTS.md](DEFECTS.md) unter den Wartungshinweisen. Kurzfassung: APKs in WSL bauen, unter Windows
 installieren, `am instrument` direkt starten. Das eigene Gerät ist `emulator-5556`;
 `emulator-5554` gehört dem Nutzer und wird nicht angefasst.
+
+**Es sind zwei Instrumentierungssuiten, nicht eine.** Die Runden 6 bis 10 haben nur die erste ausgeführt
+und ihre Zahl als das Gate berichtet; die zweite lief in keiner Runde. Beide gehören dazu:
+
+```bash
+wsl.exe -e bash -lc "cd /mnt/c/Users/thoma/mystuff/personal/Projects/SourceScribe && bash tools/build-local.sh :app:assembleDebug :app:assembleDebugAndroidTest :extractor:assembleDebugAndroidTest"
+```
+
+```bash
+adb -s emulator-5556 shell am instrument -w -r app.sourcescribe.debug.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+```bash
+adb -s emulator-5556 shell am instrument -w -r -e sourcescribeEngineUpdate true app.sourcescribe.extractor.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+Das `-e sourcescribeEngineUpdate true` ist nicht optional, auch wenn der Lauf ohne es grün aussieht: Es
+schaltet vierzehn Tests von `EngineUpdateManagerTest` frei, die sonst per Annahme übersprungen werden —
+Prüfsumme, Slotwechsel, Rückrollung, beschädigter aktiver Slot. Ohne den Schalter meldet die Suite
+21 bestanden und 18 übersprungen, mit ihm 35 bestanden und 4 übersprungen. Die verbleibenden vier
+brauchen eine echte Quelle beziehungsweise ein echtes Release und bleiben `BLOCKED/NOT_RUN`.
 
 ## Restarbeiten nach der ersten persönlichen Preview
 

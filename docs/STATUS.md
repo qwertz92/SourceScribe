@@ -405,14 +405,19 @@ baut, die er prüft, wandert mit ihr mit; genau das hat Runde 9 an der Bildadres
 steckte noch in `ArtifactFiles.MAX_CANONICAL_BYTES` (32 MiB), `JobLimits.MAX_AUDIO_SECONDS` (zehn Stunden,
 eine Zusage des Produkts), `Warnings.LIMIT` (64) und `AssemblyAiAdapter.MAX_DURATION_MS` (zehn Stunden, die
 Grenze des Anbieters). Drei davon haben die Reviewer durch Absenken der Konstante und einen grün bleibenden
-Lauf belegt. Alle vier stehen jetzt ausgeschrieben.
+Lauf belegt. Ausgeschrieben stehen jetzt fünf: dieselbe Testzeile nagelt neben `Warnings.LIMIT` auch
+`Warnings.KIND_LIMIT` (160) fest. Die fünfte ist die schwächste der Funde, weil sie als einzige schon eine
+echte Untergrenze hatte — seit Runde 7 prüft ein Test, dass sie mindestens das Doppelte aller Namen fasst,
+die das Programm selbst erzeugen kann, also 142. Zwischen 143 und 159 hielt sie nichts.
 
-Warum diese vier so lange durchgekommen sind, ist keine Zufallsfrage, sondern eine Frage der Sichtbarkeit.
-Alle vier sind öffentlich, `MAX_URL_LENGTH` aus Runde 9 ist `internal` — ein Test kann sie alle nennen,
-und ein Test, der eine Konstante nennen kann, nennt sie lieber als die Zahl. `MAX_FILENAME_PART_BYTES` und
-die Grenzen in `RetryDelay` sind dagegen `private`: Ihre Tests kamen gar nicht an sie heran und mussten die
-Zahl ausschreiben, weshalb sie dieses Muster nie hatten. Nicht Sorgfalt hat sie geschieden, sondern
-Sichtbarkeit — was auch sagt, wo als Nächstes zu suchen ist.
+Warum diese fünf so lange durchgekommen sind, ist keine Zufallsfrage, sondern eine Frage der Sichtbarkeit —
+aber nicht der zwischen `public` und `internal`. Die Tests, die eine dieser Grenzen prüfen, liegen in
+`core/src/test`, also im selben Modul; von dort ist `internal` genauso sichtbar wie `public`, und
+`Warnings.LIMIT` steht in einer `internal class`, ist also gar nicht öffentlich. Entscheidend ist eine
+andere Linie: `MAX_FILENAME_PART_BYTES` und die Grenzen in `RetryDelay` sind `private`. Ihre Tests kamen
+auch aus demselben Modul nicht an sie heran und mussten die Zahl ausschreiben, weshalb sie dieses Muster
+nie hatten. Nicht Sorgfalt hat sie geschieden, sondern Erreichbarkeit vom Test aus — was auch sagt, wo als
+Nächstes zu suchen ist.
 
 **Eine eigene Behauptung aus Runde 9 war zu großzügig.** Die Commitnachricht sagte, zwei neue Zusicherungen
 fingen einen doppelten Eintrag in der Familienliste. Ausgeführt fängt ihn eine; die zweite ist aus den

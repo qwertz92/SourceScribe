@@ -349,11 +349,21 @@ Gewinn und deshalb nicht gemacht.
   ist — die Quelle hat die beiden auseinandergehalten. Der Nutzer bekommt dann aber eine Liste, in der
   beide Spuren gar keine Sprache nennen, und keinen Hinweis darauf, dass eine genannt wurde. Die Frage ist
   damit richtig gestellt, aber schwer zu beantworten.
-- **Warum nicht gefixt:** Der Fall ist nicht beobachtet worden und mit echten yt-dlp-Daten praktisch nicht
-  erreichbar — reale Sprach-Tags sind unter zwanzig Zeichen lang. Ein eigener Text dafür bräuchte zwei neue
-  übersetzte Zeichenketten für einen Zustand, den niemand je sehen wird; die Alternative wäre, die Angabe
-  gekürzt und als gekürzt gekennzeichnet mitzuführen, was der Regel „ganz oder gar nicht“ widerspräche.
-  Die falsche stille Entscheidung ist behoben, die schlechte Frage bleibt.
+- **Der Herkunftsnachweis sagt es seit Runde 11.** Ein Reviewer hat die zweite Hälfte dieses Punktes
+  gefunden, die schwerer wiegt als die erste: `TranscriptExporter` schrieb `language=unknown`, wenn die
+  Quelle sehr wohl eine Sprache genannt hatte. Der Export ist der Herkunftsnachweis, und die Offenlegung
+  von Sprache und Unsicherheit ist eine Invariante dieses Projekts — dort stand also eine unwahre Aussage.
+  Er schreibt jetzt `language=stated-but-unusable`.
+- **Warum die Anzeige nicht gefixt ist:** Der Fall ist nicht beobachtet worden und mit echten yt-dlp-Daten
+  praktisch nicht erreichbar — reale Sprach-Tags sind unter zwanzig Zeichen lang. Ein eigener Text dafür
+  bräuchte zwei neue übersetzte Zeichenketten für einen Zustand, den niemand je sehen wird; die Alternative
+  wäre, die Angabe gekürzt und als gekürzt gekennzeichnet mitzuführen, was der Regel „ganz oder gar nicht“
+  widerspräche. Die falsche stille Entscheidung ist behoben, die schlechte Frage bleibt.
+- **Und warum die Sortierung so bleibt:** `AudioTracks.readingOrder` legt eine Spur mit verworfener Sprache
+  in dieselbe Gruppe wie eine ohne jede Sprache, ebenfalls in Runde 11 gefunden. Das bleibt absichtlich so,
+  solange die Anzeige beide als „Unbekannt“ führt: Würde nach einem Unterschied sortiert, den die Liste
+  nicht zeigt, wäre ihre Reihenfolge für den Leser nicht mehr erklärbar. Wer den Text ergänzt, ändert
+  beides zusammen.
 
 ### 23. Die Höchstdauer steht an drei Stellen als eigene Zahl (niedrig)
 
@@ -438,16 +448,25 @@ ist deshalb lokal nicht ausführbar, ohne den Windows-`adb`-Server neu zu starte
 Nutzers mit abhängen würde. Der gangbare Weg ohne Eingriff in fremde Geräte:
 
 ```bash
-bash tools/build-local.sh :app:assembleDebug :app:assembleDebugAndroidTest
+bash tools/build-local.sh :app:assembleDebug :app:assembleDebugAndroidTest :extractor:assembleDebugAndroidTest
 ```
 
-Danach unter Windows beide APKs installieren und die Instrumentierung direkt starten:
+Danach unter Windows die APKs installieren und beide Instrumentierungssuiten starten:
 
 ```powershell
 & $adb -s emulator-5556 install -r -t app/build/outputs/apk/debug/app-debug.apk
 & $adb -s emulator-5556 install -r -t app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+& $adb -s emulator-5556 install -r -t extractor/build/outputs/apk/androidTest/debug/extractor-debug-androidTest.apk
 & $adb -s emulator-5556 shell am instrument -w -r app.sourcescribe.debug.test/androidx.test.runner.AndroidJUnitRunner
+& $adb -s emulator-5556 shell am instrument -w -r -e sourcescribeEngineUpdate true app.sourcescribe.extractor.test/androidx.test.runner.AndroidJUnitRunner
 ```
+
+**Die zweite Suite gehört dazu, und die Flagge auch.** Das Modul `extractor` hat eigene 39
+Instrumentierungstests; die Reviewrunden 6 bis 10 haben nur die 191 des Moduls `app` ausgeführt und deren
+Zahl als das Gate berichtet. Ohne `-e sourcescribeEngineUpdate true` überspringt die zweite Suite vierzehn
+Tests von `EngineUpdateManagerTest` per Annahme und sieht mit 21 bestanden trotzdem grün aus; mit der
+Flagge sind es 35 bestanden, 4 übersprungen, 0 Fehler. Die vier brauchen eine echte Quelle beziehungsweise
+ein echtes Release und bleiben `BLOCKED/NOT_RUN`.
 
 ### Abhängigkeitsprüfung nach jedem Versionswechsel neu erzeugen
 
