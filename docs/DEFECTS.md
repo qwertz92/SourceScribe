@@ -114,8 +114,11 @@ dass eine unbekannte Antwort ungeprüft als Modellangabe erscheint.
 ### 9. Warncodes in der Ergebnisansicht — erledigt am 11. September 2026
 
 Bleibt als Nummer stehen, damit Verweise aus anderen Dokumenten gelten. Aus über 50 Codefamilien
-werden jetzt zwölf Sätze; die Zuordnung liegt in `core/.../TranscriptWarnings.kt` und ist ohne Gerät
-testbar. Die rohen Codes stehen weiterhin unter den Details der Ergebnisansicht. Ein Code, für den es
+werden jetzt dreizehn Sätze; die Zuordnung liegt in `core/.../TranscriptWarnings.kt` und ist ohne Gerät
+testbar. Die Zahl war hier und in [Restarbeiten](NEXT_STEPS.md) bis Runde 7 mit zwölf angegeben, obwohl
+`SECTION_ALIGNMENT` schon in Runde 5 als dreizehnte Gruppe dazugekommen war. Seit Runde 7 ist die
+Zuordnung Daten statt eines `when`, und jeder einzelne Familienname wird in fünf Schreibweisen durch die
+Zusammenfassung geführt — vorher war je einer pro Gruppe geprüft und die übrigen 46 von nichts. Die rohen Codes stehen weiterhin unter den Details der Ergebnisansicht. Ein Code, für den es
 keinen Satz gibt, wird weiterhin technisch angezeigt statt verschluckt, und ein Eintrag, der gar nicht
 wie ein Code aussieht, wird unverändert durchgereicht.
 
@@ -150,6 +153,15 @@ wie ein Code aussieht, wird unverändert durchgereicht.
 - **Heute nicht erreichbar:** In diesem Projekt hat noch kein echter Anbieterlauf stattgefunden (siehe
   Punkt 8), es gibt also keinen gespeicherten Teilstand mit Anbieterwarnungen. Erreichbar wird es,
   sobald echte Läufe existieren und danach die Warnungserzeugung erneut verändert wird.
+- **Am 11. September 2026 ist genau so eine Änderung passiert, zweiter Fall dieser Art:**
+  `SyncTranscriptParser` meldet für ein vorhandenes, aber unbrauchbares `model`-Feld jetzt
+  `REPORTED_MODEL_MALFORMED`, wo es vorher schwieg. Eine gespeicherte Antwort mit `"model":""` liefert
+  beim Neuparsen also eine Warnung mehr als die gezählte, und der Weg „nur fehlende Abschnitte“ wird
+  für diesen Teilstand dauerhaft verweigert. Der Ausfall bleibt der sichere aus dem Absatz darüber:
+  kein Kostenrisiko, keine stille Wiederholung, Teilstand erhalten. Die Änderung ist trotzdem richtig,
+  weil sie eine Meldepflicht erfüllt, und sie zeigt, dass dieser Punkt keine Einzelfallfrage ist: jede
+  künftige Korrektur an der Warnungserzeugung trifft ihn wieder, solange `normalizationVersion` nicht
+  entschieden ist.
 - **Was fehlt:** `TranscriptDocument.normalizationVersion` (`core/.../Domain.kt:163`) steht fest auf
   `"1"`, wird nirgends erhöht und nirgends geprüft — nur im Export angezeigt. Es ist offenbar genau
   für diesen Fall gedacht. Zum Schließen: einen kurzen Architekturentscheid schreiben, was ein
@@ -225,6 +237,8 @@ wie ein Code aussieht, wird unverändert durchgereicht.
   `everyRefusalTheProviderGivesForOneSectionCountsAsALostSection`.
 - **Was fehlt:** Entweder eine geschlossene Liste statt der Präfixregel oder ein Test, der die Kopplung an
   `missing` am Erzeugungsort festhält.
+- **Seit Runde 7:** Die Zahl dieser Familien ist als `TranscriptWarnings.PREFIXED_FAMILY_COUNT` zählbar und
+  geht in die Obergrenze von `Warnings` ein. Das ändert nichts an der Zuordnungsfrage hier.
 
 ### 17. „Tonspur“ gegen „Audiospur“: Englisch ist einheitlich, Deutsch nicht (niedrig)
 
@@ -263,6 +277,19 @@ vorsichtige Seite, und der Test hält sie fest statt sie zu behaupten. Der Zusat
 Exportzeile die geschriebene Endung führte; das ist eine Spalte mehr samt Migration für einen kosmetischen
 Gewinn und deshalb nicht gemacht.
 
+### 20. Die zwei Modelllängengrenzen sind unabhängig hartkodiert (niedrig)
+
+- **Stelle:** `core/.../providers/AssemblyAiAdapter.kt` und `core/.../providers/SyncTranscriptParser.kt`,
+  je ein privates `MAX_REPORTED_MODEL_LENGTH = 128`; in den Tests je ein eigenes `129`
+- **Voraussetzung:** Jemand ändert die Grenze an einer der beiden Stellen.
+- **Erwartet gegen tatsächlich:** Erwartet wäre, dass beide Parser dieselbe Antwort auf denselben Wert
+  geben — das ist die Zusage, die Runde 7 mit der Reihenfolge der Ablehnungsgründe hergestellt hat.
+  Tatsächlich hält nichts die beiden Zahlen zusammen: kein gemeinsamer Wert, kein Test, der sie
+  vergleicht. Die Abweichung fiele erst auf, wenn jemand beide Parser mit demselben Wert prüft.
+- **Was fehlt:** Ein gemeinsamer Ort für die Grenze. Er gehört nicht in einen der beiden Adapter, und ob
+  `ProviderContract` der richtige Platz für eine Parsergrenze ist, ist eine Entscheidung und kein Handgriff
+  — deshalb hier notiert statt nebenbei gemacht.
+
 ## Bewusste Entscheidungen, die wie Fehler aussehen
 
 ### Ein gewöhnlicher Start-Tap nach „Neu vorbereiten“ genügt für die Freigabe
@@ -293,6 +320,24 @@ eine fehlende Passage. Die Wortliste trägt nur die Zeiten je Wort und erscheint
 fehlender Eintrag ist dort eine fehlende Zeitangabe. Deshalb gehören `MALFORMED_SEGMENT` und
 `MISSING_SEGMENT_TEXT` zu den fehlenden Texten, `MALFORMED_WORD` und `MISSING_WORD_TEXT` zu den Wortzeiten —
 obwohl beide Paare aus derselben Zeile derselben Funktion stammen.
+
+### Die 40-Byte-Schranke des Titels trägt die Namenslänge mit
+
+Ein Reviewer hat in Runde 7 als hohen Fund gemeldet, dass `TranscriptExporter.compose` das Budget für den
+Titel als Bytegrenze minus der *Zeichenzahl* des Teils berechnet, der überleben muss. Sprache und Quell-ID
+reichen je 40 Byte, bei Dreibytezeichen also 13 Zeichen, das Budget fällt um bis zu 52 Byte zu groß aus, der
+Name überläuft seine Grenze, und der abschließende Schnitt nimmt das Ende — wo der Streuwert sitzt.
+
+Die Einheitenverwechslung war echt und ist korrigiert. Auslösbar war sie nicht, und das ist der Teil, der
+hier stehen muss, weil er sonst in jeder Runde neu als hoher Fund gemeldet wird: `generatedStem` schickt den
+Titel vorher durch `safePart` mit dessen Standardwert von 40 Byte. Der breiteste Name, den der Namensbauer
+zusammensetzen kann, bleibt damit unter der Grenze von 180 Byte — nachgewiesen mit wieder eingebautem Fehler,
+unter dem der zugehörige Test grün durchläuft, während sechs andere fallen.
+
+Daraus folgt umgekehrt: Die Schranke von 40 Byte auf dem Titel ist tragend, nicht kosmetisch. Wer den Anteil
+des Titels am Namen erhöht — die naheliegendste nächste Änderung an dieser Datei —, nimmt der Grenze ihren
+zweiten Halt. Der Test `noPartOfANameMeasuredInCharactersPushesTheIdentityOutOfIt` ist deshalb keine
+Regressionsprobe, sondern eine Schrankenprobe über 648 Namenskombinationen.
 
 ### Nicht erreichbare `PROVIDER_`- und `RESPONSE_`-Zweige in `messageText`
 

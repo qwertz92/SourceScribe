@@ -49,7 +49,8 @@ Zwischenstand und drei Glossarzitate, die nicht der Beschriftung auf dem Bildsch
 Korrekturen der zweiten Runde selbst eingebaut hatten. Die neue Zeile mit der Trefferzahl hatte keine
 reservierte Höhe und konnte beim ersten Tastendruck umbrechen, also genau der Layout-Shift, den derselbe
 Auftrag beseitigen sollte. Weiter aus Runde 3: die Warnliste beider Antwortparser wuchs mit der
-Antwortgröße statt mit der Zahl echter Probleme (gedeckelt in `core/.../providers/Warnings.kt`, betraf
+Antwortgröße statt mit der Zahl echter Probleme (gedeckelt in `core/.../Warnings.kt`, damals noch unter
+`providers/`, betraf
 auch OpenAI und Groq), die Herkunftszeile eines Audioformats nannte Felder, deren Inhalt der Leser
 verwirft, die Schrittangabe der Audiovorbereitung trug noch das Verb des Herunterladens, und zwei neue
 Textbausteine wichen vom Wortschatz des übrigen Programms ab. Zwei Funde derselben Runde sind nicht
@@ -97,8 +98,8 @@ vor Runde 3 geschlossen: Er lag nicht am Code, sondern an einem Test, der noch d
 `782aef5` verlangte. Der Plan für die Fortsetzung steht in [Restarbeiten](NEXT_STEPS.md).
 
 Nach Runde 4 umgesetzt: Die Ergebnisansicht zeigt keine rohen Warncodes mehr. Aus über 50
-Codefamilien aus vier Quellen werden zwölf Sätze, geordnet nach dem, was sie für das Transkript
-bedeuten — erst was fehlt, dann was unsicher ist, dann was der Anbieter über sich selbst gemeldet hat.
+Codefamilien aus vier Quellen wurden zunächst zwölf Sätze, seit Runde 5 dreizehn, geordnet nach
+dem, was sie für das Transkript bedeuten — erst was fehlt, dann was unsicher ist, dann was der Anbieter über sich selbst gemeldet hat.
 Die Zuordnung liegt in `core/.../TranscriptWarnings.kt` und ist damit ohne Gerät testbar; die rohen
 Codes bleiben unter den Details erreichbar, und ein unbekannter Code wird weiterhin technisch angezeigt
 statt verschluckt.
@@ -179,8 +180,67 @@ Gates nach Runde 6: 151 JVM-Tests im Modul `core` ohne Fehler, alle vier Lintber
 Der 191. ist der Test zu Punkt 19: Er führt einen echten RAW-Export aus und danach einen Textexport
 desselben Artefakts, weil die Regel für RAW-Geschwister bisher nur im Namensbauer geprüft war.
 
-**Die Schleife ist nicht konvergiert.** Sechs Runden, keine davon leer. Solange eine Runde noch etwas findet,
-ist die nächste fällig — gerade weil die Funde der Runden 3 bis 6 jeweils in den Korrekturen der Vorrunde
+### Runde 7
+
+Drei Reviewer über `2296fe5..d6af9fd`, also über alle Commits der Runden 5 und 6. Vier Funde, drei bestätigt,
+einer beim Nachrechnen entkräftet.
+
+**Der wichtigste lag wieder in der Vorrunde, und wieder in ihrem nützlichsten Teil.** Runde 6 hatte die
+Deckelung der Warnliste so erweitert, dass die erste Warnung einer noch nicht gemeldeten Art auch jenseits
+der Grenze erhalten bleibt. Die Begründung stand im Klassenkommentar: Welche Arten es gibt, entscheidet
+dieses Programm und nicht die Antwort, ihre Zahl ist also klein. Das stimmte für die drei Aufrufstellen und
+für nichts in der Klasse selbst — sie deckelte die Zahl der Arten nicht. Fünftausend verschiedene
+Freitexteinträge, oder fünftausend Großbuchstabennamen ohne angehängte Zahl, blieben alle in der Liste, und
+die Kürzungsmarke wurde nicht einmal gesetzt: genau das Wachstum mit der Antwortgröße, gegen das die Klasse
+existiert.
+
+Die Korrektur ist eine harte Obergrenze auf die Zahl der Arten und damit auf die Liste: höchstens `LIMIT`
+plus `KIND_LIMIT` Einträge, wie ein Aufrufer seine Codes auch benennt. Damit die Grenze eine Decke bleibt
+und nicht zur Arbeitsgrenze wird, ist die Zuordnung von Codefamilien zu Gruppen von einem `when` in Daten
+überführt — `TranscriptWarnings.GROUPED_FAMILIES`. Die Namen sind dadurch zählbar, ein Test hält die Zahl
+der selbst benannten Arten mit doppeltem Abstand unter der Decke, und derselbe Umbau schließt eine zweite
+Lücke aus Runde 5: von 59 Familiennamen war je einer pro Gruppe geprüft, die übrigen 46 von nichts. Jeder
+wird jetzt in fünf Schreibweisen durch die Zusammenfassung geführt.
+
+Weiter bestätigt: `CaptionTrack.name` folgte der Leerstringregel nicht, die Runde 6 für die übrigen
+Quellfelder eingezogen hatte — ein als `""` gemeldeter Spurname erschien in der Herkunftszeile als `name=`,
+wo ein fehlender Name `unknown` ergibt. Dieselbe halb geschlossene Begründung wie zweimal vorher.
+Und `SyncTranscriptParser` nannte für einen leeren, aber überlangen Modellwert den falschen Grund: zu lang,
+obwohl der Wert nichts benannte und kein Kürzen ihn brauchbar gemacht hätte. Ein kurzer leerer Wert war dort
+gar keine Meldung, während der AssemblyAI-Adapter ihn immer meldet. Beide antworten jetzt gleich. Die Folge
+für Punkt 11 der bekannten Probleme ist dort vermerkt, weil dies der zweite Fall dieser Art ist.
+
+**Ein Fund hat das Nachrechnen nicht überlebt.** Gemeldet als hoch: `compose` berechnet das Budget für den
+Titel als Bytegrenze minus der *Zeichenzahl* des Teils, der überleben muss; Sprache und Quell-ID reichen je
+40 Byte, bei Dreibytezeichen also 13 Zeichen, das Budget fällt um bis zu 52 Byte zu groß aus, und der
+abschließende Schnitt nimmt das Ende, wo der Streuwert sitzt. Die Einheitenverwechslung ist echt. Auslösbar
+ist sie nicht: `generatedStem` schickt den Titel vorher durch `safePart` mit dessen Standardwert von 40 Byte,
+und der Reviewer hat diese Schranke auf Sprache und Quell-ID angewendet, aber nicht auf den Titel. Sein
+Beispiel mit 300 Zeichen Titel erreicht `compose` nie. Korrigiert habe ich die Arithmetik trotzdem, weil die
+Grenzen sonst über zwei Schranken halten, die nichts voneinander wissen, und weil die Titelschranke
+anzuheben die naheliegendste nächste Änderung an dieser Datei ist. Der Test ist entsprechend keine
+Regressionsprobe, sondern eine Schrankenprobe über 648 Namenskombinationen; Code und
+[Bekannte Probleme](DEFECTS.md) sagen genau das.
+
+**Die Gegenprobe hat auch einen Fehler in meinem eigenen Test gefunden.** Ich habe alle Korrekturen dieser
+Runde vorübergehend zurückgenommen und die Tests laufen lassen, um zu sehen, welcher neue Test wirklich
+greift. Sechs fielen, einer nicht: Er setzte die Quelle mit `document().source.copy(...)` neu und ersetzte
+damit den langen Titel durch den kurzen Standardwert, sodass gar keine Kürzung ausgelöst wurde. Ohne diesen
+Durchlauf wäre er als grüner Test durchgegangen, der nichts prüft — und der entkräftete Fund wäre als
+behoben gemeldet worden, obwohl nichts ihn belegt hätte. Die Gegenprobe gehört ab jetzt zur Runde.
+
+Aus der Doku-Prüfung: „zwölf Sätze“ stand an zwei Stellen, obwohl `SECTION_ALIGNMENT` schon in Runde 5 die
+dreizehnte Gruppe war; der Pfad `providers/Warnings.kt` in der Runde-3-Passage zeigte seit Runde 5 auf
+nichts. Beides korrigiert. Die vom selben Reviewer gemeldete Angabe 190/184 Instrumentierungstests war zum
+Zeitpunkt seines Lesens richtig und mit `d6af9fd` bereits auf 191/185 nachgeführt — ein Zeitversatz, kein
+Fund.
+
+Gates nach Runde 7: 160 JVM-Tests im Modul `core` ohne Fehler, alle vier Lintberichte ohne Befund,
+191 Instrumentierungstests auf `emulator-5556` — 185 bestanden, 6 per Annahme übersprungen, 0 Fehler.
+Die neun neuen JVM-Tests sind die aus dieser Runde.
+
+**Die Schleife ist nicht konvergiert.** Sieben Runden, keine davon leer. Solange eine Runde noch etwas findet,
+ist die nächste fällig — gerade weil die Funde der Runden 3 bis 7 jeweils in den Korrekturen der Vorrunde
 lagen.
 
 ## UI-Feedback umgesetzt

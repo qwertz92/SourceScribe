@@ -9,29 +9,39 @@ Arbeit ohne Wiedereinlesen der ganzen Sitzung weitergehen kann. Reihenfolge ist 
 [STATUS.md](STATUS.md); was offen ist, mit Stelle und fehlendem Nachweis, in
 [DEFECTS.md](DEFECTS.md). Die Punktnummern unten sind die Nummern dort.
 
-### 1. Siebte Reviewrunde über die Korrekturen der sechsten
+### 1. Achte Reviewrunde über die Korrekturen der siebten
 
-Runden 3 bis 6 haben ihren wichtigsten Fund jeweils in den Korrekturen der Vorrunde gehabt. Der Commitbereich
-ist `2296fe5..HEAD`. Drei Sonnet-5-Reviewer: core, Texte und Doku, und einer über die Korrekturen selbst.
-Wichtig aus Runde 5 gelernt: Der Bereich muss **alle** Commits der Vorrunde abdecken, nicht nur den
-sichtbarsten — sonst bleibt ein Teil ungeprüft und muss nachgeschoben werden. Die Jagdliste:
+Runden 3 bis 7 haben ihren wichtigsten Fund jeweils in den Korrekturen der Vorrunde gehabt. Der
+Commitbereich beginnt hinter `d6af9fd`. Drei Sonnet-5-Reviewer: core, Texte und Doku, und einer über die
+Korrekturen selbst. Zwei Lehren aus den Vorrunden, die für die Auftragsformulierung gelten: der Bereich muss
+**alle** Commits der Vorrunde abdecken, nicht nur den sichtbarsten; und ein Fund, den der Reviewer nicht
+ausführen konnte, braucht eine Gegenprobe mit wieder eingebautem Fehler, bevor er als lebender Fehler gilt —
+Runde 7 hat so einen hohen Fund entkräftet und dabei einen grünen, aber wirkungslosen eigenen Test gefunden.
+Die Jagdliste:
 
-- `Warnings` fragt jetzt für jede Warnung nach ihrer Familie, um die erste ihrer Art nicht zu verdrängen.
-  Kann eine Antwort die Zahl der Arten in die Höhe treiben, oder ist sie wirklich durch den eigenen Code
-  beschränkt? Was passiert bei genau `LIMIT` Arten?
-- `TranscriptWarnings.family` und `looksLikeCode` arbeiten ohne Regex. Rechne die neue Indexarithmetik gegen
-  die alte Regex-Fassung für jeden real erzeugten Code durch. Randfälle: leere Zeichenkette, nur ein
-  Doppelpunkt, `CHUNK_` ohne Zahl, ein Name, der ganz aus Ziffern besteht.
-- `SECTION_ALIGNMENT` ist in der Reihenfolge verschoben. Stimmt jede Anzeigereihenfolge noch mit dem
-  Klassenkommentar überein, und zieht der Test die Reihenfolge wirklich nach?
-- `ExtractorMetadata.string` und `value` behandeln eine leere Zeichenkette wie ein fehlendes Feld. Gibt es
-  ein Feld, dessen Bedeutung sich dadurch ändert, statt nur präziser zu werden?
-- `TranscriptExporter.SHORT_ID_BYTES` ist von vier auf sechs erhöht. Bleibt jeder Name innerhalb der
-  Bytegrenze, auch bei langem Titel, langer Endung und Mehrbyte-Zeichen?
+- `Warnings` hat jetzt eine harte Obergrenze auf die Zahl der Arten. Was passiert bei genau `KIND_LIMIT`
+  Arten, und was bei genau `LIMIT` Einträgen mit genau `KIND_LIMIT` Arten? Trägt die Kürzungsmarke in jedem
+  Pfad, der jetzt früh aussteigt? Wächst `kinds` wirklich in keinem Pfad über die Decke?
+- Die Zuordnung ist von einem `when` in `GROUPED_FAMILIES` überführt. Ist jeder Name dort noch genau der
+  Name, den der Erzeuger schreibt? Gibt es umgekehrt einen real erzeugten Code, dessen Familie in keiner
+  Liste steht und der dem Leser deshalb als unerklärter Code erscheint? Prüfe gegen `CaptionParser`,
+  `SyncTranscriptParser`, `AssemblyAiAdapter` und `SttStep`, Erzeugungsstelle für Erzeugungsstelle.
+- `GROUPED_FAMILIES` verweist für `MORE_NOTES` auf `Warnings.TRUNCATED` statt auf ein Literal. Bleibt die
+  Sichtbarkeit sauber, und entsteht daraus eine Initialisierungsreihenfolge zwischen zwei Typen, die sich
+  gegenseitig brauchen?
+- `TranscriptExporter.byteSize` ersetzt zwei Zeichenzählungen. Steht in derselben Datei noch irgendwo eine
+  Zeichenzahl gegen eine Bytegrenze? Und hält die Schrankenprobe auch für einen Namen ohne Bindestrich, für
+  `customStem` mit Bindestrich am Ende und für `ExportFormat.RAW` ohne `rawExtension`?
+- `ExtractorMetadata` begrenzt die Originalsprache auf 100 Zeichen und verwirft einen leeren Spurnamen.
+  Gibt es ein weiteres Wurzelfeld ohne Grenze, und ändert die Grenze die Bedeutung eines Feldes statt es
+  nur zu beschneiden?
+- `SyncTranscriptParser.reportedModel` meldet jetzt für ein vorhandenes, unbrauchbares Feld. Welche
+  gespeicherten Antworten bekommen dadurch eine Warnung mehr, und welche Pfade vergleichen Warnzahlen?
+  Punkt 11 der bekannten Probleme ist der bekannte; gibt es einen zweiten?
 
 ### 2. Warncodes lesbar machen (DEFECTS 9) — erledigt
 
-Umgesetzt am 11. September 2026. Zwölf Sätze statt über 50 Codefamilien, Zuordnung in
+Umgesetzt am 11. September 2026. Dreizehn Sätze statt über 50 Codefamilien, Zuordnung in
 `core/.../TranscriptWarnings.kt`, rohe Codes unter den Details. Am Gerät angesehen und die
 Sprungfreiheit der Kopfzeilen über drei Suchzustände nachgemessen.
 
