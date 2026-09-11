@@ -128,6 +128,11 @@ class TranscriptWarningsTest {
             TranscriptWarnings.FAMILIES.keys,
             written.map { TranscriptWarnings.family(it.first) }.toSet(),
         )
+        // The comparison above is between sets, so a name listed twice hides inside it — and is caught only
+        // because the list happens to be exactly as long as the mapping. Said outright, it stays caught
+        // when a further example is added to the list one day.
+        assertEquals(TranscriptWarnings.FAMILIES.size, written.size)
+        assertEquals(written.size, written.map { TranscriptWarnings.family(it.first) }.toSet().size)
         // A group added without a code that reaches it would be a sentence nobody can ever see.
         assertEquals(WarningGroup.entries.toSet(), written.map { it.second }.toSet())
         for ((code, group) in written) {

@@ -38,16 +38,12 @@ object ExtractorMetadata {
         val source = requested.copy(
             title = string("title")?.take(2000), channel = string("channel")?.take(1000),
             durationMs = duration?.times(1000)?.toLong(),
-            // A date and a language tag are each a handful of characters, bounded here like the title and
-            // the channel above. The language is also read back into a file name, where an unbounded value
-            // would spend the whole budget of the identity part before the name reaches its digest.
-            //
-            // The commit that bounded the language called it the only root field without a limit. It was
-            // not: this date had none either, and the address below is refused rather than shortened,
-            // because half an address is not a shorter address but a wrong one.
-            publishedDate = string("upload_date")?.take(100),
+            // A date and a language tag each name one thing, so they follow the rule for identifiers below
+            // rather than the one the title and the channel above follow. The address is refused too, and
+            // for the same reason stated once more: half an address is not a shorter address but a wrong one.
+            publishedDate = identifier(string("upload_date")),
             thumbnailUrl = string("thumbnail")?.takeIf { validImageUrl(it) },
-            originalLanguage = string("language")?.take(100),
+            originalLanguage = identifier(string("language")),
         )
         val tracks = mutableListOf<CaptionTrack>()
         val urls = mutableMapOf<String, String>()
@@ -85,11 +81,10 @@ object ExtractorMetadata {
             val acodec = value("acodec")
             val vcodec = value("vcodec")
             if (!Regex("[A-Za-z0-9_.-]{1,80}").matches(id) || vcodec != "none" || acodec in setOf(null, "none")) return@mapNotNull null
-            // Bounded like the note and the container beside it. It was the one of the three that carried
-            // no limit, and it is handed on unchecked as far as the track list and the export line.
-            val language = value("language")?.take(100)
+            // A language tag, a codec and a container each name one thing; the note beside them is prose.
+            val language = identifier(value("language"))
             val note = value("format_note")?.take(500)
-            val container = value("ext")?.take(20)
+            val container = identifier(value("ext"), MAX_CONTAINER_LENGTH)
             val exact = number("filesize")?.takeIf { it > 0 && it <= MAX_TRACK_BYTES }?.toLong()
             val approximate = number("filesize_approx")?.takeIf { it > 0 && it <= MAX_TRACK_BYTES }?.toLong()
             val sampleRate = number("asr")?.takeIf { it in 1.0..768_000.0 }?.toInt()
@@ -134,7 +129,7 @@ object ExtractorMetadata {
                     else -> null
                 },
                 evidence = "yt-dlp:formats." + backing.filterValues { it != null }.keys.joinToString(","),
-                codec = acodec?.take(80),
+                codec = identifier(acodec, MAX_CODEC_LENGTH),
                 container = container,
                 bitrateKbps = rate,
                 bytes = exact ?: approximate,
@@ -181,7 +176,21 @@ object ExtractorMetadata {
             uri.host in setOf("i.ytimg.com", "img.youtube.com")
     } catch (_: Exception) { false }
 
+    /**
+     * A value that names one thing is kept whole or not at all. Prose survives being shortened — a title cut
+     * at two thousand characters still reads as the title — but a shortened date is a different date and a
+     * shortened language tag a different tag. Worse, two of them can become one: `AudioTracks.automatic`
+     * refuses to choose between two renditions whose languages differ, because which language is spoken is
+     * the reader's decision, and two different tags sharing their first hundred characters would have made
+     * that refusal quietly stop working.
+     */
+    private fun identifier(value: String?, maxLength: Int = MAX_IDENTIFIER_LENGTH) =
+        value?.takeIf { it.length <= maxLength }
+
     internal const val MAX_URL_LENGTH = 32768
+    private const val MAX_IDENTIFIER_LENGTH = 100
+    private const val MAX_CODEC_LENGTH = 80
+    private const val MAX_CONTAINER_LENGTH = 20
 }
 
 object TrackSelection {

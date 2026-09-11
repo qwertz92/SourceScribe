@@ -222,22 +222,39 @@ class ExtractorMetadataTest {
         assertEquals("yt-dlp:formats.acodec,vcodec", audio.evidence)
     }
 
-    @Test fun noFieldOfASourceIsCarriedAtWhateverLengthItArrivesIn() {
-        // The language was bounded first and called the only root field without a limit. It was not: the
-        // date had none either, and neither had the language of an audio format, which sits between a note
-        // and a container that are both bounded. All three are counted in characters, like the title and
-        // the channel; the repeated character is three bytes wide so that a switch to counting bytes shows
-        // up here instead of passing as the same number.
+    @Test fun aFieldThatNamesOneThingIsKeptWholeOrNotAtAll() {
+        // Prose survives being shortened: a title cut at two thousand characters still reads as the title.
+        // An identifier does not — a shortened date is a different date, a shortened tag a different tag —
+        // and two of them can collapse into one. That is what made this a defect rather than a preference:
+        // `AudioTracks.automatic` refuses to choose between two renditions whose languages differ, and two
+        // different tags sharing their first hundred characters would have undone that refusal in silence.
+        //
+        // The repeated character is three bytes wide, so a switch from counting characters to counting
+        // bytes shows up here instead of passing as the same number.
         val long = "あ".repeat(5000)
-        val raw = """{"id":"BaW_jenozKc","language":"$long","upload_date":"$long",
-            "formats":[{"format_id":"140","vcodec":"none","acodec":"mp4a.40.2","language":"$long",
-            "format_note":"$long","ext":"$long"}]}"""
-        val resolved = ExtractorMetadata.parse(raw, source)
-        assertEquals(100, resolved.source.originalLanguage?.length)
-        assertEquals(100, resolved.source.publishedDate?.length)
-        assertEquals(100, resolved.audio.single().language?.length)
-        assertEquals(500, resolved.audio.single().name?.length)
-        assertEquals(20, resolved.audio.single().container?.length)
+        fun parsed(language: String, date: String, codec: String, extension: String) = ExtractorMetadata.parse(
+            """{"id":"BaW_jenozKc","language":"$language","upload_date":"$date",
+                "formats":[{"format_id":"140","vcodec":"none","acodec":"$codec","language":"$language",
+                "format_note":"$long","ext":"$extension"}]}""",
+            source,
+        )
+
+        val over = parsed(long, long, "mp4a$long", long)
+        assertNull(over.source.originalLanguage)
+        assertNull(over.source.publishedDate)
+        assertNull(over.audio.single().language)
+        assertNull(over.audio.single().codec)
+        assertNull(over.audio.single().container)
+        // The note beside them is prose and keeps its shortened form, which is the other half of the rule.
+        assertEquals(500, over.audio.single().name?.length)
+
+        // Right at the bound the value still names its thing, so it is kept whole rather than refused.
+        val kept = parsed("あ".repeat(100), "あ".repeat(100), "あ".repeat(80), "あ".repeat(20))
+        assertEquals(100, kept.source.originalLanguage?.length)
+        assertEquals(100, kept.source.publishedDate?.length)
+        assertEquals(100, kept.audio.single().language?.length)
+        assertEquals(80, kept.audio.single().codec?.length)
+        assertEquals(20, kept.audio.single().container?.length)
     }
 
     @Test fun anEndlessThumbnailAddressIsRefusedRatherThanShortened() {
@@ -249,7 +266,14 @@ class ExtractorMetadataTest {
         ).source.thumbnailUrl
         val stem = "https://i.ytimg.com/vi/BaW_jenozKc/"
         assertEquals(stem, thumbnail(stem))
-        assertNull(thumbnail(stem + "a".repeat(ExtractorMetadata.MAX_URL_LENGTH)))
+
+        // The bound is written out here rather than taken from the constant. A test that builds its input
+        // from the same number it checks moves with that number, so it would pass a bound lowered by
+        // mistake — and the constant is then held to the written number once, in its own line.
+        assertEquals(32768, ExtractorMetadata.MAX_URL_LENGTH)
+        val atBound = stem + "a".repeat(32768 - stem.length)
+        assertEquals(atBound, thumbnail(atBound))
+        assertNull(thumbnail(atBound + "a"))
     }
 
     @Test fun absentLanguagePreferenceFallsBackOnlyToTheParenthesisedNote() {
