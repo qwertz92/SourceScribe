@@ -185,6 +185,18 @@ class ExtractorMetadataTest {
         assertTrue(ExtractorMetadata.parse(withoutCodec, source).audio.isEmpty())
     }
 
+    @Test fun aSourceFieldWrittenAsAnEmptyStringIsAbsentRatherThanEmpty() {
+        // The same rule the fields of a format follow. Without it the record carries an empty title and an
+        // empty original language, and both read as something the extractor reported.
+        val raw = """{"id":"BaW_jenozKc","title":"","channel":"   ","language":"","upload_date":"",
+            "formats":[{"format_id":"140","vcodec":"none","acodec":"mp4a.40.2","ext":"m4a"}]}"""
+        val resolved = ExtractorMetadata.parse(raw, source).source
+        assertNull(resolved.title)
+        assertNull(resolved.channel)
+        assertNull(resolved.originalLanguage)
+        assertNull(resolved.publishedDate)
+    }
+
     @Test fun absentLanguagePreferenceFallsBackOnlyToTheParenthesisedNote() {
         fun note(value: String) = ExtractorMetadata.parse(
             """{"id":"BaW_jenozKc","formats":[{"format_id":"140","vcodec":"none","acodec":"mp4a.40.2","format_note":"$value"}]}""",
