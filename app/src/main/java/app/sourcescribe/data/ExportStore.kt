@@ -74,16 +74,17 @@ class ExportStore @Inject constructor(
                         if (documentExists(documentUri.toUri())) {
                             row
                         } else {
-                            updateAfterFailure(
-                                row,
-                                ExportState.FAILED,
-                                ERROR_EXTERNAL_DOCUMENT_MISSING,
-                                documentUri,
-                            )
+                            // The provider answered, and it answered that this document is gone. A URI kept
+                            // here would go on naming a file that no longer exists, and `write` reads exactly
+                            // that field to decide whether a chosen export name is still taken. Dropping it
+                            // follows the convention `cleanup` already uses: null means no document out there.
+                            updateAfterFailure(row, ExportState.FAILED, ERROR_EXTERNAL_DOCUMENT_MISSING, null)
                         }
                     } catch (_: SecurityException) {
                         updateAfterFailure(row, ExportState.PERMISSION_REQUIRED, ERROR_PERMISSION_REQUIRED, documentUri)
                     } catch (_: IllegalArgumentException) {
+                        // The stored URI could not be asked at all, so nothing was established about the file
+                        // behind it. It keeps its URI and goes on counting as a name that is taken.
                         updateAfterFailure(row, ExportState.FAILED, ERROR_EXTERNAL_DOCUMENT_MISSING, documentUri)
                     }
                 }
@@ -117,6 +118,9 @@ class ExportStore @Inject constructor(
             val chosenName = dao.artifact(row.artifactId)?.displayName
             // A chosen name belongs to the reader, so the first export into a given extension keeps it exactly.
             // A second one would land on that same file, so only that one carries the per-export discriminator.
+            // A row without a document URI names no file: either it never created one, or `reconcile` asked
+            // the provider and was told the document is gone. An interrupted write is not that case — its
+            // file exists, because the URI is only stored once `createDocument` has returned.
             val repeated = dao.exports(row.artifactId).any {
                 it.id != row.id && it.documentUri != null && targetExtension(it)?.equals(payload.extension) != false
             }

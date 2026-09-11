@@ -187,8 +187,55 @@ class ExportStoreTest {
             val reconciled = harness.store.reconcile(exported.id)
             assertEquals(ExportState.FAILED, reconciled.state)
             assertEquals("EXTERNAL_DOCUMENT_MISSING", reconciled.error)
-            assertEquals(documentUri, reconciled.documentUri)
+            // The document was asked for and is gone, so the row stops naming one.
+            assertNull(reconciled.documentUri)
             assertEquals(reconciled, harness.dao.export(exported.id))
+            assertNotEquals(documentUri, reconciled.documentUri)
+        }
+    }
+
+    @Test
+    fun aChosenNameIsFreeAgainOnceItsDocumentIsProvenGone() = runBlocking {
+        withHarness(ExportFixtureProvider.Mode.NAME_COLLISION) { harness ->
+            assertEquals(1, harness.dao.renameArtifact(harness.artifactId, "Folge 12 Interview"))
+            val first = harness.store.export(harness.artifactId, ExportFormat.TEXT, harness.treeUri)
+            assertEquals(ExportState.EXPORTED, first.state)
+            val documentUri = requireNotNull(first.documentUri)
+            assertTrue(DocumentsContract.deleteDocument(context.contentResolver, documentUri.toUri()))
+            assertNull(harness.store.reconcile(first.id).documentUri)
+
+            val second = harness.store.export(harness.artifactId, ExportFormat.TEXT, harness.treeUri)
+
+            assertEquals(ExportState.EXPORTED, second.state)
+            // Nothing holds the reader's wording any more, so it is written exactly rather than with a suffix.
+            val names = providerAdmin { ExportFixtureProvider.names(context) }
+            assertEquals(names.toString(), listOf("Folge_12_Interview.txt"), names)
+        }
+    }
+
+    @Test
+    fun anInterruptedExportKeepsHoldingItsNameBecauseItsFileIsThere() = runBlocking {
+        withHarness(ExportFixtureProvider.Mode.NAME_COLLISION) { harness ->
+            assertEquals(1, harness.dao.renameArtifact(harness.artifactId, "Folge 12 Interview"))
+            val first = harness.store.export(harness.artifactId, ExportFormat.TEXT, harness.treeUri)
+            // What process loss between createDocument and the finishing update leaves behind: a WRITING row
+            // whose file exists. Telling that apart from the deleted document is the point of the field, and
+            // a fix that simply cleared it on every failure would break exactly here.
+            harness.dao.updateExport(first.copy(state = ExportState.WRITING, verification = null))
+
+            val reconciled = harness.store.reconcile(first.id)
+            assertEquals(ExportState.FAILED, reconciled.state)
+            assertEquals("EXPORT_INTERRUPTED", reconciled.error)
+            assertEquals(first.documentUri, reconciled.documentUri)
+
+            val second = harness.store.export(harness.artifactId, ExportFormat.TEXT, harness.treeUri)
+
+            // The fixture provider refuses a colliding name outright, so a missing suffix fails the export.
+            assertEquals(ExportState.EXPORTED, second.state)
+            val names = providerAdmin { ExportFixtureProvider.names(context) }
+            assertEquals(names.toString(), 2, names.size)
+            assertTrue(names.toString(), names.contains("Folge_12_Interview.txt"))
+            assertTrue(names.toString(), names.any { it.startsWith("Folge_12_Interview-") && it.endsWith(".txt") })
         }
     }
 
