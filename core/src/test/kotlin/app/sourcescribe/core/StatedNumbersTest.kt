@@ -202,35 +202,76 @@ class StatedNumbersTest {
      */
     @Test fun everyNumberThisModuleStatesHasALineInThisFile() {
         val root = sourceRoot()
-        val found = sortedSetOf<String>()
+        val found = mutableListOf<String>()
         root.walkTopDown().filter { it.isFile && it.extension == "kt" }.forEach { file ->
-            file.readLines().forEach { line ->
-                statedNumberName(line)?.let { found += "${file.name.removeSuffix(".kt")}.$it" }
-            }
+            statedNumberNames(file.readText()).forEach { found += "${file.name.removeSuffix(".kt")}.$it" }
         }
+        // An entry is file plus name, with no enclosing object in it, so two constants sharing a name in
+        // one file would arrive as one entry and the list below would speak for whichever came first. A
+        // set swallows that silently, which is why the duplicates are asked for by themselves.
+        assertEquals(
+            "Two constants in one file of this module share a name, so a single line here would have to " +
+                "stand for both of them. Rename one, or the check below cannot mean what it says.",
+            emptyList<String>(),
+            found.groupingBy { it }.eachCount().filterValues { it > 1 }.keys.sorted(),
+        )
         assertEquals(
             "The numbers this module declares and the numbers this file names have come apart. " +
                 "A new constant needs a line here saying where its value comes from; a removed one " +
                 "needs its line taken out. Source root read: $root",
             NAMED_ABOVE.toSortedSet(),
-            found,
+            found.toSortedSet(),
         )
     }
 
     /**
-     * The name of a non-private `const val` whose value is a number, or `null` for every other line.
+     * What the check above is able to see, asserted on text rather than on the tree.
+     *
+     * The tree contains none of these forms today, so reading it proves nothing about them: the check
+     * agreed with its list both before and after round 13 changed what it can read. Each line here is a
+     * declaration the line-by-line scanner walked past, and none of them is unusual Kotlin — a value moved
+     * to the next line to keep a line short, and an annotation where a lint rule is suppressed.
+     */
+    @Test fun theScannerSeesTheDeclarationsThatUsedToSlipPastIt() {
+        assertEquals(listOf("WRAPPED"), statedNumberNames("    const val WRAPPED =\n        8_388_608L\n"))
+        assertEquals(
+            listOf("ANNOTATED"),
+            statedNumberNames("    @Suppress(\"MagicNumber\") const val ANNOTATED = 224\n"),
+        )
+        assertEquals(listOf("TYPED"), statedNumberNames("    internal const val TYPED: Long = 10\n"))
+
+        // Two of one name in one file are both reported, which is what lets the check above see the
+        // collision instead of comparing its list against whichever of them came first.
+        assertEquals(listOf("SAME", "SAME"), statedNumberNames("const val SAME = 1\nconst val SAME = 2\n"))
+
+        // And what it must keep passing over.
+        assertEquals(emptyList<String>(), statedNumberNames("    private const val HIDDEN = 5\n"))
+        assertEquals(emptyList<String>(), statedNumberNames("    const val SOURCE = \"whisper-1\"\n"))
+        assertEquals(emptyList<String>(), statedNumberNames("    // const val MENTIONED = 5\n"))
+    }
+
+    /**
+     * The names of the non-private `const val`s in one file whose value is a number.
+     *
+     * The file is matched as a whole rather than line by line. Reading lines separately and requiring each
+     * to begin with `const val` let two everyday forms of Kotlin out of this check without anyone writing
+     * anything unusual: a declaration whose value sits on the next line because the first grew too long,
+     * and one with an annotation in front of it — `@Suppress("MagicNumber") const val …` is exactly the
+     * shape a suppressed lint finding takes. Either way the constant existed and this list never saw it.
+     * The `\s*` after the `=` crosses the line break, and the modifiers are read from the start of the
+     * line, so nothing can stand in front of the declaration and hide it either.
      *
      * "A number" is decided by what is written after the `=`, not by a declared type: it must carry a digit
      * and no quotation mark. So `"whisper-1"` is passed over — a name that happens to contain a digit —
      * while `MAX_AUDIO_SECONDS / 60` is kept, because an expression over numbers still states one.
      */
-    private fun statedNumberName(line: String): String? {
-        val code = line.substringBefore("//").trim()
-        if (!code.startsWith("const val ") && !code.startsWith("internal const val ")) return null
-        val name = code.substringAfter("const val ").substringBefore("=").substringBefore(":").trim()
-        if (name.isEmpty() || !name.all { it.isUpperCase() || it.isDigit() || it == '_' }) return null
-        val value = code.substringAfter("=", "").trim()
-        return name.takeIf { value.none { char -> char == '"' } && value.any(Char::isDigit) }
+    private fun statedNumberNames(source: String): List<String> {
+        val code = source.lineSequence().joinToString("\n") { it.substringBefore("//") }
+        return DECLARATION.findAll(code).mapNotNull { match ->
+            val value = match.groupValues[3]
+            if (match.groupValues[1].split(WHITESPACE).any { it == "private" }) return@mapNotNull null
+            match.groupValues[2].takeIf { value.none { char -> char == '"' } && value.any(Char::isDigit) }
+        }.toList()
     }
 
     /**
@@ -252,6 +293,22 @@ class StatedNumbersTest {
     }
 
     private companion object {
+        private const val ANNOTATION = """@[A-Za-z][\w.]*(?:\([^)]*\))?[ \t]+"""
+        private const val MODIFIER = """(?:private|internal|public|actual|expect)[ \t]+"""
+
+        /**
+         * A shouting `const val` and its value, taken from the start of a line through whatever
+         * annotations and modifiers stand in front of it. Group one is what stood there, group two the
+         * name, group three the value — whatever follows the `=` to the end of a line, which may be the
+         * next one, because `\s*` spans the break.
+         */
+        private val DECLARATION = Regex(
+            """(?m)^[ \t]*((?:$ANNOTATION|$MODIFIER)*)const[ \t]+val[ \t]+""" +
+                """([A-Z][A-Z0-9_]*)[ \t]*(?::[^=\n]+)?=\s*([^\n]+)"""
+        )
+
+        private val WHITESPACE = Regex("""\s+""")
+
         /**
          * Every number named above, as the file it is declared in and the name it is declared under.
          *
