@@ -1,6 +1,6 @@
 # Bekannte Probleme und offene Punkte
 
-**Stand:** 11. September 2026, nach elf Runden adversarischer Reviews. Diese Datei ist für den
+**Stand:** 11. September 2026, nach zwölf Runden adversarischer Reviews. Diese Datei ist für den
 nächsten Agenten gedacht und listet, was **nicht** vollständig erledigt ist. Ein geschlossener Punkt
 behält seine Nummer und einen kurzen Vermerk, damit Verweise aus anderen Dokumenten gültig bleiben. Was hier nicht steht, ist entweder erledigt oder in
 [STATUS.md](STATUS.md) beschrieben.
@@ -339,7 +339,7 @@ Gewinn und deshalb nicht gemacht.
   292 278 994, also neun Ziffern plus Vorzeichen — genau die zehn Zeichen, die `take(10)` nimmt. Schon an
   der Zeichenzahl war die alte Angabe als falsch erkennbar, ohne irgendetwas auszuführen.
 
-### 22. Die Rückfrage nach der Tonspur zeigt nicht, warum sie gestellt wird (niedrig)
+### 22. Die Rückfrage nach der Tonspur zeigt nicht, warum sie gestellt wird (Anzeige niedrig, Herkunftsnachweis war hoch — behoben)
 
 - **Stelle:** `core/src/main/kotlin/app/sourcescribe/core/AudioTracks.kt`, `describe`, zusammen mit der
   Spurauswahl in der Vorbereitungsansicht.
@@ -378,6 +378,47 @@ Gewinn und deshalb nicht gemacht.
   und nennt den Textschlüssel im Kommentar, sodass eine Änderung dort einen Test fällt und auf die Texte
   zeigt. Das ist eine Brücke, keine Behebung: Wer die Texte ändert und die Konstante nicht, fällt weiter
   durch kein Netz. Eine Formatzeichenkette mit `%d` aus `MAX_AUDIO_MINUTES` wäre die Behebung.
+
+### 24. Die Quellseite eines Preises wird mitgeführt und nirgends gezeigt (niedrig)
+
+- **Stelle:** `ProviderCapabilities.pricingSource` in
+  `core/src/main/kotlin/app/sourcescribe/core/ProviderContract.kt`, gesetzt von allen drei Adaptern.
+- **Voraussetzung:** Keine. Der Wert existiert immer.
+- **Erwartet gegen tatsächlich:** Neben der Kostenschätzung steht der Tarifstand — ein Datum. Das Datum
+  ist genau dann etwas wert, wenn man nachsehen kann, wogegen es geprüft wurde; die Seite dafür liegt im
+  Datensatz und erreicht weder Anzeige noch Export noch Diagnose. Eine Suche nach `pricingSource` findet
+  drei Zuweisungen und keinen einzigen Leser.
+- **Warum es offen bleibt:** Die Hilfe ist ein statischer Text pro Thema und kennt den gewählten Anbieter
+  nicht; ein dynamischer Absatz dort wäre eine Änderung am Hilfemodell, keine Zeile. Die Alternative,
+  die drei Adressen als Text in `help_cost_body` zu schreiben, würde jede Adresse ein zweites Mal
+  behaupten — genau das, wogegen `StatedNumbersTest` angelegt wurde. Gefunden in Runde 12 beim Prüfen
+  der Behauptung, Stichtag und Quelle stünden beide beim Betrag.
+
+### 25. Die Uploadgrenze für Groq ist die kleinere von zwei Stufen (niedrig)
+
+- **Stelle:** `GroqAdapter.MAX_UPLOAD_BYTES` in
+  `core/src/main/kotlin/app/sourcescribe/core/providers/GroqAdapter.kt`.
+- **Voraussetzung:** Ein bezahlter Groq-Schlüssel („dev tier“) und eine Datei zwischen 25 und 100 MB.
+- **Erwartet gegen tatsächlich:** Groq dokumentiert (nachgelesen am 11. September 2026) 25 MB für die
+  kostenlose und 100 MB für die bezahlte Stufe. Die App kennt die Stufe eines selbst mitgebrachten
+  Schlüssels nicht und hält deshalb alle an die kleinere; ein zahlender Nutzer bekommt eine lokale
+  Ablehnung für eine Datei, die der Anbieter angenommen hätte.
+- **Warum es so bleibt:** Die Gegenrichtung ist schlechter. Wer die Grenze anhebt, verwandelt eine lokale
+  Ablehnung in einen Fehlschlag beim Anbieter, und der ist bei einem kostenpflichtigen Dienst die teurere
+  der beiden Auskünfte. Die Behebung wäre eine Angabe der Stufe in den Zugangsdaten, nicht eine größere
+  Zahl. Seit Runde 12 sagen Kommentar und `StatedNumbersTest`, dass dies eine Entscheidung dieses
+  Programms ist und keine Zahl des Anbieters.
+
+### 26. „25 MB“ ist bei zwei Anbietern nicht als dezimal oder binär bestimmt (niedrig)
+
+- **Stelle:** `GroqAdapter.MAX_UPLOAD_BYTES` und `OpenAiAdapter.MAX_UPLOAD_BYTES`, beide `25_000_000`.
+- **Voraussetzung:** Eine Datei zwischen 25 000 000 und 26 214 400 Byte.
+- **Erwartet gegen tatsächlich:** Beide Anbieter schreiben „25 MB“ ohne zu sagen, ob sie dezimal oder
+  binär rechnen. Der Code nimmt dezimal, also die kleinere Auslegung, und liegt damit auf der sicheren
+  Seite — aber ob der Server bei 25 000 000 oder bei 26 214 400 Byte abschneidet, ist nicht belegt.
+- **Warum es offen bleibt:** Das ließe sich nur mit einem echten Request an der Grenze klären, also mit
+  einem kostenpflichtigen Aufruf. Als Vermutung gekennzeichnet, nicht als Fund. Aufgeworfen vom lesenden
+  Reviewer in Runde 12 und von ihm selbst ausdrücklich als nicht ausgeführt markiert.
 
 ## Bewusste Entscheidungen, die wie Fehler aussehen
 
@@ -454,12 +495,16 @@ bash tools/build-local.sh :app:assembleDebug :app:assembleDebugAndroidTest :extr
 Danach unter Windows die APKs installieren und beide Instrumentierungssuiten starten:
 
 ```powershell
+$adb = "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe"
 & $adb -s emulator-5556 install -r -t app/build/outputs/apk/debug/app-debug.apk
 & $adb -s emulator-5556 install -r -t app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
 & $adb -s emulator-5556 install -r -t extractor/build/outputs/apk/androidTest/debug/extractor-debug-androidTest.apk
 & $adb -s emulator-5556 shell am instrument -w -r app.sourcescribe.debug.test/androidx.test.runner.AndroidJUnitRunner
 & $adb -s emulator-5556 shell am instrument -w -r -e sourcescribeEngineUpdate true app.sourcescribe.extractor.test/androidx.test.runner.AndroidJUnitRunner
 ```
+
+Die erste Zeile gehört dazu: `$adb` stand hier seit dem 7. September in fünf Aufrufen und wurde nirgends
+gesetzt, sodass der Block beim Einfügen an der ersten Zeile scheiterte.
 
 **Die zweite Suite gehört dazu, und die Flagge auch.** Das Modul `extractor` hat eigene 39
 Instrumentierungstests; die Reviewrunden 6 bis 10 haben nur die 191 des Moduls `app` ausgeführt und deren

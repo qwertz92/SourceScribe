@@ -3,8 +3,8 @@
 **Stand:** 11. September 2026. **Freigabe:** Persönliche Preview; vollständige v1 weiterhin blockiert.
 Der Preview-Abschluss vom 8. September steht unten; seither ist die Nutzerrückmeldung vom
 10. September eingearbeitet, siehe den nächsten Abschnitt. **Die Testzahlen weiter unten in diesem
-Abschnitt sind der Stand vom 8. September und nicht der heutige.** Heute sind es 173 JVM-Tests im Modul
-`core`, 191 Instrumentierungstests im Modul `app` und 39 im Modul `extractor`, zusammen 403, davon 397
+Abschnitt sind der Stand vom 8. September und nicht der heutige.** Heute sind es 176 JVM-Tests im Modul
+`core`, 191 Instrumentierungstests im Modul `app` und 39 im Modul `extractor`, zusammen 406, davon 400
 ausgeführt; die Runde-11-Passage sagt, warum die letzten 39 zehn Runden lang in keiner Gate-Meldung
 vorkamen. App-Quellstand ist die Spitze von `main`,
 CI-Diagnose `f9d4f8b`, lokales `main` und öffentliches
@@ -34,7 +34,7 @@ API-37-/x86_64-/16-KB-Emulator nachgewiesen. Keine echte STT-API aufgerufen.
 | P5 | IMPLEMENTED: de/en-App-Sprache, System/Hell/Dunkel, überarbeitete Auswahlfelder/Navigation, Viewer/Suche/Kopieren/Share, Formate/Diagnose/Signierpfad | ADB-/Screenshotprüfungen einschließlich 200-%-Schrift und Querformat bestanden. Vollständige TalkBack-Bedienung BLOCKED; dauerhafte persönliche Release-Signatur und Installation PASS r81. |
 | P6 | Integrierte Regression und unabhängige Reviews ausgeführt; bestätigte Defekte samt Regression behoben | Vollständige Abnahme BLOCKED: Provider, physisches ARM64, TalkBack und öffentliche APK-Lizenz-/Quellbelege fehlen. |
 
-## Nutzerrückmeldung vom 10. September 2026 und elf Reviewdurchgänge
+## Nutzerrückmeldung vom 10. September 2026 und zwölf Reviewdurchgänge
 
 **Stand:** 11. September 2026. Der Nutzer hat die Preview am Gerät getestet und 20 Punkte gemeldet.
 17 davon sind umgesetzt und am Emulator oder durch Tests belegt; die drei offenen stehen mit Stelle und
@@ -481,8 +481,13 @@ bevor ein einziger Eintrag geöffnet wird. Der Testname behauptete genau das —
 
 **Das Muster „ein Test, der aus seiner eigenen Konstante baut“ hat sechs weitere Instanzen.** Alle vom
 zweiten Reviewer durch Absenken der Konstante und einen grün bleibenden Lauf belegt, eine davon zum ersten
-Mal auf dem Gerät statt in der JVM. Damit sind es zwölf seit Runde 9, einzeln gefunden — und zwölf einzeln
-gefundene Instanzen sind der Hinweis, dass das Suchen einzeln die falsche Form hat.
+Mal auf dem Gerät statt in der JVM.
+
+Hier stand daraufhin eine laufende Summe seit Runde 9. Runde 12 hat sie gestrichen, weil drei
+Nachzählungen drei verschiedene Ergebnisse hatten — meine eigene, die des lesenden Reviewers und die der
+Commit-Nachricht von `d99f950` — und keine davon aus dem Dokument heraus nachprüfbar war. Dass sich eine
+Zahl nicht reproduzieren lässt, ist derselbe Befund, den sie belegen sollte: Einzeln suchen war die falsche
+Form. Was zählbar bleibt, steht jetzt in `StatedNumbersTest` und ist dort pro Zeile nachlesbar.
 
 **Die strukturelle Antwort ist eine einzige Datei.** `StatedNumbersTest` schreibt jede Zahl aus, die dieses
 Modul behauptet: die acht Preise hinter jedem Kostenvoranschlag samt Stichtag und Quelle, die Grenzen der
@@ -514,7 +519,9 @@ eine Stufe — vier einzelne Läufe, alle vier bestanden, zum ersten Mal in dies
 übrigen bleiben mit Absicht liegen: `UiFixtureTest` ist kein Test, sondern ein Saatgenerator, der
 synthetische Daten in die App-Datenbank schreibt, und `EngineJobPinningTest` braucht ein echtes Release.
 
-Gates nach Runde 11, vollständig gezählt: **173 JVM-Tests** im Modul `core` ohne Fehler (169 vorher: vier
+Gates nach Runde 11, vollständig gezählt: **173 JVM-Tests** im Modul `core` ohne Fehler (169 vorher —
+168 am Ende von Runde 10, plus den einen Test, den `40f5894` früher in dieser Runde zu
+`TranscriptExporterTest` hinzugefügt hat: vier
 neue Methoden für die Zahlen, zwei für die Archivgrenzen, zwei durch die Zusammenlegung entfallen), alle
 vier Lintberichte ohne Befund, **191 Instrumentierungstests** im Modul `app` — 185 im gemeinsamen Lauf, vier
 weitere einzeln über ihre Stufen, 0 Fehler — und **erstmals 39** im Modul `extractor` — 35 bestanden,
@@ -522,11 +529,129 @@ weitere einzeln über ihre Stufen, 0 Fehler — und **erstmals 39** im Modul `ex
 Blockadetabelle von NEXT_STEPS, statt als Zahl in einem Satz zu verschwinden. Die Gegenprobe, die jede
 Korrektur dieser Runde zurücknimmt, lässt fünf Tests fallen.
 
-**Die Schleife ist nicht konvergiert.** Elf Runden, keine davon leer. Solange eine Runde noch etwas findet,
-ist die nächste fällig — gerade weil die Funde der Runden 3 bis 11 jeweils in den Korrekturen der Vorrunde
-lagen. Runde 10 war der deutlichste Beleg dafür, dass eine Korrektur einen Fehler verschieben statt beheben
-kann; Runde 11 der deutlichste dafür, dass auch die Messung selbst geprüft gehört — zehn Runden lang war
-eine ganze Testsuite nicht in der Zahl enthalten, die ich als Beleg genannt habe.
+### Runde 12
+
+**Der teuerste Fund dieser Runde lag außerhalb des Diffs, den der Reviewer lesen sollte.** Er hatte den
+Auftrag, die acht Preise gegen die Seiten der Anbieter nachzulesen. Dabei fiel ihm nicht eine falsche Zahl
+auf, sondern eine falsch angewandte: Der Zuschlag von fünf Cent je Stunde für eine Fachbegriffsliste wurde
+nur berechnet, wenn das Modell `universal-3-5-pro` heißt. AssemblyAI verlangt ihn für beide Modelle — die
+Seite unterscheidet sie nur darin, wie viele Begriffe sie annehmen, tausend gegen zweihundert — und die
+App schickt die Liste ohnehin für beide mit. Wer `universal-2` mit Fachbegriffen wählte, bekam eine
+Schätzung von 150 000 statt 200 000 Mikro-Dollar je Stunde: ein Viertel unter dem, was die App selbst als
+Preis hinterlegt hat.
+
+Das ist keine Anzeigeungenauigkeit. Dieselbe Zahl entscheidet in `AssemblyAiAdapter`, ob eine Anfrage gegen
+das vom Nutzer gesetzte Budget überhaupt hinausgeht. Eine Anfrage, die der Nutzer unter seinem Deckel
+glaubte, wurde abgeschickt und darüber abgerechnet — gegen die Invariante, dass der gewählte Kostenrahmen
+auch bei Fehlern gilt.
+
+**Beim Nachziehen fand ich zwei weitere Stellen, die der Reviewer nicht sehen konnte.** `SttStep` im Modul
+`app` rechnet dieselbe Summe ein zweites Mal, mit derselben Modellbedingung und demselben Fehler; das ist
+die Stelle, die beim Lauf tatsächlich gegen das Budget prüft. Und die Zahl, die der Nutzer vor dem Start
+sieht, kam aus einer dritten Rechnung in `NewSourceScreen`: Länge mal Stundenpreis, ohne jeden Zuschlag und
+ohne Groqs Mindestabrechnung. Wer sein Budget nach der angezeigten Zahl wählte, konnte es von einer
+Prüfung abgelehnt bekommen, die anders gerechnet hatte.
+
+Alle drei sind jetzt eine Rechnung. `MainViewModel.estimatedCostMicrousd` summiert über denselben
+Abschnittsplan, den der Lauf verwendet, und die Anzeige liest sie; die Hilfe sagt jetzt, was drinsteht, und
+heißt nicht mehr „Basispreis“. Überschreitet eine Quelle die Höchstdauer, steht dort kein Preis mehr und
+auch nicht „Preis unbekannt“ — das wäre eine unwahre Aussage über den Tarif gewesen, während die Zeile
+darunter schon erklärt, dass die Quelle gar nicht verarbeitet werden kann.
+
+**Die Zahlenliste aus Runde 11 hatte eine Lücke und zwei falsch einsortierte Einträge.** Es fehlte
+`TranscriptExporter.SHORT_ID_BYTES` — die sechs Bytes, mit denen ein Exportname eindeutig wird und deren
+Begründung direkt darüber steht: vier Bytes hätten eine Kollision schon bei 77 000 Namen wahrscheinlich
+gemacht, sechs erst bei zwanzig Millionen. Drei Tests lasen die Länge aus genau der Konstante ab, die sie
+prüfen sollten; die Gegenprobe hat das bestätigt: Auf vier Bytes abgesenkt blieben alle drei grün.
+
+Falsch einsortiert waren Groqs Uploadgrenze und das Prompt-Budget. Beide standen unter „was die Anbieter
+erlauben“, und beides stimmt — aber keine Anbieterseite sagt sie so. Groq dokumentiert 25 MB für die
+kostenlose und 100 MB für die bezahlte Stufe, und weil die App die Stufe eines mitgebrachten Schlüssels
+nicht kennt, hält sie alle an die kleinere: eine Entscheidung dieses Programms. Und OpenAIs Grenze sind
+224 **Tokens**, nicht Bytes; der Code zählt Bytes, was sicher ist, weil ein Byte-Tokenizer nie mehr Tokens
+als Bytes erzeugt, aber eben nicht dasselbe. Beide stehen jetzt bei den selbstgewählten Budgets, wo
+dransteht, dass keine zweite Quelle sie bestätigt.
+
+**Und die Quelle für OpenAIs Preise zeigte auf eine Seite ohne Preise.** Die beiden Zahlen stimmen, die
+verlinkte Anleitung nennt sie nur nirgends; wer das Datum daneben prüfen wollte, fand nichts zu prüfen.
+Dabei fiel ein eigener Punkt auf: Diese Adresse erreicht ohnehin niemanden. Alle drei Adapter führen sie
+mit, gelesen wird sie von nichts — weder Anzeige noch Export noch Diagnose. Das steht als
+[Punkt 24](DEFECTS.md) offen, weil die Hilfe statischer Text pro Thema ist und die Adresse ein zweites Mal
+zu behaupten genau das wäre, wogegen `StatedNumbersTest` angelegt wurde.
+
+**Die offene Frage aus Runde 11 ist beantwortet.** Die Liste schützte gegen eine geänderte Zahl, aber nichts
+hinderte jemanden daran, eine neue Konstante anzulegen und nicht einzutragen — sie hängte an Sorgfalt.
+`everyNumberThisModuleStatesHasALineInThisFile` liest jetzt den Quelltext des Moduls und sammelt jede
+nicht-`private` Konstante, deren Wert eine Zahl ist. Steht ein Name im Baum und nicht in der Liste oder
+umgekehrt, fällt der Test und nennt beide Seiten. Die Gegenprobe hat eine erfundene neue Konstante sofort
+zu Fall gebracht.
+
+Der erste Ertrag kam sofort: Beim Eintragen fiel auf, dass `SyncProviderSupport.MAX_UPLOAD_BYTES` von
+nichts gelesen wird. 25 MB standen an vier Stellen, drei davon in Gebrauch — jeder Adapter reicht seine
+eigene an `capabilities` weiter, und von dort liest die Prüfung. Die vierte war tot und ist gelöscht. Der
+Compiler sagt dazu nichts, auch mit `allWarningsAsErrors` nicht: Eine nicht-private Konstante gehört zur
+Modulschnittstelle, und ob die jemand benutzt, weiß er nicht.
+
+**Das Gegenstück dazu fand ich in `tools/check-repository.py`**, das in der CI läuft und `PASS repository
+checks` schreibt. Es entschied an einer Liste von achtzehn Dateiendungen, welche Datei es überhaupt
+öffnet. Alles ohne Endung fiel durch: `gradlew`, `LICENSE`, `.gitignore`, `.gitattributes`, dazu jede
+`.pem`, `.env` oder `.asc`, die jemand angelegt hätte. 34 verfolgte Dateien liefen so an der
+Geheimnisprüfung vorbei, während der Lauf wie eine Prüfung des Repositorys aussah; fünfzehn davon sind
+Text und hätten gelesen gehört, der Rest ist binär. Dieselbe Bauart wie die Zahlenliste vorher: eine
+Aufzählung, die jemand hätte pflegen müssen. Jetzt entscheidet ein Nullbyte am Dateianfang über Text oder
+Binärdatei, und die Schlusszeile nennt, was wirklich gelesen wurde: **202 Dateien gelesen, 19 als binär
+übersprungen**, statt vorher 187 nach Endung ausgewählter. Neue Funde gab es dabei keine — die fünfzehn
+Dateien sind sauber, sie waren nur nie angesehen worden.
+
+**Die beiden Archivtests aus Runde 11 prüften nicht, was ihr Name sagte.** Der zweite hieß, ein Archiv
+werde gestoppt, wenn es beim Auspacken über die Gesamtgrenze geht, und sein Kommentar nannte die
+komprimierten Nullbytes den Kern des Angriffs. Ausgelöst hat ihn aber die Prüfung der *deklarierten*
+Größen, die vor dem ersten gelesenen Byte greift und komprimierungsblind ist. Die Wache, die zählt, was
+wirklich aus dem Entpacker kommt, war weiter ungetestet — und sie ist die einzige, die ein lügendes Archiv
+je erreicht.
+
+Der neue Test baut deshalb zwei: eines mit einem Eintrag, der ein Kibibyte ansagt und neun Mebibyte
+mitbringt, und eines, das ehrlich bis 63 Mebibyte füllt und dann lügt. Dabei kam eine vierte
+Durchsetzungsstelle zum Vorschein, die ich nicht kannte: Nach jedem Eintrag wird verglichen, ob die
+gelesene Länge der angesagten entspricht. Sie fängt jede Lüge, die einen Eintrag zu Ende bringt —
+weswegen die beiden Testarchive so gebaut sein müssen, dass sie vorher über eine Grenze laufen. Die erste
+Fassung des Tests fiel genau daran, und das war die nützlichste Minute dieser Runde.
+
+**Gegenprobe:** Jede Korrektur zurückgenommen — der Zuschlag wieder an ein Modell gebunden, die
+Preisquelle zurück auf die Seite ohne Preise, die Exportkennung auf vier Bytes, eine nicht eingetragene
+neue Konstante angelegt und **alle vier** Stellen abgeschaltet, die ein Archiv beim Entpacken begrenzen —
+ließ 7 Tests fallen. Die drei Exporttests, die `SHORT_ID_BYTES` lesen, blieben dabei grün: genau der
+Beleg dafür, dass sie über diese Zahl nie etwas gesagt haben.
+
+Diese Gegenprobe lief im Modul `core`. Die beiden Stellen im Modul `app` sind **nicht** einzeln
+zurückgenommen worden — das hätte zwei vollständige APK-Bauten gekostet. Was dafür belegt ist: Der
+angepasste `SttStepTest` hat auf dem Gerät ausgeführt und bestanden, und er nagelt für `universal-2` mit
+Fachbegriffen 200 000 fest, was ohne den Zuschlag 150 000 wäre. Das ist eine einzelne Rechnung, keine
+Annahme darüber, welche von mehreren Wachen greift.
+
+**Dokumentation:** In der Runde-11-Passage stand eine laufende Summe „zwölf seit Runde 9“, die sich aus
+dem Dokument heraus nicht nachrechnen ließ; drei Nachzählungen kamen auf drei Ergebnisse. Sie ist
+gestrichen statt korrigiert, mit der Begründung daneben. Der Sprung von 168 auf 169 Tests zwischen Runde 10
+und 11 ist jetzt erklärt. `EngineJobPinningTest` braucht zwei Flaggen, nicht eine — die Anleitung nannte
+nur die zweite, und ohne die erste bleibt der Test übersprungen, gleich welche URL dabeisteht. Der
+PowerShell-Block in DEFECTS benutzte fünfmal ein `$adb`, das nirgends gesetzt wurde. Und in `AGENTS.md`
+stand seit dem Gründungstag, das Übergabepaket enthalte noch keinen App-Code und keinen App-Testnachweis.
+
+Gates nach Runde 12: **176 JVM-Tests** im Modul `core` ohne Fehler (173 vorher: einer für den
+Zuschlag, einer für die Vollständigkeit der Zahlenliste, einer für die zweite Archivwache), alle vier
+Lintberichte ohne Befund, der unsignierte Release-Build gebaut, `tools/check-repository.py` mit
+Selbsttest bestanden (202 Dateien gelesen, 19 als binär übersprungen), **191
+Instrumentierungstests** im Modul `app` — 185 im gemeinsamen Lauf, 4 weitere einzeln über ihre
+Stufen, 0 Fehler — und **39** im Modul `extractor` — 35 bestanden, 0 Fehler. Von 406 Tests sind damit
+400 ausgeführt. Von den sechs übrigen brauchen fünf eine echte Quelle oder ein echtes Release; die
+sechste, `UiFixtureTest`, bleibt mit Absicht aus, weil sie kein Test ist, sondern ein Saatgenerator.
+
+**Die Schleife ist nicht konvergiert.** Zwölf Runden, keine davon leer. Solange eine Runde noch etwas
+findet, ist die nächste fällig — gerade weil die Funde der Runden 3 bis 12 jeweils in den Korrekturen der
+Vorrunde lagen. Runde 10 war der deutlichste Beleg dafür, dass eine Korrektur einen Fehler verschieben
+statt beheben kann; Runde 11 dafür, dass auch die Messung selbst geprüft gehört; Runde 12 dafür, dass ein
+Reviewer, der über den zugewiesenen Diff hinaussieht, den teuersten Fund macht — und dass zwei Listen, die
+von Sorgfalt abhingen, beide dieselbe Lücke hatten.
 
 ## UI-Feedback umgesetzt
 
@@ -557,7 +682,8 @@ Die GitHub-CI hat Build/JVM/Lint bestanden und den Emulator erfolgreich gestarte
 Run 34252821287 scheiterte anschließend im Gerätetest; der konkrete Einzelfehler
 ist noch unbekannt. Eine gezielte Berichtsausgabe ist vorbereitet, aber wegen
 Pause noch nicht in CI ausgeführt. Die abschließenden kleinen UI-Änderungen r80
-sind in r81 mit 180 App-Tests, betrachtetem Screenshot und aktuellem statischen
+sind in r81 mit den damaligen 180 App-Tests (Stand 8. September; heute sind es 191), betrachtetem
+Screenshot und aktuellem statischen
 Releaseaudit nachgeprüft. Offizielle Signatur-/Ausrichtungsprüfung ebenfalls PASS.
 
 Nach dem belegten WSL-Speicherfehler sind 16 GiB Swap aktiv. Builds verwenden einen
