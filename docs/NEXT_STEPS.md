@@ -2,30 +2,32 @@
 
 ## Wiederaufnahme: hier weitermachen
 
-Geschrieben am 11. September 2026, zuletzt nach der fünften Reviewrunde nachgeführt, damit die
+Geschrieben am 11. September 2026, zuletzt nach der sechsten Reviewrunde nachgeführt, damit die
 Arbeit ohne Wiedereinlesen der ganzen Sitzung weitergehen kann. Reihenfolge ist Absicht.
 
 **Wo der Stand steht:** Die Reviewrunden und was sie gefunden haben, stehen in
 [STATUS.md](STATUS.md); was offen ist, mit Stelle und fehlendem Nachweis, in
 [DEFECTS.md](DEFECTS.md). Die Punktnummern unten sind die Nummern dort.
 
-### 1. Sechste Reviewrunde über die Korrekturen der fünften
+### 1. Siebte Reviewrunde über die Korrekturen der sechsten
 
-Runden 3, 4 und 5 haben ihren wichtigsten Fund jeweils in den Korrekturen der Vorrunde gehabt. Deshalb ist
-die Runde nach den Korrekturen nicht optional. Der Commitbereich ist `029a53f..HEAD`. Drei Sonnet-5-Agenten
-reichen für diesen Umfang: core, UI und Texte, und eine Runde über die Korrekturen selbst — dieser dritte
-Auftrag hat in Runde 5 gefehlt und musste nachgeschoben werden. Die Jagdliste:
+Runden 3 bis 6 haben ihren wichtigsten Fund jeweils in den Korrekturen der Vorrunde gehabt. Der Commitbereich
+ist `2296fe5..HEAD`. Drei Sonnet-5-Reviewer: core, Texte und Doku, und einer über die Korrekturen selbst.
+Wichtig aus Runde 5 gelernt: Der Bereich muss **alle** Commits der Vorrunde abdecken, nicht nur den
+sichtbarsten — sonst bleibt ein Teil ungeprüft und muss nachgeschoben werden. Die Jagdliste:
 
-- `TranscriptWarnings.group`: Die Zuordnung wurde an vier Stellen geändert. Sagt jeder der dreizehn Sätze
-  jetzt genau das, was am Erzeugungsort passiert, und keiner weniger?
-- `family()` streicht nur noch eine Zahl am Ende. Gibt es eine Familie, die dadurch mit einer anderen
-  zusammenfällt, oder eine, die eine Zahl im Namen trägt?
-- `CaptionParser`: Die eigene Warnungsgrenze ist durch die gemeinsame ersetzt. Ist das Verhalten bei genau
-  64 und bei 65 verschiedenen Warnungen noch das erwartete, und bleibt `complete` richtig?
-- `ExportStore.reconcile` löscht `documentUri` in einem der drei Zweige. Ist der abgebrochene Schreibfall
-  wirklich unberührt, und gibt es einen vierten Pfad, der die URI verliert?
-- `ExtractorMetadata.value` behandelt eine leere Zeichenkette wie ein fehlendes Feld. Wird dadurch eine
-  Tonspur abgewiesen, die vorher angenommen wurde?
+- `Warnings` fragt jetzt für jede Warnung nach ihrer Familie, um die erste ihrer Art nicht zu verdrängen.
+  Kann eine Antwort die Zahl der Arten in die Höhe treiben, oder ist sie wirklich durch den eigenen Code
+  beschränkt? Was passiert bei genau `LIMIT` Arten?
+- `TranscriptWarnings.family` und `looksLikeCode` arbeiten ohne Regex. Rechne die neue Indexarithmetik gegen
+  die alte Regex-Fassung für jeden real erzeugten Code durch. Randfälle: leere Zeichenkette, nur ein
+  Doppelpunkt, `CHUNK_` ohne Zahl, ein Name, der ganz aus Ziffern besteht.
+- `SECTION_ALIGNMENT` ist in der Reihenfolge verschoben. Stimmt jede Anzeigereihenfolge noch mit dem
+  Klassenkommentar überein, und zieht der Test die Reihenfolge wirklich nach?
+- `ExtractorMetadata.string` und `value` behandeln eine leere Zeichenkette wie ein fehlendes Feld. Gibt es
+  ein Feld, dessen Bedeutung sich dadurch ändert, statt nur präziser zu werden?
+- `TranscriptExporter.SHORT_ID_BYTES` ist von vier auf sechs erhöht. Bleibt jeder Name innerhalb der
+  Bytegrenze, auch bei langem Titel, langer Endung und Mehrbyte-Zeichen?
 
 ### 2. Warncodes lesbar machen (DEFECTS 9) — erledigt
 
@@ -42,10 +44,8 @@ besten zusammen mit Punkt 2, weil es dieselbe Datei und dieselbe Denkweise ist.
 
 ### 4. Kleine offene Punkte, in dieser Reihenfolge
 
-- DEFECTS 8: Längenobergrenze für `speech_model_used` plus Contract-Test mit überlanger Antwort.
 - DEFECTS 13: Eigener Fehlercode dafür, dass ein Exportdokument nicht geprüft werden konnte, statt
   denselben Grund wie für ein nachweislich gelöschtes zu melden.
-- DEFECTS 6: Mehr Bytes im Streuwert des Dateinamens oder ein Test, der die Annahme festhält.
 - DEFECTS 10: Eigener Text für `AUDIO_INVALID_INPUT` oder Nachweis, dass er nie beim Nutzer ankommt.
 
 ### 5. Was ohne den Nutzer nicht weitergeht

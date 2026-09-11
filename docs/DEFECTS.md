@@ -1,6 +1,6 @@
 # Bekannte Probleme und offene Punkte
 
-**Stand:** 11. September 2026, nach fünf Runden adversarischer Reviews. Diese Datei ist für den
+**Stand:** 11. September 2026, nach sechs Runden adversarischer Reviews. Diese Datei ist für den
 nächsten Agenten gedacht und listet, was **nicht** vollständig erledigt ist. Ein geschlossener Punkt
 behält seine Nummer und einen kurzen Vermerk, damit Verweise aus anderen Dokumenten gültig bleiben. Was hier nicht steht, ist entweder erledigt oder in
 [STATUS.md](STATUS.md) beschrieben.
@@ -78,13 +78,15 @@ belegt. Diese drei sind offen oder nur teilweise geschlossen:
   ob eine Toleranz (analog `PREPARED_DURATION_TOLERANCE_MS`) gerechtfertigt ist. Eine Toleranz weitet den
   Kostenrahmen minimal auf und darf nicht ohne diese Messung eingeführt werden.
 
-### 6. Vier Bytes Streuwert im erzeugten Dateinamen (niedrig)
+### 6. Vier Bytes Streuwert im erzeugten Dateinamen — erledigt am 11. September 2026
 
-- **Stelle:** `core/src/main/kotlin/app/sourcescribe/core/TranscriptExporter.kt`, `shortId`
-- **Stand:** Erzeugte Namen tragen vier Bytes SHA-256 des Artefakt- beziehungsweise Exportbezeichners.
-  Bei rund 77 000 Exporten insgesamt liegt die Wahrscheinlichkeit irgendeiner Kollision bei etwa 50 %.
-  Für den Einzelnutzerbetrieb ist das unkritisch, aber es ist eine bewusste Annahme, keine Garantie.
-- **Was fehlt:** Entweder mehr Bytes oder ein Test, der die Annahme dokumentiert.
+Bleibt als Nummer stehen, damit Verweise gelten. Der Streuwert ist jetzt sechs Bytes breit
+(`TranscriptExporter.SHORT_ID_BYTES`), womit dieselbe Wahrscheinlichkeit erst jenseits von sechzehn
+Millionen Namen liegt. Der frühere Eintrag übertrieb: Um denselben Namen konkurrieren nur Artefakte, die
+schon in Tag, Sprache und Quellbezeichner übereinstimmen. Genau dieses Argument war aber der Grund, warum
+die Breite eine Annahme statt einer Schranke war; mit sechs Bytes braucht man es nicht mehr.
+`theIdentityInAGeneratedNameIsADigestOfAStatedWidth` hält die Breite fest und dazu, dass es ein Streuwert
+und kein Präfix ist.
 
 ### 7. Gelöschtes Exportdokument bleibt als belegter Name gezählt — erledigt am 11. September 2026
 
@@ -97,23 +99,17 @@ hätte den zweiten Export also nicht nur kosmetisch, sondern ganz scheitern lass
 Fälle auseinander: `aChosenNameIsFreeAgainOnceItsDocumentIsProvenGone` und
 `anInterruptedExportKeepsHoldingItsNameBecauseItsFileIsThere`. Offen bleibt Punkt 13.
 
-### 8. AssemblyAI meldet Sprache und Modell ohne Längen- oder Zeichenprüfung (niedrig, unbestätigt)
+### 8. AssemblyAI meldet Modell ohne Längenprüfung — erledigt am 11. September 2026
 
-- **Stelle:** `core/src/main/kotlin/app/sourcescribe/core/providers/AssemblyAiAdapter.kt`,
-  `optionalMetadataString` für `speech_model_used`
-- **Stand:** Die gemeldete Sprache wird seit dem zweiten Reviewdurchgang auf eine Sprachkennung geprüft
-  (`en`, `en_us`, `zh-CN`). Für `speech_model_used` gilt weiterhin nur „nicht leer“: der Adapter
-  übernimmt jede Zeichenkette in beliebiger Länge nach `provenance.reportedModel`, wo sie angezeigt wird.
-  Zum Vergleich prüft `SyncTranscriptParser` (OpenAI, Groq) die gemeldete Sprache auf genau zwei
-  ASCII-Buchstaben.
-- **Unbestätigt:** Ob AssemblyAI je etwas anderes als einen kurzen Modellnamen zurückgibt. Ein echter
-  Anbieterlauf hat in diesem Projekt noch nicht stattgefunden.
-- **Was fehlt:** Eine Längenobergrenze mit Warnung statt stiller Übernahme, plus ein Contract-Test mit
-  einer überlangen Antwort.
-- **Nicht mehr offen, damit es niemand zweimal baut:** Die Warnliste selbst ist seit dem dritten
-  Reviewdurchgang gedeckelt (`core/.../providers/Warnings.kt`). Vorher erzeugte jeder fehlerhafte
-  Eintrag einer Antwort eine eigene Warnzeile, sodass eine Antwort mit Millionen Einträgen die Liste
-  mitwachsen ließ; das betraf auch `SyncTranscriptParser` und damit OpenAI und Groq.
+Bleibt als Nummer stehen, damit Verweise gelten. `speech_model_used` wird jetzt auf dieselbe Obergrenze von
+128 Zeichen geprüft, die der Parser für OpenAI und Groq schon anwendete, und bei Überlänge mit
+`REPORTED_MODEL_TOO_LONG` abgelehnt statt angezeigt. Nicht gekürzt: ein abgeschnittener Modellname wäre ein
+Wert, den niemand gemeldet hat. `aReportedModelIsRefusedRatherThanShownAtAnyLength` prüft beide Seiten der
+Grenze. Die gemeldete Sprache war schon vorher auf eine Sprachkennung geprüft.
+
+Weiter unbestätigt bleibt, ob AssemblyAI je etwas anderes als einen kurzen Modellnamen liefert: ein echter
+Anbieterlauf hat in diesem Projekt nicht stattgefunden. Die Prüfung hängt nicht davon ab — sie verhindert,
+dass eine unbekannte Antwort ungeprüft als Modellangabe erscheint.
 
 ### 9. Warncodes in der Ergebnisansicht — erledigt am 11. September 2026
 
@@ -239,7 +235,7 @@ wie ein Code aussieht, wird unverändert durchgereicht.
   gibt es — wählbare Spur gegen verarbeiteten Inhalt —, aber `help_audio_track_body` durchbricht sie selbst.
 - **Was fehlt:** Entscheidung für ein Wort und eine Durchsicht aller Vorkommen in einem Zug.
 
-### 18. Faellt die ganze Segmentliste aus, behauptet der Satz fehlenden Text (niedrig)
+### 18. Fällt die ganze Segmentliste aus, behauptet der Satz fehlenden Text (niedrig)
 
 - **Stelle:** `core/src/main/kotlin/app/sourcescribe/core/SyncTranscriptParser.kt`, `parse`, gegen
   `TranscriptWarnings.group` für `MALFORMED_SEGMENT`
@@ -254,6 +250,20 @@ wie ein Code aussieht, wird unverändert durchgereicht.
 - **Was fehlt:** Eine Warnung, die den Ersatz der Segmentliste durch das Textfeld festhält, plus eigener Satz.
   Das ist zugleich unabhängig nützlich: Heute ist ein Ergebnis ohne jede Gliederung von einem gegliederten
   nicht zu unterscheiden.
+
+### 19. Die RAW-Regel der Wiederholungsprüfung ist nur im Einzeltest belegt (niedrig)
+
+- **Stelle:** `app/src/main/java/app/sourcescribe/data/ExportStore.kt`, `targetExtension` gegenüber
+  `repeated` in `write`
+- **Stand:** Eine Geschwisterzeile im Format `RAW` liefert `null` als Endung, weil die Endung aus der
+  aufbewahrten Anbieterdatei kommt und nicht in der Exportzeile steht. Sie zählt deshalb vorsichtshalber als
+  möglicher Treffer. Belegt ist das nur durch den Einzeltest zu `collisionSafeFileName`; kein Test führt
+  einen echten Export mit einem RAW-Geschwister durch.
+- **Folge, falls die Regel bricht:** Ein selbst vergebener Name bekommt entweder einen unnötigen Zusatz oder
+  keinen, wo er einen bräuchte. Beim Prüfprovider der Tests führt der zweite Fall zum Scheitern des
+  Exports, auf einem echten Anbieter nur zu einem automatisch umbenannten Namen.
+- **Was fehlt:** Ein Instrumentierungstest, der nach einem RAW-Export einen zweiten Export desselben
+  Artefakts mit selbst vergebenem Namen durchführt.
 
 ## Bewusste Entscheidungen, die wie Fehler aussehen
 

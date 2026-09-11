@@ -36,9 +36,10 @@ API-37-/x86_64-/16-KB-Emulator nachgewiesen. Keine echte STT-API aufgerufen.
 17 davon sind umgesetzt und am Emulator oder durch Tests belegt; die drei offenen stehen mit Stelle und
 fehlendem Nachweis in [Bekannte Probleme](DEFECTS.md).
 
-Dazu kamen fünf vollständige Runden adversarischer Reviews mit Sonnet-5-Agenten, jede Runde über die
+Dazu kamen sechs vollständige Runden adversarischer Reviews mit Sonnet-5-Agenten, jede Runde über die
 Korrekturen der vorherigen: Runde 1 über `782aef5`, Runde 2 über `5a6bfef`, Runde 3 über `42f723e`,
-Runde 4 über `7da4cdf`, Runde 5 über `477dc5b` und `029a53f`.
+Runde 4 über `7da4cdf`, Runde 5 über `477dc5b` und `029a53f`, Runde 6 über `e882b25`, `94ca585`
+und `4edffa7`.
 Aus Runde 1 stammen unter anderem die Untertitelspur-Regression und die Vereinheitlichung der
 Längengrenze, aus Runde 2 ein Instrumentierungstest, der auf einen umbenannten Statuscode wartete, die
 fehlenden Fehlertexte der lokalen Audiovorbereitung, die falsch zugeordnete Meldung bei beschädigtem
@@ -144,9 +145,41 @@ geprüften Commits echt und beim nächsten Commit bereits behoben; live war nur 
 
 Gates nach Runde 5: 146 JVM-Tests im Modul `core` ohne Fehler, alle vier Lintberichte ohne Befund.
 
-**Die Schleife ist nicht konvergiert.** Fünf Runden, keine davon leer. Solange eine Runde noch etwas
-findet, ist die nächste fällig — gerade weil die Funde der Runden 3, 4 und 5 jeweils in den Korrekturen
-der Vorrunde lagen.
+**Runde 6 hat es zum vierten Mal in Folge bestätigt.** Der wichtigste Fund lag wieder in der Korrektur der
+Vorrunde, und diesmal in deren nützlichstem Teil: Die Deckelung der Warnliste zählte Einträge, und ein
+einziger kaputter Abschnitt kann sie allein füllen. Danach fiel jeder weitere Code ganz weg, auch der erste
+einer noch nicht gemeldeten Art. Vierundsechzig fehlerhafte Zeitangaben löschten damit eine spätere Warnung
+über fehlenden Text, und der Leser erfuhr nur, dass es mehr Hinweise gab, nie welche. Durch die
+Vereinheitlichung der Grenze von 256 auf 64 im selben Commit war das deutlich leichter zu erreichen als
+vorher. Jenseits der Grenze wird die erste Warnung einer Art jetzt behalten; welche Arten es gibt,
+entscheidet dieses Programm und nicht die Antwort, ihre Zahl ist also klein und beschränkt.
+
+Ein Test hatte das alte Verhalten als Soll festgeschrieben, mit der Begründung, die Kürzungsmarke halte die
+Liste ehrlich. Die Begründung hält nicht: Die Marke sagt, dass etwas fehlt, nie was. Die Zusicherung ist
+umgedreht.
+
+Weiter aus Runde 6: `SECTION_ALIGNMENT` stand vor den sicheren Verlusten, obwohl der eigene Klassenkommentar
+Sicheres vor Unsicherem stellt. Ein Code war nur auf Familienebene geprüft, nie durch die Zusammenfassung.
+Und die Behauptung, auf der die ganze Gruppierung beruht — ein unlesbarer Eintrag wird ganz fallengelassen —
+war auf der Anbieterseite durch keinen Test gegen den echten Parser abgesichert; auf der Untertitelseite war
+sie es. Zwei weitere Behauptungen standen nur in Commit-Nachrichten: dass ein Format mit leerem Codec
+verworfen wird, und — vom Reviewer gefunden — dass leere Felder außerhalb des Formatblocks derselben Regel
+folgen. Das erste stimmte und ist jetzt geprüft, das zweite stimmte nicht und ist jetzt so.
+
+`family()` und `looksLikeCode()` arbeiten seit dieser Runde ohne Regex. Der Fund der fünften Runde entstand
+daraus, dass Java-Regex den am weitesten links beginnenden Treffer nimmt; Indexarithmetik hat diese Falle
+nicht und ist nachrechenbar. Nebeneffekt: Die Familie ist billig genug, um sie bei jeder einzelnen Warnung
+zu bestimmen — der Test mit einer Million Einträgen läuft in 95 ms.
+
+Außerdem in dieser Runde geschlossen: Punkt 8 der bekannten Probleme (AssemblyAI übernahm die Modellangabe
+in beliebiger Länge) und Punkt 6 (Streuwert im Dateinamen).
+
+Gates nach Runde 6: 151 JVM-Tests im Modul `core` ohne Fehler, alle vier Lintberichte ohne Befund,
+190 Instrumentierungstests auf `emulator-5556` — 184 bestanden, 6 per Annahme übersprungen, 0 Fehler.
+
+**Die Schleife ist nicht konvergiert.** Sechs Runden, keine davon leer. Solange eine Runde noch etwas findet,
+ist die nächste fällig — gerade weil die Funde der Runden 3 bis 6 jeweils in den Korrekturen der Vorrunde
+lagen.
 
 ## UI-Feedback umgesetzt
 
