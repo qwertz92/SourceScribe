@@ -370,6 +370,48 @@ class SyncProviderTest {
     }
 
     @Test
+    fun anUnreadableEntryIsLeftOutOfTheTranscriptInsteadOfFilledIn() {
+        // This is the claim the warning grouping rests on: such an entry is skipped whole, so its text never
+        // reaches the transcript, which is why it is reported as missing text and not as a missing timestamp.
+        // The caption parser has had that pinned for a while; on this side it was only ever read from the
+        // source. Nothing is invented in place of the entry either — the gap stays a gap.
+        val result = GroqAdapter().parseSavedResponse(
+            """
+                {
+                  "text":"one two three",
+                  "segments":[
+                    {"start":0.0,"end":0.5,"text":"one"},
+                    "not an object",
+                    {"start":0.5,"end":1.0,"text":""},
+                    {"start":1.0,"end":1.5,"text":"three"}
+                  ],
+                  "words":[
+                    {"word":"one","start":0.0,"end":0.5},
+                    42,
+                    {"word":"","start":0.5,"end":1.0}
+                  ]
+                }
+            """.trimIndent().toByteArray(StandardCharsets.UTF_8),
+            request(
+                Provider.GROQ,
+                GroqAdapter.MODEL_TURBO,
+                wordTimestamps = true,
+                segmentTimestamps = true,
+                durationMs = 2_000,
+            ),
+        ) as SubmissionResult.Direct
+
+        val warnings = result.transcript.warnings
+        assertEquals(listOf("one", "three"), result.transcript.segments.map(Segment::text))
+        assertEquals(listOf("one"), result.transcript.words.map(Segment::text))
+        assertTrue(warnings.toString(), warnings.any { it.startsWith("MALFORMED_SEGMENT_") })
+        assertTrue(warnings.toString(), warnings.any { it.startsWith("MISSING_SEGMENT_TEXT_") })
+        assertTrue(warnings.toString(), warnings.any { it.startsWith("MALFORMED_WORD_") })
+        assertTrue(warnings.toString(), warnings.any { it.startsWith("MISSING_WORD_TEXT_") })
+        assertFalse(result.transcript.technicallyComplete)
+    }
+
+    @Test
     fun whisperAndGroqPromptByteLimitRejectsUnicodeBeforeUpload() {
         val server = MockWebServer()
         server.start()

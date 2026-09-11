@@ -32,6 +32,13 @@ class TranscriptWarningsTest {
             TranscriptWarnings.summarize(listOf("CHUNK_1_MISSING_SPEAKER_7")).groups)
         assertEquals(listOf(WarningGroup.SEGMENT_TIMES),
             TranscriptWarnings.summarize(listOf("INVALID_CHUNK_OFFSET_5")).groups)
+        // The three codes that carry such a word are checked through the summary too, not only here: a
+        // family name that survives the shortening is worth nothing if no group claims it.
+        for (code in listOf("WORD_TIMESTAMPS_MALFORMED_SPEAKER_4", "CHUNK_3_WORD_TIMESTAMPS_MALFORMED_OFFSET_17")) {
+            assertEquals(code, listOf(WarningGroup.WORD_TIMES), TranscriptWarnings.summarize(listOf(code)).groups)
+        }
+        assertEquals(listOf(WarningGroup.SPEAKERS),
+            TranscriptWarnings.summarize(listOf("DIARIZATION_MALFORMED_OFFSET_2")).groups)
     }
 
     @Test fun everyGroupIsReachableFromACodeSomeParserActuallyWrites() {
@@ -104,9 +111,9 @@ class TranscriptWarningsTest {
         assertEquals(
             listOf(
                 WarningGroup.COVERAGE,
-                WarningGroup.SECTION_ALIGNMENT,
                 WarningGroup.SECTION_LOST_STORAGE,
                 WarningGroup.SECTION_LOST_PROVIDER,
+                WarningGroup.SECTION_ALIGNMENT,
                 WarningGroup.WORD_TIMES,
                 WarningGroup.PROVIDER_MODEL,
                 WarningGroup.MORE_NOTES,

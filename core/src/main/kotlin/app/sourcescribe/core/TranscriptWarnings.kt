@@ -3,15 +3,16 @@ package app.sourcescribe.core
 /**
  * What a warning says about the finished transcript, independent of which parser recorded it and where.
  * The order of the entries is the order they are shown in: what is missing from the result first, what is
- * uncertain about it next, what the provider said about itself last.
+ * uncertain about it next, what the provider said about itself last. [SECTION_ALIGNMENT] sits on the seam,
+ * as the first of the uncertain ones, because it can mean a missing stretch but does not establish one.
  */
 enum class WarningGroup {
     COVERAGE,
-    SECTION_ALIGNMENT,
     SECTION_LOST_STORAGE,
     SECTION_LOST_PROVIDER,
     RESULT_SHORTENED,
     MISSING_TEXT,
+    SECTION_ALIGNMENT,
     SEGMENT_TIMES,
     WORD_TIMES,
     SPEAKERS,
@@ -50,10 +51,24 @@ object TranscriptWarnings {
     }
 
     /**
-     * True for the shape every recorded warning code has. Anything else in the list is text somebody put
+     * True for the shape every recorded warning code has: capitals, digits and underscores, optionally
+     * followed by a colon and the section numbers it names. Anything else in the list is text somebody put
      * there for a reader, and text must survive this untouched rather than be cut at its first colon.
      */
-    fun looksLikeCode(value: String): Boolean = CODE.matches(value)
+    fun looksLikeCode(value: String): Boolean {
+        val colon = value.indexOf(':')
+        val head = if (colon < 0) value.length else colon
+        if (head == 0) return false
+        for (index in 0 until head) {
+            val character = value[index]
+            if (character !in 'A'..'Z' && character !in '0'..'9' && character != '_') return false
+        }
+        for (index in head + 1 until value.length) {
+            val character = value[index]
+            if (character !in '0'..'9' && character != ',') return false
+        }
+        return true
+    }
 
     /**
      * `CHUNK_3_MALFORMED_SEGMENT_12_4` and `MISSING_CHUNKS:2,3` both name one family. A trailing number is
@@ -64,14 +79,25 @@ object TranscriptWarnings {
      * name. Stripping it would have to guess where the name ends, and the guess took the last word of every
      * family that happens to end in the same word: `MISSING_SPEAKER_7` became `MISSING` and
      * `INVALID_CHUNK_OFFSET_5` became `INVALID_CHUNK`, so neither could ever be recognised.
+     *
+     * Counted out by hand rather than matched by a pattern. A pattern is what produced that guess, because
+     * a regular expression takes the leftmost position a match can start at, not the shortest one. It also
+     * keeps this cheap enough for [Warnings] to ask for a family on every warning it records.
      */
     internal fun family(code: String): String {
         if (!looksLikeCode(code)) return code
-        var value = code.substringBefore(':').replace(CHUNK_PREFIX, "")
+        var value = code.substringBefore(':')
+        if (value.startsWith(CHUNK_PREFIX)) {
+            var end = CHUNK_PREFIX.length
+            while (end < value.length && value[end] in '0'..'9') end++
+            // Only a prefix that really carries a number names a chunk, so `CHUNK_LIKE_NAME` keeps its name.
+            if (end > CHUNK_PREFIX.length && end < value.length && value[end] == '_') value = value.substring(end + 1)
+        }
         while (true) {
-            val shorter = value.replace(INDEX_SUFFIX, "")
-            if (shorter == value) return value
-            value = shorter
+            var end = value.length
+            while (end > 0 && value[end - 1] in '0'..'9') end--
+            if (end == value.length || end == 0 || value[end - 1] != '_') return value
+            value = value.substring(0, end - 1)
         }
     }
 
@@ -134,7 +160,5 @@ object TranscriptWarnings {
         else -> if (family.startsWith("RESPONSE_")) WarningGroup.SECTION_LOST_PROVIDER else null
     }
 
-    private val CODE = Regex("[A-Z0-9_]+(:[0-9,]*)?")
-    private val CHUNK_PREFIX = Regex("^CHUNK_\\d+_")
-    private val INDEX_SUFFIX = Regex("_\\d+$")
+    private const val CHUNK_PREFIX = "CHUNK_"
 }

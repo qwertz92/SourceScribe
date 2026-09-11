@@ -177,6 +177,12 @@ class ExtractorMetadataTest {
         assertNull(track.name)
         assertNull(track.container)
         assertEquals("yt-dlp:formats.acodec,vcodec,asr", track.evidence)
+
+        // A format whose codec field is empty names no codec, so it is refused like a missing one instead of
+        // being taken as a track without one. The change said so; nothing held it to that until here.
+        val withoutCodec = """{"id":"BaW_jenozKc","formats":[{"format_id":"140","vcodec":"none","acodec":"",
+            "ext":"m4a","asr":48000}]}"""
+        assertTrue(ExtractorMetadata.parse(withoutCodec, source).audio.isEmpty())
     }
 
     @Test fun absentLanguagePreferenceFallsBackOnlyToTheParenthesisedNote() {

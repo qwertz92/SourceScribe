@@ -27,6 +27,30 @@ class WarningsTest {
         assertFalse(recorded.contains("MALFORMED_SEGMENT_${Warnings.LIMIT}"))
     }
 
+    @Test fun aSecondKindOfProblemIsNotPushedOutByTheFirstOne() {
+        // The cap counts entries, and one broken section can fill it on its own. If the cap also dropped the
+        // first warning of a kind nobody has reported yet, a second, different problem would vanish behind
+        // the marker, which says only that something is missing and not what.
+        val warnings = Warnings()
+        repeat(Warnings.LIMIT) { warnings += "INVALID_TIMING_LINE_$it" }
+        warnings += "EMPTY_CUE_LINE_999"
+        assertTrue(warnings.toList().toString(), warnings.toList().contains("EMPTY_CUE_LINE_999"))
+        // Nothing was dropped to make room for it, so there is nothing to mark as shortened yet.
+        assertFalse(warnings.toList().contains(Warnings.TRUNCATED))
+
+        // A further entry of a kind already reported is exactly what the cap is for.
+        warnings += "INVALID_TIMING_LINE_${Warnings.LIMIT}"
+        val recorded = warnings.toList()
+        assertFalse(recorded.contains("INVALID_TIMING_LINE_${Warnings.LIMIT}"))
+        assertEquals(Warnings.TRUNCATED, recorded.last())
+
+        // What the reader ends up being told: both problems, not only the one that filled the list.
+        assertEquals(
+            listOf(WarningGroup.MISSING_TEXT, WarningGroup.CAPTION_SOURCE, WarningGroup.MORE_NOTES),
+            TranscriptWarnings.summarize(recorded).groups,
+        )
+    }
+
     @Test fun theListKeepsTheOrderTheProblemsWereFoundIn() {
         // The order is the order of discovery, not the alphabet: a reader looks for the first thing that
         // went wrong. Without a case whose insertion order differs from its sorted order, a later switch

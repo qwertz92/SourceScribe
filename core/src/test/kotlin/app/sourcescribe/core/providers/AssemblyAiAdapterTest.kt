@@ -601,13 +601,15 @@ class AssemblyAiAdapterTest {
             request(config = baseConfig(wordTimestamps = true, segmentTimestamps = false)),
         ) as SubmissionResult.Direct).transcript
 
-        assertEquals(Warnings.LIMIT + 1, transcript.warnings.size)
+        assertEquals(transcript.warnings.toString(), Warnings.LIMIT + 2, transcript.warnings.size)
         assertEquals("REPORTED_LANGUAGES_MALFORMED_0", transcript.warnings.first())
         assertEquals(Warnings.TRUNCATED, transcript.warnings.last())
         assertFalse(transcript.warnings.contains("REPORTED_LANGUAGES_MALFORMED_${Warnings.LIMIT}"))
-        // The marker is what keeps a shortened list honest: the missing word timestamps of this answer did
-        // not fit into it any more, and without the marker the list would read as the whole picture.
-        assertFalse(transcript.warnings.contains("WORD_TIMESTAMPS_MISSING"))
+        // The missing word timestamps are a second, different problem, and they survive a list that two
+        // hundred language entries had already filled. This assertion used to read the other way round, and
+        // the reason given for it does not hold: the marker says that something is missing, never what, so
+        // dropping the only warning of its kind hid the second problem completely.
+        assertTrue(transcript.warnings.toString(), transcript.warnings.contains("WORD_TIMESTAMPS_MISSING"))
         // Completeness is decided separately from the warning list, so the cap cannot talk a partial
         // result into looking complete.
         assertFalse(transcript.technicallyComplete)
