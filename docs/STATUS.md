@@ -36,9 +36,9 @@ API-37-/x86_64-/16-KB-Emulator nachgewiesen. Keine echte STT-API aufgerufen.
 17 davon sind umgesetzt und am Emulator oder durch Tests belegt; die drei offenen stehen mit Stelle und
 fehlendem Nachweis in [Bekannte Probleme](DEFECTS.md).
 
-Dazu kamen vier vollständige Runden adversarischer Reviews mit je vier Sonnet-5-Agenten, jede Runde über
-die Korrekturen der vorherigen: Runde 1 über `782aef5`, Runde 2 über `5a6bfef`, Runde 3 über `42f723e`,
-Runde 4 über `7da4cdf`.
+Dazu kamen fünf vollständige Runden adversarischer Reviews mit Sonnet-5-Agenten, jede Runde über die
+Korrekturen der vorherigen: Runde 1 über `782aef5`, Runde 2 über `5a6bfef`, Runde 3 über `42f723e`,
+Runde 4 über `7da4cdf`, Runde 5 über `477dc5b` und `029a53f`.
 Aus Runde 1 stammen unter anderem die Untertitelspur-Regression und die Vereinheitlichung der
 Längengrenze, aus Runde 2 ein Instrumentierungstest, der auf einen umbenannten Statuscode wartete, die
 fehlenden Fehlertexte der lokalen Audiovorbereitung, die falsch zugeordnete Meldung bei beschädigtem
@@ -110,8 +110,42 @@ mit 1111 Treffern und ohne Treffer steht die Zählzeile jeweils bei y=696..738, 
 y=976..1029 und der Hinweis zum langen Text bei y=1076..1118 — identische Werte in allen drei
 Zuständen, obwohl die Zählzeile dabei von einer auf zwei Zeilen wechselt.
 
-**Die Schleife ist nicht konvergiert.** Vier Runden, keine davon leer. Solange eine Runde noch etwas
-findet, ist die nächste fällig — gerade weil die Funde der Runden 3 und 4 jeweils in den Korrekturen
+**Runde 5 hat es zum dritten Mal in Folge bestätigt.** Der wichtigste Fund lag wieder in der
+Vorrunde — diesmal in der Zuordnung selbst, die Runde 4 als erledigt gemeldet hatte. Zwei Reviewer fanden
+unabhängig dasselbe: `MALFORMED_SEGMENT` ließ den ganzen Eintrag fallen, der Satz sprach aber von
+fehlenden Zeitmarken. Der Text fehlte also, und die Anzeige behauptete einen kleineren Schaden als den
+eingetretenen. Dazu, aus derselben Runde:
+
+- Die Regel, die Chunk und Position aus einem Code entfernt, riet, wo der Familienname endet. Java-Regex
+  nimmt den am weitesten links beginnenden Treffer, also fraß die Regel das letzte Wort jeder Familie, die
+  selbst auf dieses Wort endet: `MISSING_SPEAKER_7` wurde zu `MISSING`, `INVALID_CHUNK_OFFSET_5` zu
+  `INVALID_CHUNK`. Beide Einträge in der Zuordnung waren damit toter Code, und angezeigt wurde das
+  verstümmelte Fragment — schlechter als der Zustand davor. Jetzt wird nur noch eine Zahl am Ende
+  gestrichen, und ein Wort davor gehört zum Familiennamen.
+- Untertitelparser und Anbieterparser schrieben beide `MALFORMED_SEGMENTS` mit verschiedener Bedeutung. Der
+  Untertitelfall heißt jetzt anders, weil dort der Text der Zeile fehlt und dort die Zeitangaben.
+- Fünf der zwölf Gruppen wurden von keinem Test je erzeugt. Ein Test prüft jetzt, dass jede Gruppe von
+  einem Code erreichbar ist, den ein Parser wirklich schreibt, und schlägt fehl, sobald eine Gruppe ohne
+  solchen Code dazukommt.
+
+Zwei Funde habe ich beim Nachrechnen selbst ergänzt, beide aus derselben Frage „trifft der Satz zu, was
+der Code tut“: `INVALID_CHUNK_OFFSET` lag bei der Abdeckung, obwohl der Text erhalten bleibt und nur die
+Zeit fehlt; und `AUDIO_INTERVAL_GAP_OR_OVERLAP` deckt laut eigenem Namen Lücke und Überlappung ab, sodass
+„nicht die ganze Tonspur steckt im Ergebnis“ im Überlappungsfall falsch war. Dafür gibt es eine eigene
+dreizehnte Gruppe mit einem Satz, der nur behauptet, was feststeht.
+
+Runde 5 hatte auch einen Fehler in meiner eigenen Aufteilung: Der Bereich für die beiden ersten Reviewer
+deckte nur die Warnanzeige ab, die Korrekturen der vierten Runde wären ungeprüft geblieben. Der
+nachgeschobene dritte Auftrag hat dann zwei weitere Dinge gefunden: eine belegte Testlücke — kein Test
+deckte den Fall ab, dass beide Schlüssel eines Feldpaares einen brauchbaren Wert tragen — und einen
+Kommentar, der behauptete, eine leere Zeichenkette trage nichts bei, während sie als `""` bis in die
+Herkunftszeile durchkam. Ein dritter gemeldeter Widerspruch in der Dokumentation war zum Zeitpunkt des
+geprüften Commits echt und beim nächsten Commit bereits behoben; live war nur eine veraltete Jagdliste.
+
+Gates nach Runde 5: 146 JVM-Tests im Modul `core` ohne Fehler, alle vier Lintberichte ohne Befund.
+
+**Die Schleife ist nicht konvergiert.** Fünf Runden, keine davon leer. Solange eine Runde noch etwas
+findet, ist die nächste fällig — gerade weil die Funde der Runden 3, 4 und 5 jeweils in den Korrekturen
 der Vorrunde lagen.
 
 ## UI-Feedback umgesetzt

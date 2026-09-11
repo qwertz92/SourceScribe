@@ -2,33 +2,30 @@
 
 ## Wiederaufnahme: hier weitermachen
 
-Geschrieben am 11. September 2026 am Ende der dritten Reviewrunde, auf Bitte des Nutzers, damit die
+Geschrieben am 11. September 2026, zuletzt nach der fünften Reviewrunde nachgeführt, damit die
 Arbeit ohne Wiedereinlesen der ganzen Sitzung weitergehen kann. Reihenfolge ist Absicht.
 
-**Wo der Stand steht:** Die drei Reviewrunden und was sie gefunden haben, stehen in
+**Wo der Stand steht:** Die Reviewrunden und was sie gefunden haben, stehen in
 [STATUS.md](STATUS.md); was offen ist, mit Stelle und fehlendem Nachweis, in
 [DEFECTS.md](DEFECTS.md). Die Punktnummern unten sind die Nummern dort.
 
-### 1. Vierte Reviewrunde über die Korrekturen der dritten
+### 1. Sechste Reviewrunde über die Korrekturen der fünften
 
-Die dritte Runde hat in `42f723e` eine Regression gefunden, die die zweite Runde selbst eingebaut
-hatte: eine Textzeile ohne reservierte Höhe, also genau der Layout-Shift, den derselbe Auftrag
-beseitigen sollte. Deshalb ist die Runde nach den Korrekturen nicht optional. Der Commitbereich für
-die Reviewer ist `42f723e..HEAD`. Vier Sonnet-5-Agenten, dieselbe Aufteilung wie bisher: core,
-App-Logik, UI, Ressourcen und Doku. Die Auftragstexte der dritten Runde lassen sich
-übernehmen; nur die Jagdliste wechselt auf die neuen Stellen:
+Runden 3, 4 und 5 haben ihren wichtigsten Fund jeweils in den Korrekturen der Vorrunde gehabt. Deshalb ist
+die Runde nach den Korrekturen nicht optional. Der Commitbereich ist `029a53f..HEAD`. Drei Sonnet-5-Agenten
+reichen für diesen Umfang: core, UI und Texte, und eine Runde über die Korrekturen selbst — dieser dritte
+Auftrag hat in Runde 5 gefehlt und musste nachgeschoben werden. Die Jagdliste:
 
-- `core/.../providers/Warnings.kt`: in Runde 4 geprüft. Eine Allowlist-Ergänzung für
-  `WARNINGS_TRUNCATED` ist nicht nötig, weil Transkriptwarnungen gar nicht in den Diagnosebericht
-  gehen. Der Contract-Test am echten Adapter fehlte und ist nachgetragen
-  (`AssemblyAiAdapterTest.anAnswerFullOfBrokenEntriesCannotGrowTheWarningListWithIt`). Offen bleibt
-  Punkt 11 in [DEFECTS.md](DEFECTS.md): die Deckelung kann die Wiederverwendung bezahlter Abschnitte
-  nach einem App-Update sperren.
-- `ExtractorMetadata.carried` prüft Zahlenfelder jetzt mit dem Zahlenleser. Gibt es ein Feld, das
-  dadurch aus `evidence` verschwindet, obwohl es weiterhin ausgewertet wird?
-- `TranscriptScreen`: Reserviert die gemessene Höhe wirklich beide Fassungen, auch bei 200 %
-  Schriftgröße und im Querformat? Springt nichts anderes, wenn `Filtered` nachläuft?
-- `AudioTracks.readingOrder` hat einen Schlüssel mehr. Ist der Comparator weiter total?
+- `TranscriptWarnings.group`: Die Zuordnung wurde an vier Stellen geändert. Sagt jeder der dreizehn Sätze
+  jetzt genau das, was am Erzeugungsort passiert, und keiner weniger?
+- `family()` streicht nur noch eine Zahl am Ende. Gibt es eine Familie, die dadurch mit einer anderen
+  zusammenfällt, oder eine, die eine Zahl im Namen trägt?
+- `CaptionParser`: Die eigene Warnungsgrenze ist durch die gemeinsame ersetzt. Ist das Verhalten bei genau
+  64 und bei 65 verschiedenen Warnungen noch das erwartete, und bleibt `complete` richtig?
+- `ExportStore.reconcile` löscht `documentUri` in einem der drei Zweige. Ist der abgebrochene Schreibfall
+  wirklich unberührt, und gibt es einen vierten Pfad, der die URI verliert?
+- `ExtractorMetadata.value` behandelt eine leere Zeichenkette wie ein fehlendes Feld. Wird dadurch eine
+  Tonspur abgewiesen, die vorher angenommen wurde?
 
 ### 2. Warncodes lesbar machen (DEFECTS 9) — erledigt
 
@@ -46,7 +43,8 @@ besten zusammen mit Punkt 2, weil es dieselbe Datei und dieselbe Denkweise ist.
 ### 4. Kleine offene Punkte, in dieser Reihenfolge
 
 - DEFECTS 8: Längenobergrenze für `speech_model_used` plus Contract-Test mit überlanger Antwort.
-- DEFECTS 7: Entscheiden, ob `reconcile` `documentUri` bei nachgewiesen fehlender Datei löscht.
+- DEFECTS 13: Eigener Fehlercode dafür, dass ein Exportdokument nicht geprüft werden konnte, statt
+  denselben Grund wie für ein nachweislich gelöschtes zu melden.
 - DEFECTS 6: Mehr Bytes im Streuwert des Dateinamens oder ein Test, der die Annahme festhält.
 - DEFECTS 10: Eigener Text für `AUDIO_INVALID_INPUT` oder Nachweis, dass er nie beim Nutzer ankommt.
 

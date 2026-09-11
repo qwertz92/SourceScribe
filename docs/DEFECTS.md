@@ -1,6 +1,6 @@
 # Bekannte Probleme und offene Punkte
 
-**Stand:** 11. September 2026, nach vier Runden adversarischer Reviews. Diese Datei ist für den
+**Stand:** 11. September 2026, nach fünf Runden adversarischer Reviews. Diese Datei ist für den
 nächsten Agenten gedacht und listet, was **nicht** vollständig erledigt ist. Ein geschlossener Punkt
 behält seine Nummer und einen kurzen Vermerk, damit Verweise aus anderen Dokumenten gültig bleiben. Was hier nicht steht, ist entweder erledigt oder in
 [STATUS.md](STATUS.md) beschrieben.
@@ -86,17 +86,16 @@ belegt. Diese drei sind offen oder nur teilweise geschlossen:
   Für den Einzelnutzerbetrieb ist das unkritisch, aber es ist eine bewusste Annahme, keine Garantie.
 - **Was fehlt:** Entweder mehr Bytes oder ein Test, der die Annahme dokumentiert.
 
-### 7. Gelöschtes Exportdokument bleibt als belegter Name gezählt (niedrig)
+### 7. Gelöschtes Exportdokument bleibt als belegter Name gezählt — erledigt am 11. September 2026
 
-- **Stelle:** `app/src/main/java/app/sourcescribe/data/ExportStore.kt`, `reconcile` gegenüber der
-  `repeated`-Prüfung in `export`
-- **Voraussetzung:** Ein Export ist fehlgeschlagen oder sein Dokument wurde außerhalb der App gelöscht.
-  `reconcile` behält `documentUri` auf der `FAILED`-Zeile.
-- **Folge:** Die Wiederholungsprüfung zählt diese Zeile weiter als belegten Namen. Ein selbst vergebener
-  Name bekommt dann beim nächsten Export einen Unterscheidungszusatz, obwohl die Datei nachweislich weg
-  ist. Es entsteht keine Kollision und kein Datenverlust, nur ein unnötiger Zusatz im Dateinamen.
-- **Was fehlt:** Entscheidung, ob `reconcile` `documentUri` bei nachgewiesen fehlender Datei löschen
-  soll. Das berührt die Exportreparatur und braucht einen eigenen Test.
+Bleibt als Nummer stehen, damit Verweise gelten. `reconcile` löscht `documentUri` jetzt genau dann, wenn
+der Anbieter gefragt wurde und geantwortet hat, dass das Dokument weg ist. Der naheliegende Fix — das Feld
+bei jedem Fehlschlag leeren — wäre selbst ein Defekt gewesen: Eine beim Schreiben abgebrochene Zeile trägt
+eine wirklich vorhandene Datei, weil die URI erst nach erfolgreichem `createDocument` gespeichert wird. Der
+Prüfprovider der Tests lehnt einen kollidierenden Namen ab, statt automatisch umzubenennen; ein solcher Fix
+hätte den zweiten Export also nicht nur kosmetisch, sondern ganz scheitern lassen. Zwei Tests halten beide
+Fälle auseinander: `aChosenNameIsFreeAgainOnceItsDocumentIsProvenGone` und
+`anInterruptedExportKeepsHoldingItsNameBecauseItsFileIsThere`. Offen bleibt Punkt 13.
 
 ### 8. AssemblyAI meldet Sprache und Modell ohne Längen- oder Zeichenprüfung (niedrig, unbestätigt)
 
@@ -177,6 +176,85 @@ wie ein Code aussieht, wird unverändert durchgereicht.
   Test. Der neue Test `provenanceDoesNotNameANumberFieldWhoseValueWasRejectedAsImplausible` hält das
   heutige Verhalten fest und würde bei einer Umstellung bewusst angepasst.
 
+### 13. Ein ungeprüftes Exportdokument wird gemeldet, als wäre es nachweislich weg (niedrig)
+
+- **Stelle:** `app/src/main/java/app/sourcescribe/data/ExportStore.kt`, `reconcile`, der
+  `IllegalArgumentException`-Zweig
+- **Voraussetzung:** Die gespeicherte Dokument-URI lässt sich beim Anbieter gar nicht abfragen, etwa weil
+  sie keine brauchbare Dokument-URI mehr ist.
+- **Erwartet gegen tatsächlich:** Erwartet wäre eine Aussage über das, was festgestellt wurde. Tatsächlich
+  trägt die Zeile denselben Grund `EXTERNAL_DOCUMENT_MISSING` wie ein wirklich gelöschtes Dokument, und der
+  Nutzer liest „Die exportierte Datei ist nicht mehr da“, obwohl nur die Prüfung fehlgeschlagen ist. Das
+  ist derselbe Fehler wie ein ungewisser Ausgang, der als sicherer dargestellt wird.
+- **Warum es so steht:** Beim Schließen von Punkt 7 aufgefallen. Der Namensteil ist gelöst, weil der
+  ungeprüfte Fall seine URI behält und der Name damit vorsichtshalber als belegt gilt. Der Text braucht
+  aber einen eigenen Fehlercode und je einen Satz in beiden Sprachen; das ist eine eigene Änderung.
+- **Was fehlt:** Zweiter Fehlercode, zwei Texte, ein Test mit einer nicht abfragbaren URI.
+
+### 14. Alte Artefakte tragen den alten Untertitelcode und bekommen weiter den Zeitmarkensatz (niedrig)
+
+- **Stelle:** `core/src/main/kotlin/app/sourcescribe/core/CaptionParser.kt` gegen bereits gespeicherte
+  `TranscriptDocument.warnings`
+- **Voraussetzung:** Ein Transkript, das vor dem 11. September 2026 aus einer Untertitelspur entstand und
+  dabei `MALFORMED_SEGMENTS_<n>` aufgezeichnet hat.
+- **Erwartet gegen tatsächlich:** Der Untertitelfall heißt jetzt `MALFORMED_CAPTION_SEGMENTS_<n>`, weil der
+  Anbieterparser denselben Namen mit anderer Bedeutung benutzte. Neue Aufträge bekommen den richtigen Satz;
+  ein alter Eintrag fällt weiter in die Zeitmarkengruppe und sagt damit „Zeitmarken fehlen“, obwohl der Text
+  dieser Stelle fehlt.
+- **Warum es so steht:** Der Index, der beide Quellen unterscheiden würde, wird beim Zusammenfassen
+  absichtlich entfernt. Eine Umschrift gespeicherter Warnlisten berührt `normalizationVersion` und hängt an
+  derselben Entscheidung wie Punkt 11.
+- **Was fehlt:** Entscheidung zusammen mit Punkt 11, ob gespeicherte Warnlisten je migriert werden.
+
+### 15. Eine Notiz aus reinen Großbuchstaben würde wie ein Code behandelt (niedrig, unbestätigt)
+
+- **Stelle:** `core/src/main/kotlin/app/sourcescribe/core/TranscriptWarnings.kt`, `looksLikeCode`
+- **Voraussetzung:** Jemand legt später freien Text in `TranscriptDocument.warnings`, der nur aus
+  Großbuchstaben, Ziffern und Unterstrichen besteht.
+- **Erwartet gegen tatsächlich:** So ein Text würde am ersten Doppelpunkt abgeschnitten und als technischer
+  Status gerahmt. Heute erreichbar ist das nicht: Die einzige Stelle, die freien Text in diese Liste legt,
+  ist der UI-Prüfdatensatz, und dessen zwei Sätze enthalten Leerzeichen und Kleinbuchstaben.
+- **Was fehlt:** Nichts, solange die Liste Codes trägt. Wird sie je für Text vorgesehen, braucht sie ein
+  eigenes Feld statt einer Formprüfung.
+
+### 16. Der `RESPONSE_`-Zweig ist nicht gegen einen künftig falsch benannten Code geschützt (niedrig)
+
+- **Stelle:** `core/src/main/kotlin/app/sourcescribe/core/TranscriptWarnings.kt`, der `else`-Zweig von
+  `group`
+- **Voraussetzung:** Jemand nennt eine neue Warnung `RESPONSE_...`, die keinen verlorenen Abschnitt bedeutet.
+- **Erwartet gegen tatsächlich:** Sie würde stillschweigend als verlorener Abschnitt gemeldet, also als
+  größerer Schaden, als entstanden ist. Heute stimmt die Regel: Jeder real erzeugte `RESPONSE_`-Code
+  entsteht in `SttStep` an einer Stelle, die im selben Schritt `missing += chunk.index` setzt — nachgeprüft
+  für alle zwölf Werte von `ProviderErrorCode` durch
+  `everyRefusalTheProviderGivesForOneSectionCountsAsALostSection`.
+- **Was fehlt:** Entweder eine geschlossene Liste statt der Präfixregel oder ein Test, der die Kopplung an
+  `missing` am Erzeugungsort festhält.
+
+### 17. „Tonspur“ gegen „Audiospur“: Englisch ist einheitlich, Deutsch nicht (niedrig)
+
+- **Stelle:** `app/src/main/res/values/strings.xml`, `step_prepare_audio` und die vier
+  `reason_audio_*`-Texte gegen den Rest der Datei
+- **Erwartet gegen tatsächlich:** Im Englischen heißt jede der zehn entsprechenden Stellen „audio track“.
+  Im Deutschen sagen die Verarbeitungstexte „Tonspur“ und die Auswahltexte „Audiospur“. Eine Lesart dafür
+  gibt es — wählbare Spur gegen verarbeiteten Inhalt —, aber `help_audio_track_body` durchbricht sie selbst.
+- **Was fehlt:** Entscheidung für ein Wort und eine Durchsicht aller Vorkommen in einem Zug.
+
+### 18. Faellt die ganze Segmentliste aus, behauptet der Satz fehlenden Text (niedrig)
+
+- **Stelle:** `core/src/main/kotlin/app/sourcescribe/core/SyncTranscriptParser.kt`, `parse`, gegen
+  `TranscriptWarnings.group` für `MALFORMED_SEGMENT`
+- **Voraussetzung:** Jeder Eintrag der Segmentliste einer Anbieterantwort ist unlesbar.
+- **Erwartet gegen tatsächlich:** Ist am Ende kein einziges Segment übrig, ersetzt der Parser die Liste durch
+  das vollständige Textfeld der Antwort. Dann fehlt kein Text, sondern nur die Gliederung samt Zeitangaben.
+  Die Warnungen sehen aber genauso aus wie bei einem Teilverlust, und der Satz sagt, Stellen fehlten im
+  Ergebnis. Für den häufigen Fall — einzelne unlesbare Einträge — ist der Satz richtig, und nur dieser Fall
+  ist gefährlich, weil ein Teilverlust leise ist.
+- **Warum es so steht:** Die Zuordnung sieht nur die Codeliste und kann nicht erkennen, ob der Ersatz gegriffen
+  hat. Sichtbar würde das erst durch eine eigene Warnung am Erzeugungsort.
+- **Was fehlt:** Eine Warnung, die den Ersatz der Segmentliste durch das Textfeld festhält, plus eigener Satz.
+  Das ist zugleich unabhängig nützlich: Heute ist ein Ergebnis ohne jede Gliederung von einem gegliederten
+  nicht zu unterscheiden.
+
 ## Bewusste Entscheidungen, die wie Fehler aussehen
 
 ### Ein gewöhnlicher Start-Tap nach „Neu vorbereiten“ genügt für die Freigabe
@@ -198,6 +276,15 @@ Was an der Meldung berechtigt war: Der Test prüfte nur den Entwurf vor diesem T
 ließ sich so lesen, als brauchte es mehr als das gewöhnliche Antippen. Beides ist korrigiert; der Test
 prüft jetzt mit einem wirklich registrierten Schlüssel, was am Tor passiert, und zusätzlich, dass ohne
 passenden Schlüssel gar nichts freigegeben wird.
+
+### `MALFORMED_SEGMENT` und `MALFORMED_WORD` liegen absichtlich in verschiedenen Gruppen
+
+Beide entstehen in derselben Zeile von `parseEntries`, und beide lassen den Eintrag fallen. Sie sagen dem
+Leser trotzdem nicht dasselbe: Die Segmentliste ist der angezeigte Lesetext, ein fehlender Eintrag ist dort
+eine fehlende Passage. Die Wortliste trägt nur die Zeiten je Wort und erscheint im Export als Wortzahl; ein
+fehlender Eintrag ist dort eine fehlende Zeitangabe. Deshalb gehören `MALFORMED_SEGMENT` und
+`MISSING_SEGMENT_TEXT` zu den fehlenden Texten, `MALFORMED_WORD` und `MISSING_WORD_TEXT` zu den Wortzeiten —
+obwohl beide Paare aus derselben Zeile derselben Funktion stammen.
 
 ### Nicht erreichbare `PROVIDER_`- und `RESPONSE_`-Zweige in `messageText`
 
