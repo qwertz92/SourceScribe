@@ -224,6 +224,36 @@ class TranscriptExporterTest {
     }
 
     @Test
+    fun theIdentityInAGeneratedNameIsADigestOfAStatedWidth() {
+        // Written down because the width is a bound the name depends on, not a formatting choice: the
+        // identity is what keeps two runs of one source apart once day, language and source id match.
+        val first = document()
+        val name = TranscriptExporter.fileName(first, ExportFormat.MARKDOWN)
+        val identity = name.removeSuffix(".md").substringAfterLast('-')
+        assertEquals(name, TranscriptExporter.SHORT_ID_BYTES * 2, identity.length)
+        assertTrue(name, identity.all { it in "0123456789abcdef" })
+
+        // A digest and not a prefix: two ids that share everything but their last character still differ.
+        assertNotEquals(
+            TranscriptExporter.fileName(first.copy(artifactId = "artifact-1-a"), ExportFormat.MARKDOWN),
+            TranscriptExporter.fileName(first.copy(artifactId = "artifact-1-b"), ExportFormat.MARKDOWN),
+        )
+
+        // The discriminator that separates two exports of one document is hashed to the same width.
+        val discriminated = TranscriptExporter.fileName(
+            first,
+            ExportFormat.MARKDOWN,
+            override = "Interview",
+            discriminator = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
+        )
+        assertEquals(
+            discriminated,
+            TranscriptExporter.SHORT_ID_BYTES * 2,
+            discriminated.removeSuffix(".md").substringAfterLast('-').length,
+        )
+    }
+
+    @Test
     fun twoArtifactsOfTheSameSourceNeverShareAGeneratedName() {
         val first = document()
         val second = first.copy(artifactId = "artifact-2")

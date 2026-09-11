@@ -22,6 +22,7 @@ object TranscriptExporter {
      */
     private const val MAX_FILENAME_BYTES = 180
     private const val MAX_FILENAME_PART_BYTES = 40
+    internal const val SHORT_ID_BYTES = 6
     /** Leaves room for the longest extension a provider raw payload can carry. */
     private const val MAX_FILENAME_STEM_BYTES = 160
     private val json = Json {
@@ -99,10 +100,18 @@ object TranscriptExporter {
     /**
      * Enough of an identifier to separate runs without turning the name into an identifier.
      * A digest rather than a prefix, so two ids that merely share their opening characters still differ.
+     *
+     * A digest of n bytes collides with even chance at roughly the square root of its value range. At four
+     * bytes that point sat near 77 000, and while only names that already agree on day, language and source
+     * compete for it, that argument is what made the width an assumption rather than a bound. Six bytes put
+     * the point past sixteen million and make the argument unnecessary. The four extra characters come out
+     * of the title's share of the name, which is trimmed for the identity anyway.
      */
     private fun shortId(value: String): String {
         val digest = MessageDigest.getInstance("SHA-256").digest(value.toByteArray(StandardCharsets.UTF_8))
-        return buildString(8) { for (index in 0 until 4) append("%02x".format(digest[index])) }
+        return buildString(SHORT_ID_BYTES * 2) {
+            for (index in 0 until SHORT_ID_BYTES) append("%02x".format(digest[index]))
+        }
     }
 
     /** Joins a readable head with a suffix that must survive, trimming only the head. */
