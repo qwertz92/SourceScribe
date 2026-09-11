@@ -154,6 +154,31 @@ class ExtractorMetadataTest {
         assertEquals("yt-dlp:formats.acodec,vcodec,ext", track.evidence)
     }
 
+    @Test fun whereTwoKeysCanSupplyOneFactOnlyTheOneThatSuppliedItIsNamed() {
+        // Both keys of each pair hold a usable value here, which the tests above never set up: they only
+        // cover pairs where one side is broken. A line that named the unused key too would claim a second
+        // source for a fact that came from one, and nothing would have failed.
+        val raw = """{"id":"BaW_jenozKc","formats":[{"format_id":"140","vcodec":"none","acodec":"mp4a.40.2",
+            "ext":"m4a","abr":129,"tbr":132,"filesize":3000,"filesize_approx":3100}]}"""
+        val track = ExtractorMetadata.parse(raw, source).audio.single()
+        assertEquals(129, track.bitrateKbps)
+        assertEquals(3000L, track.bytes)
+        assertFalse(track.bytesEstimated)
+        assertEquals("yt-dlp:formats.acodec,vcodec,ext,abr,filesize", track.evidence)
+    }
+
+    @Test fun aKeyWrittenAsAnEmptyStringNamesNothingAndIsNotClaimedAsProvenance() {
+        // The record used to keep "" as a language and name the key for it, which reads as a language the
+        // extractor supplied. An empty note and an empty container had the same problem.
+        val raw = """{"id":"BaW_jenozKc","formats":[{"format_id":"140","vcodec":"none","acodec":"mp4a.40.2",
+            "language":"","format_note":"","ext":"","asr":48000}]}"""
+        val track = ExtractorMetadata.parse(raw, source).audio.single()
+        assertNull(track.language)
+        assertNull(track.name)
+        assertNull(track.container)
+        assertEquals("yt-dlp:formats.acodec,vcodec,asr", track.evidence)
+    }
+
     @Test fun absentLanguagePreferenceFallsBackOnlyToTheParenthesisedNote() {
         fun note(value: String) = ExtractorMetadata.parse(
             """{"id":"BaW_jenozKc","formats":[{"format_id":"140","vcodec":"none","acodec":"mp4a.40.2","format_note":"$value"}]}""",

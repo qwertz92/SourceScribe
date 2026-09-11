@@ -62,7 +62,9 @@ object ExtractorMetadata {
             }
         }
         val audio = (root["formats"] as? JsonArray).orEmpty().filterIsInstance<JsonObject>().mapNotNull { item ->
-            fun value(key: String) = (item[key] as? JsonPrimitive)?.contentOrNull
+            // A key written as an empty string names nothing. Letting it through would put "" into the
+            // record and then name the key in the provenance line for it.
+            fun value(key: String) = (item[key] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
             fun signedNumber(key: String) = (item[key] as? JsonPrimitive)?.doubleOrNull?.takeIf { it.isFinite() }
             fun number(key: String) = signedNumber(key)?.takeIf { it >= 0 }
             val id = value("format_id") ?: return@mapNotNull null
