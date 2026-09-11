@@ -447,5 +447,24 @@ class MainViewModel @Inject constructor(
             }
             return total
         }
+
+        /**
+         * True when this source is longer than the job could run, by either limit that stops it.
+         *
+         * Two limits can, and they are not the same number: the app's own ceiling, which no job may
+         * exceed, and the length limit this job carries, which the user sets. The cost row reads this so
+         * that it never prices a source the same screen refuses a line below — round 12 gave it the
+         * ceiling alone, and a two-hour source under a one-hour limit was shown a figure in dollars
+         * directly above the warning that the run would be refused before anything left the device.
+         *
+         * An unusable job limit is deliberately not judged here, the way `JobLimits.exceeds` does not
+         * judge it: `configError` refuses it as an invalid entry, and calling it a length problem would
+         * name the wrong cause. The ceiling still applies in that case.
+         */
+        fun sourceTooLong(durationMs: Long?, config: JobConfig): Boolean =
+            durationMs != null && (
+                durationMs > JobLimits.MAX_AUDIO_SECONDS * 1000L ||
+                    JobLimits.exceeds(durationMs, config.maxAudioSeconds)
+                )
     }
 }

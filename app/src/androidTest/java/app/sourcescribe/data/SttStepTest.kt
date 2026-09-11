@@ -1,6 +1,7 @@
 package app.sourcescribe.data
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import app.sourcescribe.MainViewModel
 import app.sourcescribe.core.JobConfig
 import app.sourcescribe.core.Provider
 import app.sourcescribe.core.Region
@@ -91,5 +92,39 @@ class SttStepTest {
         val unknown = OpenAiAdapter().capabilities(OpenAiAdapter.MODEL_GPT_4O_TRANSCRIBE_DIARIZE)
         val unknownConfig = JobConfig(provider = Provider.OPENAI, model = OpenAiAdapter.MODEL_GPT_4O_TRANSCRIBE_DIARIZE)
         assertNull(SttStep.estimateCostMicrousd(unknown, unknownConfig, 60_000L))
+    }
+
+    /**
+     * The figure shown under a source before anyone agrees to pay it.
+     *
+     * Round 12 moved the display onto the same chunk plan and the same per-chunk function the budget gate
+     * uses, so the two cannot disagree — and then nothing tested the sum itself. The single-chunk function
+     * above was covered; adding it up over a plan was not, and that addition is where rounds 3 to 12 kept
+     * finding the defects.
+     */
+    @Test
+    fun theEstimateShownIsTheSumOverTheChunksTheRunWouldSubmit() {
+        // Twenty-five minutes is three chunks: ten, ten and five. Universal-2 at fifteen cents an hour
+        // makes 25 000, 25 000 and 12 500 micro-USD of it.
+        val universal2 = JobConfig(
+            provider = Provider.ASSEMBLYAI,
+            model = AssemblyAiAdapter.MODEL_U2,
+            region = Region.EU,
+        )
+        assertEquals(62_500L, MainViewModel.estimatedCostMicrousd(universal2, 1_500_000L))
+
+        // With speaker labels each chunk rounds up on its own, as each is billed on its own: 28 334 plus
+        // 28 334 plus 14 167 is one micro-dollar above the 70 834 an undivided calculation gives. The
+        // higher figure is the one the provider charges, so it is the one the reader is shown.
+        assertEquals(70_835L, MainViewModel.estimatedCostMicrousd(universal2.copy(diarization = true), 1_500_000L))
+
+        // Groq bills ten seconds however short the audio is, so eight seconds costs what ten would.
+        val groq = JobConfig(provider = Provider.GROQ, model = GroqAdapter.MODEL_TURBO)
+        assertEquals(112L, MainViewModel.estimatedCostMicrousd(groq, 8_000L))
+
+        // Outside the planner's bounds there is no sum to show, and no number is shown instead of a wrong
+        // one: a length of zero, and a length past the ceiling the planner refuses.
+        assertNull(MainViewModel.estimatedCostMicrousd(universal2, 0L))
+        assertNull(MainViewModel.estimatedCostMicrousd(universal2, SttStep.MAX_AUDIO_DURATION_MS + 1))
     }
 }

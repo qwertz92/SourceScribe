@@ -201,21 +201,27 @@ private fun PreviewCard(
                 // the minimum length Groq bills, so a budget chosen from what stood here could be refused
                 // by a check that had counted differently.
                 //
-                // Beyond the ceiling there is no run to price, and saying "price unknown" there would be
-                // an untrue statement about the tariff rather than about the source. The line below the
-                // row already says why the source cannot be processed; this one stops contradicting it.
-                val beyondCeiling = (source.durationMs ?: 0L) > JobLimits.MAX_AUDIO_SECONDS * 1000L
+                // Too long for this job to run at all, by either limit that can stop it. The rule is in
+                // `MainViewModel` and not written out here, for the same reason the sum above is: a screen
+                // that computes its own version of a rule the run enforces elsewhere is the defect this
+                // review loop has found more often than any other. Saying "price unknown" instead would be
+                // an untrue statement about the tariff rather than about the source; which of the two
+                // limits it is, and what to do about it, is what the line below says.
+                val tooLong = MainViewModel.sourceTooLong(source.durationMs, preview.config)
                 val estimate = source.durationMs
-                    ?.takeIf { !beyondCeiling }
+                    ?.takeIf { !tooLong }
                     ?.let { MainViewModel.estimatedCostMicrousd(preview.config, it) }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         if (estimate != null && capability != null) stringResource(R.string.estimated_cost,
                             String.format(Locale.ROOT, "%.4f", estimate / 1_000_000.0),
                             capability.priceAsOf.orEmpty())
-                        else if (beyondCeiling) stringResource(R.string.cost_beyond_ceiling)
+                        else if (tooLong) stringResource(R.string.cost_source_too_long)
                         else stringResource(R.string.price_unknown),
-                        Modifier.weight(1f), style = MaterialTheme.typography.bodySmall,
+                        // Two lines whatever it says. Raising the limit on the button below swaps a
+                        // sentence here for a shorter price, and the rest of the screen must not move
+                        // upwards while the reader is pressing it.
+                        Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, minLines = 2,
                     )
                     InfoButton(HelpTopic.COST, openHelp)
                 }

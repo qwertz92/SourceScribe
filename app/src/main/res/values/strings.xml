@@ -124,7 +124,7 @@
     <string name="missing_provider">STT erfordert einen Anbieter, ein Modell und einen passenden gespeicherten Schlüssel.</string>
     <string name="privacy">Keine Telemetrie. Schlüssel bleiben auf diesem Gerät. Externe STT beginnt erst, wenn du den Auftrag startest.</string>
     <string name="estimated_cost">Geschätzte Kosten: %1$s USD · Tarifstand %2$s</string>
-    <string name="cost_beyond_ceiling">Keine Kostenschätzung: Die Quelle überschreitet die Höchstdauer.</string>
+    <string name="cost_source_too_long">Keine Kostenschätzung: Die Quelle ist länger, als dieser Auftrag zulässt.</string>
     <string name="price_unknown">Preis unbekannt – kein kostenloses Versprechen</string>
     <string name="restore_key">Dieser Auftrag benötigt seinen ursprünglichen Schlüssel. Öffne Einstellungen und wähle „Fehlenden Schlüssel wiederherstellen“ für denselben Anbieter und dieselbe Region.</string>
     <string name="notifications_denied">Benachrichtigungen sind aus. Den Fortschritt findest du im Verlauf; die Ausführung unterliegt weiterhin den Android-Hintergrundregeln.</string>

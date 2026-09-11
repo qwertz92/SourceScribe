@@ -32,6 +32,27 @@ class ViewRulesTest {
     }
 
     @Test
+    fun aSourceLongerThanThisJobAllowsIsNotPriced() {
+        val config = JobConfig(mode = AcquisitionMode.STT_ONLY, provider = Provider.GROQ,
+            model = GroqAdapter.MODEL_TURBO, maxAudioSeconds = 3_600L)
+
+        // Two hours under a one-hour limit: far inside the app's ten-hour ceiling, and still a source this
+        // job cannot run. Round 12 consulted the ceiling alone, so the cost row offered a figure in
+        // dollars for exactly this case while the warning below it said the run would be refused.
+        assertTrue(MainViewModel.sourceTooLong(7_200_000L, config))
+        assertEquals(false, MainViewModel.sourceTooLong(3_600_000L, config))
+
+        // An unusable job limit is not judged as a length problem — but the ceiling still is.
+        val unusableLimit = config.copy(maxAudioSeconds = 0L)
+        assertEquals(false, MainViewModel.sourceTooLong(7_200_000L, unusableLimit))
+        assertTrue(MainViewModel.sourceTooLong(JobLimits.MAX_AUDIO_SECONDS * 1000L + 1, unusableLimit))
+        assertEquals(false, MainViewModel.sourceTooLong(JobLimits.MAX_AUDIO_SECONDS * 1000L, unusableLimit))
+
+        // A source whose length nobody knows is not too long. It has no price either, for another reason.
+        assertEquals(false, MainViewModel.sourceTooLong(null, config))
+    }
+
+    @Test
     fun damagedStoredConfigurationHasNoFallbackProviderOrDefaults() {
         for (raw in listOf("", "{", "{\"mode\":\"BROKEN\"}", "{\"provider\":\"UNKNOWN\"}")) {
             assertNull(app.sourcescribe.data.decodeStoredJobConfig(raw))

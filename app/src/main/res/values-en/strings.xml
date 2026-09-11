@@ -122,7 +122,7 @@
     <string name="missing_provider">STT requires a provider, model, and matching saved key.</string>
     <string name="privacy">No telemetry. Keys remain on this device. External STT begins when you start the job.</string>
     <string name="estimated_cost">Estimated cost: %1$s USD · pricing as of %2$s</string>
-    <string name="cost_beyond_ceiling">No cost estimate: the source exceeds the maximum length.</string>
+    <string name="cost_source_too_long">No cost estimate: the source is longer than this job allows.</string>
     <string name="price_unknown">Price unknown – no promise of free use</string>
     <string name="restore_key">This job requires its original key. Open Settings and select “Restore missing key” for the same provider and region.</string>
     <string name="notifications_denied">Notifications are off. You can find progress in the history; execution remains subject to Android background restrictions.</string>
