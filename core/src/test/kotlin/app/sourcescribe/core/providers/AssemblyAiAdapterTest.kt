@@ -648,6 +648,43 @@ class AssemblyAiAdapterTest {
     }
 
     @Test
+    fun aReportedModelIsRefusedRatherThanShownAtAnyLength() {
+        fun parsed(reported: String): Pair<String?, List<String>> {
+            val response = """
+                {
+                  "id":"0072a82b-aa22-4962-add2-6121c36c17c6",
+                  "status":"completed",
+                  "text":"one",
+                  "language_code":"en",
+                  "speech_model_used":$reported,
+                  "words":[],
+                  "utterances":null
+                }
+            """.trimIndent()
+            val transcript = (adapter.parseSavedResponse(response.toByteArray(), request())
+                as SubmissionResult.Direct).transcript
+            return transcript.reportedModel to transcript.warnings
+        }
+
+        // The names AssemblyAI actually reports stay untouched, including one right at the bound.
+        assertEquals("universal-2", parsed("\"universal-2\"").first)
+        assertEquals("x".repeat(128), parsed("\"" + "x".repeat(128) + "\"").first)
+
+        // One character more is refused loudly. It is not shortened: a cut name would be a value nobody
+        // reported, and this string is shown to a reader as the model that produced the transcript.
+        val long = parsed("\"" + "x".repeat(129) + "\"")
+        assertNull(long.first)
+        assertTrue(long.second.toString(), "REPORTED_MODEL_TOO_LONG" in long.second)
+        assertFalse(long.second.toString(), "REPORTED_MODEL_MALFORMED" in long.second)
+
+        // An empty or non-string value keeps the existing malformed warning rather than the length one.
+        val blank = parsed("\"\"")
+        assertNull(blank.first)
+        assertTrue(blank.second.toString(), "REPORTED_MODEL_MALFORMED" in blank.second)
+        assertFalse(blank.second.toString(), "REPORTED_MODEL_TOO_LONG" in blank.second)
+    }
+
+    @Test
     fun wordTimesAreMillisecondsAndChunkOffsetAppliesOnlyToEvidence() {
         val response = """
             {

@@ -548,8 +548,24 @@ class AssemblyAiAdapter(private val http: ProviderHttp = ProviderHttp()) : Provi
         return result.distinct()
     }
 
-    private fun parseReportedModel(objectValue: JsonObject, warnings: Warnings): String? =
-        optionalMetadataString(objectValue, "speech_model_used", warnings, WARNING_REPORTED_MODEL_MALFORMED)
+    /**
+     * The name is stored with the transcript and shown as the model the provider says it used, so it is
+     * refused rather than displayed at whatever length an answer happens to carry. An overlong value is not
+     * shortened: a cut model name would be a value nobody reported.
+     */
+    private fun parseReportedModel(objectValue: JsonObject, warnings: Warnings): String? {
+        val reported = optionalMetadataString(
+            objectValue,
+            "speech_model_used",
+            warnings,
+            WARNING_REPORTED_MODEL_MALFORMED,
+        ) ?: return null
+        if (reported.length > MAX_REPORTED_MODEL_LENGTH) {
+            warnings += WARNING_REPORTED_MODEL_TOO_LONG
+            return null
+        }
+        return reported
+    }
 
     private fun optionalMetadataString(
         objectValue: JsonObject,
@@ -661,6 +677,9 @@ class AssemblyAiAdapter(private val http: ProviderHttp = ProviderHttp()) : Provi
         private const val MILLIS_PER_SECOND = 1000L
         private const val MILLIS_PER_HOUR = 3_600_000L
         private const val MAX_RESPONSE_BYTES = 16 * 1024 * 1024
+        // Deliberately the same bound the OpenAI and Groq parser applies to the model it reports, so
+        // one answer cannot be shown with a name the other would have refused.
+        private const val MAX_REPORTED_MODEL_LENGTH = 128
         private const val WARNING_WORD_TIMESTAMPS_MISSING = "WORD_TIMESTAMPS_MISSING"
         private const val WARNING_WORD_TIMESTAMPS_MALFORMED = "WORD_TIMESTAMPS_MALFORMED"
         private const val WARNING_WORD_TIMESTAMPS_OUT_OF_RANGE = "WORD_TIMESTAMPS_OUT_OF_RANGE"
@@ -671,6 +690,7 @@ class AssemblyAiAdapter(private val http: ProviderHttp = ProviderHttp()) : Provi
         private const val WARNING_SEGMENT_TIMESTAMPS_MISSING = "SEGMENT_TIMESTAMPS_MISSING"
         private const val WARNING_REPORTED_LANGUAGES_MALFORMED = "REPORTED_LANGUAGES_MALFORMED"
         private const val WARNING_REPORTED_MODEL_MALFORMED = "REPORTED_MODEL_MALFORMED"
+        private const val WARNING_REPORTED_MODEL_TOO_LONG = "REPORTED_MODEL_TOO_LONG"
         private val SUPPORTED_MODELS = setOf(MODEL_U35, MODEL_U2)
         private val UUID_PATTERN = Regex("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
         private val LANGUAGE_PATTERN = Regex("^[a-z]{2,3}(-[A-Z]{2})?$")
