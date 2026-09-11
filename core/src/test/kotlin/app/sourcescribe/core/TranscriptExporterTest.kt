@@ -362,6 +362,51 @@ class TranscriptExporterTest {
         )
     }
 
+    @Test
+    fun noPartOfANameMeasuredInCharactersPushesTheIdentityOutOfIt() {
+        // The budget left for the readable head was a byte limit minus the *character* count of the part that
+        // must survive, and a language or a source id made of three-byte characters makes those two differ by
+        // up to 52. This passed before that arithmetic was corrected, which is the finding: the head is
+        // capped at 40 bytes of its own and an overridden name at 160, so the caps kept every reachable name
+        // inside the limit while the arithmetic did not. The grid below is the widest set of parts the name
+        // builder accepts, so it pins the property to the arithmetic — and raising the title's share of the
+        // name stays the one-line change it looks like.
+        val plain = "youtube:BaW_jenozKc"
+        for (title in listOf("T".repeat(300), "あ".repeat(300))) {
+            for (sourceId in listOf(plain, "あ".repeat(40), "録音".repeat(30) + ".m4a")) {
+                for (language in listOf(null, "de")) {
+                    for (originalLanguage in listOf(null, "de", "あ".repeat(40))) {
+                        val base = document(title = title, sourceId = sourceId)
+                        val wide = base.copy(
+                            language = language,
+                            source = base.source.copy(originalLanguage = originalLanguage),
+                        )
+                        for (discriminator in listOf(null, "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee")) {
+                            for (override in listOf(null, "あ".repeat(200), "O".repeat(200))) {
+                                for ((format, rawExtension) in listOf(
+                                    ExportFormat.MARKDOWN to null,
+                                    ExportFormat.RAW to "字幕テキスト",
+                                    ExportFormat.RAW to "json3",
+                                )) {
+                                    val name = TranscriptExporter.fileName(
+                                        wide, format, override, discriminator, rawExtension,
+                                    )
+                                    assertTrue(name, name.toByteArray(Charsets.UTF_8).size <= 180)
+                                    // A name the reader chose ends where the reader ended it, unless a
+                                    // discriminator was appended; every generated name ends in the digest.
+                                    if (override != null && discriminator == null) continue
+                                    val identity = name.substringBeforeLast('.').substringAfterLast('-')
+                                    assertEquals(name, TranscriptExporter.SHORT_ID_BYTES * 2, identity.length)
+                                    assertTrue(name, identity.all { it in "0123456789abcdef" })
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     private fun document(
         title: String = "A title",
         sourceId: String = "youtube:BaW_jenozKc",
