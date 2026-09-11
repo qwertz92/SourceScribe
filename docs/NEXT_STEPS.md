@@ -2,50 +2,59 @@
 
 ## Wiederaufnahme: hier weitermachen
 
-Geschrieben am 11. September 2026, zuletzt nach der neunten Reviewrunde nachgeführt, damit die
+Geschrieben am 11. September 2026, zuletzt nach der zehnten Reviewrunde nachgeführt, damit die
 Arbeit ohne Wiedereinlesen der ganzen Sitzung weitergehen kann. Reihenfolge ist Absicht.
 
 **Wo der Stand steht:** Die Reviewrunden und was sie gefunden haben, stehen in
 [STATUS.md](STATUS.md); was offen ist, mit Stelle und fehlendem Nachweis, in
 [DEFECTS.md](DEFECTS.md). Die Punktnummern unten sind die Nummern dort.
 
-### 1. Zehnte Reviewrunde über die Korrekturen der neunten
+### 1. Elfte Reviewrunde über die Korrekturen der zehnten
 
-Runden 3 bis 9 haben ihren wichtigsten Fund jeweils in den Korrekturen der Vorrunde gehabt. Die beiden
-Commits der neunten Runde einzeln benennen, nicht als Bereich — die Bereichsschreibweise lag in Runde 7
-schon einmal daneben, weil `a..b` den Anfangscommit auslässt und ältere Fixes Vorfahren davon sind. Drei
-Sonnet-5-Reviewer: core, Texte und Doku, und einer über die Korrekturen selbst. Drei Lehren gehören in den
-Auftrag: ein Fund, den der Reviewer nicht ausführen konnte, gilt erst nach einer Gegenprobe mit wieder
-eingebautem Fehler als lebender Fehler; jede Zahl in der Doku wird nachgezählt, weil in den Runden 7, 8 und
-9 je eine falsche darin stand, alle von mir; und solange ein Reviewer läuft, wird an keiner Datei
-gearbeitet, die er lesen könnte — in Runde 9 hat das einen Fund gegen einen Baum erzeugt, der sich unter
-dem Reviewer bewegte. Die Jagdliste:
+Runden 3 bis 10 haben ihren wichtigsten Fund jeweils in den Korrekturen der Vorrunde gehabt. Runde 10 am
+deutlichsten: Die Korrektur der Vorrunde hatte ihren Fehler nicht behoben, sondern verschoben und seinen
+Auslöser verbreitert. Die Commits der zehnten Runde einzeln benennen, nicht als Bereich — die
+Bereichsschreibweise lag in Runde 7 schon einmal daneben, weil `a..b` den Anfangscommit auslässt und
+ältere Fixes Vorfahren davon sind. Drei Sonnet-5-Reviewer: core, Doku, und einer quer durchs Repository.
+Vier Lehren gehören in den Auftrag:
 
-- Die neue Regel lautet: Prosa wird gekürzt, ein Bezeichner ganz behalten oder ganz verworfen. Ist die
-  Zuordnung richtig getroffen? `title`, `channel` und `format_note` gelten als Prosa, `upload_date`,
-  `language`, `acodec` und `ext` als Bezeichner. Gibt es ein Feld auf der falschen Seite — eines, dessen
-  gekürzte Form eine andere Aussage macht statt einer kürzeren? Und: Ist ein langer Bezeichner jetzt still
-  weg, wo vorher ein falscher Wert stand — fällt das irgendwo auf, oder sieht es wie „nicht angegeben“ aus?
-- Genau das ist der Kern des Runde-9-Funds: Ein Fix der Vorrunde zog eine Grenze ein und hob dabei eine
-  Zusicherung auf (`AudioTracks.automatic` wählte plötzlich selbst). Sucht dasselbe Muster in den neuen
-  Änderungen: Welche Eigenschaft, die woanders im Code zugesichert ist, könnte das Verwerfen — nicht mehr
-  das Kürzen — eines Wertes kippen? `AudioTracks`, `CaptionTracks` und alles, was über `originalLanguage`
-  entscheidet, sind die Kandidaten.
-- Der Grenzwerttest für die Bildadresse nennt die Zahl jetzt ausgeschrieben und sichert die Konstante
-  getrennt zu. Gibt es weitere Tests, die ihre Eingabe aus derselben Konstante bauen, die sie prüfen, und
-  deshalb mit einer versehentlich veränderten Grenze mitwandern? `MAX_FILENAME_PART_BYTES`, `LIMIT`,
-  `KIND_LIMIT` und die Zeitgrenzen sind die Stellen, wo ich das vermute.
-- Der Vollständigkeitstest der Familienliste vergleicht Mengen und hat seit Runde 9 zwei zusätzliche
-  Zusicherungen gegen doppelte Einträge. Greifen sie wirklich? Baue einen doppelten Eintrag ein und sieh
-  nach, welche Zeile fällt — und ob sie es aus dem beabsichtigten Grund tut, nicht wegen der zufällig
-  gleichen Länge von Liste und Zuordnung.
-- Die Doku dieser Runde korrigiert fünf Zahlen und begründet jede. Zähle sie alle nach: 59 Familiennamen,
-  21 in keinem Test, 32 nicht durch die Zusammenfassung, dreizehn zusammengesetzte Namen, mindestens 43
-  Codes im `else`-Zweig, 162 JVM-Tests, 224 als schlimmster Fall der Warnliste. Die Trennung von
-  `MALFORMED_WORD` und `MALFORMED_WORDS` entscheidet die ersten drei; ohne sie kommt etwas anderes heraus.
-- DEFECTS 4 und Abschnitt 3 dieses Dokuments tragen seit Runde 9 dieselbe Aussage. Prüfe, ob sie das
-  wirklich tun, und ob eine dritte Stelle — STATUS, PRODUCT, der Code selbst — noch die widerlegte Annahme
-  vertritt, alle Codes des Zweigs bedeuteten dasselbe.
+- Ein Fund, den der Reviewer nicht ausführen konnte, gilt erst nach einer Gegenprobe mit wieder
+  eingebautem Fehler als lebender Fehler.
+- Jede Zahl in der Doku wird nachgezählt, und **jede Zahl nennt den Stand, für den sie gilt** — in Runde
+  10 stand eine richtige Zahl ohne ihren Commit da und wäre beim Nachzählen gegen den heutigen Baum als
+  falsch gemeldet worden.
+- Jeder Symbolname in einem Auftrag wird vorher gegen den Baum geprüft. Die Liste der Vorrunde schickte
+  einen Reviewer nach `CaptionTracks`, das es nicht gibt.
+- Ein Reviewer, der für Gegenproben Dateien verändert, und einer, der liest, laufen **nicht** gleichzeitig.
+  In Runde 10 haben beide lesenden Reviewer den Baum unter sich wandern sehen, weil ich dem dritten das
+  Verändern erlaubt habe.
+
+Die Jagdliste:
+
+- `AudioTrack.languageRefused` ist neu und sagt, dass die Quelle eine Sprache genannt hat, die der
+  Datensatz nicht tragen konnte. Wird die Unterscheidung überall gezogen, wo sie zählt — oder nur in
+  `AudioTracks.automatic`? Und die unbeantwortete Frage dahinter: Die App fragt jetzt zurück, zeigt dem
+  Nutzer aber zwei Spuren ohne jede Sprachangabe. Ist das eine lesbare Frage oder eine rätselhafte?
+- Dieselbe Verwechslung eine Ebene höher: Wo sonst bedeutet `null` zwei verschiedene Dinge — „nicht
+  angegeben“ und „angegeben, aber verworfen“? `Source.originalLanguage`, `publishedDate`, `codec`,
+  `container`, `reportedModel`. Ein Reviewer der zehnten Runde hat für diese fünf gesagt, dass keine davon
+  eine Entscheidung trägt; prüfe das selbst nach, statt es zu übernehmen. Eine Stelle habe ich selbst
+  geprüft und nicht als Fehler gewertet: `TrackSelection.captions` ordnet nach `originalLanguage`, und ein
+  verworfener Wert lässt `preferOriginalLanguage` still wirkungslos werden. Entschieden wird dabei aber
+  nichts — die Funktion sortiert nur, die Liste wird nicht kürzer, und ab zwei Einträgen fragt
+  `JobCoordinator` ohnehin. Wer das anders sieht, soll es an einem Ablauf zeigen.
+- Die Regel „Tragen ist begrenzt, Fragen nicht“ gilt jetzt in `ExtractorMetadata`. Wird anderswo eine Frage
+  an eine gekürzte Kopie gestellt? `CaptionParser`, `SttStep`, `Diagnostics`, `Labels` sind die Stellen mit
+  `contains(`, `startsWith(` oder `endsWith(` auf einem Wert, der vorher durch `take(` gelaufen ist.
+- **Die vier neu ausgeschriebenen Grenzen: Ist die festgenagelte Zahl die richtige?** Eine Grenze
+  festzunageln hält sie fest, auch wenn sie von Anfang an falsch war. `MAX_CANONICAL_BYTES` (32 MiB),
+  `MAX_AUDIO_SECONDS` (36 000), `Warnings.LIMIT` (64), `MAX_DURATION_MS` (36 000 000). Für die zweite ist
+  die Probe leicht: Der Text `invalid_duration` nennt in beiden Sprachen 600 Minuten, ohne sie von dort zu
+  lesen. Für die vierte gilt sie gegen die aktuelle Anbieterdokumentation.
+- Die Sichtbarkeit war die Ursache: Ein Test greift nach einer Konstante, wenn er sie sehen kann. Welche
+  `internal` oder `public` Konstanten gibt es sonst noch, und hängt an einer davon ein Test, der mit ihr
+  mitwandert? Die Suche geht über alle drei Module, nicht nur über `core`.
+- Und die Doku: Jede Zahl der Runde-10-Passage nachzählen, mit dem Stand, für den sie gilt.
 
 ### 2. Warncodes lesbar machen (DEFECTS 9) — erledigt
 

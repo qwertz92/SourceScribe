@@ -30,14 +30,14 @@ API-37-/x86_64-/16-KB-Emulator nachgewiesen. Keine echte STT-API aufgerufen.
 | P5 | IMPLEMENTED: de/en-App-Sprache, System/Hell/Dunkel, überarbeitete Auswahlfelder/Navigation, Viewer/Suche/Kopieren/Share, Formate/Diagnose/Signierpfad | ADB-/Screenshotprüfungen einschließlich 200-%-Schrift und Querformat bestanden. Vollständige TalkBack-Bedienung BLOCKED; dauerhafte persönliche Release-Signatur und Installation PASS r81. |
 | P6 | Integrierte Regression und unabhängige Reviews ausgeführt; bestätigte Defekte samt Regression behoben | Vollständige Abnahme BLOCKED: Provider, physisches ARM64, TalkBack und öffentliche APK-Lizenz-/Quellbelege fehlen. |
 
-## Nutzerrückmeldung vom 10. September 2026 und neun Reviewdurchgänge
+## Nutzerrückmeldung vom 10. September 2026 und zehn Reviewdurchgänge
 
 **Stand:** 11. September 2026. Der Nutzer hat die Preview am Gerät getestet und 20 Punkte gemeldet.
 17 davon sind umgesetzt und am Emulator oder durch Tests belegt; die drei offenen stehen mit Stelle und
 fehlendem Nachweis in [Bekannte Probleme](DEFECTS.md).
 
-Dazu kamen neun vollständige Runden adversarischer Reviews mit Sonnet-5-Agenten, jede Runde über die
-Korrekturen der vorherigen. Die ersten sechs stehen in diesem Abschnitt, die Runden 7 bis 9 in eigenen
+Dazu kamen zehn vollständige Runden adversarischer Reviews mit Sonnet-5-Agenten, jede Runde über die
+Korrekturen der vorherigen. Die ersten sechs stehen in diesem Abschnitt, die Runden 7 bis 10 in eigenen
 Abschnitten darunter: Runde 1 über `782aef5`, Runde 2 über `5a6bfef`, Runde 3 über `42f723e`,
 Runde 4 über `7da4cdf`, Runde 5 über `477dc5b` und `029a53f`, Runde 6 über `e882b25`, `94ca585`
 und `4edffa7`.
@@ -371,10 +371,78 @@ Gates nach Runde 9: 162 JVM-Tests im Modul `core` ohne Fehler, alle vier Lintber
 Die Gegenprobe mit wieder eingebautem Kürzen und gesenkter Adressgrenze lässt beide betroffenen Tests
 fallen.
 
-**Die Schleife ist nicht konvergiert.** Neun Runden, keine davon leer. Solange eine Runde noch etwas findet,
-ist die nächste fällig — gerade weil die Funde der Runden 3 bis 9 jeweils in den Korrekturen der Vorrunde
-lagen, zuletzt zweimal in Folge überwiegend in deren Tests und deren Beschreibung statt in deren
-Produktionscode.
+### Runde 10
+
+Drei Reviewer über die beiden Commits der neunten Runde. Einer für den Code, einer für die Doku, und
+einer nicht für einen Commit, sondern quer durchs Repository auf die zwei Muster, die diese Schleife schon
+nachweislich erwischt hat. Der wichtigste Fund liegt wieder in der Vorrunde, und diesmal haben ihn zwei
+Reviewer unabhängig voneinander gefunden und jeder mit einem eigenen, ausgeführten Test belegt.
+
+**Die Korrektur der neunten Runde hat den Fehler nicht beseitigt, sondern verschoben — und dabei
+verbreitert.** Runde 8 kürzte Sprachangaben auf 100 Zeichen; zwei verschiedene Tags mit gleichen ersten
+hundert Zeichen wurden dadurch zu einem, und `AudioTracks.automatic` hörte auf, die Wahl zwischen
+verschiedenen gesprochenen Sprachen zu verweigern. Runde 9 ersetzte das Kürzen durch Verwerfen — und ein
+verworfener Wert ist `null`, genau wie ein nie angegebener. Zwei Tonspuren mit überlangen, schon im ersten
+Zeichen verschiedenen Tags lesen sich seither beide als `null`; die Weigerung greift nicht. Der Auslöser
+wurde dabei weiter, nicht enger: vorher brauchte es zwei Tags mit gemeinsamem Anfang, jetzt genügen zwei
+überlange, und auch ein überlanger neben einer Spur, die gar keine Sprache nennt.
+
+Die Unterscheidung steht jetzt im Datensatz selbst: `AudioTrack.languageRefused` sagt, dass die Quelle eine
+Sprache genannt hat, die der Datensatz nicht tragen konnte. Verworfen ist nicht dasselbe wie nie gesagt —
+das Erste heißt, dass die Quelle zwei Spuren auseinandergehalten hat.
+
+**Beim Nachverfolgen kam dieselbe Verwechslung noch dreimal vor, in derselben Datei.** Ob ein Sprach-Tag auf
+`-desc` endet, ob eine Notiz `(original)` enthält, ob sie `drc` enthält — alle drei Fragen wurden an die
+begrenzte Kopie gestellt statt an das, was angekommen ist. Alle drei entscheiden, welche Spur ohne Rückfrage
+gewählt wird: die erste, ob eine Bildbeschreibung als Dialog durchgeht; die zweite, welche Spur als Original
+gilt; die dritte die Reihenfolge. Die Regel ist jetzt vollständig ausgesprochen: **Tragen ist begrenzt,
+Fragen nicht.** Beobachtet wurde keiner der drei Fälle: Reale Sprach-Tags sind unter zwanzig Zeichen
+lang — das hat ein Reviewer gegen die Anbieterdokumentation geprüft — und Formatnotizen sind ein
+paar Worte, wofür es allerdings nur die Fixtures dieses Repositorys als Beleg gibt.
+
+**Vier Grenzen wurden nur aus sich selbst gelesen.** Ein Test, der seine Eingabe aus derselben Konstante
+baut, die er prüft, wandert mit ihr mit; genau das hat Runde 9 an der Bildadresse repariert. Dieselbe Form
+steckte noch in `ArtifactFiles.MAX_CANONICAL_BYTES` (32 MiB), `JobLimits.MAX_AUDIO_SECONDS` (zehn Stunden,
+eine Zusage des Produkts), `Warnings.LIMIT` (64) und `AssemblyAiAdapter.MAX_DURATION_MS` (zehn Stunden, die
+Grenze des Anbieters). Drei davon haben die Reviewer durch Absenken der Konstante und einen grün bleibenden
+Lauf belegt. Alle vier stehen jetzt ausgeschrieben.
+
+Warum diese vier so lange durchgekommen sind, ist keine Zufallsfrage, sondern eine Frage der Sichtbarkeit.
+Alle vier sind öffentlich, `MAX_URL_LENGTH` aus Runde 9 ist `internal` — ein Test kann sie alle nennen,
+und ein Test, der eine Konstante nennen kann, nennt sie lieber als die Zahl. `MAX_FILENAME_PART_BYTES` und
+die Grenzen in `RetryDelay` sind dagegen `private`: Ihre Tests kamen gar nicht an sie heran und mussten die
+Zahl ausschreiben, weshalb sie dieses Muster nie hatten. Nicht Sorgfalt hat sie geschieden, sondern
+Sichtbarkeit — was auch sagt, wo als Nächstes zu suchen ist.
+
+**Eine eigene Behauptung aus Runde 9 war zu großzügig.** Die Commitnachricht sagte, zwei neue Zusicherungen
+fingen einen doppelten Eintrag in der Familienliste. Ausgeführt fängt ihn eine; die zweite ist aus den
+beiden anderen rechnerisch bereits ableitbar und kann bei dieser Reihenfolge nie selbst die fallende Zeile
+sein. Falsch ist sie nicht, zusätzlich fängt sie nichts.
+
+Aus der Doku-Prüfung: Ein Kommentar im Familientest trug noch die alte „Elf“, die Runde 9 im Fließtext schon
+zu dreizehn korrigiert hatte. Die Jagdliste für diese Runde nannte `CaptionTracks` als Kandidaten — dieses
+Symbol gibt es nicht, es gibt nur `CaptionTrack`, eine Datenklasse ohne Auswahllogik. Sie schrieb „korrigiert
+fünf Zahlen“ und zählte sieben auf. Und sie forderte, „21 in keinem Test“ nachzuzählen, ohne zu sagen, dass
+diese Zahl zum Stand `d6af9fd` gehört: Seit Runde 8 stehen alle 59 Namen von Hand im Familientest, heute
+wären es 0. Ein Agent, der der Liste wörtlich folgt, hätte eine korrekte Zahl für falsch gehalten.
+
+**Und eine Lehre über das Verfahren, die ich mir selbst geschrieben und selbst gebrochen habe.** Runde 9
+endete mit dem Satz, während ein Reviewer läuft, werde an keiner Datei gearbeitet, die er lesen könnte.
+Ich habe mich daran gehalten — und gleichzeitig einem der drei Reviewer ausdrücklich erlaubt, für
+Gegenproben Dateien zu verändern, während die beiden anderen lasen. Beide haben den Baum unter sich
+wandern sehen und es gemeldet. Die Regel gilt nicht nur für mich: Ein Reviewer, der verändert, und einer,
+der liest, laufen nicht gleichzeitig.
+
+Gates nach Runde 10: 168 JVM-Tests im Modul `core` ohne Fehler (162 vorher, sechs neue Methoden), alle vier
+Lintberichte ohne Befund, 191 Instrumentierungstests auf `emulator-5556` — 185 bestanden, 6 per Annahme
+übersprungen, 0 Fehler. Die Gegenprobe, die jede Korrektur dieser Runde zurücknimmt, lässt genau sieben Tests
+fallen: die sechs neuen Methoden und die eine bestehende, die eine neue Zusicherung bekommen hat. Kein
+weiterer Test fällt, keine der Korrekturen ändert also bestehendes Verhalten.
+
+**Die Schleife ist nicht konvergiert.** Zehn Runden, keine davon leer. Solange eine Runde noch etwas findet,
+ist die nächste fällig — gerade weil die Funde der Runden 3 bis 10 jeweils in den Korrekturen der Vorrunde
+lagen. Runde 10 ist dabei der deutlichste Beleg: Die Korrektur der Vorrunde hat ihren Fehler nicht behoben,
+sondern verschoben und seinen Auslöser verbreitert, und das ist ohne eine weitere Runde nicht aufgefallen.
 
 ## UI-Feedback umgesetzt
 

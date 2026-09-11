@@ -1,6 +1,6 @@
 # Bekannte Probleme und offene Punkte
 
-**Stand:** 11. September 2026, nach neun Runden adversarischer Reviews. Diese Datei ist für den
+**Stand:** 11. September 2026, nach zehn Runden adversarischer Reviews. Diese Datei ist für den
 nächsten Agenten gedacht und listet, was **nicht** vollständig erledigt ist. Ein geschlossener Punkt
 behält seine Nummer und einen kurzen Vermerk, damit Verweise aus anderen Dokumenten gültig bleiben. Was hier nicht steht, ist entweder erledigt oder in
 [STATUS.md](STATUS.md) beschrieben.
@@ -338,6 +338,36 @@ Gewinn und deshalb nicht gemacht.
 - **Der Wert stand hier zuerst mit einer Ziffer zu wenig.** `Long.MAX_VALUE` Millisekunden liegen im Jahr
   292 278 994, also neun Ziffern plus Vorzeichen — genau die zehn Zeichen, die `take(10)` nimmt. Schon an
   der Zeichenzahl war die alte Angabe als falsch erkennbar, ohne irgendetwas auszuführen.
+
+### 22. Die Rückfrage nach der Tonspur zeigt nicht, warum sie gestellt wird (niedrig)
+
+- **Stelle:** `core/src/main/kotlin/app/sourcescribe/core/AudioTracks.kt`, `describe`, zusammen mit der
+  Spurauswahl in der Vorbereitungsansicht.
+- **Voraussetzung:** Zwei Tonspuren, deren Sprachangaben die Quelle genannt hat, die aber länger als hundert
+  Zeichen waren und deshalb nicht in den Datensatz übernommen wurden (`AudioTrack.languageRefused`).
+- **Erwartet gegen tatsächlich:** Seit Runde 10 verweigert `automatic` hier die stille Wahl, was richtig
+  ist — die Quelle hat die beiden auseinandergehalten. Der Nutzer bekommt dann aber eine Liste, in der
+  beide Spuren gar keine Sprache nennen, und keinen Hinweis darauf, dass eine genannt wurde. Die Frage ist
+  damit richtig gestellt, aber schwer zu beantworten.
+- **Warum nicht gefixt:** Der Fall ist nicht beobachtet worden und mit echten yt-dlp-Daten praktisch nicht
+  erreichbar — reale Sprach-Tags sind unter zwanzig Zeichen lang. Ein eigener Text dafür bräuchte zwei neue
+  übersetzte Zeichenketten für einen Zustand, den niemand je sehen wird; die Alternative wäre, die Angabe
+  gekürzt und als gekürzt gekennzeichnet mitzuführen, was der Regel „ganz oder gar nicht“ widerspräche.
+  Die falsche stille Entscheidung ist behoben, die schlechte Frage bleibt.
+
+### 23. Die Höchstdauer steht an drei Stellen als eigene Zahl (niedrig)
+
+- **Stelle:** `core/src/main/kotlin/app/sourcescribe/core/JobLimits.kt` (`MAX_AUDIO_SECONDS = 36_000`) und
+  `invalid_duration` in `app/src/main/res/values/strings.xml` sowie `values-en/strings.xml`, beide mit
+  „600 Minuten“ im Text.
+- **Voraussetzung:** Jede Änderung an der Höchstdauer.
+- **Erwartet gegen tatsächlich:** Erwartet wäre eine Zahl, aus der die anderen folgen. Tatsächlich stehen
+  drei unabhängige Zahlen da; die beiden Texte lesen nichts aus der Konstante. Eine geänderte Konstante
+  hätte die App etwas anderes durchsetzen lassen, als beide Texte versprechen.
+- **Was seit Runde 10 gilt:** `JobLimitsTest` nagelt die Konstante auf 36 000 Sekunden und 600 Minuten fest
+  und nennt den Textschlüssel im Kommentar, sodass eine Änderung dort einen Test fällt und auf die Texte
+  zeigt. Das ist eine Brücke, keine Behebung: Wer die Texte ändert und die Konstante nicht, fällt weiter
+  durch kein Netz. Eine Formatzeichenkette mit `%d` aus `MAX_AUDIO_MINUTES` wäre die Behebung.
 
 ## Bewusste Entscheidungen, die wie Fehler aussehen
 
