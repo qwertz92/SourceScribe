@@ -16,6 +16,9 @@ from pathlib import Path
 
 MAX_SCAN_BYTES = 1_048_576
 BINARY_PROBE_BYTES = 8192
+# A byte-order mark is the one thing that says "this text is two bytes per character" before the NUL
+# heuristic below can mistake those bytes for a binary file.
+UTF16_BOMS = (b"\xff\xfe", b"\xfe\xff")
 SKIP_PARTS = {".git", ".local-tools", ".gradle", "build", "out", "generated"}
 
 # This is the SHA-256 of the wrapper JAR fetched from the official Gradle source
@@ -117,17 +120,24 @@ def _read_text(path: Path, tally: Tally | None = None) -> str | None:
     """Return a file's text, or None when it holds bytes no pattern here could match.
 
     The decision comes from the bytes, not from a list of suffixes. A list is remembered rather than
-    checked: until 11 September 2026 this function opened eighteen suffixes and passed silently over
+    checked: until 11 September 2026 this function opened nineteen suffixes and passed silently over
     everything else, so `gradlew`, `.gitignore`, `LICENSE` and every other extension-less file in the
     tree went unread while the run still printed PASS. A private key saved as `.pem` would have been
     among them. A NUL byte near the start is the one thing that says "not text", and it is what a
     `.so`, a `.png` and the packed extractor all carry.
+
+    Except in UTF-16, where every ASCII character is stored as two bytes and one of them is NUL, so the
+    first letter of such a file trips that heuristic and the whole file goes unread. That is not an
+    exotic encoding on this machine: Notepad's "Unicode" option and older PowerShell redirections both
+    write it. A byte-order mark is therefore checked before the NUL probe. Without a mark, UTF-16 stays
+    indistinguishable from binary here, which is a limit of this check rather than a property of it.
     """
     counter = tally if tally is not None else Tally()
     try:
         with path.open("rb") as handle:
             head = handle.read(BINARY_PROBE_BYTES)
-            if b"\0" in head:
+            encoding = "utf-16" if head[:2] in UTF16_BOMS else "utf-8"
+            if encoding == "utf-8" and b"\0" in head:
                 counter.binary += 1
                 return None
             raw = head + handle.read(MAX_SCAN_BYTES - len(head) + 1)
@@ -138,7 +148,7 @@ def _read_text(path: Path, tally: Tally | None = None) -> str | None:
         counter.truncated += 1
         raw = raw[:MAX_SCAN_BYTES]
     counter.scanned += 1
-    return raw.decode("utf-8", errors="replace")
+    return raw.decode(encoding, errors="replace")
 
 
 def _issue_path(path: Path, root: Path) -> str:
@@ -167,6 +177,8 @@ def _check_actions(root: Path) -> list[Issue]:
     if not workflow_root.is_dir():
         return issues
     for path in sorted(workflow_root.glob("*.y*ml")):
+        # Deliberately outside the coverage tally: the walk in `check_repository` has already counted
+        # this file, and counting it again here would overstate what the run opened.
         text = _read_text(path)
         if text is None:
             continue
@@ -207,6 +219,7 @@ def _check_dependency_verification(root: Path) -> list[Issue]:
     path = root / "gradle" / "verification-metadata.xml"
     if not path.is_file():
         return [Issue("gradle/verification-metadata.xml", None, "dependency verification metadata is missing")]
+    # A second read of a file the walk has already counted, as in `_check_actions` above.
     text = _read_text(path)
     if text is None or "<verification-metadata" not in text:
         return [Issue("gradle/verification-metadata.xml", None, "dependency verification metadata is invalid")]
@@ -245,6 +258,9 @@ def _self_test() -> None:
         (root / "src/main/launcher").write_bytes(b"#!/bin/sh\nTOKEN=gsk_" + b"C" * 24 + b"\n")
         # And the same bytes inside something binary, which must stay closed.
         (root / "src/main/blob.bin").write_bytes(b"\0\0\0gsk_" + b"D" * 24)
+        # Plain text with a NUL inside every character, which is what UTF-16 is. Until round 13 this
+        # file was ruled binary on its first letter and never searched.
+        (root / "src/main/utf16.kt").write_bytes(('val key = "gsk_' + "E" * 24 + '"\n').encode("utf-16"))
         tally = Tally()
         issues = check_repository(root, tracked_only=False, tally=tally)
         reasons = {issue.reason for issue in issues}
@@ -256,7 +272,10 @@ def _self_test() -> None:
         assert not any(issue.path.startswith("src/androidTest/") for issue in issues)
         assert any(issue.path == "src/main/launcher" for issue in issues), "extension-less file went unread"
         assert not any(issue.path == "src/main/blob.bin" for issue in issues), "binary file was read as text"
-        assert tally.binary == 1 and tally.scanned >= 5, str(tally)
+        assert any(issue.path == "src/main/utf16.kt" for issue in issues), "UTF-16 file went unread"
+        # Exactly, not at least. A lower bound is satisfied by a file going unread, which is the one
+        # thing this counter exists to make visible.
+        assert tally == Tally(scanned=6, binary=1), str(tally)
     print("PASS self-test")
 
 
@@ -278,8 +297,8 @@ def main(argv: list[str]) -> int:
         print(f"     coverage: {tally}")
         return 1
     # The counts are part of the result, not decoration. A PASS over nothing looks exactly like a PASS
-    # over everything, and this check spent four days looking at eighteen suffixes while reading as if
-    # it had looked at the repository.
+    # over everything, and from 7 to 11 September 2026 this check looked at nineteen suffixes while
+    # reading as if it had looked at the repository.
     print(f"PASS repository checks ({tally})")
     return 0
 
