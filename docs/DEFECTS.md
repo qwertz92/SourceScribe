@@ -1,6 +1,6 @@
 # Bekannte Probleme und offene Punkte
 
-**Stand:** 11. September 2026, nach acht Runden adversarischer Reviews. Diese Datei ist für den
+**Stand:** 11. September 2026, nach neun Runden adversarischer Reviews. Diese Datei ist für den
 nächsten Agenten gedacht und listet, was **nicht** vollständig erledigt ist. Ein geschlossener Punkt
 behält seine Nummer und einen kurzen Vermerk, damit Verweise aus anderen Dokumenten gültig bleiben. Was hier nicht steht, ist entweder erledigt oder in
 [STATUS.md](STATUS.md) beschrieben.
@@ -58,15 +58,28 @@ belegt. Diese drei sind offen oder nur teilweise geschlossen:
   das ist tragbar, weil ein Speicherfehler in jedem dieser Fälle die Ursache benennt. Der
   `else`-Zweig zeigt
   weiterhin „Vorgang konnte nicht abgeschlossen werden“ plus den technischen Status.
-- **Was offen ist:** 43 Codes fallen weiter in diesen Zweig. Ausgezählt am 11. September 2026 aus den
-  Stellen, die die Felder schreiben, die `messageText` liest — `SttStep`, `JobCoordinator`, `ExportStore`,
-  `MainViewModel` —, gegen die Codes, die das `when` beantwortet.
+- **Was offen ist:** Mindestens 43 Codes fallen weiter in diesen Zweig. Ausgezählt am 11. September 2026
+  aus den Stellen, die die Felder schreiben, die `messageText` liest — `SttStep`, `JobCoordinator`,
+  `ExportStore`, `MainViewModel` —, gegen die Codes, die das `when` beantwortet.
+- **Diese Auszählung ist nachweislich unvollständig,** gefunden in Runde 9. `JobCoordinator` bildet in
+  seinem `catch` die Ausnahmen auf den Fehlercode ab und kopiert dabei `CaptionParseException.reason`,
+  `ArtifactFilesException.reason` und `StorageBudgetException.reason` unverändert hinein. Die Codes dieser
+  drei Klassen stehen in `core/.../CaptionParser.kt`, `core/.../ArtifactFiles.kt` und
+  `app/.../data/StorageBudget.kt` — keine davon war in der Liste oben. `PATH_ESCAPE` und `RAW_HASH_MISMATCH`,
+  die zwei Beispiele, die dieser Punkt von Anfang an nannte, kommen genau von dort. Wer den Punkt schließt,
+  fängt also bei diesen drei Dateien an und zählt neu; 43 ist eine Untergrenze, keine Zahl.
 - **Die Annahme dieses Punktes hält der Auszählung nicht stand:** Sie bedeuten *nicht* alle „ein interner
-  Bindungs- oder Prüfschritt hat nicht gepasst". Etwa die Hälfte sind gewöhnliche Betriebsausgänge —
-  `INTERRUPTED`, `REMOTE_TIMEOUT`, `NO_TRANSCRIPT`, `ENGINE_NOT_AVAILABLE`, `AUDIO_TRACK_MISSING`,
-  `SOURCE_NOT_FOUND`, `RESPONSE_NOT_READY` —, für die dieser Satz schlicht falsch wäre. Ein gemeinsamer
-  Satz für den ganzen Zweig würde damit genau den Fehler machen, den diese Reviewschleife sonst jagt: eine
-  Ursache behaupten, die nicht die eingetretene ist.
+  Bindungs- oder Prüfschritt hat nicht gepasst“. Ein guter Teil sind gewöhnliche Betriebsausgänge —
+  `INTERRUPTED`, `REMOTE_TIMEOUT`, `NO_TRANSCRIPT`, `ENGINE_NOT_AVAILABLE`, `AUDIO_TRACK_MISSING` —, für
+  die dieser Satz schlicht falsch wäre. Ein gemeinsamer Satz für den ganzen Zweig würde damit genau den
+  Fehler machen, den diese Reviewschleife sonst jagt: eine Ursache behaupten, die nicht die eingetretene ist.
+- **Zwei Codes standen in dieser Aufzählung zu Unrecht, gefunden in Runde 9.** `RESPONSE_NOT_READY`
+  (`SttStep.kt:985`) entsteht aus `state != RESPONSE_SAVED` **oder** aus einem Fehlschlag von
+  `bindingMatches` — der zweite Fall ist wörtlich eine Bindungsprüfung, dieser Code gehört also in beide
+  Lager und braucht einen Satz, der beide trägt. Bei `SOURCE_NOT_FOUND` ist offen, ob er im Normalbetrieb
+  überhaupt erreichbar ist: Beide beteiligten Fremdschlüssel stehen auf `RESTRICT`, und `JobCoordinator`
+  wartet vor dem Löschen auf den Abbruch der Arbeit. Das spricht eher für ein internes Prüfproblem als für
+  einen gewöhnlichen Ausgang; nachgewiesen ist keins von beidem.
 - **Was das für die Lösung heißt:** Die Integritätscodes brauchen eine ausdrücklich aufgezählte Liste — kein
   Namensmuster, denn ein Muster beansprucht jeden künftigen Code, der zufällig auf dasselbe Wort endet, was
   Punkt 16 für `RESPONSE_` bereits als Risiko führt. Die Betriebsausgänge brauchen eigene Texte oder bleiben
@@ -127,7 +140,8 @@ werden jetzt dreizehn Sätze; die Zuordnung liegt in `core/.../TranscriptWarning
 testbar. Die Zahl war hier und in [Restarbeiten](NEXT_STEPS.md) bis Runde 7 mit zwölf angegeben, obwohl
 `SECTION_ALIGNMENT` schon in Runde 5 als dreizehnte Gruppe dazugekommen war. Seit Runde 7 ist die
 Zuordnung Daten statt eines `when`, und jeder einzelne Familienname wird in fünf Schreibweisen durch die
-Zusammenfassung geführt — vorher kamen 34 der 59 Namen in überhaupt keinem Test vor. Seit Runde 8 steht
+Zusammenfassung geführt — vorher kamen 21 der 59 Namen in keinem Test vor und 32 nicht durch die
+Zusammenfassung. Seit Runde 8 steht
 neben der Zuordnung eine zweite, aus den Erzeugern abgeschriebene Liste, damit ein gegenüber dem Erzeuger
 falsch geschriebener Name auffällt statt beiden Seiten gleichzeitig zu entgehen. Die rohen Codes stehen weiterhin unter den Details der Ergebnisansicht. Ein Code, für den es
 keinen Satz gibt, wird weiterhin technisch angezeigt statt verschluckt, und ein Eintrag, der gar nicht
@@ -314,12 +328,16 @@ Gewinn und deshalb nicht gemacht.
 - **Voraussetzung:** `createdAt` liegt außerhalb der Jahre 0000–9999.
 - **Erwartet gegen tatsächlich:** Erwartet wird ein Ausschnitt der Form `YYYY-MM-DD`. Tatsächlich schreibt
   `Instant.toString()` solche Jahre mit Vorzeichen und variabler Stellenzahl, sodass die ersten zehn Zeichen
-  etwa `+29227899` lauten — Tag und Monat fehlen, und zwei Läufe desselben Tages könnten sich im Namen nicht
+  `+292278994` lauten — Tag und Monat fehlen, und zwei Läufe desselben Tages könnten sich im Namen nicht
   mehr über das Datum unterscheiden.
 - **Warum nicht gefixt:** `createdAt` kommt aus der Uhr des Geräts, nicht aus einer Antwort; der Fall setzt
   eine grob falsch gestellte Uhr voraus. Die Bytegrenzen des Namens bleiben eingehalten, weil diese
   Darstellung reines ASCII ist. Hergeleitet aus der dokumentierten Form von `Instant.toString()`, nicht
-  ausgeführt — entscheiden würde `assertEquals("+29227899", Instant.ofEpochMilli(Long.MAX_VALUE).toString().take(10))`.
+  ausgeführt — entscheiden würde
+  `assertEquals("+292278994", Instant.ofEpochMilli(Long.MAX_VALUE).toString().take(10))`.
+- **Der Wert stand hier zuerst mit einer Ziffer zu wenig.** `Long.MAX_VALUE` Millisekunden liegen im Jahr
+  292 278 994, also neun Ziffern plus Vorzeichen — genau die zehn Zeichen, die `take(10)` nimmt. Schon an
+  der Zeichenzahl war die alte Angabe als falsch erkennbar, ohne irgendetwas auszuführen.
 
 ## Bewusste Entscheidungen, die wie Fehler aussehen
 

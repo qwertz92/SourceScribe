@@ -30,14 +30,15 @@ API-37-/x86_64-/16-KB-Emulator nachgewiesen. Keine echte STT-API aufgerufen.
 | P5 | IMPLEMENTED: de/en-App-Sprache, System/Hell/Dunkel, überarbeitete Auswahlfelder/Navigation, Viewer/Suche/Kopieren/Share, Formate/Diagnose/Signierpfad | ADB-/Screenshotprüfungen einschließlich 200-%-Schrift und Querformat bestanden. Vollständige TalkBack-Bedienung BLOCKED; dauerhafte persönliche Release-Signatur und Installation PASS r81. |
 | P6 | Integrierte Regression und unabhängige Reviews ausgeführt; bestätigte Defekte samt Regression behoben | Vollständige Abnahme BLOCKED: Provider, physisches ARM64, TalkBack und öffentliche APK-Lizenz-/Quellbelege fehlen. |
 
-## Nutzerrückmeldung vom 10. September 2026 und vier Reviewdurchgänge
+## Nutzerrückmeldung vom 10. September 2026 und neun Reviewdurchgänge
 
 **Stand:** 11. September 2026. Der Nutzer hat die Preview am Gerät getestet und 20 Punkte gemeldet.
 17 davon sind umgesetzt und am Emulator oder durch Tests belegt; die drei offenen stehen mit Stelle und
 fehlendem Nachweis in [Bekannte Probleme](DEFECTS.md).
 
-Dazu kamen sechs vollständige Runden adversarischer Reviews mit Sonnet-5-Agenten, jede Runde über die
-Korrekturen der vorherigen: Runde 1 über `782aef5`, Runde 2 über `5a6bfef`, Runde 3 über `42f723e`,
+Dazu kamen neun vollständige Runden adversarischer Reviews mit Sonnet-5-Agenten, jede Runde über die
+Korrekturen der vorherigen. Die ersten sechs stehen in diesem Abschnitt, die Runden 7 bis 9 in eigenen
+Abschnitten darunter: Runde 1 über `782aef5`, Runde 2 über `5a6bfef`, Runde 3 über `42f723e`,
 Runde 4 über `7da4cdf`, Runde 5 über `477dc5b` und `029a53f`, Runde 6 über `e882b25`, `94ca585`
 und `4edffa7`.
 Aus Runde 1 stammen unter anderem die Untertitelspur-Regression und die Vereinheitlichung der
@@ -186,7 +187,7 @@ Drei Reviewer. Der für die übrige Codeänderung bekam `2296fe5`, `7c913ca` und
 der für Texte und Doku den Bereich `029a53f..f0f6884`, der für die Kernmechanik die Korrekturen der sechsten
 Runde. Vier Funde, drei bestätigt, einer beim Nachrechnen entkräftet.
 
-Diese Passage nannte zunächst pauschal „`2296fe5..d6af9fd`, also alle Commits der Runden 5 und 6". Das war
+Diese Passage nannte zunächst pauschal „`2296fe5..d6af9fd`, also alle Commits der Runden 5 und 6“. Das war
 als Zusammenfassung falsch: Diese Schreibweise lässt `2296fe5` selbst aus, und die drei Fix-Commits der
 fünften Runde sind Vorfahren davon, liegen also gar nicht darin. Abgedeckt waren sie trotzdem, weil die
 Aufträge sie einzeln beziehungsweise über den zweiten Bereich benannten — die Zusammenfassung stimmte nicht,
@@ -206,16 +207,24 @@ plus `KIND_LIMIT` Einträge, wie ein Aufrufer seine Codes auch benennt. Damit di
 und nicht zur Arbeitsgrenze wird, ist die Zuordnung von Codefamilien zu Gruppen von einem `when` in Daten
 überführt — `TranscriptWarnings.GROUPED_FAMILIES`. Die Namen sind dadurch zählbar, ein Test hält die Zahl
 der selbst benannten Arten mit doppeltem Abstand unter der Decke, und derselbe Umbau schließt eine zweite
-Lücke aus Runde 5: von 59 Familiennamen kamen 34 in überhaupt keinem Test vor. Jeder wird jetzt in fünf
-Schreibweisen durch die Zusammenfassung geführt.
+Lücke aus Runde 5: von 59 Familiennamen kamen 21 in keinem einzigen Test vor, und 32 wurden nicht durch
+die Zusammenfassung geführt, die dieser Test prüft. Jeder wird jetzt in fünf Schreibweisen durch sie
+geführt.
 
-Die Zahl stand hier zuerst als 46, gerechnet als 59 minus die dreizehn Namen der Ein-Beispiel-pro-Gruppe-
-Liste. Das war zu hoch: Andere Tests in denselben beiden Dateien nennen weitere Namen nebenbei. Nachgezählt
-über den Stand `d6af9fd` sind 25 Namen dort irgendwo genannt und 34 nirgends.
+Diese beiden Zahlen standen hier in zwei Anläufen falsch, und der Weg dahin gehört dazu. Zuerst als 46,
+gerechnet als 59 minus die dreizehn Namen der Ein-Beispiel-pro-Gruppe-Liste — zu hoch, weil andere Tests
+weitere Namen nebenbei nennen. Dann als „34 in überhaupt keinem Test“, was die Zahl der engen Frage mit den
+Worten der weiten verband: 34 galt nur für die beiden Dateien, die die Zusammenfassung ausführen, nicht für
+die Suite. Nachgezählt über den Stand `d6af9fd`, jeden Namen als Namen gelesen und nicht als Anfang eines
+längeren: 38 der 59 kommen irgendwo in `core/src/test` vor, 21 nirgends; in den beiden Dateien mit der
+Zusammenfassung sind es 27 und 32. Wer die Zahl nachrechnet, braucht die Grenze zwischen `MALFORMED_WORD`
+und `MALFORMED_WORDS` — ohne sie kommt etwas anderes heraus, und genau daran sind meine ersten beiden
+Anläufe gescheitert.
 
 Ausgeliefert wurde in derselben Runde noch eine Begrenzung, die keiner der Funde verlangt hat: Die
-gemeldete Originalsprache wird auf 100 Zeichen gekürzt, weil sie als einziges Wurzelfeld gar keine Grenze
-trug — was, wie Runde 8 gezeigt hat, so nicht stimmte.
+gemeldete Originalsprache bekam eine Grenze von 100 Zeichen, weil sie als einziges Wurzelfeld gar keine
+trug — was, wie Runde 8 gezeigt hat, so nicht stimmte, und was Runde 9 vom Kürzen auf Verwerfen umgestellt
+hat.
 
 Weiter bestätigt: `CaptionTrack.name` folgte der Leerstringregel nicht, die Runde 6 für die übrigen
 Quellfelder eingezogen hatte — ein als `""` gemeldeter Spurname erschien in der Herkunftszeile als `name=`,
@@ -267,7 +276,7 @@ Produktionslogik der Vorrunde selbst — dafür zwei in dem, was ich über sie g
 
 **Der wichtigste betrifft einen Test aus Runde 7 und ist wieder dasselbe Muster.** Der neue Test, der jeden
 Familiennamen durch die Zusammenfassung führt, verspricht in seinem Kommentar Schutz gegen „einen Namen, der
-gegenüber seinem Erzeuger falsch geschrieben ist". Das kann er nicht halten: Er nimmt Eingabe und Erwartung
+gegenüber seinem Erzeuger falsch geschrieben ist“. Das kann er nicht halten: Er nimmt Eingabe und Erwartung
 aus derselben Zuordnung, also stimmen die beiden miteinander überein, was immer dort steht. Eine Zusage, die
 weiter trägt als das, was der Code prüft — diesmal im Kommentar eines Tests statt in dem einer Klasse.
 
@@ -275,29 +284,34 @@ Geschlossen ist das mit einer zweiten Quelle statt mit einer Korrektur des Komme
 `everyGroupIsReachableFromACodeSomeParserActuallyWrites` führt jetzt nicht mehr ein Beispiel pro Gruppe,
 sondern einen Eintrag pro Familie, abgeschrieben aus den vier Dateien, die Warnungen aufzeichnen, in der
 Form, die die aufzeichnende Zeile wirklich erzeugt. Eine Umbenennung nur auf einer der beiden Seiten fällt
-damit auf. Der Grund, warum es diese zweite Quelle von Hand braucht: Elf der 59 Namen kommen in den
+damit auf. Der Grund, warum es diese zweite Quelle von Hand braucht: Dreizehn der 59 Namen kommen in den
 Erzeugern als Zeichenkette überhaupt nicht vor, weil die Zeile sie aus Teilen zusammensetzt
 (`"MISSING_${"$"}{if (word) "WORD" else "SEGMENT"}_TEXT_${"$"}index"` und ähnlich). Weder eine Suche noch ein Leser
 findet sie dort.
 
 **Der zweite große Fund widerlegt eine Behauptung aus meiner eigenen Commit-Nachricht.** Sie sagte, die
-Originalsprache sei „als einziges Wurzelfeld" ohne Längengrenze gewesen. Sie war es nicht: Das Datum hatte
+Originalsprache sei „als einziges Wurzelfeld“ ohne Längengrenze gewesen. Sie war es nicht: Das Datum hatte
 ebenfalls keine, die Adresse des Vorschaubilds auch nicht, und die Sprache eines Audioformats steht zwischen
 einer Notiz und einem Container, die beide begrenzt sind. Genau die halb geschlossene Lücke, die diese
 Schleife inzwischen viermal gefunden hat, diesmal in meiner Begründung statt in meinem Code. Datum und
-Formatsprache werden jetzt wie ihre Nachbarn auf 100 Zeichen gekürzt; die Adresse wird abgelehnt statt
-gekürzt, an derselben Grenze wie die Untertiteladresse, weil eine halbe Adresse keine kürzere ist, sondern
-eine falsche.
+Formatsprache bekommen eine Grenze von 100 Zeichen; die Adresse wird an derselben Grenze wie die
+Untertiteladresse abgelehnt statt gekürzt, weil eine halbe Adresse keine kürzere ist, sondern eine falsche.
+Runde 9 hat dieses „abgelehnt statt gekürzt“ dann auf Datum und Sprache mit ausgedehnt — siehe dort.
 
 Dazu ein Fehler, den ein Reviewer beim Durchspielen einer Testlücke gefunden hat und der älter ist als diese
 Runden: Eine Dateiendung aus lauter Zeichen, die ein Name nicht tragen kann, fällt nicht auf den Ersatzwert
 zurück. Die Zeichen werden einzeln durch Unterstriche ersetzt und die Folge dann zu einem einzigen
-zusammengefasst, das Ergebnis ist also nie leer, und der Test auf Leere griff nicht. Eine Endung `???` wurde
-damit zu `_`, und die Datei nannte gar kein Format mehr.
+zusammengefasst, das Ergebnis ist also nie leer, und der Test auf Leere griff nicht. Eine Endung `???` wird
+damit zu `_`, und die Datei nennt gar kein Format mehr.
+
+Dass das je passiert wäre, behauptet dieser Absatz nicht mehr: Alle drei Stellen, die heute eine Endung
+liefern, geben nur Werte aus festen Listen her. Erreichbar ist der Fall über den selbst gewählten Namen, wo
+er jetzt sichtbar abgelehnt wird statt eine Datei namens `_` zu erzeugen. Die Härtung selbst gilt einer
+gemeinsam genutzten Funktion und damit auch dem nächsten Aufrufer ohne solche Liste.
 
 Aus der Doku-Prüfung, alle drei nachgezählt und bestätigt: die Zahl 46 war zu hoch (richtig sind 34, siehe
 oben); die Bereichsangabe für die Reviewer der Vorrunde stimmte nicht mit der Git-Semantik überein; und zwei
-Standzeilen waren bei „sechs Runden" stehengeblieben, obwohl derselbe Commit die siebte beschrieb. Dazu ein
+Standzeilen waren bei „sechs Runden“ stehengeblieben, obwohl derselbe Commit die siebte beschrieb. Dazu ein
 Pfad in Punkt 18, dem seit Runde 5 das Segment `providers/` fehlt.
 
 **Auch in dieser Runde hat die Gegenprobe gearbeitet.** Vier Tests fallen mit wieder eingebauten Fehlern:
@@ -309,9 +323,57 @@ ersetzt.
 Gates nach Runde 8: 162 JVM-Tests im Modul `core` ohne Fehler, alle vier Lintberichte ohne Befund,
 191 Instrumentierungstests auf `emulator-5556` — 185 bestanden, 6 per Annahme übersprungen, 0 Fehler.
 
-**Die Schleife ist nicht konvergiert.** Acht Runden, keine davon leer. Solange eine Runde noch etwas findet,
-ist die nächste fällig — gerade weil die Funde der Runden 3 bis 8 jeweils in den Korrekturen der Vorrunde
-lagen, in dieser Runde zum ersten Mal überwiegend in deren Tests und deren Beschreibung statt in deren
+### Runde 9
+
+Drei Reviewer über die vier Commits der achten Runde. Der für die Kernmechanik hat alle 59 Einträge der
+neuen Familienliste einzeln gegen die Zeile geprüft, die sie schreibt, und keinen Fehler gefunden — die
+Liste stimmt. Die Funde liegen anderswo, und der wichtigste wieder in der Korrektur der Vorrunde.
+
+**Die Begrenzung aus Runde 8 hat eine zugesicherte Eigenschaft gebrochen.** `AudioTracks.automatic`
+weigert sich, zwischen zwei Tonspuren zu wählen, deren Sprachen sich unterscheiden; welche Sprache
+gesprochen wird, ist eine Entscheidung des Lesers und bleibt bei ihm. Das Kürzen auf 100 Zeichen konnte
+zwei verschiedene Sprachangaben, die in ihren ersten hundert Zeichen übereinstimmen, zu einer machen — die
+Weigerung hörte still auf zu greifen, und die App entschied selbst. Ein Fix, der eine Grenze einzog und
+dabei eine Zusicherung aufhob.
+
+Die Regel steht jetzt ausgesprochen da statt unterstellt: Prosa überlebt das Kürzen, ein Bezeichner nicht.
+Datum, Sprache, Codec und Container werden ganz behalten oder ganz verworfen, wie es die Adresse des
+Vorschaubilds seit Runde 8 schon wird; Titel, Kanal und Notiz bleiben Prosa und werden weiter gekürzt.
+
+**Der schwerste Doku-Fund steht in einem Commit gegen sich selbst.** Derselbe Commit, der in DEFECTS 4 die
+Annahme „diese Codes bedeuten alle dasselbe“ ausdrücklich verworfen hat, ließ dieselbe Annahme samt der
+alten Zahl in Abschnitt 3 von NEXT_STEPS stehen — und genau dieses Dokument soll die Arbeit ohne
+Wiedereinlesen fortsetzen lassen. Ein Agent, der nur dort liest, hätte die widerlegte Diagnose bekommen.
+Beide Stellen tragen jetzt dieselbe Aussage, und die Zusammenfassung verweist ausdrücklich auf den Punkt.
+
+Weiter aus der Doku-Prüfung, alle nachgezählt und bestätigt: „Elf“ nur zusammengesetzte Namen sind
+dreizehn. Die Zahl 34 galt für die beiden Dateien, die die Zusammenfassung ausführen, stand aber unter den
+Worten „in überhaupt keinem Test“ — quer über die Suite sind es 21. Der entscheidende Testausdruck in
+Punkt 21 hatte eine Ziffer zu wenig, an der Zeichenzahl ohne jede Ausführung erkennbar. Die Auszählung
+hinter „43 Codes“ nennt ihre Quellen unvollständig, weil `JobCoordinator` auch die Codes dreier weiterer
+Dateien durchreicht — 43 ist eine Untergrenze. Zwei Codes standen zu Unrecht in der Liste der gewöhnlichen
+Betriebsausgänge. Und sieben Zitate schlossen mit einem geraden Anführungszeichen statt dem deutschen.
+
+**Einen Fund habe ich zurückgewiesen.** Der Kernreviewer schrieb, kein Test führe `SyncTranscriptParser`
+aus, alle 26 seiner Familien seien nur über die Zuordnung geprüft. `SyncProviderTest` instanziiert die
+OpenAI- und Groq-Adapter elfmal und nagelt zehn dieser Codes über echte Durchläufe fest, darunter
+`MALFORMED_SEGMENT`, `MISSING_WORD_TEXT` und beide Modellcodes. Selbst nachgezählt, bevor ich etwas daran
+geändert habe.
+
+**Eine Lehre über das Verfahren, nicht über den Code.** Ein Fund des Doku-Reviewers — die Doku nenne das
+Verwerfen „Kürzen“ — betraf eine Änderung, die noch gar nicht committet war: Ich hatte `ExtractorMetadata`
+bearbeitet, während er lief, und er liest zum Prüfen auch Code. Recht hatte er trotzdem, nur eben über
+einen Stand, den es beim Commit noch nicht gab. Solange ein Reviewer läuft, wird an keiner Datei mehr
+gearbeitet, die er lesen könnte — auch nicht an einer außerhalb seines Auftrags.
+
+Gates nach Runde 9: 162 JVM-Tests im Modul `core` ohne Fehler, alle vier Lintberichte ohne Befund,
+191 Instrumentierungstests auf `emulator-5556` — 185 bestanden, 6 per Annahme übersprungen, 0 Fehler.
+Die Gegenprobe mit wieder eingebautem Kürzen und gesenkter Adressgrenze lässt beide betroffenen Tests
+fallen.
+
+**Die Schleife ist nicht konvergiert.** Neun Runden, keine davon leer. Solange eine Runde noch etwas findet,
+ist die nächste fällig — gerade weil die Funde der Runden 3 bis 9 jeweils in den Korrekturen der Vorrunde
+lagen, zuletzt zweimal in Folge überwiegend in deren Tests und deren Beschreibung statt in deren
 Produktionscode.
 
 ## UI-Feedback umgesetzt
