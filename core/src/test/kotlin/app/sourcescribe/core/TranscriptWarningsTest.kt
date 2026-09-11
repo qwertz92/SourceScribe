@@ -48,7 +48,7 @@ class TranscriptWarningsTest {
         // with itself and cannot see a name misspelt against the parser that writes it. Here a name that
         // exists in only one of the two lists fails.
         //
-        // Eleven of these names appear nowhere in the parsers as a literal, because the line assembles them
+        // Thirteen of these names appear nowhere in the parsers as a literal, because the line assembles them
         // from pieces — `"MISSING_${"$"}{if (word) "WORD" else "SEGMENT"}_TEXT_${"$"}index"` and its kin. Neither a
         // search nor a reader finds them there, which is exactly why they are spelled out once here.
         val written = listOf(

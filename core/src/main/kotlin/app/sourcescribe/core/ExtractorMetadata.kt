@@ -82,8 +82,14 @@ object ExtractorMetadata {
             val vcodec = value("vcodec")
             if (!Regex("[A-Za-z0-9_.-]{1,80}").matches(id) || vcodec != "none" || acodec in setOf(null, "none")) return@mapNotNull null
             // A language tag, a codec and a container each name one thing; the note beside them is prose.
-            val language = identifier(value("language"))
-            val note = value("format_note")?.take(500)
+            // Both values are also kept as they arrived, because asking a question about a value is not the
+            // same as carrying it. Whether a tag ends in `-desc` and whether a note says `(original)` can be
+            // answered from the whole of what arrived; answering them from the bounded copy is how a marked
+            // rendition would quietly lose its mark — and both marks decide which track is chosen.
+            val statedLanguage = value("language")
+            val language = identifier(statedLanguage)
+            val statedNote = value("format_note")
+            val note = statedNote?.take(500)
             val container = identifier(value("ext"), MAX_CONTAINER_LENGTH)
             val exact = number("filesize")?.takeIf { it > 0 && it <= MAX_TRACK_BYTES }?.toLong()
             val approximate = number("filesize_approx")?.takeIf { it > 0 && it <= MAX_TRACK_BYTES }?.toLong()
@@ -95,7 +101,7 @@ object ExtractorMetadata {
             val rateKey = if (number("abr") != null) "abr" else if (number("tbr") != null) "tbr" else null
             val rate = (number("abr") ?: number("tbr"))?.takeIf { it in 1.0..10_000.0 }?.toInt()
             // A DRC rendition is only ever marked by the extractor id suffix or its note; never inferred from bitrate.
-            val compressed = id.endsWith("-drc", ignoreCase = true) || note?.contains("drc", ignoreCase = true) == true
+            val compressed = id.endsWith("-drc", ignoreCase = true) || statedNote?.contains("drc", ignoreCase = true) == true
             // yt-dlp encodes the track role numerically: 10 original, 5 default, -10 audio description.
             val preference = signedNumber("language_preference")?.toInt()
             // Provenance is built from the values themselves instead of from a second set of checks beside
@@ -125,10 +131,11 @@ object ExtractorMetadata {
                 isOriginal = when {
                     preference == ORIGINAL_LANGUAGE_PREFERENCE -> true
                     preference != null -> false
-                    note?.contains("(original)", ignoreCase = true) == true -> true
+                    statedNote?.contains("(original)", ignoreCase = true) == true -> true
                     else -> null
                 },
                 evidence = "yt-dlp:formats." + backing.filterValues { it != null }.keys.joinToString(","),
+                languageRefused = statedLanguage != null && language == null,
                 codec = identifier(acodec, MAX_CODEC_LENGTH),
                 container = container,
                 bitrateKbps = rate,
@@ -138,7 +145,7 @@ object ExtractorMetadata {
                 channels = channelCount,
                 dynamicRangeCompressed = compressed,
                 audioDescription = preference == AUDIO_DESCRIPTION_PREFERENCE ||
-                    language?.endsWith("-desc", ignoreCase = true) == true,
+                    statedLanguage?.endsWith("-desc", ignoreCase = true) == true,
             )
         }.distinctBy { it.id }
         return ResolvedSource(source, tracks, audio, urls)

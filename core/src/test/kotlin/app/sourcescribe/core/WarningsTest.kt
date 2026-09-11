@@ -94,6 +94,15 @@ class WarningsTest {
         assertEquals(listOf("ZEBRA_MISSING", "APPLE_MALFORMED", "MIDDLE_UNCERTAIN"), warnings.toList())
     }
 
+    @Test fun bothCeilingsAreWrittenOutHereAndNotOnlyReachedThroughTheirConstants() {
+        // The assertions in this file build their input from these two numbers, so a lowered ceiling moves
+        // the input with it and stays green. `KIND_LIMIT` does have a floor of its own — twice the names
+        // the program can produce, checked above — but nothing holds it anywhere between that floor and
+        // its actual value, and `LIMIT` has no floor at all.
+        assertEquals(64, Warnings.LIMIT)
+        assertEquals(160, Warnings.KIND_LIMIT)
+    }
+
     @Test fun aListThatFitsCarriesNoTruncationMarker() {
         val warnings = Warnings()
         repeat(Warnings.LIMIT) { warnings += "MALFORMED_SEGMENT_$it" }

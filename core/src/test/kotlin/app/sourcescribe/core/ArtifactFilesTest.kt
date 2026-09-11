@@ -283,6 +283,11 @@ class ArtifactFilesTest {
 
     @Test
     fun sizeBoundsAndRetentionBoundaryAreEnforced() = withStore { store ->
+        // The bound written out, because the input below cannot fail its check whatever the constant says:
+        // a document built from text as long as the bound carries the whole record around that text as
+        // well, and so exceeds every value the constant could take. The raw bound further down is a
+        // different case — it is compared against the bytes themselves, and its input sits one over it.
+        assertEquals(32 * 1024 * 1024, ArtifactFiles.MAX_CANONICAL_BYTES)
         val oversizedCanonical = document(segments = listOf(Segment("x".repeat(ArtifactFiles.MAX_CANONICAL_BYTES))))
         val canonicalFailure = assertThrows(ArtifactFilesException::class.java) {
             store.write(oversizedCanonical)

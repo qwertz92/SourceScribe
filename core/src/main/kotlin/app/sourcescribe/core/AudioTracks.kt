@@ -97,6 +97,7 @@ object AudioTracks {
     /**
      * The rendition the app selects without asking. Returns null whenever the choice would silently
      * decide between different spoken languages; a language is a content decision and stays with the user.
+     * A language the record refused counts as a language here, not as a missing one — see below.
      */
     fun automatic(tracks: List<AudioTrack>): AudioTrack? {
         if (tracks.isEmpty()) return null
@@ -105,6 +106,11 @@ object AudioTracks {
         val spoken = tracks.filterNot { it.audioDescription }
         if (spoken.isEmpty()) return null
         val candidates = spoken.filter { it.isOriginal == true }.ifEmpty { spoken }
+        // A refused language is not an absent one. Where the source stated a tag the record could not carry,
+        // `language` is null and the comparison below reads two such renditions — or one of them beside one
+        // that stated nothing — as agreeing, which is exactly the silent decision this function exists to
+        // refuse. A single candidate decides nothing between languages and is still chosen.
+        if (candidates.size > 1 && candidates.any { it.languageRefused }) return null
         if (candidates.map { normalizedLanguage(it.language) }.distinct().size > 1) return null
         return candidates.sortedWith(preference).firstOrNull()
     }

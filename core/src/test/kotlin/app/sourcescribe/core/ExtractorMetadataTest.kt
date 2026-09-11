@@ -286,6 +286,55 @@ class ExtractorMetadataTest {
         assertNull(note("low"))
     }
 
+    @Test fun aLanguageTheRecordRefusedIsNotReadAsNoLanguageAtAll() {
+        fun format(id: String, language: String?) =
+            """{"format_id":"$id","vcodec":"none","acodec":"mp4a.40.2"""" +
+                (language?.let { ""","language":"$it"""" } ?: "") + "}"
+
+        fun parse(vararg formats: String) = ExtractorMetadata.parse(
+            """{"id":"BaW_jenozKc","formats":[${formats.joinToString(",")}]}""",
+            source,
+        )
+        // Two tags that differ from their first character, both too long for the record to carry. Neither
+        // survives, so both renditions read `null` — and without the mark that a tag was stated at all, the
+        // refusal to choose between different spoken languages quietly stops working. The shape of the
+        // trigger changed with the fix that introduced it: while these values were shortened rather than
+        // refused, the two collided only when their first hundred characters matched.
+        val longTags = "en-" + "x".repeat(150) to "de-" + "y".repeat(150)
+        val both = parse(format("140", longTags.first), format("141", longTags.second))
+        assertEquals(2, both.audio.size)
+        assertTrue(both.audio.all { it.language == null && it.languageRefused })
+        assertNull(TrackSelection.audio(both, null))
+        // One refused tag beside one never stated is the same question: the source told them apart.
+        assertNull(TrackSelection.audio(parse(format("140", longTags.first), format("141", null)), null))
+        // Two renditions that both stated nothing are not a question, and never were.
+        assertEquals("140", TrackSelection.audio(parse(format("140", null), format("141", null)), null)?.id)
+        // A single rendition decides nothing between languages and is still chosen without asking.
+        assertEquals("140", TrackSelection.audio(parse(format("140", longTags.first)), null)?.id)
+        // A tag short enough to carry is not marked as refused, and agreeing tags still answer the question.
+        val carried = parse(format("140", "en"), format("141", "en-GB"))
+        assertTrue(carried.audio.none { it.languageRefused })
+        assertEquals("140", TrackSelection.audio(carried, null)?.id)
+    }
+
+    @Test fun aMarkOnAValueIsReadFromTheWholeValueAndNotFromTheBoundedCopy() {
+        fun single(field: String, value: String) = ExtractorMetadata.parse(
+            """{"id":"BaW_jenozKc","formats":[{"format_id":"140","vcodec":"none","acodec":"mp4a.40.2","$field":"$value"}]}""",
+            source,
+        ).audio.single()
+        // Carrying a value is bounded; asking a question about it is not. A language tag too long to carry
+        // still answers whether it names narration of the picture, and a description track read as dialogue
+        // would be transcribed in place of the speech somebody wanted.
+        assertTrue(single("language", "en-" + "x".repeat(150) + "-desc").audioDescription)
+        // The same for the note: both marks it carries decide which rendition is chosen without asking, so
+        // neither may be lost to the five hundred characters the record keeps of it.
+        val note = "n".repeat(600)
+        assertEquals(true, single("format_note", "$note (original)").isOriginal)
+        assertTrue(single("format_note", "$note drc").dynamicRangeCompressed)
+        // What is carried stays bounded all the same: the note in the record is the shortened one.
+        assertEquals(500, single("format_note", "$note (original)").name?.length)
+    }
+
     @Test fun ambiguousAudioRequiresChoice() {
         val tracks = listOf(AudioTrack("140", "BaW_jenozKc", "de", null, null, "fixture"), AudioTrack("140-1", "BaW_jenozKc", "en", null, null, "fixture"))
         val resolved = ResolvedSource(source, emptyList(), tracks, emptyMap())

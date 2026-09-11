@@ -61,6 +61,13 @@ data class AudioTrack(
     val name: String?,
     val isOriginal: Boolean?,
     val evidence: String,
+    /**
+     * The source stated a language for this rendition that the record could not carry, because a value
+     * naming one thing is kept whole or not at all. This is not the same as stating none: a refused tag
+     * still says the source told two renditions apart, and [AudioTracks.automatic] may not read two of
+     * them as agreeing just because neither language survived into the record.
+     */
+    val languageRefused: Boolean = false,
     val codec: String? = null,
     val container: String? = null,
     val bitrateKbps: Int? = null,

@@ -27,6 +27,24 @@ class AudioTracksTest {
         assertTrue(AudioTracks.describe(listOf(description, spoken), 60_000).single { it.recommended }.track.id == "140")
     }
 
+    @Test fun aRefusedLanguageCountsAsALanguageAndNotAsSilence() {
+        // `null` reaches this function for two different reasons: the source stated no language, or it
+        // stated one the record could not carry. Only the second says the source told two renditions apart,
+        // and only a flag beside the value can still say so once the value itself is gone.
+        val refused = track("140", language = null, bitrateKbps = 96).copy(languageRefused = true)
+        val alsoRefused = track("141", language = null, bitrateKbps = 128).copy(languageRefused = true)
+        assertNull(AudioTracks.automatic(listOf(refused, alsoRefused)))
+        assertNull(AudioTracks.automatic(listOf(refused, track("142", language = null, bitrateKbps = 128))))
+        // Alone it decides nothing between languages, so it is still the recommendation.
+        assertEquals("140", AudioTracks.automatic(listOf(refused))?.id)
+        assertTrue(AudioTracks.describe(listOf(refused), 60_000).single().recommended)
+        // And two renditions that both stated nothing are not a question, as they never were.
+        assertEquals(
+            "140",
+            AudioTracks.automatic(listOf(track("140", language = null), track("141", language = null)))?.id,
+        )
+    }
+
     @Test fun severalSpokenLanguagesStayTheReadersDecision() {
         assertNull(AudioTracks.automatic(listOf(track("140", "de", bitrateKbps = 128), track("141", "en", bitrateKbps = 128))))
         // Regional variants of one language are the same content decision, so they do not need a question.

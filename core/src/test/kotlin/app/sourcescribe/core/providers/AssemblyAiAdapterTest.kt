@@ -33,6 +33,13 @@ import org.junit.Before
 import org.junit.Test
 
 class AssemblyAiAdapterTest {
+    @Test fun theDurationCeilingIsWrittenOutHereAndNotOnlyReachedThroughTheConstant() {
+        // The two places that use it add one and therefore move with it. This ceiling is AssemblyAI's own,
+        // not ours, so changing the number changes what a source is told about the provider it was refused
+        // by — which makes it worth stating rather than deriving.
+        assertEquals(10 * 60 * 60 * 1000L, AssemblyAiAdapter.MAX_DURATION_MS)
+    }
+
     private lateinit var server: MockWebServer
     private lateinit var adapter: AssemblyAiAdapter
     private lateinit var audio: File
