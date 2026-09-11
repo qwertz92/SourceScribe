@@ -195,6 +195,27 @@ class ExportStoreTest {
     }
 
     @Test
+    fun aRawSiblingCountsAsATakenNameBecauseTheRowDoesNotRecordItsExtension() = runBlocking {
+        withHarness(ExportFixtureProvider.Mode.NAME_COLLISION, retainRaw = true) { harness ->
+            assertEquals(1, harness.dao.renameArtifact(harness.artifactId, "Folge 12 Interview"))
+            val raw = harness.store.export(harness.artifactId, ExportFormat.RAW, harness.treeUri)
+            assertEquals(ExportState.EXPORTED, raw.state)
+
+            val text = harness.store.export(harness.artifactId, ExportFormat.TEXT, harness.treeUri)
+
+            // An export row records the format but not the extension a raw export actually wrote, because
+            // that comes from the retained provider file. The check therefore cannot tell whether this
+            // sibling holds the name the text export wants, and counts it as held rather than risk writing
+            // over it. Only this test puts that rule through a real export instead of the name builder.
+            assertEquals(ExportState.EXPORTED, text.state)
+            val names = providerAdmin { ExportFixtureProvider.names(context) }
+            assertEquals(names.toString(), 2, names.size)
+            assertTrue(names.toString(), names.contains("Folge_12_Interview.$RAW_EXTENSION"))
+            assertTrue(names.toString(), names.any { it.startsWith("Folge_12_Interview-") && it.endsWith(".txt") })
+        }
+    }
+
+    @Test
     fun aChosenNameIsFreeAgainOnceItsDocumentIsProvenGone() = runBlocking {
         withHarness(ExportFixtureProvider.Mode.NAME_COLLISION) { harness ->
             assertEquals(1, harness.dao.renameArtifact(harness.artifactId, "Folge 12 Interview"))
@@ -411,12 +432,16 @@ class ExportStoreTest {
         assertEquals("Folge_12_Interview.md", name)
     }
 
-    private suspend fun withHarness(mode: ExportFixtureProvider.Mode, block: suspend (Harness) -> Unit) {
+    private suspend fun withHarness(
+        mode: ExportFixtureProvider.Mode,
+        retainRaw: Boolean = false,
+        block: suspend (Harness) -> Unit,
+    ) {
         val treeUri = configureProvider(mode)
         val artifactRoot = File(context.cacheDir, "sourcescribe-artifacts-test-${UUID.randomUUID()}")
         val artifacts = ArtifactFiles(artifactRoot)
-        val document = document("00000000-0000-0000-0000-000000000001")
-        val stored = artifacts.write(document)
+        val document = document("00000000-0000-0000-0000-000000000001", retainRaw)
+        val stored = if (retainRaw) artifacts.write(document, RAW_FIXTURE, RAW_EXTENSION) else artifacts.write(document)
         val job = JobRow(UUID.randomUUID().toString(), "source-1", Json.encodeToString(JobConfig()), 1L)
         val attempt = AttemptRow(UUID.randomUUID().toString(), job.id, Branch.CAPTIONS, 1, 1L)
         val artifact = ArtifactRow(
@@ -470,10 +495,13 @@ class ExportStoreTest {
         val treeUri: String,
     )
 
-    private fun document(artifactId: String) = TranscriptDocument(
+    private val RAW_FIXTURE = """{"events":[]}""".toByteArray()
+    private val RAW_EXTENSION = "json3"
+
+    private fun document(artifactId: String, retainRaw: Boolean = false) = TranscriptDocument(
         artifactId = artifactId,
         source = Source(id = "source-1", kind = SourceKind.YOUTUBE, title = "Fixture source"),
-        acquisition = JobConfig(mode = AcquisitionMode.CAPTIONS_ONLY),
+        acquisition = JobConfig(mode = AcquisitionMode.CAPTIONS_ONLY, retainRaw = retainRaw),
         provenance = Provenance(origin = Origin.YOUTUBE),
         segments = listOf(Segment("fixture transcript")),
         createdAt = 1L,

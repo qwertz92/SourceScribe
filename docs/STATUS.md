@@ -175,7 +175,9 @@ Außerdem in dieser Runde geschlossen: Punkt 8 der bekannten Probleme (AssemblyA
 in beliebiger Länge) und Punkt 6 (Streuwert im Dateinamen).
 
 Gates nach Runde 6: 151 JVM-Tests im Modul `core` ohne Fehler, alle vier Lintberichte ohne Befund,
-190 Instrumentierungstests auf `emulator-5556` — 184 bestanden, 6 per Annahme übersprungen, 0 Fehler.
+191 Instrumentierungstests auf `emulator-5556` — 185 bestanden, 6 per Annahme übersprungen, 0 Fehler.
+Der 191. ist der Test zu Punkt 19: Er führt einen echten RAW-Export aus und danach einen Textexport
+desselben Artefakts, weil die Regel für RAW-Geschwister bisher nur im Namensbauer geprüft war.
 
 **Die Schleife ist nicht konvergiert.** Sechs Runden, keine davon leer. Solange eine Runde noch etwas findet,
 ist die nächste fällig — gerade weil die Funde der Runden 3 bis 6 jeweils in den Korrekturen der Vorrunde

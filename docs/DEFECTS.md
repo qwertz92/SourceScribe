@@ -251,19 +251,17 @@ wie ein Code aussieht, wird unverändert durchgereicht.
   Das ist zugleich unabhängig nützlich: Heute ist ein Ergebnis ohne jede Gliederung von einem gegliederten
   nicht zu unterscheiden.
 
-### 19. Die RAW-Regel der Wiederholungsprüfung ist nur im Einzeltest belegt (niedrig)
+### 19. Die RAW-Regel der Wiederholungsprüfung — erledigt am 11. September 2026
 
-- **Stelle:** `app/src/main/java/app/sourcescribe/data/ExportStore.kt`, `targetExtension` gegenüber
-  `repeated` in `write`
-- **Stand:** Eine Geschwisterzeile im Format `RAW` liefert `null` als Endung, weil die Endung aus der
-  aufbewahrten Anbieterdatei kommt und nicht in der Exportzeile steht. Sie zählt deshalb vorsichtshalber als
-  möglicher Treffer. Belegt ist das nur durch den Einzeltest zu `collisionSafeFileName`; kein Test führt
-  einen echten Export mit einem RAW-Geschwister durch.
-- **Folge, falls die Regel bricht:** Ein selbst vergebener Name bekommt entweder einen unnötigen Zusatz oder
-  keinen, wo er einen bräuchte. Beim Prüfprovider der Tests führt der zweite Fall zum Scheitern des
-  Exports, auf einem echten Anbieter nur zu einem automatisch umbenannten Namen.
-- **Was fehlt:** Ein Instrumentierungstest, der nach einem RAW-Export einen zweiten Export desselben
-  Artefakts mit selbst vergebenem Namen durchführt.
+Am selben Tag aufgenommen und geschlossen. Eine Geschwisterzeile im Format `RAW` liefert `null` als
+Endung, weil die Endung aus der aufbewahrten Anbieterdatei kommt und nicht in der Exportzeile steht; sie
+zählt deshalb vorsichtshalber als belegter Name. Belegt war das nur durch den Einzeltest zum Namensbauer.
+`aRawSiblingCountsAsATakenNameBecauseTheRowDoesNotRecordItsExtension` führt jetzt einen echten RAW-Export
+aus und danach einen Textexport desselben Artefakts mit selbst vergebenem Namen. Die Zeile bekommt einen
+Unterscheidungszusatz, obwohl `.json3` und `.txt` gar nicht kollidieren könnten — das ist die bewusst
+vorsichtige Seite, und der Test hält sie fest statt sie zu behaupten. Der Zusatz wäre vermeidbar, wenn die
+Exportzeile die geschriebene Endung führte; das ist eine Spalte mehr samt Migration für einen kosmetischen
+Gewinn und deshalb nicht gemacht.
 
 ## Bewusste Entscheidungen, die wie Fehler aussehen
 
