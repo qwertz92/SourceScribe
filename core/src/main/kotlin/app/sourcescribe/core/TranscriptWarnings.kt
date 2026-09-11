@@ -101,64 +101,97 @@ object TranscriptWarnings {
         }
     }
 
-    private fun group(family: String): WarningGroup? = when (family) {
-        // `MALFORMED_WORD` and `MISSING_WORD_TEXT` cost the word list an entry, and that list carries the
-        // times per word; the text a reader sees comes from the segments. So they belong here rather than
-        // with the missing passages, unlike their segment counterparts below.
-        "WORD_TIMESTAMPS_MISSING", "WORD_TIMESTAMPS_MALFORMED", "WORD_TIMESTAMPS_MALFORMED_SPEAKER",
-        "WORD_TIMESTAMPS_MALFORMED_OFFSET", "WORD_TIMESTAMPS_OUT_OF_RANGE", "MALFORMED_WORD",
-        "MISSING_WORD_TEXT", "INVALID_WORD_TIMESTAMP", "OUT_OF_RANGE_WORD_TIMESTAMP",
-        "NON_MONOTONIC_WORD_TIMESTAMP", "MALFORMED_WORDS", "MISSING_WORD_TIMESTAMPS",
-        "INCOMPLETE_WORD_TIMESTAMPS" -> WarningGroup.WORD_TIMES
+    private fun group(family: String): WarningGroup? = FAMILIES[family]
+        // A refusal the provider gave for one section is built from its error code, so it is matched by its
+        // prefix instead of being listed value by value.
+        ?: if (family.startsWith(RESPONSE_PREFIX)) WarningGroup.SECTION_LOST_PROVIDER else null
 
-        // Every family here keeps its text and loses only its place on the timeline. `INVALID_CHUNK_OFFSET`
-        // belongs with them: the entry is still written, its start and end are dropped.
-        "SEGMENT_TIMESTAMPS_MISSING", "MALFORMED_SEGMENTS", "INVALID_SEGMENT_TIMESTAMP",
-        "OUT_OF_RANGE_SEGMENT_TIMESTAMP", "NON_MONOTONIC_SEGMENT_TIMESTAMP", "MISSING_SEGMENT_TIMESTAMPS",
-        "INCOMPLETE_SEGMENT_TIMESTAMPS", "INVALID_CHUNK_OFFSET" -> WarningGroup.SEGMENT_TIMES
-
-        // An entry that could not be read at all is skipped whole, so its text never reaches the transcript.
-        // That is a missing passage and not a missing timestamp, which is what the group above is for.
-        "MALFORMED_SEGMENT", "MALFORMED_CAPTION_SEGMENT", "MALFORMED_CAPTION_SEGMENTS",
-        "MISSING_SEGMENT_TEXT", "EMPTY_CUE_LINE", "EMPTY_EVENT" -> WarningGroup.MISSING_TEXT
-
-        "DIARIZATION_MISSING", "DIARIZATION_MALFORMED", "DIARIZATION_MALFORMED_OFFSET",
-        "DIARIZATION_OUT_OF_RANGE", "DIARIZATION_SPEAKER_MISSING", "MALFORMED_DIARIZED_SEGMENTS",
-        "MISSING_DIARIZED_SEGMENTS", "MISSING_DIARIZED_SPEAKER", "MISSING_SPEAKER" ->
-            WarningGroup.SPEAKERS
-
-        "WORD_LIMIT_REACHED", "SEGMENT_LIMIT_REACHED", "EVENT_LIMIT_REACHED" ->
-            WarningGroup.RESULT_SHORTENED
-
-        "REPORTED_LANGUAGES_MALFORMED", "MULTIPLE_LANGUAGES", "LANGUAGE_LIMIT_REACHED" ->
-            WarningGroup.PROVIDER_LANGUAGE
-
-        "REPORTED_MODEL_MALFORMED", "REPORTED_MODEL_TOO_LONG", "MULTIPLE_REPORTED_MODELS" ->
-            WarningGroup.PROVIDER_MODEL
-
-        "MISSING_CHUNKS" -> WarningGroup.COVERAGE
-
-        // The check behind this one fires for a gap and for an overlap alike, and cannot tell them apart.
-        // Saying a part is missing would claim more than was established.
-        "AUDIO_INTERVAL_GAP_OR_OVERLAP" -> WarningGroup.SECTION_ALIGNMENT
+    /**
+     * Every family this program names outright, with the group it belongs to. Data rather than a `when`, for
+     * two reasons. The names become countable, which is what lets [Warnings] bound the number of kinds it
+     * keeps against the number that can actually arise instead of against a convention its callers follow.
+     * And a test can drive each single name through [summarize], where before one example per group stood in
+     * for all of them and most of these names were covered by nothing at all.
+     */
+    internal val GROUPED_FAMILIES: List<Pair<WarningGroup, List<String>>> = listOf(
+        WarningGroup.COVERAGE to listOf("MISSING_CHUNKS"),
 
         // These look like a storage problem and are not one: every place that records them drops the whole
         // section from the transcript in the same step, so they belong with what is missing, not with what
         // could not be filed away.
-        "RESPONSE_STORAGE", "RAW_RESPONSE_TOO_LARGE", "RAW_RESPONSE_AGGREGATE_TOO_LARGE",
-        "CANONICAL_TRANSCRIPT_AGGREGATE_TOO_LARGE" -> WarningGroup.SECTION_LOST_STORAGE
+        WarningGroup.SECTION_LOST_STORAGE to listOf(
+            "RESPONSE_STORAGE", "RAW_RESPONSE_TOO_LARGE", "RAW_RESPONSE_AGGREGATE_TOO_LARGE",
+            "CANONICAL_TRANSCRIPT_AGGREGATE_TOO_LARGE",
+        ),
 
-        "REMOTE_NOT_COMPLETE" -> WarningGroup.SECTION_LOST_PROVIDER
+        WarningGroup.SECTION_LOST_PROVIDER to listOf("REMOTE_NOT_COMPLETE"),
 
-        "MALFORMED_CUE_LINE", "INVALID_TIMING_LINE", "UNKNOWN_VTT_SETTING", "MALFORMED_EVENT",
-        "MISSING_OR_INVALID_TIMING_EVENT", "STRUCTURAL_ROLLUP_UNCERTAIN" -> WarningGroup.CAPTION_SOURCE
+        WarningGroup.RESULT_SHORTENED to listOf(
+            "WORD_LIMIT_REACHED", "SEGMENT_LIMIT_REACHED", "EVENT_LIMIT_REACHED",
+        ),
 
-        "WARNINGS_TRUNCATED" -> WarningGroup.MORE_NOTES
+        // An entry that could not be read at all is skipped whole, so its text never reaches the transcript.
+        // That is a missing passage and not a missing timestamp, which is what SEGMENT_TIMES is for.
+        WarningGroup.MISSING_TEXT to listOf(
+            "MALFORMED_SEGMENT", "MALFORMED_CAPTION_SEGMENT", "MALFORMED_CAPTION_SEGMENTS",
+            "MISSING_SEGMENT_TEXT", "EMPTY_CUE_LINE", "EMPTY_EVENT",
+        ),
 
-        // A refusal the provider gave for one section is built from its error code, so it is matched by its
-        // prefix instead of being listed value by value.
-        else -> if (family.startsWith("RESPONSE_")) WarningGroup.SECTION_LOST_PROVIDER else null
-    }
+        // The check behind this one fires for a gap and for an overlap alike, and cannot tell them apart.
+        // Saying a part is missing would claim more than was established.
+        WarningGroup.SECTION_ALIGNMENT to listOf("AUDIO_INTERVAL_GAP_OR_OVERLAP"),
+
+        // Every family here keeps its text and loses only its place on the timeline. `INVALID_CHUNK_OFFSET`
+        // belongs with them: the entry is still written, its start and end are dropped.
+        WarningGroup.SEGMENT_TIMES to listOf(
+            "SEGMENT_TIMESTAMPS_MISSING", "MALFORMED_SEGMENTS", "INVALID_SEGMENT_TIMESTAMP",
+            "OUT_OF_RANGE_SEGMENT_TIMESTAMP", "NON_MONOTONIC_SEGMENT_TIMESTAMP",
+            "MISSING_SEGMENT_TIMESTAMPS", "INCOMPLETE_SEGMENT_TIMESTAMPS", "INVALID_CHUNK_OFFSET",
+        ),
+
+        // `MALFORMED_WORD` and `MISSING_WORD_TEXT` cost the word list an entry, and that list carries the
+        // times per word; the text a reader sees comes from the segments. So they belong here rather than
+        // with the missing passages, unlike their segment counterparts above.
+        WarningGroup.WORD_TIMES to listOf(
+            "WORD_TIMESTAMPS_MISSING", "WORD_TIMESTAMPS_MALFORMED", "WORD_TIMESTAMPS_MALFORMED_SPEAKER",
+            "WORD_TIMESTAMPS_MALFORMED_OFFSET", "WORD_TIMESTAMPS_OUT_OF_RANGE", "MALFORMED_WORD",
+            "MISSING_WORD_TEXT", "INVALID_WORD_TIMESTAMP", "OUT_OF_RANGE_WORD_TIMESTAMP",
+            "NON_MONOTONIC_WORD_TIMESTAMP", "MALFORMED_WORDS", "MISSING_WORD_TIMESTAMPS",
+            "INCOMPLETE_WORD_TIMESTAMPS",
+        ),
+
+        WarningGroup.SPEAKERS to listOf(
+            "DIARIZATION_MISSING", "DIARIZATION_MALFORMED", "DIARIZATION_MALFORMED_OFFSET",
+            "DIARIZATION_OUT_OF_RANGE", "DIARIZATION_SPEAKER_MISSING", "MALFORMED_DIARIZED_SEGMENTS",
+            "MISSING_DIARIZED_SEGMENTS", "MISSING_DIARIZED_SPEAKER", "MISSING_SPEAKER",
+        ),
+
+        WarningGroup.PROVIDER_LANGUAGE to listOf(
+            "REPORTED_LANGUAGES_MALFORMED", "MULTIPLE_LANGUAGES", "LANGUAGE_LIMIT_REACHED",
+        ),
+
+        WarningGroup.PROVIDER_MODEL to listOf(
+            "REPORTED_MODEL_MALFORMED", "REPORTED_MODEL_TOO_LONG", "MULTIPLE_REPORTED_MODELS",
+        ),
+
+        WarningGroup.CAPTION_SOURCE to listOf(
+            "MALFORMED_CUE_LINE", "INVALID_TIMING_LINE", "UNKNOWN_VTT_SETTING", "MALFORMED_EVENT",
+            "MISSING_OR_INVALID_TIMING_EVENT", "STRUCTURAL_ROLLUP_UNCERTAIN",
+        ),
+
+        WarningGroup.MORE_NOTES to listOf(Warnings.TRUNCATED),
+    )
+
+    /**
+     * [GROUPED_FAMILIES] by name. Two groups claiming one name would leave no trace here, the later one
+     * simply taking the family from the earlier, so a test compares this size against the number listed.
+     */
+    internal val FAMILIES: Map<String, WarningGroup> =
+        GROUPED_FAMILIES.flatMap { (group, families) -> families.map { it to group } }.toMap()
 
     private const val CHUNK_PREFIX = "CHUNK_"
+    private const val RESPONSE_PREFIX = "RESPONSE_"
+
+    /** The families built from a provider error code instead of being listed, one per [ProviderErrorCode]. */
+    internal val PREFIXED_FAMILY_COUNT = ProviderErrorCode.entries.size
 }

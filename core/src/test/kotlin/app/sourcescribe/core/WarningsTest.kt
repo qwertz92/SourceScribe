@@ -51,6 +51,38 @@ class WarningsTest {
         )
     }
 
+    @Test fun aKindNamedAfterSomethingAnAnswerSaidRunsIntoACeilingAndNotIntoTheHeap() {
+        // The exception for the first warning of a kind rested on there being few kinds. That is true of the
+        // codes this program writes, and it was true of nothing in this class: a producer that put a value
+        // from an answer into a code name would hand it a new kind every time, every one of them a first of
+        // its kind, and the list would grow with the answer again — which is the one thing the limit exists
+        // to stop. Both shapes below did exactly that, and neither even set the marker.
+        for (name in listOf<(Int) -> String>(
+            // Free text, which the family reduction leaves whole because it is not shaped like a code.
+            { index -> "the answer said $index" },
+            // A code-shaped name whose distinguishing part is not the trailing number that gets stripped.
+            { index -> "REPORTED_" + index.toString().map { "ABCDEFGHIJ"[it - '0'] }.joinToString("") },
+        )) {
+            val warnings = Warnings()
+            repeat(5_000) { warnings += name(it) }
+            val recorded = warnings.toList()
+            assertEquals(recorded.size.toString(), Warnings.KIND_LIMIT + 1, recorded.size)
+            assertEquals(Warnings.TRUNCATED, recorded.last())
+            assertEquals(name(0), recorded.first())
+        }
+    }
+
+    @Test fun theCeilingLeavesRoomForEveryKindTheProgramItselfNames() {
+        // What makes the ceiling above a ceiling rather than a working limit. If this ever fails, the codes
+        // grew towards it and were not counted: a real answer would start losing the first warning of a
+        // kind, which is the loss the exception was added to prevent.
+        val named = TranscriptWarnings.FAMILIES.size + TranscriptWarnings.PREFIXED_FAMILY_COUNT
+        assertTrue(
+            "$named kinds named against a ceiling of ${Warnings.KIND_LIMIT}",
+            named * 2 <= Warnings.KIND_LIMIT,
+        )
+    }
+
     @Test fun theListKeepsTheOrderTheProblemsWereFoundIn() {
         // The order is the order of discovery, not the alphabet: a reader looks for the first thing that
         // went wrong. Without a case whose insertion order differs from its sorted order, a later switch

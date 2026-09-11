@@ -165,6 +165,42 @@ class TranscriptWarningsTest {
         assertTrue(TranscriptWarnings.looksLikeCode("CHUNK_3_WORD_TIMESTAMPS_MALFORMED_17"))
     }
 
+    @Test fun everyFamilyThisProgramNamesIsRecognisedInEveryShapeItIsRecordedIn() {
+        // One example per group used to stand in for all of them, which left most of these names covered by
+        // nothing: a name misspelt against its producer, or one that the family reduction shortens before
+        // the lookup ever sees it, would have been reported as an unexplained code to the reader.
+        for ((group, families) in TranscriptWarnings.GROUPED_FAMILIES) {
+            for (family in families) {
+                assertEquals("$family is not its own family name", family, TranscriptWarnings.family(family))
+                val shapes = listOf(
+                    family,
+                    "CHUNK_7_$family",
+                    family + "_12",
+                    "CHUNK_2_" + family + "_4_9",
+                    "$family:2,3",
+                )
+                for (code in shapes) {
+                    assertEquals(code, listOf(group), TranscriptWarnings.summarize(listOf(code)).groups)
+                }
+            }
+        }
+    }
+
+    @Test fun everyGroupHasAFamilyAndNoFamilyBelongsToTwoGroups() {
+        // The mapping used to be a `when`, where a group without a single code of its own was a line nobody
+        // would miss and a name claimed twice was the compiler's business. As data it is neither, so both
+        // are asked here: a group with no family can never be shown, and of two groups claiming one name the
+        // second silently takes it from the first.
+        assertEquals(
+            WarningGroup.entries.toSet(),
+            TranscriptWarnings.GROUPED_FAMILIES.map { it.first }.toSet(),
+        )
+        assertEquals(
+            TranscriptWarnings.GROUPED_FAMILIES.sumOf { it.second.size },
+            TranscriptWarnings.FAMILIES.size,
+        )
+    }
+
     @Test fun anEmptyListSaysNothing() {
         val summary = TranscriptWarnings.summarize(emptyList())
         assertEquals(emptyList<WarningGroup>(), summary.groups)
