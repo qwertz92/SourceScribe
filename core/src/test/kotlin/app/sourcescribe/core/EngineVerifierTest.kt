@@ -143,6 +143,51 @@ class EngineVerifierTest {
         }
     }
 
+    @Test
+    fun anArchiveOfTooManyEntriesIsRejectedBeforeAnyOfThemIsRead() {
+        // Until round 11 nothing exercised this limit, or the one below it. Both are the part of the
+        // signed-update path that stops an archive from being enormous in the two ways a small file can be:
+        // by holding a great many members, or by unpacking to far more than it weighs. That the mechanism
+        // works was never in doubt and never shown either, which are different things.
+        //
+        // The inputs are built from the production numbers on purpose. What is asked here is whether the
+        // check fires at the size the program actually enforces; whether that size is the intended one is
+        // asked in `StatedNumbersTest`, where the number is written out.
+        val entries = Array(EngineVerifier.MAX_ARCHIVE_ENTRIES + 1) { "filler-$it.bin" to ByteArray(1) }
+        val crowded = zipFile(VERSION_PATH to versionSource(), EJS_VERSION_PATH to ejsSource(), *entries)
+        try {
+            val failure = assertThrows(EngineVerificationException::class.java) {
+                EngineVerifier.inspectArchive(crowded)
+            }
+            assertEquals(EngineVerificationCode.ARCHIVE, failure.code)
+            // The name of this test is a claim, and it is the one the negative control had to settle: the
+            // count is read from the archive's end record and refused there, before a single entry is
+            // opened. Two later guards repeat it while the entries are walked; disabling only those two
+            // leaves this test green, which is how the end-record check was found to be the one that fires.
+            assertEquals("ARCHIVE: unsupported archive layout", failure.message)
+        } finally {
+            assertTrue(crowded.delete())
+        }
+    }
+
+    @Test
+    fun anArchiveThatUnpacksPastTheTotalIsRejectedEvenWhenEveryEntryFits() {
+        // Each member stays inside the per-entry limit, so only the running total can catch this one. Nine
+        // of them at eight mebibytes is seventy-two, against a ceiling of sixty-four. The bytes are zeros
+        // and therefore compress to almost nothing, which is the whole point of the attack being guarded.
+        val filler = ByteArray(EngineVerifier.MAX_ENTRY_BYTES)
+        val entries = Array(9) { "part-$it.bin" to filler }
+        val inflated = zipFile(VERSION_PATH to versionSource(), EJS_VERSION_PATH to ejsSource(), *entries)
+        try {
+            val failure = assertThrows(EngineVerificationException::class.java) {
+                EngineVerifier.inspectArchive(inflated)
+            }
+            assertEquals(EngineVerificationCode.ARCHIVE, failure.code)
+        } finally {
+            assertTrue(inflated.delete())
+        }
+    }
+
     private fun resource(name: String): ByteArray =
         requireNotNull(javaClass.getResourceAsStream("/engine/$name")).use { it.readBytes() }
 

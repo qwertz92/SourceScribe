@@ -30,14 +30,12 @@ class JobLimitsTest {
         assertNull(JobLimits.suggestedSeconds(601 * 60_000L))
     }
 
-    @Test fun theCeilingItselfIsWrittenOutHereAndNotOnlyReachedThroughTheConstant() {
+    @Test fun theAnswersAtTheCeilingAreGivenAsNumbersAndNotAsTheConstant() {
         // Every other assertion in this file reaches the ceiling through the constant and therefore moves
         // with it: set to one hour, a tenth of what it is, all of them stay green while the app quietly
-        // stops accepting sources it offers to carry. And the offer is a second hard-coded number: the
-        // `invalid_duration` string names 600 minutes in both languages without reading it from here. The
-        // number is therefore written out, which ties the two together, and the answers at its edge with it.
-        assertEquals(10 * 60 * 60L, JobLimits.MAX_AUDIO_SECONDS)
-        assertEquals(600L, JobLimits.MAX_AUDIO_MINUTES)
+        // stops accepting sources it offers to carry. These two name the edge outright, so a moved ceiling
+        // changes an answer here. The ceiling itself is stated in `StatedNumbersTest`, beside the note that
+        // two translated strings carry the same six hundred minutes without reading them from it.
         assertEquals(36_000L, JobLimits.suggestedSeconds(36_000_000L))
         assertNull(JobLimits.suggestedSeconds(36_000_001L))
     }

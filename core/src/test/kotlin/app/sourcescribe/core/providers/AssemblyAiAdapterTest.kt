@@ -33,12 +33,6 @@ import org.junit.Before
 import org.junit.Test
 
 class AssemblyAiAdapterTest {
-    @Test fun theDurationCeilingIsWrittenOutHereAndNotOnlyReachedThroughTheConstant() {
-        // The two places that use it add one and therefore move with it. This ceiling is AssemblyAI's own,
-        // not ours, so changing the number changes what a source is told about the provider it was refused
-        // by — which makes it worth stating rather than deriving.
-        assertEquals(10 * 60 * 60 * 1000L, AssemblyAiAdapter.MAX_DURATION_MS)
-    }
 
     private lateinit var server: MockWebServer
     private lateinit var adapter: AssemblyAiAdapter
@@ -430,6 +424,10 @@ class AssemblyAiAdapterTest {
     }
 
     @Test
+    // The word ending at 161 ms is not an arbitrary fixture value: it sits one millisecond past
+    // `AssemblyAiAdapter.MIN_DURATION_MS`. Raise that constant and this test falls for a reason that has
+    // nothing to do with what it checks, which is why the number is called out here rather than left to be
+    // rediscovered. Found in round 11 while proving that the constant itself was unpinned.
     fun responseTimesStayWithinChunkAndOversizedReplayIsRejected() {
         val wordTranscript = (adapter.parseSavedResponse(
             """
