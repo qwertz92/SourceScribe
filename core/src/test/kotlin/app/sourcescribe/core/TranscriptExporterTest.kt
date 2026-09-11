@@ -197,6 +197,23 @@ class TranscriptExporterTest {
     }
 
     @Test
+    fun theProvenanceRecordSaysWhenASourceNamedALanguageItCouldNotCarry() {
+        fun exported(track: AudioTrack) = TranscriptExporter.render(
+            document().let { it.copy(provenance = it.provenance.copy(sourceAudioTrack = track)) },
+            ExportFormat.MARKDOWN,
+        )
+
+        val track = AudioTrack("audio-track", "BaW_jenozKc", null, null, null, "observed")
+        // Nothing was said, so nothing is claimed.
+        assertTrue(exported(track).contains("language=unknown"))
+        // Something was said that the record could not carry. Writing `unknown` here would state that the
+        // source named no language, which is not what happened, and this file is the provenance record.
+        val refused = exported(track.copy(languageRefused = true))
+        assertTrue(refused.contains("language=stated-but-unusable"))
+        assertFalse(refused.contains("language=unknown"))
+    }
+
+    @Test
     fun generatedFilenamesLeadWithTheTitleAndStillCarryIdentity() {
         val document = document(
             sourceId = "youtube:abc/../CON",

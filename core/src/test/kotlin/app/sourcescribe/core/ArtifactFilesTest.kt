@@ -283,11 +283,16 @@ class ArtifactFilesTest {
 
     @Test
     fun sizeBoundsAndRetentionBoundaryAreEnforced() = withStore { store ->
-        // The bound written out, because the input below cannot fail its check whatever the constant says:
-        // a document built from text as long as the bound carries the whole record around that text as
-        // well, and so exceeds every value the constant could take. The raw bound further down is a
-        // different case — it is compared against the bytes themselves, and its input sits one over it.
+        // Both bounds written out, because neither input below can fail its check whatever the constant
+        // says. The document is built from text as long as the bound and carries the whole record around
+        // that text as well, so it exceeds every value the constant could take; the raw array is built as
+        // the bound plus one, which is larger than the bound for the same reason one is larger than zero.
+        // Those two inputs do test the comparison — that it is `>` and not `>=`, and that the stated reason
+        // comes out — but neither can say whether the number itself is the intended one. That is these two
+        // lines, and the first of them was written in round 10 with a note claiming the second was a
+        // different case. It is not: the shape of the input differs, the blindness to the value does not.
         assertEquals(32 * 1024 * 1024, ArtifactFiles.MAX_CANONICAL_BYTES)
+        assertEquals(16 * 1024 * 1024, ArtifactFiles.MAX_RAW_BYTES)
         val oversizedCanonical = document(segments = listOf(Segment("x".repeat(ArtifactFiles.MAX_CANONICAL_BYTES))))
         val canonicalFailure = assertThrows(ArtifactFilesException::class.java) {
             store.write(oversizedCanonical)

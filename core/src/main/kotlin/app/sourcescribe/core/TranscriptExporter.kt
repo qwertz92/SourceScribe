@@ -365,7 +365,10 @@ object TranscriptExporter {
         listOf(
             "id=${it.id}",
             "sourceVideoId=${it.sourceVideoId}",
-            "language=${it.language ?: "unknown"}",
+            // A language the record refused is not one the source never gave. `unknown` for both would
+            // put a statement into the provenance record that is untrue of the first — the source did name
+            // a language — and this file is where what the source said is meant to be readable.
+            "language=${it.language ?: if (it.languageRefused) "stated-but-unusable" else "unknown"}",
             "name=${it.name ?: "unknown"}",
             "isOriginal=${it.isOriginal?.toString() ?: "unknown"}",
             "evidence=${it.evidence}",
