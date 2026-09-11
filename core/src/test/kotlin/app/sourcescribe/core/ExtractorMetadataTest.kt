@@ -222,11 +222,34 @@ class ExtractorMetadataTest {
         assertEquals("yt-dlp:formats.acodec,vcodec", audio.evidence)
     }
 
-    @Test fun anEndlessLanguageTagIsBoundedLikeTheTitleBesideIt() {
-        // It is read back into a file name, where the identity part has 40 bytes for the whole language and
-        // an unbounded value would spend every one of them before the name even reaches the digest.
-        val raw = """{"id":"BaW_jenozKc","language":"${"d".repeat(5000)}"}"""
-        assertEquals(100, ExtractorMetadata.parse(raw, source).source.originalLanguage?.length)
+    @Test fun noFieldOfASourceIsCarriedAtWhateverLengthItArrivesIn() {
+        // The language was bounded first and called the only root field without a limit. It was not: the
+        // date had none either, and neither had the language of an audio format, which sits between a note
+        // and a container that are both bounded. All three are counted in characters, like the title and
+        // the channel; the repeated character is three bytes wide so that a switch to counting bytes shows
+        // up here instead of passing as the same number.
+        val long = "あ".repeat(5000)
+        val raw = """{"id":"BaW_jenozKc","language":"$long","upload_date":"$long",
+            "formats":[{"format_id":"140","vcodec":"none","acodec":"mp4a.40.2","language":"$long",
+            "format_note":"$long","ext":"$long"}]}"""
+        val resolved = ExtractorMetadata.parse(raw, source)
+        assertEquals(100, resolved.source.originalLanguage?.length)
+        assertEquals(100, resolved.source.publishedDate?.length)
+        assertEquals(100, resolved.audio.single().language?.length)
+        assertEquals(500, resolved.audio.single().name?.length)
+        assertEquals(20, resolved.audio.single().container?.length)
+    }
+
+    @Test fun anEndlessThumbnailAddressIsRefusedRatherThanShortened() {
+        // Half an address is not a shorter address, it is a different one, so this field is the one that
+        // cannot be cut. It is held to the same length as the caption address, which had that bound while
+        // this one had none at all.
+        fun thumbnail(value: String) = ExtractorMetadata.parse(
+            """{"id":"BaW_jenozKc","thumbnail":"$value"}""", source,
+        ).source.thumbnailUrl
+        val stem = "https://i.ytimg.com/vi/BaW_jenozKc/"
+        assertEquals(stem, thumbnail(stem))
+        assertNull(thumbnail(stem + "a".repeat(ExtractorMetadata.MAX_URL_LENGTH)))
     }
 
     @Test fun absentLanguagePreferenceFallsBackOnlyToTheParenthesisedNote() {

@@ -321,9 +321,8 @@ class SyncProviderTest {
 
     @Test
     fun overlongReportedModelIsDiscardedWithExplicitUnknownProvenanceWarning() {
-        val result = OpenAiAdapter().parseSavedResponse(
-            "{\"text\":\"hello\",\"model\":\"${"x".repeat(129)}\"}"
-                .toByteArray(StandardCharsets.UTF_8),
+        fun parsed(model: String) = OpenAiAdapter().parseSavedResponse(
+            "{\"text\":\"hello\",\"model\":\"$model\"}".toByteArray(StandardCharsets.UTF_8),
             request(
                 Provider.OPENAI,
                 OpenAiAdapter.MODEL_GPT_TRANSCRIBE,
@@ -331,8 +330,16 @@ class SyncProviderTest {
             ),
         ) as SubmissionResult.Direct
 
+        val result = parsed("x".repeat(129))
         assertNull(result.transcript.reportedModel)
         assertTrue(result.transcript.warnings.contains("REPORTED_MODEL_TOO_LONG"))
+
+        // The bound counts characters, and the name right at it is kept. Both halves were missing here
+        // while the matching test for the other parser had them, so the two read the same field against
+        // the same number with only one of them saying which number and in what unit.
+        assertEquals("x".repeat(128), parsed("x".repeat(128)).transcript.reportedModel)
+        assertEquals("ä".repeat(128), parsed("ä".repeat(128)).transcript.reportedModel)
+        assertNull(parsed("ä".repeat(129)).transcript.reportedModel)
     }
 
     @Test
@@ -354,7 +361,7 @@ class SyncProviderTest {
 
         // A key that is present and unusable is a finding here as much as in the AssemblyAI adapter, the
         // only other reader of this field. Anything short and blank used to pass in silence.
-        for (unusable in listOf("\"\"", "\"   \"", "7", "true", "[]")) {
+        for (unusable in listOf("\"\"", "\"   \"", "7", "true", "[]", "{}")) {
             assertTrue(unusable, warnings(unusable).contains("REPORTED_MODEL_MALFORMED"))
         }
 

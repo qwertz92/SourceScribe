@@ -37,10 +37,15 @@ object ExtractorMetadata {
         if (duration != null && (!duration.isFinite() || duration < 0 || duration > 7 * 24 * 3600)) throw InvalidSource("INVALID_DURATION")
         val source = requested.copy(
             title = string("title")?.take(2000), channel = string("channel")?.take(1000),
-            durationMs = duration?.times(1000)?.toLong(), publishedDate = string("upload_date"),
-            // A language tag is a handful of characters. Bounded like the title and the channel next to it,
-            // because this one is also read back into a file name, where an unbounded value would spend the
-            // whole budget of the identity part.
+            durationMs = duration?.times(1000)?.toLong(),
+            // A date and a language tag are each a handful of characters, bounded here like the title and
+            // the channel above. The language is also read back into a file name, where an unbounded value
+            // would spend the whole budget of the identity part before the name reaches its digest.
+            //
+            // The commit that bounded the language called it the only root field without a limit. It was
+            // not: this date had none either, and the address below is refused rather than shortened,
+            // because half an address is not a shorter address but a wrong one.
+            publishedDate = string("upload_date")?.take(100),
             thumbnailUrl = string("thumbnail")?.takeIf { validImageUrl(it) },
             originalLanguage = string("language")?.take(100),
         )
@@ -80,7 +85,9 @@ object ExtractorMetadata {
             val acodec = value("acodec")
             val vcodec = value("vcodec")
             if (!Regex("[A-Za-z0-9_.-]{1,80}").matches(id) || vcodec != "none" || acodec in setOf(null, "none")) return@mapNotNull null
-            val language = value("language")
+            // Bounded like the note and the container beside it. It was the one of the three that carried
+            // no limit, and it is handed on unchecked as far as the track list and the export line.
+            val language = value("language")?.take(100)
             val note = value("format_note")?.take(500)
             val container = value("ext")?.take(20)
             val exact = number("filesize")?.takeIf { it > 0 && it <= MAX_TRACK_BYTES }?.toLong()
@@ -148,7 +155,7 @@ object ExtractorMetadata {
             uri.path in setOf("/api/timedtext", "/timedtext")
         val segmented = uri.host == "manifest.googlevideo.com" &&
             uri.path?.startsWith("/api/manifest/hls_timedtext_playlist/") == true
-        if (value.length > 32768 || uri.scheme != "https" || uri.rawUserInfo != null || uri.port != -1 ||
+        if (value.length > MAX_URL_LENGTH || uri.scheme != "https" || uri.rawUserInfo != null || uri.port != -1 ||
             uri.rawFragment != null || (!direct && !segmented)) throw InvalidSource("INVALID_CAPTION_URL")
     }
 
@@ -168,8 +175,13 @@ object ExtractorMetadata {
 
     private fun validImageUrl(value: String): Boolean = try {
         val uri = URI(value)
-        uri.scheme == "https" && uri.rawUserInfo == null && uri.port == -1 && uri.host in setOf("i.ytimg.com", "img.youtube.com")
+        // Same length the caption address is held to, and for the same reason: an address is kept whole or
+        // not at all, so the only place to stop an endless one is before it is accepted.
+        value.length <= MAX_URL_LENGTH && uri.scheme == "https" && uri.rawUserInfo == null && uri.port == -1 &&
+            uri.host in setOf("i.ytimg.com", "img.youtube.com")
     } catch (_: Exception) { false }
+
+    internal const val MAX_URL_LENGTH = 32768
 }
 
 object TrackSelection {

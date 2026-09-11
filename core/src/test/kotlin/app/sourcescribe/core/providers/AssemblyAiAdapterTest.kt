@@ -680,6 +680,11 @@ class AssemblyAiAdapterTest {
         assertEquals(null, longer.first)
         assertTrue(longer.second.toString(), longer.second.contains("REPORTED_MODEL_TOO_LONG"))
 
+        // And it counts the units a Kotlin length counts, not the characters a reader would count. Each of
+        // these is one character and two units, so sixty-five of them are over a bound of 128 units and far
+        // under one of 128 characters — the only shape that tells those two apart.
+        assertEquals(null, parsed("\"" + "\uD83D\uDE00".repeat(65) + "\"").first)
+
         // One character more is refused loudly. It is not shortened: a cut name would be a value nobody
         // reported, and this string is shown to a reader as the model that produced the transcript.
         val long = parsed("\"" + "x".repeat(129) + "\"")
