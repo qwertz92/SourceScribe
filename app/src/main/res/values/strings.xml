@@ -387,7 +387,7 @@
     <string name="step_submit">Beim Absenden an den Anbieter</string>
     <string name="step_collect">Beim Abholen des Ergebnisses</string>
     <string name="step_import">Beim Importieren der Datei</string>
-    <string name="step_audio">Beim Beschaffen der Tonspur</string>
+    <string name="step_prepare_audio">Beim Vorbereiten der Tonspur</string>
     <string name="step_engine">Beim Aktualisieren der Extraktionskomponente</string>
     <string name="reason_network">Es kam keine Verbindung zustande. Prüfe das Netz und versuche es erneut.</string>
     <string name="reason_rate_limit">Zu viele Anfragen in kurzer Zeit. Die App wartet und versucht es später erneut.</string>
@@ -412,15 +412,15 @@
     <string name="reason_import_invalid">Diese Datei ist keine Audiodatei, die die App verarbeiten kann.</string>
     <string name="reason_import_unavailable">Die Datei ist nicht mehr erreichbar. Möglicherweise wurde sie verschoben oder gelöscht.</string>
     <string name="reason_import_probe">Länge und Format der Datei ließen sich nicht bestimmen.</string>
-    <string name="reason_audio_input_unusable">Die heruntergeladene Tondatei war nicht lesbar.</string>
+    <string name="reason_audio_input_unusable">Die Audiodatei dieses Auftrags war nicht lesbar.</string>
     <string name="reason_audio_probe">Länge und Format der Tonspur ließen sich nicht bestimmen.</string>
     <string name="reason_audio_conversion">Die Tonspur ließ sich nicht in das Format umwandeln, das für die Übertragung nötig ist.</string>
-    <string name="reason_audio_output_invalid">Die umgewandelte Tondatei war unbrauchbar. Es wurde nichts gesendet.</string>
+    <string name="reason_audio_output_invalid">Die umgewandelte Audiodatei war unbrauchbar. Es wurde nichts gesendet.</string>
     <string name="reason_audio_too_large">Die vorbereitete Tonspur ist größer, als dieser Auftrag zulässt.</string>
     <string name="reason_audio_out_of_range">Der angeforderte Ausschnitt liegt außerhalb der Tonspur.</string>
     <string name="reason_audio_leftover">Am Ablageort lag noch eine Datei aus einem früheren Versuch. Bereite den Auftrag neu vor.</string>
     <string name="reason_audio_workspace">Der interne Arbeitsordner der App war nicht benutzbar.</string>
-    <string name="checkpoint_damaged">Der gespeicherte Zwischenstand dieses Auftrags ist nicht mehr lesbar. Der Auftrag wurde angehalten, damit nichts doppelt gesendet wird. Bereite die Quelle neu vor.</string>
+    <string name="checkpoint_damaged">Der gespeicherte Zwischenstand dieses Auftrags ist nicht mehr lesbar. Der Auftrag wurde angehalten, damit nichts doppelt gesendet wird. Bereite den Auftrag neu vor.</string>
     <string name="reason_import_corrupt">Die Datei ist beschädigt und ließ sich nicht vollständig lesen.</string>
     <string name="source_not_a_video_link">Das ist kein Link auf ein einzelnes YouTube-Video. Erwartet wird eine Adresse wie https://www.youtube.com/watch?v=… oder https://youtu.be/…</string>
     <string name="source_several_videos">Der Text enthält mehrere Videos. Gib genau einen Link an.</string>

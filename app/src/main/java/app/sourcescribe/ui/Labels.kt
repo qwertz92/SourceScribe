@@ -379,7 +379,7 @@ private fun stepText(code: String, @StringRes reason: Int): String {
         code.startsWith("PROVIDER_") -> R.string.step_submit
         code.startsWith("RESPONSE_") -> R.string.step_collect
         code.startsWith("AUDIO_IMPORT_") -> R.string.step_import
-        code.startsWith("AUDIO_") -> R.string.step_audio
+        code.startsWith("AUDIO_") -> R.string.step_prepare_audio
         code.startsWith("ENGINE_") -> R.string.step_engine
         else -> return stringResource(reason)
     }

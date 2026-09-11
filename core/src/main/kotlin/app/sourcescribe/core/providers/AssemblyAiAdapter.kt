@@ -264,7 +264,7 @@ class AssemblyAiAdapter(private val http: ProviderHttp = ProviderHttp()) : Provi
     private fun parseTranscript(objectValue: JsonObject, request: TranscriptionRequest): ProviderTranscript {
         val text = requiredString(objectValue, "text")
         val model = request.config.model?.takeIf { it in SUPPORTED_MODELS } ?: invalidResponse()
-        val warnings = ArrayList<String>()
+        val warnings = Warnings()
         val reportedLanguages = parseReportedLanguages(objectValue, warnings)
         val language = reportedLanguages.firstOrNull()
         val reportedModel = parseReportedModel(objectValue, warnings)
@@ -306,7 +306,7 @@ class AssemblyAiAdapter(private val http: ProviderHttp = ProviderHttp()) : Provi
             language = language,
             requestedModel = model,
             reportedModel = reportedModel,
-            warnings = warnings.distinct(),
+            warnings = warnings.toList(),
             technicallyComplete = technicallyComplete,
             words = words,
             reportedLanguages = reportedLanguages,
@@ -315,7 +315,7 @@ class AssemblyAiAdapter(private val http: ProviderHttp = ProviderHttp()) : Provi
 
     private fun parseWords(
         objectValue: JsonObject,
-        warnings: MutableList<String>,
+        warnings: Warnings,
         speakerRequired: Boolean,
     ): ParsedWords {
         val value = objectValue["words"] ?: return ParsedWords(emptyList(), malformed = false)
@@ -356,7 +356,7 @@ class AssemblyAiAdapter(private val http: ProviderHttp = ProviderHttp()) : Provi
 
     private fun parseUtterances(
         objectValue: JsonObject,
-        warnings: MutableList<String>,
+        warnings: Warnings,
         speakerRequired: Boolean,
     ): ParsedUtterances {
         val value = objectValue["utterances"] ?: return ParsedUtterances(emptyList(), false, false)
@@ -436,7 +436,7 @@ class AssemblyAiAdapter(private val http: ProviderHttp = ProviderHttp()) : Provi
     private fun toWordSegments(
         entries: List<WordEvidence>,
         request: TranscriptionRequest,
-        warnings: MutableList<String>,
+        warnings: Warnings,
     ): List<Segment> = entries.mapIndexedNotNull { index, word ->
         // AssemblyAI times are chunk-relative milliseconds: validate their raw extent
         // first, then apply the chunk offset only to retained provider evidence.
@@ -465,7 +465,7 @@ class AssemblyAiAdapter(private val http: ProviderHttp = ProviderHttp()) : Provi
     private fun toUtteranceSegments(
         entries: List<UtteranceEvidence>,
         request: TranscriptionRequest,
-        warnings: MutableList<String>,
+        warnings: Warnings,
     ): List<Segment> = entries.mapIndexedNotNull { index, utterance ->
         // Utterance times follow the same chunk-relative millisecond rule as words.
         if (utterance.start > request.durationMs || utterance.end > request.durationMs) {
@@ -522,7 +522,7 @@ class AssemblyAiAdapter(private val http: ProviderHttp = ProviderHttp()) : Provi
 
     private fun parseReportedLanguages(
         objectValue: JsonObject,
-        warnings: MutableList<String>,
+        warnings: Warnings,
     ): List<String> {
         val result = ArrayList<String>()
         val direct = optionalMetadataString(objectValue, "language_code", warnings)
@@ -547,13 +547,13 @@ class AssemblyAiAdapter(private val http: ProviderHttp = ProviderHttp()) : Provi
         return result.distinct()
     }
 
-    private fun parseReportedModel(objectValue: JsonObject, warnings: MutableList<String>): String? =
+    private fun parseReportedModel(objectValue: JsonObject, warnings: Warnings): String? =
         optionalMetadataString(objectValue, "speech_model_used", warnings, WARNING_REPORTED_MODEL_MALFORMED)
 
     private fun optionalMetadataString(
         objectValue: JsonObject,
         key: String,
-        warnings: MutableList<String>,
+        warnings: Warnings,
         warning: String = WARNING_REPORTED_LANGUAGES_MALFORMED,
     ): String? {
         val value = objectValue[key] ?: return null

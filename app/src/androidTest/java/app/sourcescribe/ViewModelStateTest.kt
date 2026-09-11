@@ -202,7 +202,7 @@ class ViewModelStateTest {
     }
 
     @Test
-    fun prepareAgainRequiresExplicitProviderChoiceForRetainedLocalSource() = withFixture {
+    fun prepareAgainCarriesTheSettingsButNeverTheUploadApproval() = withFixture {
         awaitInitialization()
         val requested = approvedConfig()
         val jobId = seedRetainedLocalJob(requested)
@@ -216,10 +216,18 @@ class ViewModelStateTest {
 
         val selected = completed.previews.single().config
         assertEquals(AcquisitionMode.STT_ONLY, selected.mode)
-        assertNull(selected.provider)
-        assertNull(selected.model)
-        assertNull(selected.credentialId)
+        // Re-preparing exists so a job that ran into its own limit can be started again with one value
+        // changed, which is why it carries the stored settings over.
+        assertEquals(requested.provider, selected.provider)
+        assertEquals(requested.model, selected.model)
+        assertEquals(requested.credentialId, selected.credentialId)
+        // A track id from the previous run is not reused; the tracks are resolved again for this preview.
+        assertNull(selected.captionTrackId)
+        assertNull(selected.audioTrackId)
+        // What is never carried is the approval to upload. Without a fresh, deliberate Start the
+        // configuration is refused, so re-preparing alone can never cost anything.
         assertFalse(selected.uploadApproved)
+        assertEquals("UPLOAD_APPROVAL_REQUIRED", MainViewModel.configError(selected))
         assertEquals(selected, completed.draft)
 
         val preservedPreviews = completed.previews

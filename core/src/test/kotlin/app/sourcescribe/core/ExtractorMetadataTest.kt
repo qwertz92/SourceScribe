@@ -115,6 +115,21 @@ class ExtractorMetadataTest {
         assertEquals("yt-dlp:formats.acodec,vcodec,ext,audio_channels", track.evidence)
     }
 
+    @Test fun provenanceDoesNotNameANumberFieldThatCarriedSomethingOtherThanANumber() {
+        // A key present but empty, or holding a word or a boolean, gives the readers below nothing: abr,
+        // asr and audio_channels all come back null here. Naming them in the evidence line would claim a
+        // backing that no value provides, which is the same overstatement as naming a JSON null.
+        val raw = """{"id":"BaW_jenozKc","formats":[{"format_id":"140","vcodec":"none","acodec":"mp4a.40.2",
+            "ext":"m4a","abr":"","asr":"unknown","audio_channels":true,"tbr":128,"language_preference":-10}]}"""
+        val track = ExtractorMetadata.parse(raw, source).audio.single()
+        assertEquals(128, track.bitrateKbps)
+        assertNull(track.sampleRateHz)
+        assertNull(track.channels)
+        assertEquals("yt-dlp:formats.language_preference,acodec,vcodec,ext,tbr", track.evidence)
+        // A negative role number is a value language_preference really carries, so it stays named.
+        assertTrue(track.audioDescription)
+    }
+
     @Test fun absentLanguagePreferenceFallsBackOnlyToTheParenthesisedNote() {
         fun note(value: String) = ExtractorMetadata.parse(
             """{"id":"BaW_jenozKc","formats":[{"format_id":"140","vcodec":"none","acodec":"mp4a.40.2","format_note":"$value"}]}""",

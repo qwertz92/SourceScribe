@@ -63,10 +63,16 @@ object ExtractorMetadata {
         }
         val audio = (root["formats"] as? JsonArray).orEmpty().filterIsInstance<JsonObject>().mapNotNull { item ->
             fun value(key: String) = (item[key] as? JsonPrimitive)?.contentOrNull
-            fun number(key: String) = (item[key] as? JsonPrimitive)?.doubleOrNull?.takeIf { it.isFinite() && it >= 0 }
-            // A key written as JSON null is a key without a value: `value()` and `number()` both return null
-            // for it, so the provenance line must not count it as a field this entry carried either.
-            fun carried(key: String) = (item[key] as? JsonPrimitive)?.contentOrNull != null
+            fun signedNumber(key: String) = (item[key] as? JsonPrimitive)?.doubleOrNull?.takeIf { it.isFinite() }
+            fun number(key: String) = signedNumber(key)?.takeIf { it >= 0 }
+            // The provenance line must name only the fields this entry really carried a value in, so each
+            // field is tested with the reader that consumes it below. A key written as JSON null, as an
+            // empty string, or as a word where a number belongs yields nothing and is not carried either.
+            fun carried(key: String) = when (key) {
+                "language_preference" -> signedNumber(key) != null
+                "abr", "tbr", "filesize", "filesize_approx", "asr", "audio_channels" -> number(key) != null
+                else -> value(key) != null
+            }
             val id = value("format_id") ?: return@mapNotNull null
             val acodec = value("acodec")
             if (!Regex("[A-Za-z0-9_.-]{1,80}").matches(id) || value("vcodec") != "none" || acodec in setOf(null, "none")) return@mapNotNull null
@@ -76,8 +82,7 @@ object ExtractorMetadata {
             // A DRC rendition is only ever marked by the extractor id suffix or its note; never inferred from bitrate.
             val compressed = id.endsWith("-drc", ignoreCase = true) || note?.contains("drc", ignoreCase = true) == true
             // yt-dlp encodes the track role numerically: 10 original, 5 default, -10 audio description.
-            val preference = (item["language_preference"] as? JsonPrimitive)?.doubleOrNull
-                ?.takeIf { it.isFinite() }?.toInt()
+            val preference = signedNumber("language_preference")?.toInt()
             AudioTrack(
                 id = id,
                 sourceVideoId = requireNotNull(source.videoId),

@@ -8,6 +8,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -40,18 +41,22 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import app.sourcescribe.MainViewModel
 import app.sourcescribe.R
 import app.sourcescribe.core.AudioTracks
 import app.sourcescribe.core.ExportFormat
+import app.sourcescribe.core.Segment
 import app.sourcescribe.core.TranscriptDocument
 import app.sourcescribe.core.TranscriptExporter
 import kotlinx.coroutines.Dispatchers
@@ -87,9 +92,18 @@ internal fun TranscriptScreen(
             export(format, uri.toString())
         }
     }
-    val segments by produceState(document.segments, document.artifactId, query) {
-        value = withContext(Dispatchers.Default) { document.segments.filter { it.text.contains(query, ignoreCase = true) } }
+    // The filter runs off the main thread, so the result carries the query it was computed for. Count
+    // line and list are then always describing the same state, instead of the number racing ahead of
+    // the list it claims to count.
+    val filtered by produceState(Filtered("", document.segments), document.artifactId, query) {
+        value = withContext(Dispatchers.Default) {
+            Filtered(query, if (query.isBlank()) document.segments
+            else document.segments.filter { it.text.contains(query, ignoreCase = true) })
+        }
     }
+    val segments = filtered.segments
+    val countStyle = MaterialTheme.typography.bodySmall
+    val textMeasurer = rememberTextMeasurer()
     val copyText by produceState<String?>(null, document.artifactId) { value = withContext(Dispatchers.Default) { document.text } }
     val copyRanges = remember(copyText) { copyText?.let(MainViewModel::clipboardRanges).orEmpty() }
     val copyPart: (IntRange) -> Unit = { range ->
@@ -132,15 +146,26 @@ internal fun TranscriptScreen(
                         }
                         // While a search is running the total alone is misleading: the list underneath is
                         // the filtered one, so the line says how much of the result is currently visible.
-                        Text(
-                            if (query.isBlank()) {
-                                pluralStringResource(R.plurals.segments_count, document.segments.size, document.segments.size)
-                            } else {
-                                stringResource(R.string.segments_matching,
-                                    numberText(segments.size), numberText(document.segments.size))
-                            },
-                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                        // Both wordings are measured at the real width and font scale and the taller one is
+                        // reserved, so the first keystroke cannot push the warnings and the list down.
+                        val total = document.segments.size
+                        val totalText = pluralStringResource(R.plurals.segments_count, total, total)
+                        val widestMatchText = stringResource(R.string.segments_matching,
+                            numberText(total), numberText(total))
+                        BoxWithConstraints(Modifier.fillMaxWidth()) {
+                            val countHeight = remember(totalText, widestMatchText, countStyle, constraints.maxWidth, textMeasurer) {
+                                listOf(totalText, widestMatchText).maxOf { candidate ->
+                                    textMeasurer.measure(candidate, countStyle,
+                                        constraints = Constraints(maxWidth = constraints.maxWidth)).size.height
+                                }
+                            }
+                            Text(
+                                if (filtered.query.isBlank()) totalText else stringResource(R.string.segments_matching,
+                                    numberText(segments.size), numberText(total)),
+                                Modifier.heightIn(min = with(LocalDensity.current) { countHeight.toDp() }),
+                                style = countStyle, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                         if (document.scope.technicallyComplete != true) Text(stringResource(R.string.technically_partial),
                             color = MaterialTheme.colorScheme.error)
                         if (document.warnings.isNotEmpty()) Text(document.warnings.joinToString(" · "),
@@ -317,3 +342,6 @@ private fun RenameDialog(
         }
     }
 }
+
+/** A filtered result together with the search text it belongs to. */
+private class Filtered(val query: String, val segments: List<Segment>)

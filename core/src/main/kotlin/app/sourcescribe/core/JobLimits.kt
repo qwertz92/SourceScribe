@@ -23,6 +23,9 @@ object JobLimits {
      * little. Null only when no allowed limit admits it, because the source is past the app's own ceiling.
      */
     fun suggestedSeconds(durationMs: Long): Long? {
+        // Checked before the rounding, not after: on a duration near Long.MAX_VALUE the added remainder
+        // would overflow and the rounded value would come back negative, below the ceiling it must refuse.
+        if (durationMs > MAX_AUDIO_SECONDS * 1000L) return null
         val needed = ((durationMs + 59_999) / 60_000) * 60
         if (needed > MAX_AUDIO_SECONDS) return null
         return minOf(needed + 5 * 60, MAX_AUDIO_SECONDS)

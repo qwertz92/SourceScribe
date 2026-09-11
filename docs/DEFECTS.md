@@ -1,7 +1,7 @@
 # Bekannte Probleme und offene Punkte
 
-**Stand:** 11. September 2026. Diese Datei ist für den nächsten Agenten gedacht und listet ausschließlich,
-was **nicht** vollständig erledigt ist. Was hier nicht steht, ist entweder erledigt oder in
+**Stand:** 11. September 2026, nach drei Runden adversarischer Reviews. Diese Datei ist für den
+nächsten Agenten gedacht und listet ausschließlich, was **nicht** vollständig erledigt ist. Was hier nicht steht, ist entweder erledigt oder in
 [STATUS.md](STATUS.md) beschrieben.
 
 Jeder Eintrag nennt Datei und Stelle, die Voraussetzung, das erwartete gegenüber dem tatsächlichen
@@ -52,7 +52,10 @@ belegt. Diese drei sind offen oder nur teilweise geschlossen:
 - **Stelle:** `app/src/main/java/app/sourcescribe/ui/Labels.kt`, `messageText`
 - **Stand:** Die Familien, die ein Nutzer im Alltag trifft, haben eigene Texte: ungültige Links,
   Anbieterfehler, Extraktionsfehler, Engine-Updates, Audioimport, und seit dem zweiten Reviewdurchgang
-  auch die zehn Codes der lokalen Audiovorbereitung (`AudioPreparationCode`). Der `else`-Zweig zeigt
+  neun der zehn Codes der lokalen Audiovorbereitung (`AudioPreparationCode`). Der zehnte,
+  `AUDIO_STORAGE_FAILED`, teilt weiter den Sammeltext `reason_storage` mit sieben anderen Präfixen;
+  das ist tragbar, weil ein Speicherfehler in jedem dieser Fälle die Ursache benennt. Der
+  `else`-Zweig zeigt
   weiterhin „Vorgang konnte nicht abgeschlossen werden“ plus den technischen Status.
 - **Was offen ist:** Rund 45 interne Integritätscodes fallen weiter in diesen Zweig, etwa
   `SUBMISSION_BINDING_MISMATCH`, `PREPARED_AUDIO_CHANGED`, `ARTIFACT_BINDING_MISMATCH`,
@@ -107,6 +110,39 @@ belegt. Diese drei sind offen oder nur teilweise geschlossen:
   Anbieterlauf hat in diesem Projekt noch nicht stattgefunden.
 - **Was fehlt:** Eine Längenobergrenze mit Warnung statt stiller Übernahme, plus ein Contract-Test mit
   einer überlangen Antwort.
+- **Nicht mehr offen, damit es niemand zweimal baut:** Die Warnliste selbst ist seit dem dritten
+  Reviewdurchgang gedeckelt (`core/.../providers/Warnings.kt`). Vorher erzeugte jeder fehlerhafte
+  Eintrag einer Antwort eine eigene Warnzeile, sodass eine Antwort mit Millionen Einträgen die Liste
+  mitwachsen ließ; das betraf auch `SyncTranscriptParser` und damit OpenAI und Groq.
+
+### 9. Warncodes stehen unübersetzt in der Ergebnisansicht (mittel)
+
+- **Stelle:** `app/src/main/java/app/sourcescribe/ui/TranscriptScreen.kt`, die Warnzeile aus
+  `document.warnings`
+- **Voraussetzung:** Eine Anbieterantwort enthält etwas, das der Parser nicht verwerten kann. Das ist
+  kein Ausnahmefall: fehlende Wortzeitstempel und fehlende Sprecherzuordnung sind gewöhnliche
+  Abweichungen, und beide erzeugen eine Warnung.
+- **Erwartet:** Ein Satz, der sagt, was am Ergebnis unsicher ist.
+- **Tatsächlich:** Die rohen Codes stehen im Text der Ansicht, etwa
+  `WORD_TIMESTAMPS_MALFORMED_17 · DIARIZATION_SPEAKER_MISSING_3 · WARNINGS_TRUNCATED`. Genau solche
+  unerklärten Kürzel hat der Nutzer am 10. September 2026 an anderer Stelle gemeldet.
+- **Was fehlt:** Eine Zuordnung Warncode zu Satz, analog zu `messageText`, mit einer Behandlung für
+  den Indexanhang (`_17`) und für `WARNINGS_TRUNCATED`. Der Umfang sind rund 25 Codes in
+  `AssemblyAiAdapter` und `SyncTranscriptParser`. Vorsicht: Dieselben Codes stehen auch in der
+  Diagnose, dort müssen sie technisch bleiben.
+
+### 10. Ein Fehlertext deckt zwei verschiedene Ursachen ab (niedrig, unbestätigt)
+
+- **Stelle:** `app/src/main/java/app/sourcescribe/ui/Labels.kt`, Zweig
+  `AUDIO_INVALID_INPUT` / `AUDIO_INPUT_NOT_FILE`
+- **Stand:** Beide zeigen „Die Audiodatei dieses Auftrags war nicht lesbar.“ Für
+  `AUDIO_INPUT_NOT_FILE` stimmt das. `AUDIO_INVALID_INPUT` entsteht dagegen in
+  `AudioPreparation.validateChunkRequest` bei einem unmöglichen Parameter, also bei einem
+  Programmierfehler, nicht bei einer kaputten Datei.
+- **Unbestätigt:** Ein Auslöser in normaler Nutzung wurde nicht gefunden; die Prüfung schützt gegen
+  internen Fehlgebrauch. Deshalb kein eigener Text, sondern hier notiert.
+- **Was fehlt:** Entweder ein eigener Text in der Familie der internen Integritätscodes (Punkt 4) oder
+  der Nachweis, dass der Code nie beim Nutzer ankommt.
 
 ## Bewusste Entscheidungen, die wie Fehler aussehen
 

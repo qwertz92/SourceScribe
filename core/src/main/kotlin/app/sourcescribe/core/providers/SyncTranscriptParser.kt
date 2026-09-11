@@ -160,7 +160,7 @@ object SyncTranscriptParser {
         val text = string(objectRoot["text"])
         if (text == null || text.isBlank()) invalidResponse()
 
-        val warnings = ArrayList<String>()
+        val warnings = Warnings()
         val rawModelReported = string(objectRoot["model"])
         if (rawModelReported != null && rawModelReported.length > MAX_REPORTED_MODEL_LENGTH) {
             warnings += "REPORTED_MODEL_TOO_LONG"
@@ -190,7 +190,7 @@ object SyncTranscriptParser {
             language = language,
             requestedModel = model,
             reportedModel = modelReported,
-            warnings = warnings.distinct(),
+            warnings = warnings.toList(),
             technicallyComplete = technicallyComplete,
             words = parsed.words,
             reportedLanguages = reportedLanguages,
@@ -200,7 +200,7 @@ object SyncTranscriptParser {
     private fun parseTimestampedSegments(
         root: JsonObject,
         request: TranscriptionRequest,
-        warnings: MutableList<String>,
+        warnings: Warnings,
     ): ParsedParts {
         val rawSegments = root["segments"] as? JsonArray
         val rawWords = root["words"] as? JsonArray
@@ -217,7 +217,7 @@ object SyncTranscriptParser {
     private fun parseDiarizedSegments(
         element: JsonElement?,
         request: TranscriptionRequest,
-        warnings: MutableList<String>,
+        warnings: Warnings,
     ): List<Segment> {
         val rawSegments = element as? JsonArray ?: return emptyList()
         return parseEntries(rawSegments, request, TimeEvidence.PROVIDER_SEGMENT, "speaker", warnings)
@@ -228,7 +228,7 @@ object SyncTranscriptParser {
         request: TranscriptionRequest,
         evidence: TimeEvidence,
         field: String?,
-        warnings: MutableList<String>,
+        warnings: Warnings,
     ): List<Segment> {
         val result = ArrayList<Segment>()
         var previousStart: Long? = null
@@ -306,7 +306,7 @@ object SyncTranscriptParser {
         root: JsonObject,
         model: String,
         request: TranscriptionRequest,
-        warnings: MutableList<String>,
+        warnings: Warnings,
     ): Boolean {
         var complete = true
         if (model == "gpt-transcribe") return true
@@ -389,7 +389,7 @@ object SyncTranscriptParser {
         return true
     }
 
-    private fun responseLanguages(root: JsonObject, warnings: MutableList<String>): Pair<List<String>, String?> {
+    private fun responseLanguages(root: JsonObject, warnings: Warnings): Pair<List<String>, String?> {
         val values = LinkedHashSet<String>()
         var validObserved = 0
         fun add(value: String?) {

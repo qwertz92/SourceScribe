@@ -385,7 +385,7 @@
     <string name="step_submit">While sending to the provider</string>
     <string name="step_collect">While collecting the result</string>
     <string name="step_import">While importing the file</string>
-    <string name="step_audio">While obtaining the audio</string>
+    <string name="step_prepare_audio">While preparing the audio</string>
     <string name="step_engine">While updating the extraction component</string>
     <string name="reason_network">No connection was made. Check the network and try again.</string>
     <string name="reason_rate_limit">Too many requests in a short time. The app waits and tries again later.</string>
@@ -410,7 +410,7 @@
     <string name="reason_import_invalid">This file is not an audio file the app can process.</string>
     <string name="reason_import_unavailable">The file can no longer be reached. It may have been moved or deleted.</string>
     <string name="reason_import_probe">The length and format of the file could not be determined.</string>
-    <string name="reason_audio_input_unusable">The downloaded audio file could not be read.</string>
+    <string name="reason_audio_input_unusable">The audio file for this job could not be read.</string>
     <string name="reason_audio_probe">The length and format of the audio track could not be determined.</string>
     <string name="reason_audio_conversion">The audio track could not be converted into the format the transfer needs.</string>
     <string name="reason_audio_output_invalid">The converted audio file was unusable. Nothing was sent.</string>
@@ -418,7 +418,7 @@
     <string name="reason_audio_out_of_range">The requested section lies outside the audio track.</string>
     <string name="reason_audio_leftover">A file from an earlier attempt was still in place. Prepare the job again.</string>
     <string name="reason_audio_workspace">The app’s internal working folder was not usable.</string>
-    <string name="checkpoint_damaged">The saved progress of this job can no longer be read. The job was stopped so that nothing is sent twice. Prepare the source again.</string>
+    <string name="checkpoint_damaged">The saved progress of this job can no longer be read. The job was stopped so that nothing is sent twice. Prepare the job again.</string>
     <string name="reason_import_corrupt">The file is damaged and could not be read in full.</string>
     <string name="source_not_a_video_link">That is not a link to a single YouTube video. Expected is an address such as https://www.youtube.com/watch?v=… or https://youtu.be/…</string>
     <string name="source_several_videos">The text contains several videos. Give exactly one link.</string>

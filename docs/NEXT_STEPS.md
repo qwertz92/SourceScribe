@@ -1,4 +1,78 @@
-# Restarbeiten nach der ersten persönlichen Preview
+# Restarbeiten
+
+## Wiederaufnahme: hier morgen anfangen
+
+Geschrieben am 11. September 2026 am Ende der dritten Reviewrunde, auf Bitte des Nutzers, damit die
+Arbeit ohne Wiedereinlesen der ganzen Sitzung weitergehen kann. Reihenfolge ist Absicht.
+
+**Wo der Stand steht:** Die drei Reviewrunden und was sie gefunden haben, stehen in
+[STATUS.md](STATUS.md); was offen ist, mit Stelle und fehlendem Nachweis, in
+[DEFECTS.md](DEFECTS.md). Die Punktnummern unten sind die Nummern dort.
+
+### 1. Vierte Reviewrunde über die Korrekturen der dritten
+
+Die dritte Runde hat in `42f723e` eine Regression gefunden, die die zweite Runde selbst eingebaut
+hatte: eine Textzeile ohne reservierte Höhe, also genau der Layout-Shift, den derselbe Auftrag
+beseitigen sollte. Deshalb ist die Runde nach den Korrekturen nicht optional. Der Commitbereich für
+die Reviewer ist `42f723e..HEAD`. Vier Sonnet-5-Agenten, dieselbe Aufteilung wie bisher: core,
+App-Logik, UI, Ressourcen und Doku. Die Auftragstexte der dritten Runde lassen sich
+übernehmen; nur die Jagdliste wechselt auf die neuen Stellen:
+
+- `core/.../providers/Warnings.kt` ist neu und wird von beiden Antwortparsern benutzt. Kann durch die
+  Deckelung eine Warnung verschwinden, die eine Abnahmeprüfung braucht? Schon geprüft und nicht
+  nötig: eine Allowlist-Ergänzung für `WARNINGS_TRUNCATED` (Transkriptwarnungen gehen gar nicht in
+  den Diagnosebericht, `Diagnostics.kt` kennt sie nicht) und ein Contract-Test mit mehr als 64
+  verschiedenen Warnungen (kein bestehender kommt dem nahe, alle 129 core-Tests sind grün).
+- `ExtractorMetadata.carried` prüft Zahlenfelder jetzt mit dem Zahlenleser. Gibt es ein Feld, das
+  dadurch aus `evidence` verschwindet, obwohl es weiterhin ausgewertet wird?
+- `TranscriptScreen`: Reserviert die gemessene Höhe wirklich beide Fassungen, auch bei 200 %
+  Schriftgröße und im Querformat? Springt nichts anderes, wenn `Filtered` nachläuft?
+- `AudioTracks.readingOrder` hat einen Schlüssel mehr. Ist der Comparator weiter total?
+
+### 2. Warncodes lesbar machen (DEFECTS 9, mittel)
+
+Der größte verbleibende sichtbare Mangel und derselbe Mangel, den der Nutzer am 10. September an
+anderen Stellen gemeldet hat: In der Ergebnisansicht stehen rohe Codes wie
+`WORD_TIMESTAMPS_MALFORMED_17`. Umfang sind rund 25 Codes in `AssemblyAiAdapter` und
+`SyncTranscriptParser`. Vorgehen: Indexanhang abschneiden, Codefamilie auf einen Satz abbilden
+(analog `messageText` in `Labels.kt`), gleiche Familien zusammenfassen statt sie zu wiederholen, und
+die technische Fassung in der Diagnose unverändert lassen.
+
+### 3. Interne Integritätscodes (DEFECTS 4, mittel)
+
+Rund 45 Codes fallen in den `else`-Zweig von `messageText`. Sie bedeuten alle dasselbe: ein interner
+Bindungs- oder Prüfschritt hat nicht gepasst, und es wurde nichts stillschweigend akzeptiert. Ein
+gemeinsamer erklärender Satz plus technischer Status ist besser als der jetzige generische Text. Am
+besten zusammen mit Punkt 2, weil es dieselbe Datei und dieselbe Denkweise ist.
+
+### 4. Kleine offene Punkte, in dieser Reihenfolge
+
+- DEFECTS 8: Längenobergrenze für `speech_model_used` plus Contract-Test mit überlanger Antwort.
+- DEFECTS 7: Entscheiden, ob `reconcile` `documentUri` bei nachgewiesen fehlender Datei löscht.
+- DEFECTS 6: Mehr Bytes im Streuwert des Dateinamens oder ein Test, der die Annahme festhält.
+- DEFECTS 10: Eigener Text für `AUDIO_INVALID_INPUT` oder Nachweis, dass er nie beim Nutzer ankommt.
+
+### 5. Was ohne den Nutzer nicht weitergeht
+
+- DEFECTS 2: Nachfragen, was bei der unteren Schaltfläche mit mehr Platz gemeint war — Höhe, Abstand
+  zum Navigationsbalken oder Daumenreichweite. Ohne das ist jede weitere Änderung geraten.
+- DEFECTS 1: Querformat und ein zweites Gerät für den gemeldeten Scrollfehler. Am Emulator ist er
+  nicht reproduzierbar; ob er auf dem Gerät des Nutzers noch auftritt, ist ungeprüft.
+- DEFECTS 3: Die Aussage zu AssemblyAI-Regionen gegen die aktuelle Anbieterdokumentation prüfen.
+- Die drei Live-Providerläufe, ARM64 und TalkBack bleiben blockiert wie in der Tabelle unten.
+
+### Ablauf für die Gates, damit nichts gesucht werden muss
+
+```bash
+wsl.exe -e bash -lc "cd /mnt/c/Users/thoma/mystuff/personal/Projects/SourceScribe && bash tools/build-local.sh :core:test :app:lintDebug :app:lintRelease :extractor:lintDebug :extractor:lintRelease"
+```
+
+Instrumentierung läuft **nicht** über Gradle aus WSL heraus; der Grund und der gangbare Weg stehen in
+[DEFECTS.md](DEFECTS.md) unter den Wartungshinweisen. Kurzfassung: APKs in WSL bauen, unter Windows
+installieren, `am instrument` direkt starten. Das eigene Gerät ist `emulator-5556`;
+`emulator-5554` gehört dem Nutzer und wird nicht angefasst.
+
+## Restarbeiten nach der ersten persönlichen Preview
 
 Stand: 8. September 2026. Diese Liste konkretisiert die unveränderte Roadmap.
 Keine automatische Arbeitsfreigabe nach Preview-Abschluss; Nutzerfeedback abwarten.

@@ -79,6 +79,29 @@ class AudioTracksTest {
         assertEquals(order, AudioTracks.describe(tracks.reversed(), 600_000).map { it.track.id })
     }
 
+    @Test fun aMissingLanguageAndAnUnusableRateSortLastInsteadOfJumpingTheQueue() {
+        // Two keys of the reading order that the dubbed-video case never reaches: a rendition the extractor
+        // gave no language for, and one whose rate is too low for speech. Both belong behind the usable
+        // ones, and a missing language must not be able to collide with a real language code.
+        val tracks = listOf(
+            track("140-none", null, bitrateKbps = 128),
+            track("140-zz", "zz", bitrateKbps = 128),
+            track("139-en", "en", bitrateKbps = 8),
+            track("140-en", "en", bitrateKbps = 128),
+            track("140-de", "de", bitrateKbps = 128),
+        )
+        val order = AudioTracks.describe(tracks, 600_000).map { it.track.id }
+        // No track is recommended here, so the order is language code first, unusable rate and unknown
+        // language last. "zz" is a real code and stays ahead of the entry that carries none.
+        assertEquals(listOf("140-de", "140-en", "139-en", "140-zz", "140-none"), order)
+        assertEquals(order, AudioTracks.describe(tracks.reversed(), 600_000).map { it.track.id })
+        // A blank language is as absent as a null one and must not sort as an empty language code.
+        assertEquals("140-none", AudioTracks.describe(
+            listOf(track("140-none", "   ", bitrateKbps = 128), track("140-de", "de", bitrateKbps = 128)),
+            600_000,
+        ).last().track.id)
+    }
+
     @Test fun sizeClassesOnlySeparateWhatIsActuallyDifferent() {
         val described = AudioTracks.describe(listOf(
             track("249", bitrateKbps = 64), track("250", bitrateKbps = 96), track("251", bitrateKbps = 160),

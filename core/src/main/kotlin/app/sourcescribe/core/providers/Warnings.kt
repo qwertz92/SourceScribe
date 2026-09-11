@@ -1,0 +1,25 @@
+package app.sourcescribe.core.providers
+
+/**
+ * Warnings are recorded per malformed entry, and one answer may carry hundreds of thousands of entries:
+ * an unbounded list therefore grows with the size of the answer instead of with the number of distinct
+ * problems, and a single deliberately broken answer could fill the heap of a phone that way. Only
+ * [LIMIT] distinct warnings are kept. Once that many are recorded a single [TRUNCATED] marker is added,
+ * so a shortened list is never mistaken for the whole picture.
+ */
+internal class Warnings {
+    private val recorded = LinkedHashSet<String>()
+    private var truncated = false
+
+    operator fun plusAssign(warning: String) {
+        if (warning in recorded) return
+        if (recorded.size < LIMIT) recorded += warning else truncated = true
+    }
+
+    fun toList(): List<String> = if (truncated) recorded.toList() + TRUNCATED else recorded.toList()
+
+    internal companion object {
+        const val LIMIT = 64
+        const val TRUNCATED = "WARNINGS_TRUNCATED"
+    }
+}

@@ -30,18 +30,28 @@ API-37-/x86_64-/16-KB-Emulator nachgewiesen. Keine echte STT-API aufgerufen.
 | P5 | IMPLEMENTED: de/en-App-Sprache, System/Hell/Dunkel, überarbeitete Auswahlfelder/Navigation, Viewer/Suche/Kopieren/Share, Formate/Diagnose/Signierpfad | ADB-/Screenshotprüfungen einschließlich 200-%-Schrift und Querformat bestanden. Vollständige TalkBack-Bedienung BLOCKED; dauerhafte persönliche Release-Signatur und Installation PASS r81. |
 | P6 | Integrierte Regression und unabhängige Reviews ausgeführt; bestätigte Defekte samt Regression behoben | Vollständige Abnahme BLOCKED: Provider, physisches ARM64, TalkBack und öffentliche APK-Lizenz-/Quellbelege fehlen. |
 
-## Nutzerrückmeldung vom 10. September 2026 und zwei Reviewdurchgänge
+## Nutzerrückmeldung vom 10. September 2026 und drei Reviewdurchgänge
 
 **Stand:** 11. September 2026. Der Nutzer hat die Preview am Gerät getestet und 20 Punkte gemeldet.
 17 davon sind umgesetzt und am Emulator oder durch Tests belegt; die drei offenen stehen mit Stelle und
 fehlendem Nachweis in [Bekannte Probleme](DEFECTS.md).
 
-Dazu kamen zwei vollständige Runden adversarischer Reviews mit je vier Sonnet-5-Agenten. Runde 1 lief über
-`782aef5`, Runde 2 über `5a6bfef`. Aus Runde 1 stammen unter anderem die Untertitelspur-Regression und die
-Vereinheitlichung der Längengrenze, aus Runde 2 ein Instrumentierungstest, der auf einen umbenannten
-Statuscode wartete, die fehlenden Fehlertexte der lokalen Audiovorbereitung, die falsch zugeordnete Meldung
-bei beschädigtem Zwischenstand und drei Glossarzitate, die nicht der Beschriftung auf dem Bildschirm
-entsprachen.
+Dazu kamen drei vollständige Runden adversarischer Reviews mit je vier Sonnet-5-Agenten, jede Runde über
+die Korrekturen der vorherigen: Runde 1 über `782aef5`, Runde 2 über `5a6bfef`, Runde 3 über `42f723e`.
+Aus Runde 1 stammen unter anderem die Untertitelspur-Regression und die Vereinheitlichung der
+Längengrenze, aus Runde 2 ein Instrumentierungstest, der auf einen umbenannten Statuscode wartete, die
+fehlenden Fehlertexte der lokalen Audiovorbereitung, die falsch zugeordnete Meldung bei beschädigtem
+Zwischenstand und drei Glossarzitate, die nicht der Beschriftung auf dem Bildschirm entsprachen.
+
+**Runde 3 hat belegt, warum die Schleife nötig ist:** Ihr wichtigster Fund war eine Regression, die die
+Korrekturen der zweiten Runde selbst eingebaut hatten. Die neue Zeile mit der Trefferzahl hatte keine
+reservierte Höhe und konnte beim ersten Tastendruck umbrechen, also genau der Layout-Shift, den derselbe
+Auftrag beseitigen sollte. Weiter aus Runde 3: die Warnliste beider Antwortparser wuchs mit der
+Antwortgröße statt mit der Zahl echter Probleme (gedeckelt in `core/.../providers/Warnings.kt`, betraf
+auch OpenAI und Groq), die Herkunftszeile eines Audioformats nannte Felder, deren Inhalt der Leser
+verwirft, die Schrittangabe der Audiovorbereitung trug noch das Verb des Herunterladens, und zwei neue
+Textbausteine wichen vom Wortschatz des übrigen Programms ab. Zwei Funde derselben Runde sind nicht
+geschlossen, sondern als Punkt 9 und 10 in [Bekannte Probleme](DEFECTS.md) aufgenommen.
 
 Zusätzlich umgesetzt, weil am Gerät sichtbar geworden: Die Audiospurliste ist nach Lesereihenfolge sortiert
 (Empfehlung, Originalsprache, weitere Sprachen, Audiodeskription zuletzt), die Ergebnisansicht zeigt bei
@@ -55,9 +65,15 @@ Untertitelauftrag mit 286 Abschnitten, Zustandschip mit Ergebnis darunter, Teile
 Scrollen am rechten Rand bis zum letzten Abschnitt bei 18:25, Volltextsuche bei offener Tastatur und
 Zurücknavigation ohne Appende.
 
-Gates auf diesem Stand: 124 JVM-Tests im Modul `core` ohne Fehler, alle vier Lintberichte (`:app` und
-`:extractor`, debug und release) ohne Befund. Die Instrumentierungstests sind aus WSL heraus nicht über
-Gradle startbar; der Grund und der gangbare Weg über `am instrument` stehen in [Bekannte Probleme](DEFECTS.md).
+Gates nach Runde 3: 129 JVM-Tests im Modul `core` ohne Fehler (124 vorher, fünf neu für die Funde dieser
+Runde), alle vier Lintberichte (`:app` und `:extractor`, debug und release) ohne Befund. Die
+Instrumentierungstests sind aus WSL heraus nicht über Gradle startbar; der Grund und der gangbare Weg
+über `am instrument` stehen in [Bekannte Probleme](DEFECTS.md). Über diesen Weg am 11. September 2026
+auf `emulator-5556` gelaufen: 188 Instrumentierungstests, 182 bestanden, 6 per Annahme übersprungen
+(die ausdrücklich opt-in gestellten Inszenierungstests, nach `AGENTS.md` als `NOT_RUN` zu führen),
+0 Fehlschläge. Damit ist auch der einzige Fehlschlag des vorherigen Stands geschlossen: Er lag nicht am
+Code, sondern an einem Test, der noch den Vertrag vor `782aef5` verlangte. Der Wiederaufnahmeplan für
+die vierte Runde steht in [Restarbeiten](NEXT_STEPS.md).
 
 ## UI-Feedback umgesetzt
 

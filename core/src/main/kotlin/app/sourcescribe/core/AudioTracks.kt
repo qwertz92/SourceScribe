@@ -83,7 +83,11 @@ object AudioTracks {
         { if (it.recommended) 0 else 1 },
         { if (it.audioDescription) 1 else 0 },
         { if (it.isOriginal == true) 0 else 1 },
-        { normalizedLanguage(it.track.language) ?: "\uffff" },
+        // A track without a usable language goes last within its group. That is a key of its own rather
+        // than a sentinel string, because `language` is carried through from the extractor unchecked and
+        // no reserved value can be guaranteed not to appear in it.
+        { if (normalizedLanguage(it.track.language) == null) 1 else 0 },
+        { normalizedLanguage(it.track.language) ?: "" },
         { if (it.dynamicRangeCompressed) 1 else 0 },
         { if (it.bitrateKbps?.let { rate -> rate < MINIMUM_USEFUL_KBPS } == true) 1 else 0 },
         { it.bitrateKbps ?: Int.MAX_VALUE },
