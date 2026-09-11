@@ -168,12 +168,20 @@ internal fun TranscriptScreen(
                         }
                         if (document.scope.technicallyComplete != true) Text(stringResource(R.string.technically_partial),
                             color = MaterialTheme.colorScheme.error)
-                        if (document.warnings.isNotEmpty()) Text(document.warnings.joinToString(" · "),
-                            style = MaterialTheme.typography.bodySmall)
+                        // One sentence per thing that is actually wrong with the result, instead of the
+                        // raw codes: a job of sixty sections can carry thousands of them, and they answer
+                        // a parser's question rather than the reader's. They stay available under the
+                        // details below, where a fault report can still quote them.
+                        warningTexts(document.warnings).forEach { warning ->
+                            Text(warning, style = MaterialTheme.typography.bodySmall)
+                        }
                         TextButton({ showProvenance = !showProvenance }) { Text(stringResource(R.string.provenance_details)) }
                         if (showProvenance) {
                             Text("${stringResource(R.string.source)}: ${document.source.canonicalUrl ?: document.source.fileName ?: document.source.id}")
                             Text("ID: ${document.source.id}")
+                            if (document.warnings.isNotEmpty()) Text(
+                                stringResource(R.string.warning_codes) + ": " +
+                                    document.warnings.joinToString(" · "))
                             Text(stringResource(R.string.model_requested, document.provenance.requestedModel ?: stringResource(R.string.unknown)))
                             Text(stringResource(R.string.model_reported, document.provenance.reportedModel ?: stringResource(R.string.unknown)))
                             Text(stringResource(R.string.original_language_value, document.source.originalLanguage ?: stringResource(R.string.unknown)))

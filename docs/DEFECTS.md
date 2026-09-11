@@ -1,7 +1,8 @@
 # Bekannte Probleme und offene Punkte
 
 **Stand:** 11. September 2026, nach vier Runden adversarischer Reviews. Diese Datei ist für den
-nächsten Agenten gedacht und listet ausschließlich, was **nicht** vollständig erledigt ist. Was hier nicht steht, ist entweder erledigt oder in
+nächsten Agenten gedacht und listet, was **nicht** vollständig erledigt ist. Ein geschlossener Punkt
+behält seine Nummer und einen kurzen Vermerk, damit Verweise aus anderen Dokumenten gültig bleiben. Was hier nicht steht, ist entweder erledigt oder in
 [STATUS.md](STATUS.md) beschrieben.
 
 Jeder Eintrag nennt Datei und Stelle, die Voraussetzung, das erwartete gegenüber dem tatsächlichen
@@ -115,35 +116,13 @@ belegt. Diese drei sind offen oder nur teilweise geschlossen:
   Eintrag einer Antwort eine eigene Warnzeile, sodass eine Antwort mit Millionen Einträgen die Liste
   mitwachsen ließ; das betraf auch `SyncTranscriptParser` und damit OpenAI und Groq.
 
-### 9. Warncodes stehen unübersetzt in der Ergebnisansicht (mittel)
+### 9. Warncodes in der Ergebnisansicht — erledigt am 11. September 2026
 
-- **Stelle:** `app/src/main/java/app/sourcescribe/ui/TranscriptScreen.kt`, die Warnzeile aus
-  `document.warnings`
-- **Voraussetzung:** Eine Anbieterantwort enthält etwas, das der Parser nicht verwerten kann. Das ist
-  kein Ausnahmefall: fehlende Wortzeitstempel und fehlende Sprecherzuordnung sind gewöhnliche
-  Abweichungen, und beide erzeugen eine Warnung.
-- **Erwartet:** Ein Satz, der sagt, was am Ergebnis unsicher ist.
-- **Tatsächlich:** Die rohen Codes stehen im Text der Ansicht, etwa
-  `WORD_TIMESTAMPS_MALFORMED_17 · DIARIZATION_SPEAKER_MISSING_3 · WARNINGS_TRUNCATED`. Genau solche
-  unerklärten Kürzel hat der Nutzer am 10. September 2026 an anderer Stelle gemeldet.
-- **Umfang, am 11. September 2026 vollständig ausgezählt:** über 50 Codefamilien aus **vier**
-  Quellen, nicht zwei — `providers/SyncTranscriptParser.kt` (OpenAI und Groq),
-  `providers/AssemblyAiAdapter.kt`, `CaptionParser.kt` und die Zusammenführung der Chunks in
-  `data/SttStep.kt`. Letztere stellt jeder Anbieterwarnung `CHUNK_<index>_` voran, weshalb ein
-  Auftrag mit bis zu 60 Chunks bis zu 3900 Einträge tragen kann. Die Anzeige muss deshalb
-  zusammenfassen, nicht aufzählen.
-- **Was fehlt:** Eine Zuordnung Codefamilie zu Satz, analog zu `messageText`: führendes
-  `CHUNK_<n>_` und die Indexanhänge (`_17`, `_SPEAKER_3`, `_OFFSET_5`) abschneiden, gleiche
-  Aussagen zu einem Satz zusammenfassen, unbekannte Codes weiterhin technisch anzeigen statt sie zu
-  verschlucken. Vorsicht: `document.warnings` darf sich dabei nicht ändern — drei Stellen leiten
-  daraus `Outcome.SUCCESS_WITH_WARNINGS` ab. Die Diagnose enthält diese Codes nicht, dort ist
-  nichts anzupassen.
-- **Beim Formulieren aufgepasst:** Die Familie um `RESPONSE_STORAGE`,
-  `RAW_RESPONSE_TOO_LARGE` und `CANONICAL_TRANSCRIPT_AGGREGATE_TOO_LARGE` klingt nach einem reinen
-  Aufbewahrungsproblem, ist aber keines: jede dieser Stellen in `SttStep.kt` setzt zugleich
-  `missing += chunk.index`, der Abschnitt fällt also komplett aus dem Transkript. Ein beruhigender
-  Satz wäre hier ein Verstoß gegen „ein Teilergebnis darf nicht als vollständiger Erfolg
-  erscheinen“.
+Bleibt als Nummer stehen, damit Verweise aus anderen Dokumenten gelten. Aus über 50 Codefamilien
+werden jetzt zwölf Sätze; die Zuordnung liegt in `core/.../TranscriptWarnings.kt` und ist ohne Gerät
+testbar. Die rohen Codes stehen weiterhin unter den Details der Ergebnisansicht. Ein Code, für den es
+keinen Satz gibt, wird weiterhin technisch angezeigt statt verschluckt, und ein Eintrag, der gar nicht
+wie ein Code aussieht, wird unverändert durchgereicht.
 
 ### 10. Ein Fehlertext deckt zwei verschiedene Ursachen ab (niedrig, unbestätigt)
 

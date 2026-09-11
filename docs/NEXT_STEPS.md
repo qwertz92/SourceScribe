@@ -30,14 +30,11 @@ App-Logik, UI, Ressourcen und Doku. Die Auftragstexte der dritten Runde lassen s
   Schriftgröße und im Querformat? Springt nichts anderes, wenn `Filtered` nachläuft?
 - `AudioTracks.readingOrder` hat einen Schlüssel mehr. Ist der Comparator weiter total?
 
-### 2. Warncodes lesbar machen (DEFECTS 9, mittel)
+### 2. Warncodes lesbar machen (DEFECTS 9) — erledigt
 
-Der größte verbleibende sichtbare Mangel und derselbe Mangel, den der Nutzer am 10. September an
-anderen Stellen gemeldet hat: In der Ergebnisansicht stehen rohe Codes wie
-`WORD_TIMESTAMPS_MALFORMED_17`. Umfang sind rund 25 Codes in `AssemblyAiAdapter` und
-`SyncTranscriptParser`. Vorgehen: Indexanhang abschneiden, Codefamilie auf einen Satz abbilden
-(analog `messageText` in `Labels.kt`), gleiche Familien zusammenfassen statt sie zu wiederholen, und
-die technische Fassung in der Diagnose unverändert lassen.
+Umgesetzt am 11. September 2026. Zwölf Sätze statt über 50 Codefamilien, Zuordnung in
+`core/.../TranscriptWarnings.kt`, rohe Codes unter den Details. Am Gerät angesehen und die
+Sprungfreiheit der Kopfzeilen über drei Suchzustände nachgemessen.
 
 ### 3. Interne Integritätscodes (DEFECTS 4, mittel)
 

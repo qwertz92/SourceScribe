@@ -95,6 +95,21 @@ bestanden, 6 per Annahme übersprungen (die ausdrücklich opt-in gestellten Insz
 vor Runde 3 geschlossen: Er lag nicht am Code, sondern an einem Test, der noch den Vertrag vor
 `782aef5` verlangte. Der Plan für die Fortsetzung steht in [Restarbeiten](NEXT_STEPS.md).
 
+Nach Runde 4 umgesetzt: Die Ergebnisansicht zeigt keine rohen Warncodes mehr. Aus über 50
+Codefamilien aus vier Quellen werden zwölf Sätze, geordnet nach dem, was sie für das Transkript
+bedeuten — erst was fehlt, dann was unsicher ist, dann was der Anbieter über sich selbst gemeldet hat.
+Die Zuordnung liegt in `core/.../TranscriptWarnings.kt` und ist damit ohne Gerät testbar; die rohen
+Codes bleiben unter den Details erreichbar, und ein unbekannter Code wird weiterhin technisch angezeigt
+statt verschluckt.
+
+Gerätebeleg dazu vom 11. September 2026 auf `emulator-5556`, mit dem synthetischen UI-Prüfdatensatz
+(10 000 Abschnitte): Die beiden freien Sätze des Datensatzes stehen unverändert da, ohne technischen
+Rahmen und ohne am Doppelpunkt abgeschnitten zu werden — der Fehler, den die Formprüfung für
+Nicht-Codes verhindert. Die Sprungfreiheit wurde über drei Suchzustände nachgemessen: ohne Suche,
+mit 1111 Treffern und ohne Treffer steht die Zählzeile jeweils bei y=696..738, der Detailknopf bei
+y=976..1029 und der Hinweis zum langen Text bei y=1076..1118 — identische Werte in allen drei
+Zuständen, obwohl die Zählzeile dabei von einer auf zwei Zeilen wechselt.
+
 **Die Schleife ist nicht konvergiert.** Vier Runden, keine davon leer. Solange eine Runde noch etwas
 findet, ist die nächste fällig — gerade weil die Funde der Runden 3 und 4 jeweils in den Korrekturen
 der Vorrunde lagen.

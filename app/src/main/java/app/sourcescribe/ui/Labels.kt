@@ -2,6 +2,7 @@ package app.sourcescribe.ui
 
 import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import app.sourcescribe.R
@@ -20,7 +21,9 @@ import app.sourcescribe.core.Phase
 import app.sourcescribe.core.Provenance
 import app.sourcescribe.core.Provider
 import app.sourcescribe.core.Region
+import app.sourcescribe.core.TranscriptWarnings
 import app.sourcescribe.core.Translation
+import app.sourcescribe.core.WarningGroup
 import app.sourcescribe.extractor.EngineChannel
 import androidx.compose.ui.text.intl.Locale as ComposeLocale
 import java.time.LocalDate
@@ -367,6 +370,38 @@ internal fun byteSize(bytes: Long): String {
     "LOCAL_PROCESSING_FAILED" -> stringResource(R.string.local_failed)
     "CLEANUP_FAILED" -> stringResource(R.string.cleanup_failed)
     else -> stringResource(R.string.operation_failed) + "\n" + stringResource(R.string.error_detail, code)
+}
+
+/**
+ * The sentences a result's warnings add up to, in the order they are shown. The grouping itself lives in
+ * `TranscriptWarnings` so it can be tested without a device; only the wording belongs here. A code that
+ * matches no group keeps its technical form rather than disappearing.
+ */
+@Composable
+internal fun warningTexts(warnings: List<String>): List<String> {
+    val summary = remember(warnings) { TranscriptWarnings.summarize(warnings) }
+    return summary.groups.map { stringResource(warningResource(it)) } +
+        summary.unknown.map { entry ->
+            // A code nobody has a sentence for is shown as the technical status it is. Free text in this
+            // list was already written for a reader and is shown as it stands.
+            if (TranscriptWarnings.looksLikeCode(entry)) stringResource(R.string.error_detail, entry) else entry
+        }
+}
+
+@StringRes
+private fun warningResource(group: WarningGroup): Int = when (group) {
+    WarningGroup.COVERAGE -> R.string.warning_coverage
+    WarningGroup.SECTION_LOST_STORAGE -> R.string.warning_section_lost_storage
+    WarningGroup.SECTION_LOST_PROVIDER -> R.string.warning_section_lost_provider
+    WarningGroup.RESULT_SHORTENED -> R.string.warning_result_shortened
+    WarningGroup.MISSING_TEXT -> R.string.warning_missing_text
+    WarningGroup.SEGMENT_TIMES -> R.string.warning_segment_times
+    WarningGroup.WORD_TIMES -> R.string.warning_word_times
+    WarningGroup.SPEAKERS -> R.string.warning_speakers
+    WarningGroup.PROVIDER_LANGUAGE -> R.string.warning_provider_language
+    WarningGroup.PROVIDER_MODEL -> R.string.warning_provider_model
+    WarningGroup.CAPTION_SOURCE -> R.string.warning_caption_source
+    WarningGroup.MORE_NOTES -> R.string.warning_more_notes
 }
 
 /**
