@@ -2,62 +2,55 @@
 
 ## Wiederaufnahme: hier weitermachen
 
-Geschrieben am 11. September 2026, zuletzt nach der zehnten Reviewrunde nachgeführt, damit die
+Geschrieben am 11. September 2026, zuletzt nach der elften Reviewrunde nachgeführt, damit die
 Arbeit ohne Wiedereinlesen der ganzen Sitzung weitergehen kann. Reihenfolge ist Absicht.
 
 **Wo der Stand steht:** Die Reviewrunden und was sie gefunden haben, stehen in
 [STATUS.md](STATUS.md); was offen ist, mit Stelle und fehlendem Nachweis, in
 [DEFECTS.md](DEFECTS.md). Die Punktnummern unten sind die Nummern dort.
 
-### 1. Elfte Reviewrunde über die Korrekturen der zehnten
+### 1. Zwölfte Reviewrunde über die Korrekturen der elften
 
-Runden 3 bis 10 haben ihren wichtigsten Fund jeweils in den Korrekturen der Vorrunde gehabt. Runde 10 am
-deutlichsten: Die Korrektur der Vorrunde hatte ihren Fehler nicht behoben, sondern verschoben und seinen
-Auslöser verbreitert. Die Commits der zehnten Runde sind `db8a6d2` (Code) und `c795ab0` (Doku); die der
-elften stehen darunter, sobald sie geschrieben sind. Einzeln benennen, nicht als Bereich — die
-Bereichsschreibweise lag in Runde 7 schon einmal daneben, weil `a..b` den Anfangscommit auslässt und
-ältere Fixes Vorfahren davon sind. Drei Sonnet-5-Reviewer: core, Doku, und einer quer durchs Repository.
-Vier Lehren gehören in den Auftrag:
+Runden 3 bis 11 haben ihren wichtigsten Fund jeweils in den Korrekturen der Vorrunde gehabt. Runde 11 hat
+das Feld erweitert: Ihr schwerster Fund lag nicht im Code, sondern in der Messung — zehn Runden lang war
+eine ganze Testsuite nicht in der Zahl enthalten, die als Beleg genannt wurde. Die Commits der elften Runde
+sind `40f5894` und `90c3f94` sowie die beiden dieser Nachbereitung; einzeln benennen, nicht als Bereich,
+weil `a..b` den Anfangscommit auslässt.
 
-- Ein Fund, den der Reviewer nicht ausführen konnte, gilt erst nach einer Gegenprobe mit wieder
-  eingebautem Fehler als lebender Fehler.
-- Jede Zahl in der Doku wird nachgezählt, und **jede Zahl nennt den Stand, für den sie gilt** — in Runde
-  10 stand eine richtige Zahl ohne ihren Commit da und wäre beim Nachzählen gegen den heutigen Baum als
-  falsch gemeldet worden.
-- Jeder Symbolname in einem Auftrag wird vorher gegen den Baum geprüft. Die Liste der Vorrunde schickte
-  einen Reviewer nach `CaptionTracks`, das es nicht gibt.
-- Ein Reviewer, der für Gegenproben Dateien verändert, und einer, der liest, laufen **nicht** gleichzeitig.
-  In Runde 10 haben beide lesenden Reviewer den Baum unter sich wandern sehen, weil ich dem dritten das
-  Verändern erlaubt habe.
+Zwei rein lesende Reviewer zuerst, der verändernde danach allein — das hat in Runde 11 funktioniert und
+bleibt so. Fünf Lehren gehören in den Auftrag:
+
+- Ein Fund, den der Reviewer nicht ausführen konnte, gilt erst nach einer Gegenprobe als lebender Fehler.
+- **Eine Gegenprobe muss jede Stelle abschalten, die eine Regel durchsetzt, nicht die erstbeste.** In Runde
+  11 blieb ein neuer Test grün, nachdem zwei von drei Durchsetzungsstellen deaktiviert waren — und genau
+  das hat die dritte, vorher unbekannte, sichtbar gemacht.
+- Jede Zahl wird nachgezählt und nennt den Stand, für den sie gilt.
+- Jeder Symbolname in einem Auftrag wird vorher gegen den Baum geprüft.
+- Ein Reviewer, der für Gegenproben Dateien verändert, läuft nicht neben einem, der liest.
 
 Die Jagdliste:
 
-- `AudioTrack.languageRefused` ist neu und sagt, dass die Quelle eine Sprache genannt hat, die der
-  Datensatz nicht tragen konnte. Wird die Unterscheidung überall gezogen, wo sie zählt — oder nur in
-  `AudioTracks.automatic`? Und die unbeantwortete Frage dahinter: Die App fragt jetzt zurück, zeigt dem
-  Nutzer aber zwei Spuren ohne jede Sprachangabe. Ist das eine lesbare Frage oder eine rätselhafte?
-- Dieselbe Verwechslung eine Ebene höher: Wo sonst bedeutet `null` zwei verschiedene Dinge — „nicht
-  angegeben“ und „angegeben, aber verworfen“? `Source.originalLanguage`, `publishedDate`, `codec`,
-  `container`, `reportedModel`. Ein Reviewer der zehnten Runde hat für diese fünf gesagt, dass keine davon
-  eine Entscheidung trägt; prüfe das selbst nach, statt es zu übernehmen. Eine Stelle habe ich selbst
-  geprüft und nicht als Fehler gewertet: `TrackSelection.captions` ordnet nach `originalLanguage`, und ein
-  verworfener Wert lässt `preferOriginalLanguage` still wirkungslos werden. Entschieden wird dabei aber
-  nichts — die Funktion sortiert nur, die Liste wird nicht kürzer, und ab zwei Einträgen fragt
-  `JobCoordinator` ohnehin. Wer das anders sieht, soll es an einem Ablauf zeigen.
-- Die Regel „Tragen ist begrenzt, Fragen nicht“ gilt jetzt in `ExtractorMetadata`. Wird anderswo eine Frage
-  an eine gekürzte Kopie gestellt? `CaptionParser`, `SttStep`, `Diagnostics`, `Labels` sind die Stellen mit
-  `contains(`, `startsWith(` oder `endsWith(` auf einem Wert, der vorher durch `take(` gelaufen ist.
-- **Die fünf neu ausgeschriebenen Grenzen: Ist die festgenagelte Zahl die richtige?** Eine Grenze
-  festzunageln hält sie fest, auch wenn sie von Anfang an falsch war. `MAX_CANONICAL_BYTES` (32 MiB),
-  `MAX_AUDIO_SECONDS` (36 000), `Warnings.LIMIT` (64), `Warnings.KIND_LIMIT` (160), `MAX_DURATION_MS`
-  (36 000 000). Zwei davon sind in Runde 11 gegen eine zweite Quelle bestätigt worden: `MAX_AUDIO_SECONDS`
-  gegen die 600 Minuten, die der Text `invalid_duration` in beiden Sprachen nennt, und `MAX_DURATION_MS`
-  gegen AssemblyAIs eigene Dokumentation. Für die übrigen drei gibt es keine zweite Quelle im Repository —
-  das ist eine Lücke im Beweis, kein Fehler, und wer sie schließen kann, soll es sagen.
-- Die Sichtbarkeit war die Ursache: Ein Test greift nach einer Konstante, wenn er sie sehen kann. Welche
-  `internal` oder `public` Konstanten gibt es sonst noch, und hängt an einer davon ein Test, der mit ihr
-  mitwandert? Die Suche geht über alle drei Module, nicht nur über `core`.
-- Und die Doku: Jede Zahl der Runde-10-Passage nachzählen, mit dem Stand, für den sie gilt.
+- **`StatedNumbersTest` ist neu und behauptet, jede Zahl dieses Moduls zu nennen. Stimmt das?** Welche
+  nicht-`private` Konstante in `core` fehlt in der Liste? Und die schärfere Frage dahinter: Der Test
+  schützt gegen eine *geänderte* Zahl, aber nichts hält jemanden davon ab, eine *neue* Konstante
+  hinzuzufügen und nicht einzutragen. Gibt es dafür eine Schranke, die nicht von Sorgfalt abhängt?
+- **Ist eine der dort festgenagelten Zahlen die falsche?** Festnageln hält eine Zahl fest, auch wenn sie von
+  Anfang an falsch war. Die acht Preise und die Anbietergrenzen sind gegen die Seiten der drei Anbieter
+  prüfbar; `MAX_UPLOAD_BYTES` bei Groq und OpenAI, `MAX_PROMPT_BYTES` und die Stichtage vom 7. September
+  sind seither von niemandem nachgelesen worden.
+- **Die Module `app` und `extractor` haben keine solche Liste.** Welche Zahlen behaupten sie, und hängt an
+  einer davon ein Test, der mit ihr mitwandert? Runde 11 hat nur `core` durchsucht.
+- **Weiter beim Messen selbst.** Neun Instrumentierungsargumente sind bekannt, sieben davon echte
+  Schranken. Gibt es eine Prüfung, die aus einem anderen Grund nicht läuft — eine Gradle-Aufgabe, die in
+  keinem Ablauf steht, eine Lint-Regel, die es gar nicht bis zum Bericht schafft, ein Testverzeichnis ohne
+  Runner? Und: Sagt `tools/check-repository.py` etwas, das es nicht wirklich prüft?
+- **Die zwei neuen Archivtests.** Sie bauen ihre Eingabe aus den Produktionswerten, was hier richtig ist.
+  Aber prüfen sie, was ihr Name sagt? Schalte jede Durchsetzungsstelle einzeln ab und sieh nach, welche
+  greift — bei der Eintragszahl waren es drei, und die wirksame war nicht die offensichtliche.
+- **`Source.originalLanguage` hat kein Gegenstück zu `AudioTrack.languageRefused`.** Ein verworfener Wert
+  sieht dort wie ein nie genannter aus. Geprüft wurde, dass `TrackSelection.captions` dadurch nur sortiert
+  und nichts still entscheidet; prüfe es nach und such, ob sonst jemand dieses Feld liest.
+- Und die Doku: Jede Zahl der Runde-11-Passage nachzählen, mit dem Stand, für den sie gilt.
 
 ### 2. Warncodes lesbar machen (DEFECTS 9) — erledigt
 
@@ -92,7 +85,8 @@ anfängst; diese Zusammenfassung ersetzt ihn nicht.
 - DEFECTS 1: Querformat und ein zweites Gerät für den gemeldeten Scrollfehler. Am Emulator ist er
   nicht reproduzierbar; ob er auf dem Gerät des Nutzers noch auftritt, ist ungeprüft.
 - DEFECTS 3: Die Aussage zu AssemblyAI-Regionen gegen die aktuelle Anbieterdokumentation prüfen.
-- Die drei Live-Providerläufe, ARM64 und TalkBack bleiben blockiert wie in der Tabelle unten.
+- Die drei Live-Providerläufe, ARM64 und TalkBack bleiben blockiert wie in der Tabelle unten, und mit
+  ihnen die sechs Tests, die eine echte Quelle oder ein echtes Release brauchen.
 
 ### Ablauf für die Gates, damit nichts gesucht werden muss
 
@@ -126,6 +120,25 @@ Prüfsumme, Slotwechsel, Rückrollung, beschädigter aktiver Slot. Ohne den Scha
 21 bestanden und 18 übersprungen, mit ihm 35 bestanden und 4 übersprungen. Die verbleibenden vier
 brauchen eine echte Quelle beziehungsweise ein echtes Release und bleiben `BLOCKED/NOT_RUN`.
 
+**Die App-Suite hat dieselbe Art Schranke, und vier ihrer sechs Übersprungenen sind ausführbar.**
+`ProcessRecoveryTest` stellt den Prozesstod über einen Neustart hinweg nach und verlangt pro Lauf genau
+eine Stufe; mit mehreren Stufen gleichzeitig fallen die übrigen drei, sie werden also nicht übersprungen,
+sondern rot. Vier einzelne Läufe:
+
+```bash
+adb -s emulator-5556 shell am instrument -w -r -e class app.sourcescribe.data.ProcessRecoveryTest#stage1PersistsAcceptedAssemblyRemote -e sourcescribeProcessFixture true -e sourcescribeProcessStage 1 app.sourcescribe.debug.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+und ebenso für `stage2ReopensAndFinalizesWithoutResubmission` mit Stufe `2`,
+`stage1PersistsRevokedLocalAudioImport` mit `import-1` und
+`stage2ReopensPrivateAudioAfterGrantAndSourceLoss` mit `import-2`.
+
+Die zwei übrigen Auslassungen der App-Suite bleiben mit Absicht liegen: `UiFixtureTest` ist kein Test,
+sondern ein Saatgenerator, der synthetische Daten in die echte App-Datenbank des Geräts schreibt, und
+`EngineJobPinningTest` braucht `engineProbeSource`, also ein echtes Release. Zusammengerechnet sind damit
+von 403 Tests 397 ausgeführt; die sechs übrigen stehen als `BLOCKED/NOT_RUN` in
+[DEFECTS.md](DEFECTS.md).
+
 ## Restarbeiten nach der ersten persönlichen Preview
 
 Stand: 8. September 2026. Diese Liste konkretisiert die unveränderte Roadmap.
@@ -138,6 +151,7 @@ Keine automatische Arbeitsfreigabe nach Preview-Abschluss; Nutzerfeedback abwart
 | 1 — drei Live-Provider, BLOCKED | Nutzer testet selbst oder erteilt je Anbieter Zugang, freigegebene Datei und Kostenrahmen. Mit kurzer eigener Aufnahme starten; Modellzugang, Sprache/Zeiten/Sprecher, Provenienz und Export prüfen. | Je AssemblyAI, OpenAI und Groq ein echter dokumentierter Lauf. Keine Schlüssel/Transkripte veröffentlichen; Modelllisten/Fixtures genügen nicht. |
 | 1 — öffentliche APK, BLOCKED | FFmpeg-/x264-/VMAF-/SVT-AV1-Quellen und Notices der enthaltenen Versionen zuordnen. Falls nicht belastbar möglich, gezielten reproduzierbaren Native-Neubau erwägen. | Passende Source-/Lizenzbelege nach [Lizenzbericht](reports/2026-09-07-licenses.md), finaler APK-/ABI-Audit. Erst danach APK als Release-Asset. |
 | 2 — TalkBack, BLOCKED | Fokusnavigation/Aktivierung mit geeigneter echter Eingabe oder menschlichem Tester. Sprachausgabe ankündigen, Einstellungen restaurieren. | Hauptflächen einschließlich Trackdialog, Viewer, Export und Fehleransicht bedienbar; Labels/Reihenfolge tatsächlich geprüft. Semantiktests bereits PASS. |
+| 2 — sechs übersprungene Tests, BLOCKED/NOT_RUN | Vier davon brauchen eine echte Videoquelle (`ExtractionChainTest` zwei, `NativeRuntimeTest` einer über `publicSourceUrl`) oder ein echtes Engine-Release (`EngineUpdateManagerTest.realReleaseStageActivateAndRollbackSurvivesManagerRestart`, `EngineJobPinningTest` über `engineProbeSource`). `UiFixtureTest` bleibt mit Absicht aus: Es ist ein Saatgenerator, der synthetische Daten in die App-Datenbank des Geräts schreibt, kein Test. | Je ein dokumentierter Lauf mit echter Quelle beziehungsweise echtem Release. Gefunden in Runde 11, als auffiel, dass `am instrument` auch dann `OK` schreibt, wenn eine Annahme übersprungen wurde. |
 | 2 — persönliche Updates, teilweise NOT_RUN | Privaten Signing-Key separat sichern/übertragen. Bei nächster App-Änderung VersionCode erhöhen, bestehende persönliche Installation mit demselben Key aktualisieren. | Verlauf bleibt nach signiertem App-Update erhalten. Signing/Erstinstallation PASS, Upgrade dieser Installation noch NOT_RUN. |
 | 2 — Nutzerfeedback, ausstehend | Gerät/Version, Schritte, erwartetes/tatsächliches Verhalten und Screenshot erfassen. Reproduzierbare Defekte eng fixen. | Regression und unabhängige Gegenprüfung im betroffenen Bedienpfad; keine pauschale Kosmetikschleife. |
 | 3 — frischer Clone, NOT_RUN | BUILD auf zweitem Rechner oder isoliertem Linux-System ohne vorhandene Projektcaches ausführen. | Wrapper-/Dependency-Verifikation, Build und passende Tests erfolgreich. Privater Key/SDK/Appdaten separat. |

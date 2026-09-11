@@ -2,7 +2,11 @@
 
 **Stand:** 11. September 2026. **Freigabe:** Persönliche Preview; vollständige v1 weiterhin blockiert.
 Der Preview-Abschluss vom 8. September steht unten; seither ist die Nutzerrückmeldung vom
-10. September eingearbeitet, siehe den nächsten Abschnitt. App-Quellstand ist die Spitze von `main`,
+10. September eingearbeitet, siehe den nächsten Abschnitt. **Die Testzahlen weiter unten in diesem
+Abschnitt sind der Stand vom 8. September und nicht der heutige.** Heute sind es 173 JVM-Tests im Modul
+`core`, 191 Instrumentierungstests im Modul `app` und 39 im Modul `extractor`, zusammen 403, davon 397
+ausgeführt; die Runde-11-Passage sagt, warum die letzten 39 zehn Runden lang in keiner Gate-Meldung
+vorkamen. App-Quellstand ist die Spitze von `main`,
 CI-Diagnose `f9d4f8b`, lokales `main` und öffentliches
 [GitHub-Repository](https://github.com/qwertz92/SourceScribe).
 
@@ -30,14 +34,14 @@ API-37-/x86_64-/16-KB-Emulator nachgewiesen. Keine echte STT-API aufgerufen.
 | P5 | IMPLEMENTED: de/en-App-Sprache, System/Hell/Dunkel, überarbeitete Auswahlfelder/Navigation, Viewer/Suche/Kopieren/Share, Formate/Diagnose/Signierpfad | ADB-/Screenshotprüfungen einschließlich 200-%-Schrift und Querformat bestanden. Vollständige TalkBack-Bedienung BLOCKED; dauerhafte persönliche Release-Signatur und Installation PASS r81. |
 | P6 | Integrierte Regression und unabhängige Reviews ausgeführt; bestätigte Defekte samt Regression behoben | Vollständige Abnahme BLOCKED: Provider, physisches ARM64, TalkBack und öffentliche APK-Lizenz-/Quellbelege fehlen. |
 
-## Nutzerrückmeldung vom 10. September 2026 und zehn Reviewdurchgänge
+## Nutzerrückmeldung vom 10. September 2026 und elf Reviewdurchgänge
 
 **Stand:** 11. September 2026. Der Nutzer hat die Preview am Gerät getestet und 20 Punkte gemeldet.
 17 davon sind umgesetzt und am Emulator oder durch Tests belegt; die drei offenen stehen mit Stelle und
 fehlendem Nachweis in [Bekannte Probleme](DEFECTS.md).
 
-Dazu kamen zehn vollständige Runden adversarischer Reviews mit Sonnet-5-Agenten, jede Runde über die
-Korrekturen der vorherigen. Die ersten sechs stehen in diesem Abschnitt, die Runden 7 bis 10 in eigenen
+Dazu kamen elf vollständige Runden adversarischer Reviews mit Sonnet-5-Agenten, jede Runde über die
+Korrekturen der vorherigen. Die ersten sechs stehen in diesem Abschnitt, die Runden 7 bis 11 in eigenen
 Abschnitten darunter: Runde 1 über `782aef5`, Runde 2 über `5a6bfef`, Runde 3 über `42f723e`,
 Runde 4 über `7da4cdf`, Runde 5 über `477dc5b` und `029a53f`, Runde 6 über `e882b25`, `94ca585`
 und `4edffa7`.
@@ -444,10 +448,85 @@ Lintberichte ohne Befund, 191 Instrumentierungstests auf `emulator-5556` — 185
 fallen: die sechs neuen Methoden und die eine bestehende, die eine neue Zusicherung bekommen hat. Kein
 weiterer Test fällt, keine der Korrekturen ändert also bestehendes Verhalten.
 
-**Die Schleife ist nicht konvergiert.** Zehn Runden, keine davon leer. Solange eine Runde noch etwas findet,
-ist die nächste fällig — gerade weil die Funde der Runden 3 bis 10 jeweils in den Korrekturen der Vorrunde
-lagen. Runde 10 ist dabei der deutlichste Beleg: Die Korrektur der Vorrunde hat ihren Fehler nicht behoben,
-sondern verschoben und seinen Auslöser verbreitert, und das ist ohne eine weitere Runde nicht aufgefallen.
+### Runde 11
+
+Diesmal in zwei Phasen: erst zwei rein lesende Reviewer, danach der verändernde allein auf dem Baum. Das
+war die Lehre aus Runde 10, und sie hat funktioniert — kein Reviewer hat diesmal einen Baum geprüft, der
+sich unter ihm bewegte.
+
+**Der schwerste Fund betrifft nicht den Code, sondern die Beweisführung dieser Schleife selbst.** Seit
+Runde 6 stand in jeder Gate-Meldung „191 Instrumentierungstests“. Das Modul `extractor` hat eigene 39, und
+die liefen in keiner der zehn Runden. Schlimmer ist die zweite Hälfte: Ohne das Argument
+`-e sourcescribeEngineUpdate true` überspringt diese Suite vierzehn Tests per Annahme und schreibt trotzdem
+`OK (39 tests)`. Ohne Flagge 21 bestanden und 18 übersprungen, mit ihr 35 und 4 — beide Läufe sehen grün
+aus, und nur der zweite prüft Prüfsumme, Slotwechsel und Rückrollung der signierten Engine-Updates.
+
+Der Grund ist der dokumentierte Notbehelf selbst: Weil Gradle aus WSL den Emulator nicht erreicht, wird das
+rohe Textprotokoll von `am instrument` gelesen, und genau das schreibt `OK`, sobald kein harter Fehlschlag
+auftrat — eine übersprungene Annahme zählt dort nicht. Ein Reviewer hat beide Läufe nachgestellt und die
+Zahlen bestätigt, und dabei alle neun Instrumentierungsargumente des Projekts aufgelistet: sieben davon
+sind echte Schranken, hinter denen ohne Flaggen zusammen 24 Tests still liegen bleiben. Der Ablauf in
+NEXT_STEPS und der Wartungshinweis in DEFECTS nennen jetzt beide Suiten, beide Aufrufe und beide Zahlen.
+
+**Zwei Sicherheitsgrenzen hatten überhaupt keinen Test.** `EngineVerifier.MAX_ARCHIVE_ENTRIES` und
+`MAX_TOTAL_UNPACKED_BYTES` sind die Abwehr gegen ein Archiv, das klein ankommt und groß wird — die Stelle,
+an der ein signiertes Update ausgepackt wird. Dass der Mechanismus greift, war nie bezweifelt und nie
+gezeigt worden; das sind verschiedene Dinge. Beide haben jetzt einen Test mit den echten Produktionswerten.
+
+**Und die Gegenprobe hat an einem davon sofort gearbeitet.** Der Test für die Eintragszahl blieb grün,
+nachdem ich zwei der drei Stellen abgeschaltet hatte, die diese Grenze durchsetzen. Der Grund ist gutartig
+und war mir unbekannt: Die Zahl wird schon aus dem Endverzeichnis des Archivs gelesen und dort verworfen,
+bevor ein einziger Eintrag geöffnet wird. Der Testname behauptete genau das — jetzt prüft er es auch,
+über die Meldung, die dabei entsteht.
+
+**Das Muster „ein Test, der aus seiner eigenen Konstante baut“ hat sechs weitere Instanzen.** Alle vom
+zweiten Reviewer durch Absenken der Konstante und einen grün bleibenden Lauf belegt, eine davon zum ersten
+Mal auf dem Gerät statt in der JVM. Damit sind es zwölf seit Runde 9, einzeln gefunden — und zwölf einzeln
+gefundene Instanzen sind der Hinweis, dass das Suchen einzeln die falsche Form hat.
+
+**Die strukturelle Antwort ist eine einzige Datei.** `StatedNumbersTest` schreibt jede Zahl aus, die dieses
+Modul behauptet: die acht Preise hinter jedem Kostenvoranschlag samt Stichtag und Quelle, die Grenzen der
+drei Anbieter, die eine Grenze, die dem Nutzer versprochen wird, und die Budgets, für die es keine zweite
+Quelle gibt — die letzten ausdrücklich als solche benannt, weil „keine zweite Quelle“ eine ehrliche
+Antwort ist und eine unausgesprochene Annahme nicht. Die verstreuten Festlegungen aus den Runden 10 und 11
+sind dorthin gewandert, damit keine Zahl an zwei Stellen behauptet wird.
+
+**Dabei fiel etwas auf, das kein Reviewer gesucht hatte.** Fünf der acht Preisangaben, aus denen der
+Kostenvoranschlag gebaut wird, standen in keinem Test: beide AssemblyAI-Modellpreise, beide Aufschläge und
+der Whisper-Preis von OpenAI. Ebenso wenig die zehn Sekunden, die Groq mindestens berechnet, zwei der drei
+Stichtage und jede der drei Quellseiten. Ein Tippfehler um den Faktor zehn hätte den Betrag verschoben, den
+jemand vor dem Bezahlen zu sehen bekommt, und jeder Test wäre grün geblieben. Die drei übrigen Preise waren
+in `SyncProviderTest` ausgeschrieben — meine erste Fassung dieses Satzes behauptete, keiner sei es, und war
+damit selbst eine Zahl ohne Nachzählen.
+
+Weiter aus den beiden lesenden Phasen: Der Herkunftsnachweis schrieb `language=unknown`, wo die Quelle sehr
+wohl eine Sprache genannt hatte, die der Datensatz nicht tragen konnte; er schreibt jetzt
+`language=stated-but-unusable`. Mein eigener Kommentar aus Runde 10 nannte den Rohdaten-Grenzwert „einen
+anderen Fall“ — er ist keiner, `ByteArray(n + 1)` ist für jedes `n` größer als `n`. Die Behauptung „alle
+vier sind öffentlich“ stimmte nicht, weil `Warnings` eine `internal class` ist; die Erklärung ist dadurch
+besser geworden, denn die entscheidende Linie ist nicht `public` gegen `internal`, sondern `private` gegen
+vom Test aus erreichbar. Festgenagelt waren fünf Grenzen, nicht vier. Und NEXT_STEPS verlangte, die Commits
+der Runde einzeln zu benennen, und nannte keinen.
+
+**Auch die App-Suite hatte solche Schranken, und vier ihrer sechs Auslassungen waren ausführbar.**
+`ProcessRecoveryTest` stellt den Prozesstod über einen Neustart hinweg nach und verlangt pro Lauf genau
+eine Stufe — vier einzelne Läufe, alle vier bestanden, zum ersten Mal in dieser Schleife. Die zwei
+übrigen bleiben mit Absicht liegen: `UiFixtureTest` ist kein Test, sondern ein Saatgenerator, der
+synthetische Daten in die App-Datenbank schreibt, und `EngineJobPinningTest` braucht ein echtes Release.
+
+Gates nach Runde 11, vollständig gezählt: **173 JVM-Tests** im Modul `core` ohne Fehler (169 vorher: vier
+neue Methoden für die Zahlen, zwei für die Archivgrenzen, zwei durch die Zusammenlegung entfallen), alle
+vier Lintberichte ohne Befund, **191 Instrumentierungstests** im Modul `app` — 185 im gemeinsamen Lauf, vier
+weitere einzeln über ihre Stufen, 0 Fehler — und **erstmals 39** im Modul `extractor` — 35 bestanden,
+0 Fehler. Von 403 Tests sind damit 397 ausgeführt. Die sechs übrigen stehen als eigene Zeile in der
+Blockadetabelle von NEXT_STEPS, statt als Zahl in einem Satz zu verschwinden. Die Gegenprobe, die jede
+Korrektur dieser Runde zurücknimmt, lässt fünf Tests fallen.
+
+**Die Schleife ist nicht konvergiert.** Elf Runden, keine davon leer. Solange eine Runde noch etwas findet,
+ist die nächste fällig — gerade weil die Funde der Runden 3 bis 11 jeweils in den Korrekturen der Vorrunde
+lagen. Runde 10 war der deutlichste Beleg dafür, dass eine Korrektur einen Fehler verschieben statt beheben
+kann; Runde 11 der deutlichste dafür, dass auch die Messung selbst geprüft gehört — zehn Runden lang war
+eine ganze Testsuite nicht in der Zahl enthalten, die ich als Beleg genannt habe.
 
 ## UI-Feedback umgesetzt
 
