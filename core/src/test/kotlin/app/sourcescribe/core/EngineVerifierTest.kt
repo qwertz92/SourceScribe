@@ -171,10 +171,15 @@ class EngineVerifierTest {
     }
 
     @Test
-    fun anArchiveThatUnpacksPastTheTotalIsRejectedEvenWhenEveryEntryFits() {
+    fun anArchiveThatDeclaresMoreThanTheTotalIsRejectedEvenWhenEveryEntryFits() {
         // Each member stays inside the per-entry limit, so only the running total can catch this one. Nine
-        // of them at eight mebibytes is seventy-two, against a ceiling of sixty-four. The bytes are zeros
-        // and therefore compress to almost nothing, which is the whole point of the attack being guarded.
+        // of them at eight mebibytes is seventy-two, against a ceiling of sixty-four.
+        //
+        // What fires is the check on the sizes the archive itself declares, and it fires on the eighth
+        // entry, before any of its bytes are read: the message says so and is asserted for that reason.
+        // The comment here used to say the zeros compressing to nothing was the point, which described a
+        // different guard than the one this test reaches — the check below is blind to compression and
+        // would refuse a stored archive of the same shape identically.
         val filler = ByteArray(EngineVerifier.MAX_ENTRY_BYTES)
         val entries = Array(9) { "part-$it.bin" to filler }
         val inflated = zipFile(VERSION_PATH to versionSource(), EJS_VERSION_PATH to ejsSource(), *entries)
@@ -183,9 +188,81 @@ class EngineVerifierTest {
                 EngineVerifier.inspectArchive(inflated)
             }
             assertEquals(EngineVerificationCode.ARCHIVE, failure.code)
+            assertEquals("ARCHIVE: archive declared size exceeds limit", failure.message)
         } finally {
             assertTrue(inflated.delete())
         }
+    }
+
+    @Test
+    fun anArchiveThatUnpacksPastWhatItDeclaresIsStoppedWhileItIsBeingRead() {
+        // The check above trusts the sizes the archive states, which is enough only while they are honest.
+        // A central directory is data like any other and an attacker writes it: these say one kibibyte and
+        // hold mebibytes of zeros, which deflate to almost nothing. What catches them counts bytes as they
+        // leave the inflater, and it is the only one of the two guards a lying archive ever reaches — the
+        // half of this defence that no test had exercised before round 12.
+        //
+        // Two archives, because that guard is two comparisons and one would otherwise stand in for the
+        // other. A third check sits just past both and decides the shape of each: when an entry finishes,
+        // its length must equal what it declared, so a lie only ever reaches the guards above if it trips
+        // one of them before the entry ends. The first archive is one entry of nine mebibytes declaring a
+        // kibibyte, which passes the per-entry ceiling on the way. The second keeps every entry well under
+        // that ceiling and fills the archive honestly to sixty-three mebibytes first, so that a last,
+        // lying entry of two carries the running total past sixty-four while it is still being read.
+        val honest = ByteArray(7 * 1024 * 1024)
+        val overOneEntry = zipFile(
+            VERSION_PATH to versionSource(),
+            EJS_VERSION_PATH to ejsSource(),
+            "payload.bin" to ByteArray(EngineVerifier.MAX_ENTRY_BYTES + 1024 * 1024),
+        )
+        val overTheTotal = zipFile(
+            VERSION_PATH to versionSource(),
+            EJS_VERSION_PATH to ejsSource(),
+            *Array(9) { "honest-$it.bin" to honest },
+            "payload.bin" to ByteArray(2 * 1024 * 1024),
+        )
+        try {
+            understateDeclaredSize(overOneEntry, "payload.bin", 1024)
+            understateDeclaredSize(overTheTotal, "payload.bin", 1024)
+            for (archive in listOf(overOneEntry, overTheTotal)) {
+                val failure = assertThrows(EngineVerificationException::class.java) {
+                    EngineVerifier.inspectArchive(archive)
+                }
+                assertEquals(EngineVerificationCode.ARCHIVE, failure.code)
+                assertEquals("ARCHIVE: archive decompression exceeds limit", failure.message)
+            }
+        } finally {
+            assertTrue(overOneEntry.delete())
+            assertTrue(overTheTotal.delete())
+        }
+    }
+
+    /**
+     * Rewrite one entry's stated uncompressed size in the archive's central directory.
+     *
+     * `ZipOutputStream` cannot be asked to write a size that disagrees with what it wrote, so the bytes are
+     * edited afterwards. The field is four little-endian bytes at offset 24 of a central directory header,
+     * and the header is found by scanning for its `PK` signature rather than by following the
+     * stored offsets: these archives carry a shebang line in front, so every offset inside them is shifted
+     * by its length.
+     */
+    private fun understateDeclaredSize(file: File, name: String, declared: Int) {
+        val bytes = file.readBytes()
+        var index = 0
+        while (index + 46 <= bytes.size) {
+            val signature = bytes[index] == 0x50.toByte() && bytes[index + 1] == 0x4b.toByte() &&
+                bytes[index + 2] == 0x01.toByte() && bytes[index + 3] == 0x02.toByte()
+            val nameLength = (bytes[index + 28].toInt() and 0xff) or ((bytes[index + 29].toInt() and 0xff) shl 8)
+            if (signature && index + 46 + nameLength <= bytes.size &&
+                String(bytes, index + 46, nameLength) == name
+            ) {
+                for (offset in 0 until 4) bytes[index + 24 + offset] = (declared shr (8 * offset)).toByte()
+                file.writeBytes(bytes)
+                return
+            }
+            index++
+        }
+        throw AssertionError("no central directory header for $name")
     }
 
     private fun resource(name: String): ByteArray =
