@@ -427,5 +427,25 @@ class MainViewModel @Inject constructor(
             val adapter = when (config.provider) { Provider.GROQ -> GroqAdapter(); Provider.OPENAI -> OpenAiAdapter(); Provider.ASSEMBLYAI -> AssemblyAiAdapter(); null -> null }
             config.model?.let { adapter?.capabilities(it) }
         } catch (_: ProviderError) { null }
+
+        /**
+         * What the whole source is estimated to cost, added up the way a run is actually charged.
+         *
+         * A job is submitted chunk by chunk and every chunk is priced on its own, so the total is not the
+         * length times the hourly rate: the rounding happens per chunk, a minimum billed length applies per
+         * chunk, and the surcharges belong to the chunk as well. That is also how the budget is enforced
+         * later, which is the reason this function and not a second formula stands behind the figure on
+         * screen. `null` means no checked rate is stored for this model, which does not mean free.
+         */
+        fun estimatedCostMicrousd(config: JobConfig, durationMs: Long): Long? {
+            val capability = capabilities(config) ?: return null
+            if (durationMs !in 1..SttStep.MAX_AUDIO_DURATION_MS) return null
+            var total = 0L
+            for (window in SttStep.chunkPlan(durationMs)) {
+                val part = SttStep.estimateCostMicrousd(capability, config, window.durationMs) ?: return null
+                total = if (total > Long.MAX_VALUE - part) return Long.MAX_VALUE else total + part
+            }
+            return total
+        }
     }
 }

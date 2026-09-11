@@ -196,13 +196,24 @@ private fun PreviewCard(
 
             if (AcquisitionPlanner.mayUseSpeechToText(preview.config.mode)) {
                 val capability = MainViewModel.capabilities(preview.config)
-                val price = capability?.priceMicrousdPerHour
-                val durationMs = source.durationMs
+                // The figure the reader is shown is the one the budget is measured against, from the same
+                // function. Length times hourly rate left out the surcharges for speakers and keyterms and
+                // the minimum length Groq bills, so a budget chosen from what stood here could be refused
+                // by a check that had counted differently.
+                //
+                // Beyond the ceiling there is no run to price, and saying "price unknown" there would be
+                // an untrue statement about the tariff rather than about the source. The line below the
+                // row already says why the source cannot be processed; this one stops contradicting it.
+                val beyondCeiling = (source.durationMs ?: 0L) > JobLimits.MAX_AUDIO_SECONDS * 1000L
+                val estimate = source.durationMs
+                    ?.takeIf { !beyondCeiling }
+                    ?.let { MainViewModel.estimatedCostMicrousd(preview.config, it) }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        if (price != null && durationMs != null) stringResource(R.string.estimated_cost,
-                            String.format(Locale.ROOT, "%.4f", price * durationMs.toDouble() / 3_600_000 / 1_000_000),
+                        if (estimate != null && capability != null) stringResource(R.string.estimated_cost,
+                            String.format(Locale.ROOT, "%.4f", estimate / 1_000_000.0),
                             capability.priceAsOf.orEmpty())
+                        else if (beyondCeiling) stringResource(R.string.cost_beyond_ceiling)
                         else stringResource(R.string.price_unknown),
                         Modifier.weight(1f), style = MaterialTheme.typography.bodySmall,
                     )
