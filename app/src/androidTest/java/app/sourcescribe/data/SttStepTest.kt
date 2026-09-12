@@ -135,6 +135,12 @@ class SttStepTest {
         val groq = JobConfig(provider = Provider.GROQ, model = GroqAdapter.MODEL_TURBO)
         assertEquals(112L, MainViewModel.estimatedCostMicrousd(groq, 8_000L))
 
+        // And the minimum applies per chunk, not per job: ten minutes and eight seconds is two chunks,
+        // and the second is billed as ten seconds. 6 667 for the first plus 112 for the second. Until
+        // round 14 only the single-chunk case was asserted, so a minimum applied once per job instead of
+        // once per request would have passed.
+        assertEquals(6_779L, MainViewModel.estimatedCostMicrousd(groq, 608_000L))
+
         // Outside the planner's bounds there is no sum to show, and no number is shown instead of a wrong
         // one: a length of zero, and a length past the ceiling the planner refuses.
         assertNull(MainViewModel.estimatedCostMicrousd(universal2, 0L))
