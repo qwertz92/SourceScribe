@@ -78,6 +78,19 @@ class SttStepTest {
             ),
         )
 
+        // A list holding only blanks is not a prompt the provider charges for, it is a request the
+        // adapter rejects outright. Adding the surcharge for it quoted a higher price for a job that
+        // cannot start — the same shape as the length defect round 13 fixed, through another door.
+        val blankTerms = assemblyConfig.copy(contextTerms = listOf("", "  "), diarization = false)
+        assertEquals(
+            210_000L,
+            SttStep.estimateCostMicrousd(
+                assembly.capabilities(AssemblyAiAdapter.MODEL_U35),
+                blankTerms,
+                3_600_000L,
+            ),
+        )
+
         val groq = GroqAdapter()
         val groqConfig = JobConfig(provider = Provider.GROQ, model = GroqAdapter.MODEL_TURBO)
         assertEquals(

@@ -2215,9 +2215,13 @@ class SttStep @Inject constructor(
             }
             // Only Universal-3.5 Pro is charged for a keyterms prompt; Universal-2 has it included in its
             // base rate, which is what the provider's add-on table says in the column beside it.
+            //
+            // `isNotBlank`, not `isNotEmpty`: the adapter refuses a blank term outright, so a list holding
+            // only blanks is not a prompt the provider would charge for — it is a request it would reject.
+            // Counting it here showed a surcharge for a job that cannot run.
             if (capabilities.provider == Provider.ASSEMBLYAI &&
                 config.model == app.sourcescribe.core.providers.AssemblyAiAdapter.MODEL_U35 &&
-                config.contextTerms.isNotEmpty()
+                config.contextTerms.any { it.isNotBlank() }
             ) {
                 hourly = saturatedAdd(hourly, app.sourcescribe.core.providers.AssemblyAiAdapter.KEYTERMS_U35_MICRO_USD_PER_HOUR)
             }
