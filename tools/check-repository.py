@@ -16,8 +16,11 @@ from pathlib import Path
 
 MAX_SCAN_BYTES = 1_048_576
 BINARY_PROBE_BYTES = 8192
-# A byte-order mark is the one thing that says "this text is two bytes per character" before the NUL
-# heuristic below can mistake those bytes for a binary file.
+# A byte-order mark is the one thing that says "this text is more than one byte per character" before
+# the NUL heuristic below can mistake those bytes for a binary file. The four-byte marks are tested
+# first and must be: a UTF-32LE mark is `ff fe 00 00`, whose first two bytes are exactly a UTF-16LE
+# mark, so testing two bytes first reads a UTF-32 file as UTF-16 and finds nothing in it.
+UTF32_BOMS = (b"\xff\xfe\x00\x00", b"\x00\x00\xfe\xff")
 UTF16_BOMS = (b"\xff\xfe", b"\xfe\xff")
 SKIP_PARTS = {".git", ".local-tools", ".gradle", "build", "out", "generated"}
 
@@ -116,6 +119,20 @@ def _paths(root: Path, tracked_only: bool) -> list[Path]:
     return _tracked_paths(root) if tracked_only else _filesystem_paths(root)
 
 
+def _encoding_from_mark(head: bytes) -> str:
+    """The encoding a byte-order mark declares, or UTF-8 when there is none.
+
+    Order matters, and getting it wrong is worse than not looking at all: `ff fe 00 00` is a UTF-32LE
+    mark and `ff fe` is a UTF-16LE mark, so a two-byte test matches both and decodes a UTF-32 file into
+    text with a NUL between every character. Nothing matches such text, and the file is counted as read.
+    """
+    if head[:4] in UTF32_BOMS:
+        return "utf-32"
+    if head[:2] in UTF16_BOMS:
+        return "utf-16"
+    return "utf-8"
+
+
 def _read_text(path: Path, tally: Tally | None = None) -> str | None:
     """Return a file's text, or None when it holds bytes no pattern here could match.
 
@@ -126,17 +143,18 @@ def _read_text(path: Path, tally: Tally | None = None) -> str | None:
     among them. A NUL byte near the start is the one thing that says "not text", and it is what a
     `.so`, a `.png` and the packed extractor all carry.
 
-    Except in UTF-16, where every ASCII character is stored as two bytes and one of them is NUL, so the
-    first letter of such a file trips that heuristic and the whole file goes unread. That is not an
-    exotic encoding on this machine: Notepad's "Unicode" option and older PowerShell redirections both
-    write it. A byte-order mark is therefore checked before the NUL probe. Without a mark, UTF-16 stays
-    indistinguishable from binary here, which is a limit of this check rather than a property of it.
+    Except in UTF-16 and UTF-32, where every ASCII character is stored as two or four bytes and some of
+    them are NUL, so the first letter of such a file trips that heuristic and the whole file goes unread.
+    UTF-16 is not an exotic encoding on this machine: Notepad's "Unicode" option and older PowerShell
+    redirections both write it. A byte-order mark is therefore checked before the NUL probe, widest mark
+    first — see `_encoding_from_mark`. Without a mark, either stays indistinguishable from binary here,
+    which is a limit of this check rather than a property of it.
     """
     counter = tally if tally is not None else Tally()
     try:
         with path.open("rb") as handle:
             head = handle.read(BINARY_PROBE_BYTES)
-            encoding = "utf-16" if head[:2] in UTF16_BOMS else "utf-8"
+            encoding = _encoding_from_mark(head)
             if encoding == "utf-8" and b"\0" in head:
                 counter.binary += 1
                 return None
@@ -261,6 +279,9 @@ def _self_test() -> None:
         # Plain text with a NUL inside every character, which is what UTF-16 is. Until round 13 this
         # file was ruled binary on its first letter and never searched.
         (root / "src/main/utf16.kt").write_bytes(('val key = "gsk_' + "E" * 24 + '"\n').encode("utf-16"))
+        # Four bytes per character, and a mark whose first two bytes are a UTF-16 mark. Read as UTF-16 it
+        # decodes into text with a NUL between every character, which matches nothing and looks scanned.
+        (root / "src/main/utf32.kt").write_bytes(('val key = "gsk_' + "F" * 24 + '"\n').encode("utf-32"))
         tally = Tally()
         issues = check_repository(root, tracked_only=False, tally=tally)
         reasons = {issue.reason for issue in issues}
@@ -273,9 +294,10 @@ def _self_test() -> None:
         assert any(issue.path == "src/main/launcher" for issue in issues), "extension-less file went unread"
         assert not any(issue.path == "src/main/blob.bin" for issue in issues), "binary file was read as text"
         assert any(issue.path == "src/main/utf16.kt" for issue in issues), "UTF-16 file went unread"
+        assert any(issue.path == "src/main/utf32.kt" for issue in issues), "UTF-32 file went unread"
         # Exactly, not at least. A lower bound is satisfied by a file going unread, which is the one
         # thing this counter exists to make visible.
-        assert tally == Tally(scanned=6, binary=1), str(tally)
+        assert tally == Tally(scanned=7, binary=1), str(tally)
     print("PASS self-test")
 
 
