@@ -9,34 +9,35 @@ Arbeit ohne Wiedereinlesen der ganzen Sitzung weitergehen kann. Reihenfolge ist 
 [STATUS.md](STATUS.md); was offen ist, mit Stelle und fehlendem Nachweis, in
 [DEFECTS.md](DEFECTS.md). Die Punktnummern unten sind die Nummern dort.
 
-### 1. Vierzehnte Reviewrunde über die Korrekturen der dreizehnten
+### 1. Fünfzehnte Reviewrunde über die Korrekturen der vierzehnten
 
-Runden 3 bis 13 haben ihren wichtigsten Fund jeweils in den Korrekturen der Vorrunde gehabt. Runde 13 ist
-der schärfste Fall davon: **Der teuerste Fund der Vorrunde war selbst der Fehler.** Runde 12 hatte gemeldet,
-AssemblyAI verlange den Zuschlag für Fachbegriffe für beide Modelle, und die richtige Modellbedingung
-entfernt. Die Zusatztabelle des Anbieters hat eine Spalte je Modell: „$0.05 /hr“ unter Universal-3.5 Pro,
-**„Included“** unter Universal-2. Die Bedingung ist zurück, und ein Test nagelt jetzt beide Spalten fest.
-Commits der dreizehnten Runde sind `d6a773c` (Zuschlag), `dd371f5` (Zahlenprüfung), `0c30bde` (UTF-16),
-`f5cc8c5` (Kostenzeile) und der Dokumentationscommit, der diesen Absatz trägt; einzeln benennen, nicht als
-Bereich, weil `a..b` den
-Anfangscommit auslässt.
+Runden 3 bis 14 haben ihren wichtigsten Fund jeweils in den Korrekturen der Vorrunde gehabt. Runde 14 ist
+die schärfste Fassung davon: **Zwei ihrer drei Hauptfunde waren Fehler in den Korrekturen der Runde 13, und
+einer war schlimmer als die Lücke, die er schließen sollte.** Der UTF-16-Fix ließ eine UTF-32-Datei als
+gelesen zählen, obwohl vorher die Nullbyte-Probe sie ehrlich als binär gemeldet hätte. Commits der
+vierzehnten Runde sind `9021bf5` (UTF-32), `8c16c0a` (Zahlenprüfung), `1b63860` (Preisgrund), `7e0b625`
+(Kostenzeile), `710c64f` (leere Begriffsliste), `538dfec` (Groqs Mindestabrechnung) und der
+Dokumentationscommit, der diesen Absatz trägt; einzeln benennen, nicht als Bereich, weil `a..b` den
+Anfangscommit
+auslässt.
 
-Zwei rein lesende Reviewer zuerst, der verändernde danach allein. Sieben Lehren gehören in den Auftrag:
+Zwei rein lesende Reviewer zuerst, der verändernde danach allein. Neun Lehren gehören in den Auftrag:
 
 - Ein Fund, den der Reviewer nicht ausführen konnte, gilt erst nach einer Gegenprobe als lebender Fehler.
 - **Eine Gegenprobe muss jede Stelle abschalten, die eine Regel durchsetzt, nicht die erstbeste.** Runde 11
-  fand so eine dritte, unbekannte Durchsetzungsstelle; Runde 12 fand eine vierte, weil ein neuer Test
-  eine andere Meldung bekam als die, auf die er gewartet hatte. Beides heißt dasselbe: Die Annahme
-  darüber, welche Wache greift, ist der Teil, der geprüft gehört.
-- **Eine grüne Gegenprobe über einer falschen Zahl sieht aus wie eine über einer richtigen.** Runde 12 hat
-  belegt, dass ein Test 200 000 festhält — nicht, dass 200 000 stimmt. Die Gegenprobe prüft die Kopplung
-  zwischen Test und Code, nie die Aussage über die Welt.
-- **Eine Anbieterangabe wird aus dem Markup der Seite gelesen, nicht aus einer Zusammenfassung.** Genau
-  daran ist Runde 12 gescheitert: Das zusammenfassende Abrufwerkzeug machte aus der Tabellenzelle
-  „Included“ einen Preis. Der Befehl und das Vorgehen stehen als Wartungshinweis in
-  [DEFECTS.md](DEFECTS.md).
-- **Ein Fund außerhalb des zugewiesenen Diffs ist ein Fund.** Der teuerste Fund der Runden 12 und 13 kam
-  beide Male so zustande. Der Auftrag soll das ausdrücklich erlauben.
+  fand so eine dritte, unbekannte Durchsetzungsstelle; Runde 12 eine vierte.
+- **Eine grüne Gegenprobe über einer falschen Zahl sieht aus wie eine über einer richtigen.** Sie prüft die
+  Kopplung zwischen Test und Code, nie die Aussage über die Welt.
+- **Eine Anbieterangabe wird aus dem Markup der Seite gelesen, nicht aus einer Zusammenfassung.** Der
+  Befehl und das Vorgehen stehen als Wartungshinweis in [DEFECTS.md](DEFECTS.md).
+- **Eine Randbedingung, die als „heute irrelevant“ abgehakt wird, braucht dieselbe Quellenprüfung wie die
+  Zahl, um die es geht.** Runde 13 schrieb „kein veröffentlichter Preis“ über ein Modell, dessen Preiszeile
+  in derselben Ausgabe stand, die sie gerade prüfte.
+- **Frage bei jeder Korrektur: Was konnte die Prüfung vorher, das sie danach nicht mehr kann?** Nicht nur,
+  was sie jetzt mehr kann. Und: Trennt sie „geprüft und sauber“ noch von „nicht geprüft“? Eine
+  Erweiterung, die einen Fall still in die erste Kategorie schiebt, ist schlimmer als die Lücke davor.
+- **Ein Fund außerhalb des zugewiesenen Diffs ist ein Fund.** Der wichtigste Fund der Runden 12, 13 und 14
+  kam jedes Mal so zustande.
 - Jede Zahl wird nachgezählt und nennt den Stand, für den sie gilt. Eine laufende Summe, die sich nicht
   aus dem Dokument heraus nachrechnen lässt, gehört gestrichen statt korrigiert.
 - Ein Reviewer, der für Gegenproben Dateien verändert, läuft nicht neben einem, der liest. Jeder
@@ -44,38 +45,34 @@ Zwei rein lesende Reviewer zuerst, der verändernde danach allein. Sieben Lehren
 
 Die Jagdliste:
 
-- **Die Zahlenprüfung ist jetzt ein regulärer Ausdruck über die ganze Datei.** Sie nimmt Annotationen und
-  Modifizierer vom Zeilenanfang mit und folgt dem `=` über den Zeilenumbruch. Was sieht sie immer noch
-  nicht — ein `const val` in einem Blockkommentar, ein Wert, der eine Funktion mit Ziffern im Namen
-  aufruft, eine Deklaration hinter einem Zeilenumbruch *vor* dem `=`? `theScannerSeesTheDeclarationsThat
-  UsedToSlipPastIt` ist der Ort für die Antwort.
-- **Die Module `app` und `extractor` haben keine Zahlenliste.** Aus den Jagdlisten von Runde 12 und 13
-  übriggeblieben: Welche Zahlen behaupten sie, und hängt an einer davon ein Test, der mit ihr mitwandert?
-  `SttStep` allein hält Zeitlimits, Kettenlängen und Chunkgrößen. Die schärfere Frage bleibt: Taugt die
-  Bauart aus `core` für ein Androidmodul, dessen Tests auf dem Gerät laufen und den Quelltext dort nicht
-  sehen?
-- **Die Kostenzeile prüft jetzt zwei Längengrenzen.** `JobLimits.MAX_AUDIO_SECONDS` und
-  `config.maxAudioSeconds`. Gibt es eine dritte Stelle, die einen Lauf an der Länge scheitern lässt und
-  die diese Zeile nicht kennt — in `prepare()`, im Planer, beim Anbieter?
-- **Vier Stellen rechnen eine Dauer in Geld um** (DEFECTS 27). Runde 13 hat die vierte benannt und als
-  heute folgenlos belegt. Bleibt die allgemeine Frage aus Runde 12 unbeantwortet: Welche *andere* Rechnung
-  dieses Programms steht mehr als einmal im Baum?
-- **Was `tools/check-repository.py` nicht liest, steht jetzt in DEFECTS 28.** UTF-16 ohne Markierung, alles
-  über einem Mebibyte, unversionierte Workflow-Dateien beim Geheimnisscan. Und die Gegenrichtung, weiter
-  offen: Findet die neue Abdeckung etwas, das in `docs/` steht und dort nicht stehen sollte?
-- **`Source.originalLanguage` hat kein Gegenstück zu `AudioTrack.languageRefused`.** Aus Runde 12
-  übriggeblieben, von niemandem geprüft: Ein verworfener Wert sieht dort wie ein nie genannter aus. Such,
-  wer dieses Feld liest, und ob eine dieser Lesestellen still entscheidet.
-- **`ProviderCapabilities.pricingSource` erreicht niemanden** (DEFECTS 24). Der Nutzer sieht einen Preis und
-  einen Stichtag, aber nie die Seite, gegen die der Stichtag gilt. Gibt es einen Weg dahin, der die Adresse
-  nicht ein zweites Mal behauptet? Seit Runde 13 hängt DEFECTS 29 mit dran: Die Seite für OpenAI nennt
-  `whisper-1` gar nicht.
+- **Der neue reguläre Ausdruck in `StatedNumbersTest` deutet das Präfix nicht mehr**
+  (`(?:^|;)([^\n;]*?)\bconst[ \t]+val`) und ist damit deutlich permissiver als die Fassung aus Runde 13.
+  Was findet er jetzt, das keine Deklaration ist? Eine mehrzeilige rohe Zeichenkette mit `const val` darin
+  wäre der erste Kandidat — im Modul `core` gibt es heute keine, aber die Frage gehört gestellt, weil die
+  vorige Fassung diesen Fall nicht haben konnte. Das ist die Umkehrung des Runde-14-Funds und genau die
+  Richtung, die eine Erweiterung gefährlich macht.
+- **Die Kostenzeile hat jetzt `minLines = 2`, `maxLines = 2` und einen Auslassungspunkt.** Ungemessen ist,
+  ob einer der drei Texte bei 200 % Schrift drei Zeilen braucht und also abgeschnitten wird. Am Gerät
+  nachsehen, in beiden Sprachen, bei 200 % Schrift und im Querformat — die einzige offene Frage der
+  Runde 14, die ein Gerät braucht.
+- **DEFECTS 30 und 31 sind mit Absicht offen und zeigen auf dieselbe Frage:** die Mindestdauer eines Modells
+  als dritte Längenschranke, die die Anzeige nicht kennt, und eine leere Fachbegriffsliste, die erst bei der
+  Übermittlung abgelehnt wird. Sollte `configError` die Adapterprüfung aufrufen statt sie nachzubauen?
+- **Die Module `app` und `extractor` haben keine Zahlenliste.** Seit Runde 12 offen. Taugt die Bauart aus
+  `core` für ein Androidmodul, dessen Tests auf dem Gerät laufen und den Quelltext dort nicht sehen?
+- **`Source.originalLanguage` hat kein Gegenstück zu `AudioTrack.languageRefused`.** Seit Runde 12 offen,
+  von niemandem geprüft: Ein verworfener Wert sieht dort wie ein nie genannter aus.
+- **`ProviderCapabilities.pricingSource` erreicht niemanden** (DEFECTS 24), und DEFECTS 29 hängt daran: Die
+  Preisseite von OpenAI nennt `whisper-1` gar nicht.
 - **Nicht mehr offen, damit es niemand ein zweites Mal aufmacht:** Alle acht Preiszahlen sind am
-  12. September 2026 aus dem Markup der drei Anbieterseiten nachgelesen worden, nicht aus einer
-  Zusammenfassung — AssemblyAI 0,21/0,15 je Stunde, Sprechertrennung 0,02 in beiden Spalten, Fachbegriffe
-  0,05 nur in der Spalte Universal-3.5 Pro; Groq 0,111 und 0,04 je Stunde, Mindestabrechnung zehn
-  Sekunden, 25 MB gegen 100 MB; OpenAI 0,0045 und 0,006 je Minute. Alle acht stimmen mit dem Code überein.
-- Und die Doku: Jede Zahl der Runde-13-Passage nachzählen, mit dem Stand, für den sie gilt.
+  12. September 2026 aus dem Markup der drei Anbieterseiten nachgelesen worden, in Runde 13 und in Runde 14
+  unabhängig voneinander — AssemblyAI 0,21/0,15 je Stunde, Sprechertrennung 0,02 in beiden Spalten,
+  Fachbegriffe 0,05 nur in der Spalte Universal-3.5 Pro; Groq 0,111 und 0,04 je Stunde, Mindestabrechnung
+  zehn Sekunden, 25 MB gegen 100 MB; OpenAI 0,0045 und 0,006 je Minute. Alle acht stimmen mit dem Code
+  überein. Ebenfalls geprüft und leer: Es gibt keinen weiteren AssemblyAI-Zusatz, den die App mitschickt und
+  nicht berechnet — der gesendete Rumpf enthält nur `audio_url`, `speech_models`, `punctuate`,
+  `speaker_labels`, Sprachfelder und `keyterms_prompt`.
+- Und die Doku: Jede Zahl der Runde-14-Passage nachzählen, mit dem Stand, für den sie gilt.
 
 ### 2. Warncodes lesbar machen (DEFECTS 9) — erledigt
 
@@ -167,13 +164,21 @@ und ebenso für `stage2ReopensAndFinalizesWithoutResubmission` mit Stufe `2`,
 `stage2ReopensPrivateAudioAfterGrantAndSourceLoss` mit `import-2`.
 
 Die zwei übrigen Auslassungen der App-Suite bleiben mit Absicht liegen: `UiFixtureTest` ist kein Test,
-sondern ein Saatgenerator, der synthetische Daten in die echte App-Datenbank des Geräts schreibt, und
-`EngineJobPinningTest` braucht **zwei** Flaggen: `-e sourcescribeEngineJobPinning true` schaltet ihn
-überhaupt erst frei, und `-e engineProbeSource <URL>` gibt ihm das echte Release. Die erste wird im
-Test zuerst geprüft, also bleibt er ohne sie übersprungen, gleichgültig welche URL dabeisteht.
+sondern ein Saatgenerator, der synthetische Daten in die echte App-Datenbank des Geräts schreibt — seine
+Flagge heißt `sourcescribeUiFixture`, und sie stand bis Runde 14 in keinem Dokument überhaupt; `BUILD.md`
+schließt die Klasse stattdessen mit `-e notClass` aus, was denselben Zweck erfüllt und den Namen nie
+nötig machte. Und `EngineJobPinningTest` braucht **zwei** Flaggen: `-e sourcescribeEngineJobPinning true`
+schaltet ihn überhaupt erst frei, und `-e engineProbeSource <URL>` gibt ihm das echte Release. Die erste
+wird im Test zuerst geprüft, also bleibt er ohne sie übersprungen, gleichgültig welche URL dabeisteht.
+
+**Die neunte Flagge ist keine Schranke.** `engineUpdateChannel` wählt in `EngineJobPinningTest` und in
+`EngineUpdateManagerTest` den Kanal eines echten Releases und fällt ohne Angabe auf `NIGHTLY` zurück.
+Sie überspringt nichts und fehlt deshalb zu Recht in der Liste der Schranken — aber sie stand bis
+Runde 14 nur in zwei datierten Berichten vom 7. September, also nirgends, wo jemand nachsieht.
 Zusammengerechnet sind damit
-von 406 Tests 400 ausgeführt; die sechs übrigen stehen als `BLOCKED/NOT_RUN` in
-[DEFECTS.md](DEFECTS.md).
+von 409 Tests 403 ausgeführt; die sechs übrigen stehen als `BLOCKED/NOT_RUN` in
+[DEFECTS.md](DEFECTS.md). Es bleiben dieselben sechs; die drei Tests, die Runde 13 hinzugefügt hat,
+laufen alle.
 
 ## Restarbeiten nach der ersten persönlichen Preview
 

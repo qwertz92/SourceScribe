@@ -1,6 +1,6 @@
 # Bekannte Probleme und offene Punkte
 
-**Stand:** 12. September 2026, nach dreizehn Runden adversarischer Reviews. Diese Datei ist für den
+**Stand:** 12. September 2026, nach vierzehn Runden adversarischer Reviews. Diese Datei ist für den
 nächsten Agenten gedacht und listet, was **nicht** vollständig erledigt ist. Ein geschlossener Punkt
 behält seine Nummer und einen kurzen Vermerk, damit Verweise aus anderen Dokumenten gültig bleiben. Was hier nicht steht, ist entweder erledigt oder in
 [STATUS.md](STATUS.md) beschrieben.
@@ -431,6 +431,12 @@ Gewinn und deshalb nicht gemacht.
   addieren die Zuschläge, diese nicht. Dass das heute nichts ändert, ist geprüft und nicht vermutet: Groq
   meldet `diarization = false` für jedes Modell, und OpenAIs einziges diarisierendes Modell hat
   `priceMicrousdPerHour = null` und wird eine Zeile weiter abgelehnt, statt geschätzt zu werden.
+  **Runde 13 hat dafür einen falschen Grund in den Code geschrieben** — „kein veröffentlichter Preis“.
+  `gpt-4o-transcribe-diarize` ist bepreist, aber je Token: 2,50 und 10,00 Dollar je Million. Die
+  „$0.006 / minute“ daneben stehen in einer Spalte, die die Seite selbst „Estimated cost“ überschreibt.
+  Eine Dauer lässt sich nicht mit einer Tokenzahl multiplizieren, also gibt es keinen Stundensatz zu
+  führen, und `null` ist die richtige Angabe aus einem anderen Grund als dem genannten. Am
+  12. September 2026 aus dem Markup der Seite nachgelesen.
 - **Warum es offen bleibt:** Die Zuschläge stehen nicht in `ProviderCapabilities`, sondern beim jeweiligen
   Adapter; sie hier einzurechnen hieße, sie in den Vertrag aufzunehmen. Das ist eine Vertragsänderung und
   keine Zeile. Als Vorprüfung bleibt die Stelle ungefährlich — was bindet, ist `SttStep.submit`, das mit
@@ -440,19 +446,26 @@ Gewinn und deshalb nicht gemacht.
 ### 28. Was `tools/check-repository.py` weiterhin nicht liest (niedrig)
 
 - **Stelle:** `_read_text` und `_check_actions` in `tools/check-repository.py`.
-- **Voraussetzung:** Je nach Fall: eine UTF-16-Datei ohne Byte-Reihenfolge-Markierung, eine Textdatei über
-  einem Mebibyte, oder eine noch nicht versionierte Datei unter `.github/workflows/`.
-- **Erwartet gegen tatsächlich:** Drei Reste, nachdem Runde 13 UTF-16 **mit** Markierung geschlossen hat.
-  Ohne Markierung ist UTF-16 an den Bytes nicht von einer Binärdatei zu unterscheiden und fällt weiter
-  durch. Eine Textdatei über `MAX_SCAN_BYTES` wird bei 1 048 576 Byte gekappt; ein Geheimnis dahinter wird
-  nicht gefunden, und der Abschlusszeile ist die Kappung anzusehen (`… read only to 1048576 bytes`), dem
-  Exitcode nicht. Und `_check_actions` durchsucht das Dateisystem statt `git ls-files`, prüft eine
-  unversionierte Workflow-Datei also auf ungepinnte Actions, während der Geheimnisscan sie nie sieht.
-- **Warum es offen bleibt:** Alle drei sind heute leer — keine UTF-16-Datei im Baum, die einzige Datei
-  über einem Mebibyte ist die gepackte Extraktor-Engine und echt binär, und `.github/workflows/` enthält
-  nur Versioniertes. Die Reihenfolge ist Absicht: Die weitere Richtung — mehr prüfen, nicht weniger — ist
-  bei der Actions-Prüfung die sichere. Gefunden vom lesenden Reviewer in Runde 13, der die Funktionen
-  außerhalb des Repositorys gegen gebaute Dateien laufen ließ.
+- **Voraussetzung:** Je nach Fall: eine UTF-16- oder UTF-32-Datei **ohne** Byte-Reihenfolge-Markierung,
+  eine Textdatei über einem Mebibyte, oder eine noch nicht versionierte Datei unter `.github/workflows/`.
+- **Erwartet gegen tatsächlich:** Drei Reste, nachdem Runde 13 UTF-16 und Runde 14 UTF-32 **mit**
+  Markierung geschlossen haben. Ohne Markierung ist beides an den Bytes nicht von einer Binärdatei zu
+  unterscheiden und fällt weiter durch. Eine Textdatei über `MAX_SCAN_BYTES` wird bei 1 048 576 Byte
+  gekappt; ein Geheimnis dahinter wird nicht gefunden, und der Abschlusszeile ist die Kappung anzusehen
+  (`… read only to 1048576 bytes`), dem Exitcode nicht. Und `_check_actions` durchsucht das Dateisystem
+  statt `git ls-files`, prüft eine unversionierte Workflow-Datei also auf ungepinnte Actions, während der
+  Geheimnisscan sie nie sieht.
+- **Was Runde 14 hier geschlossen hat, und warum es schlimmer war als die Lücke davor:** Eine
+  UTF-32LE-Markierung lautet `ff fe 00 00`, und ihre ersten zwei Bytes sind genau eine UTF-16LE-Markierung.
+  Runde 13 prüfte zwei Bytes, also wurde eine UTF-32-Datei als UTF-16 dekodiert — Text mit einem Nullbyte
+  zwischen jedem Zeichen, an dem kein Muster greift — und **als gelesen gezählt**. Vor Runde 13 hätte die
+  Nullbyte-Probe dieselbe Datei ehrlich als binär gemeldet. Die vier Bytes werden jetzt zuerst geprüft.
+- **Warum der Rest offen bleibt:** Alle drei sind heute leer — keine Datei im Baum trägt eine UTF-16- oder
+  UTF-32-Markierung, die einzige Datei über einem Mebibyte ist die gepackte Extraktor-Engine und echt
+  binär, und `.github/workflows/` enthält nur Versioniertes. Die Reihenfolge ist Absicht: Die weitere
+  Richtung — mehr prüfen, nicht weniger — ist bei der Actions-Prüfung die sichere. Gefunden vom lesenden
+  Reviewer in Runde 13 und in Runde 14 erneut, beide Male durch Ausführen der Funktionen außerhalb des
+  Repositorys gegen selbstgebaute Dateien.
 
 ### 29. Die Preisseite von OpenAI nennt `whisper-1` nicht (niedrig)
 
@@ -468,6 +481,37 @@ Gewinn und deshalb nicht gemacht.
   Schritt auszusprechen statt ihn anzunehmen — das steht seit Runde 13 im Kommentar neben der Zahl.
   Hängt an Punkt 24 weiter oben in dieser Datei:
   Solange die Adresse niemanden erreicht, erreicht auch diese Einschränkung niemanden.
+
+### 30. Die Mindestdauer eines Modells ist eine dritte Längenschranke, die die Anzeige nicht kennt (niedrig)
+
+- **Stelle:** `AssemblyAiAdapter.MIN_DURATION_MS` (160 ms) und `GroqAdapter.MIN_DURATION_MS` (10 ms) gegen
+  `MainViewModel.sourceTooLong` und `MainViewModel.estimatedCostMicrousd`.
+- **Voraussetzung:** Eine Quelle unter 160 ms bei AssemblyAI beziehungsweise unter 10 ms bei Groq. Die
+  Abschnittsplanung reicht sie als einen Abschnitt durch, weil `MIN_FINAL_CHUNK_DURATION_MS` nur bei mehr
+  als einem Abschnitt eingreift.
+- **Erwartet gegen tatsächlich:** Runde 13 hat die Kostenzeile daran gehindert, eine **zu lange** Quelle zu
+  bepreisen. Am anderen Ende gilt dasselbe nicht: Eine Quelle unter der Mindestdauer bekommt einen
+  winzigen Preis angezeigt, während die Übermittlung sie mit `INVALID_INPUT` ablehnen würde.
+- **Warum es offen bleibt:** Eine Quelle unter einer Zehntelsekunde ist für ein Transkriptionswerkzeug
+  praxisfremd, und die Behebung wäre eine dritte Bedingung in einer Regel, die „zu lang“ heißt — eine zu
+  kurze Quelle braucht eine andere Aussage, nicht dieselbe. Bewusst als Punkt notiert statt beiläufig
+  mitgefixt. Gefunden vom lesenden Reviewer in Runde 14.
+
+### 31. Eine leere Fachbegriffsliste wird erst bei der Übermittlung abgelehnt (niedrig)
+
+- **Stelle:** `MainViewModel.configError` gegen `AssemblyAiAdapter.validateConfig`
+  (`core/src/main/kotlin/app/sourcescribe/core/providers/AssemblyAiAdapter.kt`, `trimmed.isEmpty()`).
+- **Voraussetzung:** Ein `JobConfig`, dessen `contextTerms` nur leere oder blanke Einträge enthält. Über den
+  Bildschirm nicht erreichbar — die Eingabe filtert jede Leerzeile beim Tippen weg —, wohl aber über einen
+  gespeicherten oder übernommenen Auftrag: `SettingsStore` prüft beim Laden Länge und Steuerzeichen, nicht
+  Leere.
+- **Erwartet gegen tatsächlich:** `configError` nennt keinen Fehler, die Vorschau sieht startbereit aus,
+  und die Übermittlung lehnt den Auftrag dann mit `INVALID_INPUT` ab. Runde 14 hat den Teil geschlossen,
+  der Geld betraf: Die Kostenzeile rechnete für so eine Liste den Zuschlag für Fachbegriffe mit ein.
+- **Warum es offen bleibt:** Die Vorschau vollständig gegen die Adapterprüfungen zu spiegeln wäre die
+  vierte Stelle, die dieselbe Regel führt — genau die Bauart, die diese Reviewschleife sonst abbaut. Der
+  richtige Zug wäre, `configError` die Adapterprüfung aufrufen zu lassen, und das ist eine
+  Vertragsänderung. Gefunden vom lesenden Reviewer in Runde 14.
 
 ## Bewusste Entscheidungen, die wie Fehler aussehen
 

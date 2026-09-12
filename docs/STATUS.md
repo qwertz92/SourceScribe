@@ -1,12 +1,14 @@
 # Tatsächlicher Projektstatus
 
-**Stand:** 11. September 2026. **Freigabe:** Persönliche Preview; vollständige v1 weiterhin blockiert.
+**Stand:** 12. September 2026. **Freigabe:** Persönliche Preview; vollständige v1 weiterhin blockiert.
 Der Preview-Abschluss vom 8. September steht unten; seither ist die Nutzerrückmeldung vom
 10. September eingearbeitet, siehe den nächsten Abschnitt. **Die Testzahlen weiter unten in diesem
-Abschnitt sind der Stand vom 8. September und nicht der heutige.** Heute sind es 176 JVM-Tests im Modul
-`core`, 191 Instrumentierungstests im Modul `app` und 39 im Modul `extractor`, zusammen 406, davon 400
+Abschnitt sind der Stand vom 8. September und nicht der heutige.** Heute sind es 177 JVM-Tests im Modul
+`core`, 193 Instrumentierungstests im Modul `app` und 39 im Modul `extractor`, zusammen 409, davon 403
 ausgeführt; die Runde-11-Passage sagt, warum die letzten 39 zehn Runden lang in keiner Gate-Meldung
-vorkamen. App-Quellstand ist die Spitze von `main`,
+vorkamen. Diese vier Zahlen standen bis Runde 14 unter dem Wort „Heute“ auf dem Stand der zwölften
+Runde — die Gate-Zahlen einer Runde stehen in ihrer eigenen Passage, und dieser Satz oben muss
+mitwandern. App-Quellstand ist die Spitze von `main`,
 CI-Diagnose `f9d4f8b`, lokales `main` und öffentliches
 [GitHub-Repository](https://github.com/qwertz92/SourceScribe).
 
@@ -775,14 +777,101 @@ Von 409 Tests sind damit 403 ausgeführt, drei mehr als nach Runde 12 in beiden 
 übrigen brauchen fünf eine echte Quelle oder ein echtes Release; die sechste, `UiFixtureTest`, bleibt mit
 Absicht aus, weil sie kein Test ist, sondern ein Saatgenerator.
 
-**Die Schleife ist nicht konvergiert.** Dreizehn Runden, keine davon leer. Solange eine Runde noch etwas
+### Runde 14
+
+Commits: `9021bf5` (UTF-32), `8c16c0a` (Zahlenprüfung), `1b63860` (Preisgrund), `7e0b625` (Kostenzeile),
+`710c64f` (leere Begriffsliste), `538dfec` (Groqs Mindestabrechnung) und der Dokumentationscommit, der
+diesen Absatz trägt.
+
+**Zwei der drei wichtigsten Funde dieser Runde sind Fehler, die Runde 13 gemacht hat, während sie Fehler
+der Runde 12 korrigierte.** Das ist keine Wiederholung des Vorrundenmusters, sondern seine Verschärfung:
+Nicht der Fund war falsch, sondern die Korrektur.
+
+**Der UTF-16-Fix hat UTF-32 schlechter gemacht als vorher.** Eine UTF-32LE-Byte-Reihenfolge-Markierung
+lautet `ff fe 00 00`. Ihre ersten zwei Bytes sind genau eine UTF-16LE-Markierung. Runde 13 prüfte zwei
+Bytes, also wurde eine UTF-32-Datei als UTF-16 dekodiert: Text mit einem Nullbyte zwischen jedem Zeichen,
+an dem kein Geheimnismuster greift — **und sie wurde als gelesen gezählt**. Vor Runde 13 hätte die
+Nullbyte-Probe dieselbe Datei ehrlich als binär gemeldet und die Abschlusszeile es gesagt. Damit hat eine
+Korrektur, die Abdeckung hinzufügen sollte, an einer Stelle Abdeckung vorgetäuscht. Die vier Bytes werden
+jetzt zuerst geprüft, UTF-32 wird gelesen, und der Selbsttest enthält so eine Datei.
+
+**Und in derselben Runde habe ich eine Anbieterbehauptung aufgeschrieben, die das widerlegende Markup schon
+auf dem Schirm hatte.** Der Kommentar zu DEFECTS 27 sagte, OpenAIs diarisierendes Modell habe „keinen
+veröffentlichten Preis“. `gpt-4o-transcribe-diarize` ist bepreist, je Token: 2,50 und 10,00 Dollar je
+Million. Ich hatte diese Zeile beim Prüfen von `whisper-1` in derselben Ausgabe stehen und nicht gelesen.
+Der Wert im Code bleibt richtig — `priceMicrousdPerHour = null` —, aber aus einem anderen Grund: Die
+„$0.006 / minute“ daneben stehen in einer Spalte, die die Seite selbst „Estimated cost“ überschreibt, und
+eine Dauer lässt sich nicht mit einer Tokenzahl multiplizieren. Es gibt keinen Stundensatz zu führen, und
+das Verweigern einer Schätzung ist die ehrliche Antwort, nicht eine Lücke. Dass die Lehre der Vorrunde
+— Markup statt Zusammenfassung — den Fehler nicht verhindert hat, liegt daran, dass ich das Markup hatte
+und die falsche Zeile daraus gelesen habe. Die Lehre lautet jetzt schärfer: Eine Randbedingung, die als
+„heute irrelevant“ abgehakt wird, braucht dieselbe Quellenprüfung wie die Zahl, um die es geht.
+
+**Die Zahlenprüfung ließ sich weiterhin umgehen, in fünf Formen, und fand eine, die es nicht gibt.**
+Runde 13 hatte das Präfix vor einer Deklaration ausgeschrieben: Name, optionale Klammer, Leerraum. Eine
+Annotation kann tiefer klammern — `@Deprecated("x", ReplaceWith("y()"))` ist drei Ebenen — und kein
+regulärer Ausdruck kann Klammern zählen. Dazu: ein Umbruch **vor** dem `=` statt danach, eine Deklaration
+hinter einem Semikolon, und ein Blockkommentar hinter dem Wert, dessen Anführungszeichen den Wert als
+Zeichenkette aussehen ließen. Die sechste Form ist die Gegenrichtung und wäre laut geworden: Ein
+`const val` **innerhalb** eines Blockkommentars wurde als echt gezählt und hätte den Test für eine
+Konstante scheitern lassen, die es nicht gibt.
+
+Das Präfix wird jetzt gar nicht mehr gedeutet. Es wird nur auf das Wort `private` gelesen, also muss es
+nicht verstanden werden — „alles Übrige auf dieser Zeile“ genügt, und Blockkommentare werden vorher
+entfernt. Alle siebzehn Fälle standen erst als Python-Modell, bevor eine Zeile Kotlin geschrieben wurde;
+elf davon sind jetzt Zusicherungen im Test.
+
+**Die Kostenzeile reservierte ihre Höhe nur nach unten.** Runde 13 setzte `minLines = 2` und schrieb
+daneben „two lines whatever it says“. `minLines` verhindert eine erste, nicht eine dritte Zeile. Die
+Schwesterzeile desselben Bildschirms setzt seit langem beide Grenzen und nimmt einen Auslassungspunkt in
+Kauf; die Kostenzeile tut das jetzt auch, und der längste der drei Texte ist gekürzt, damit der Fall
+seltener wird. Ob einer von ihnen bei größter Schrift wirklich drei Zeilen braucht, ist **nicht gemessen**
+— mit der Obergrenze ist es ein abgeschnittenes Wort statt eines springenden Bildschirms, und das ist die
+Abwägung, die der Rest dieses Bildschirms schon trifft.
+
+**Zwei kleinere Funde, beide dieselbe Gestalt wie der Längenfehler der Vorrunde.** Eine Fachbegriffsliste,
+die nur leere Einträge enthält, bekam den Zuschlag angerechnet, obwohl der Adapter so einen Auftrag
+vollständig ablehnt; die Bedingung liest jetzt `isNotBlank` statt `isNotEmpty`. Und die Mindestdauer eines
+Modells — 160 ms bei AssemblyAI, 10 ms bei Groq — ist eine dritte Längenschranke, die die Anzeige nicht
+kennt. Die bleibt als [Punkt 30](DEFECTS.md) offen: Eine zu kurze Quelle braucht eine andere Aussage als
+„zu lang“, und eine dritte Bedingung in eine Regel dieses Namens zu schreiben wäre der falsche Zug.
+
+**Gegenprobe.** Jede Korrektur mit einem Test zurückgenommen, in zwei Läufen, weil die Module getrennt
+gebaut werden. Drei Prüfungen fielen: der Selbsttest von `check-repository.py`, sobald die
+Markierungsprüfung wieder zwei Bytes liest; der Scannertest, sobald das Präfix wieder ausgeschrieben und
+das Blockkommentarmuster stillgelegt ist; und `estimateCostCeilsMinimumAndAssemblyAddonsAndBlocksUnknownPrice`
+im Modul `app`, sobald eine blanke Begriffsliste wieder als Prompt zählt.
+
+**Drei Korrekturen dieser Runde haben keine Gegenprobe, und zwar aus drei verschiedenen Gründen.** Der
+richtiggestellte Grund für `priceMicrousdPerHour = null` ist Prosa und ändert kein Verhalten. Die
+Obergrenze der Kostenzeile hat keinen UI-Test, und dass sie wirkt, ist am Code zu sehen, nicht an einem
+Lauf — gemessen ist sie nicht. Und Groqs Mindestabrechnung über mehrere Abschnitte ist eine
+Testergänzung ohne begleitende Codeänderung: Es gibt nichts zurückzunehmen, weil die Logik schon richtig
+war und nur ungeprüft. Alle drei stehen hier, statt unter „Gegenprobe: sechs“ mitgezählt zu werden.
+
+**Und wieder fiel `everyNumberThisModuleStatesHasALineInThisFile` nicht**, obwohl der Scanner
+zurückgenommen war — dieselbe Beobachtung wie in Runde 13, aus demselben Grund: Keine der sechs Formen
+kommt im Baum vor. Der Test am Baum kann diese Lücke nicht zeigen, der Test an Textbeispielen schon.
+
+Gates nach Runde 14: **177 JVM-Tests** im Modul `core` ohne Fehler (unverändert zu Runde 13, weil diese
+Runde Zusicherungen zu bestehenden Tests hinzugefügt hat und keine neuen Testmethoden), alle vier
+Lintberichte ohne Befund, der unsignierte Release-Build gebaut, `tools/check-repository.py` mit Selbsttest
+bestanden (202 Dateien gelesen, 19 als binär übersprungen), **193 Instrumentierungstests** im Modul `app`
+— 187 im gemeinsamen Lauf, 4 weitere einzeln über ihre Stufen, 0 Fehler — und **39** im Modul `extractor`
+— 35 bestanden, 4 per Annahme übersprungen, 0 Fehler. Von 409 Tests sind damit 403 ausgeführt, wie nach
+Runde 13; die sechs übrigen sind dieselben sechs.
+
+**Die Schleife ist nicht konvergiert.** Vierzehn Runden, keine davon leer. Solange eine Runde noch etwas
 findet, ist die nächste fällig — gerade weil die Funde der Runden 3 bis 13 jeweils in den Korrekturen der
 Vorrunde lagen. Runde 10 war der deutlichste Beleg dafür, dass eine Korrektur einen Fehler verschieben
 statt beheben kann; Runde 11 dafür, dass auch die Messung selbst geprüft gehört; Runde 12 dafür, dass ein
 Reviewer, der über den zugewiesenen Diff hinaussieht, den teuersten Fund macht — und dass zwei Listen, die
 von Sorgfalt abhingen, beide dieselbe Lücke hatten. Runde 13 ist der bislang deutlichste Fall: Der teuerste
 Fund einer Runde kann selbst der Fehler sein. Eine Korrektur, die eine Anbieteraussage ändert, ist erst
-belegt, wenn die Anbieterseite im Original gelesen wurde und nicht in einer Zusammenfassung.
+belegt, wenn die Anbieterseite im Original gelesen wurde und nicht in einer Zusammenfassung. Und Runde 14
+sagt, warum das nicht reicht: Zwei ihrer drei Hauptfunde waren Fehler **in** den Korrekturen der Runde 13,
+einer davon schlimmer als die Lücke, die er schließen sollte. Eine Korrektur ist neuer, ungeprüfter Code,
+auch wenn sie eine Prüfung erweitert.
 
 ## UI-Feedback umgesetzt
 
