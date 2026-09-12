@@ -92,9 +92,16 @@ internal object SyncProviderSupport {
         if (request.durationMs > maxDurationMs) invalidInput()
         if (request.chunkStartMs > Long.MAX_VALUE - request.durationMs) invalidInput()
         // A fourth place in this program that turns a duration into money, and the only one with no
-        // surcharge in it. That is right for the two providers reaching this function today — Groq offers
-        // no diarization at all, and OpenAI's one diarizing model has no published price, so it is refused
-        // a line below rather than estimated — but it would be wrong the day either gains a priced add-on.
+        // surcharge in it. That is right for the two providers reaching this function today, and both
+        // reasons were re-read from the providers' own pages on 2026-09-12: Groq offers no diarization at
+        // all, and OpenAI's one diarizing model carries `priceMicrousdPerHour = null`, so `unsupported()`
+        // fires a line below instead of an estimate. That null is not "no published price" — round 13
+        // wrote that here and it was wrong. `gpt-4o-transcribe-diarize` is priced, but per token, $2.50
+        // and $10.00 a million; the "$0.006 / minute" beside it sits in a column the page itself heads
+        // "Estimated cost". A duration cannot be multiplied by a token count, so there is no rate to
+        // carry, and refusing to name one is the honest answer rather than a gap.
+        //
+        // It would still be wrong the day either provider gains an add-on with a real hourly surcharge.
         // This is a pre-check; what binds is `SttStep.submit`, which adds the surcharges and measures the
         // whole plan against the budget before anything is sent.
         request.config.maxCostMicrousd?.let { budget ->
