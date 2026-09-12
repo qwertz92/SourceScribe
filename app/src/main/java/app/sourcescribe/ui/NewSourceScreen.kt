@@ -218,10 +218,16 @@ private fun PreviewCard(
                             capability.priceAsOf.orEmpty())
                         else if (tooLong) stringResource(R.string.cost_source_too_long)
                         else stringResource(R.string.price_unknown),
-                        // Two lines whatever it says. Raising the limit on the button below swaps a
-                        // sentence here for a shorter price, and the rest of the screen must not move
-                        // upwards while the reader is pressing it.
-                        Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, minLines = 2,
+                        // Two lines whatever it says, both bounds. Raising the limit on the button
+                        // below swaps a sentence here for a shorter price, and the rest of the screen
+                        // must not move while the reader is pressing it. Round 13 set only the lower
+                        // bound, which reserves two lines but does not stop a third — the same
+                        // convention as the title above, which sets both and accepts an ellipsis. All
+                        // three texts are kept short for that reason; whether any of them reaches a
+                        // third line at the largest font is not measured, and the cap makes that a
+                        // clipped word rather than a jumping screen.
+                        Modifier.weight(1f), style = MaterialTheme.typography.bodySmall,
+                        minLines = 2, maxLines = 2, overflow = TextOverflow.Ellipsis,
                     )
                     InfoButton(HelpTopic.COST, openHelp)
                 }
