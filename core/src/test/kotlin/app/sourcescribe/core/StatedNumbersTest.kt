@@ -233,6 +233,7 @@ class StatedNumbersTest {
      * to the next line to keep a line short, and an annotation where a lint rule is suppressed.
      */
     @Test fun theScannerSeesTheDeclarationsThatUsedToSlipPastIt() {
+        // Round 13 closed these three.
         assertEquals(listOf("WRAPPED"), statedNumberNames("    const val WRAPPED =\n        8_388_608L\n"))
         assertEquals(
             listOf("ANNOTATED"),
@@ -240,33 +241,55 @@ class StatedNumbersTest {
         )
         assertEquals(listOf("TYPED"), statedNumberNames("    internal const val TYPED: Long = 10\n"))
 
+        // Round 14 closed these five. The break can come before the `=` as well as after it; an
+        // annotation's arguments can nest deeper than a pattern can count; a declaration can follow a
+        // semicolon; and a block comment after the value used to put a quotation mark into it.
+        assertEquals(listOf("EARLY"), statedNumberNames("    const val EARLY\n        = 5\n"))
+        assertEquals(
+            listOf("NESTED"),
+            statedNumberNames("    @Deprecated(\"x\", ReplaceWith(\"y()\")) const val NESTED = 5\n"),
+        )
+        assertEquals(listOf("AFTER"), statedNumberNames("    val other = 1; const val AFTER = 5\n"))
+        assertEquals(listOf("COUNT"), statedNumberNames("    const val COUNT = 5 /* \"units\" */\n"))
+        assertEquals(listOf("TWO"), statedNumberNames("    @JvmStatic @Suppress(\"F\") const val TWO = 5\n"))
+
         // Two of one name in one file are both reported, which is what lets the check above see the
         // collision instead of comparing its list against whichever of them came first.
         assertEquals(listOf("SAME", "SAME"), statedNumberNames("const val SAME = 1\nconst val SAME = 2\n"))
 
-        // And what it must keep passing over.
+        // And what it must keep passing over. The last two are the other direction: a declaration that
+        // only looks like one. Counting those would fail this test for a constant that does not exist.
         assertEquals(emptyList<String>(), statedNumberNames("    private const val HIDDEN = 5\n"))
+        assertEquals(emptyList<String>(), statedNumberNames("val a = 1; private const val Q = 5\n"))
         assertEquals(emptyList<String>(), statedNumberNames("    const val SOURCE = \"whisper-1\"\n"))
         assertEquals(emptyList<String>(), statedNumberNames("    // const val MENTIONED = 5\n"))
+        assertEquals(emptyList<String>(), statedNumberNames("/*\nconst val IN_A_BLOCK = 5\n*/\n"))
+        assertEquals(emptyList<String>(), statedNumberNames("/**\n * const val IN_KDOC = 5\n */\n"))
+        assertEquals(emptyList<String>(), statedNumberNames("    val text = \"const val QUOTED = 5\"\n"))
+
+        // A real declaration after a block comment is still found, so stripping them loses nothing.
+        assertEquals(listOf("AFTER_BLOCK"), statedNumberNames("/*\n c\n*/\nconst val AFTER_BLOCK = 7\n"))
     }
 
     /**
      * The names of the non-private `const val`s in one file whose value is a number.
      *
-     * The file is matched as a whole rather than line by line. Reading lines separately and requiring each
-     * to begin with `const val` let two everyday forms of Kotlin out of this check without anyone writing
-     * anything unusual: a declaration whose value sits on the next line because the first grew too long,
-     * and one with an annotation in front of it — `@Suppress("MagicNumber") const val …` is exactly the
-     * shape a suppressed lint finding takes. Either way the constant existed and this list never saw it.
-     * The `\s*` after the `=` crosses the line break, and the modifiers are read from the start of the
-     * line, so nothing can stand in front of the declaration and hide it either.
+     * The file is matched as a whole rather than line by line, because a declaration can be written over
+     * two lines and can have anything in front of it, and neither is unusual Kotlin. Round 13 closed three
+     * such forms — a value on the following line, an annotation in front, two constants of one name — and
+     * round 14 closed five more that the same reasoning had missed: a break before the `=` rather than
+     * after it, an annotation whose arguments nest, a declaration after a semicolon, a value followed by a
+     * block comment containing a quotation mark, and — the other direction — a declaration written inside
+     * a block comment, which was counted as real and would have failed this test for a constant that does
+     * not exist. Every one of them was reproduced before it was fixed; none occurs in the tree today.
      *
      * "A number" is decided by what is written after the `=`, not by a declared type: it must carry a digit
      * and no quotation mark. So `"whisper-1"` is passed over — a name that happens to contain a digit —
      * while `MAX_AUDIO_SECONDS / 60` is kept, because an expression over numbers still states one.
      */
     private fun statedNumberNames(source: String): List<String> {
-        val code = source.lineSequence().joinToString("\n") { it.substringBefore("//") }
+        val withoutBlocks = BLOCK_COMMENT.replace(source, "\n")
+        val code = withoutBlocks.lineSequence().joinToString("\n") { it.substringBefore("//") }
         return DECLARATION.findAll(code).mapNotNull { match ->
             val value = match.groupValues[3]
             if (match.groupValues[1].split(WHITESPACE).any { it == "private" }) return@mapNotNull null
@@ -293,19 +316,25 @@ class StatedNumbersTest {
     }
 
     private companion object {
-        private const val ANNOTATION = """@[A-Za-z][\w.]*(?:\([^)]*\))?[ \t]+"""
-        private const val MODIFIER = """(?:private|internal|public|actual|expect)[ \t]+"""
-
-        /**
-         * A shouting `const val` and its value, taken from the start of a line through whatever
-         * annotations and modifiers stand in front of it. Group one is what stood there, group two the
-         * name, group three the value — whatever follows the `=` to the end of a line, which may be the
-         * next one, because `\s*` spans the break.
-         */
+        // A shouting `const val` and its value, wherever it stands. Group one is whatever else shares
+        // the line: annotations, modifiers, or another declaration before a semicolon. It is
+        // deliberately not parsed. Round 13 spelled the annotation out as a name and one optional
+        // parenthesised group, and an annotation's argument list nests — @Deprecated("x",
+        // ReplaceWith("y()")) is three levels deep — which no regular expression can count. Since the
+        // prefix is only ever read for the word `private`, it does not need to be understood.
+        //
+        // Group two is the name, group three the value: whatever follows the `=` to the end of a line.
+        // The `\s*` on both sides of the `=` spans a line break, so a declaration wrapped before or
+        // after the `=` is still one match.
         private val DECLARATION = Regex(
-            """(?m)^[ \t]*((?:$ANNOTATION|$MODIFIER)*)const[ \t]+val[ \t]+""" +
-                """([A-Z][A-Z0-9_]*)[ \t]*(?::[^=\n]+)?=\s*([^\n]+)"""
+            """(?m)(?:^|;)([^\n;]*?)\bconst[ \t]+val[ \t]+""" +
+                """([A-Z][A-Z0-9_]*)\s*(?::[^=\n]+)?\s*=\s*([^\n]+)"""
         )
+
+        // A block comment, however many lines it runs. Line comments are cut per line instead, which is
+        // why a block comment needed its own pattern: a declaration inside one was read as real code,
+        // and a block comment after a value put a quotation mark into the value and hid it.
+        private val BLOCK_COMMENT = Regex("""/\*.*?\*/""", RegexOption.DOT_MATCHES_ALL)
 
         private val WHITESPACE = Regex("""\s+""")
 
