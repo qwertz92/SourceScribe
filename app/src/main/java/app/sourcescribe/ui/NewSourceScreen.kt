@@ -328,9 +328,10 @@ private fun ConfigControls(
                     info = HelpTopic.CAPTION_TRACK, openHelp = openHelp) { change(config.copy(allowUploaderCaptions = it)) }
                 Toggle(R.string.automatic_captions, config.allowAutomaticCaptions, enabled) { change(config.copy(allowAutomaticCaptions = it)) }
                 Toggle(R.string.translated_captions, config.allowTranslatedCaptions, enabled) { change(config.copy(allowTranslatedCaptions = it)) }
-                OutlinedTextField(config.preferredLanguages.joinToString(","),
-                    { change(config.copy(preferredLanguages = it.split(',').map(String::trim).filter(String::isNotBlank))) },
-                    Modifier.fillMaxWidth(), enabled = enabled, label = { Text(stringResource(R.string.languages)) })
+                ListField(config.preferredLanguages, { it.joinToString(",") },
+                    { typed -> typed.split(',').map(String::trim).filter(String::isNotBlank) },
+                    { change(config.copy(preferredLanguages = it)) }, Modifier.fillMaxWidth(), enabled,
+                    label = { Text(stringResource(R.string.languages)) })
             }
             if (AcquisitionPlanner.mayUseSpeechToText(config.mode)) {
                 val cap = MainViewModel.capabilities(config)
@@ -350,9 +351,10 @@ private fun ConfigControls(
                             style = MaterialTheme.typography.labelLarge)
                         InfoButton(HelpTopic.CONTEXT_TERMS, openHelp)
                     }
-                    OutlinedTextField(config.contextTerms.joinToString("\n"),
-                        { change(config.copy(contextTerms = it.lines().filter(String::isNotBlank))) },
-                        Modifier.fillMaxWidth(), enabled = enabled, minLines = 2, maxLines = 4)
+                    ListField(config.contextTerms, { it.joinToString("\n") },
+                        { typed -> typed.lines().filter(String::isNotBlank) },
+                        { change(config.copy(contextTerms = it)) }, Modifier.fillMaxWidth(), enabled,
+                        minLines = 2, maxLines = 4)
                 }
             }
             Toggle(R.string.retain_raw, config.retainRaw, enabled, info = HelpTopic.RETENTION, openHelp = openHelp) {
@@ -382,6 +384,55 @@ private fun ConfigControls(
             }
         }
     }
+}
+
+/**
+ * A text field over a list the configuration stores already split, which keeps what is being typed.
+ *
+ * Bound straight to the list, the field lost every separator the moment it was typed: a line break after
+ * "Kubernetes" split into "Kubernetes" and an empty entry, the empty entry was dropped, the list joined
+ * back to "Kubernetes", and that is what the field showed. A second term could only be pasted, or typed by
+ * breaking the first one in two. The field now holds what was typed and hands on the list it splits into,
+ * and it follows the list only when the list changes from outside — a preset, or a job prepared again.
+ *
+ * Telling "from outside" apart is the hard part, because a list handed on comes back late. Several keys
+ * can be typed between two frames, and the effect below can run for a list that is already out of date. A
+ * version that followed every list differing from the text took such a late list for a change from
+ * outside and reset the text to it mid-word: typed fast on a device, "Kubernetes", Enter, "Docker" came out
+ * as "Kuberes" and "Dokern". So every list handed on is remembered until it comes back, and only a list
+ * that was never handed on moves the text.
+ */
+@Composable
+private fun ListField(
+    values: List<String>,
+    join: (List<String>) -> String,
+    split: (String) -> List<String>,
+    change: (List<String>) -> Unit,
+    modifier: Modifier,
+    enabled: Boolean,
+    minLines: Int = 1,
+    maxLines: Int = Int.MAX_VALUE,
+    label: (@Composable () -> Unit)? = null,
+) {
+    var text by rememberSaveable { mutableStateOf(join(values)) }
+    // Oldest first. A list comes back at most once and possibly never, because two quick changes can reach
+    // the next frame as one; the newest one coming back settles everything handed on before it.
+    val handedOn = remember { mutableListOf<List<String>>() }
+    LaunchedEffect(values) {
+        when {
+            values == handedOn.lastOrNull() -> handedOn.clear()
+            values in handedOn -> repeat(handedOn.indexOf(values) + 1) { handedOn.removeAt(0) }
+            split(text) != values -> { handedOn.clear(); text = join(values) }
+        }
+    }
+    OutlinedTextField(text, { typed ->
+        text = typed
+        val list = split(typed)
+        if (list != (handedOn.lastOrNull() ?: values)) {
+            handedOn += list
+            change(list)
+        }
+    }, modifier, enabled = enabled, label = label, minLines = minLines, maxLines = maxLines)
 }
 
 /**
