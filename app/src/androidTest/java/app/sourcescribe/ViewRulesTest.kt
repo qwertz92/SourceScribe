@@ -84,6 +84,17 @@ class ViewRulesTest {
             260_004L,
             MainViewModel.estimatedCostMicrousd(config.copy(contextTerms = listOf("Kubernetes")), 3_600_000L),
         )
+
+        // What a job gets is what Start makes of the preview, and Start drops blank entries. A list stored with
+        // one, from before the field dropped them itself, showed as an empty field while the job stayed refused,
+        // and nothing on the screen said where the blank entry was (round 17). Refused as it stands, it is neither
+        // refused nor unpriced once Start has made the job of it.
+        val key = CredentialInfo("c", Provider.ASSEMBLYAI, config.region)
+        val started = MainViewModel.configurationForStart(oneBlank, listOf(key))
+        assertEquals(emptyList<String>(), started.contextTerms)
+        assertEquals(null, MainViewModel.configError(started))
+        assertNotEquals(null, MainViewModel.estimatedCostMicrousd(started, 3_600_000L))
+        assertEquals(listOf("Kubernetes"), MainViewModel.configurationForStart(mixed, listOf(key)).contextTerms)
     }
 
     @Test

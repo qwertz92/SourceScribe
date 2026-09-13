@@ -458,10 +458,19 @@ class MainViewModel @Inject constructor(
             }
         }
 
-        /** Only the deliberate Start action persists this approval, bound to its exact job configuration. */
+        /**
+         * The job a deliberate Start creates from [config]. Only this action persists the upload approval, bound to
+         * its exact job configuration.
+         *
+         * It also leaves blank keyterms out. The field over the terms drops them as they are typed, but a list
+         * stored before it did, in a job prepared again or in a preset, can still hold one. `[""]` shows as an empty
+         * field, and every provider refuses the whole list over it, so such a job stayed refused with nothing on
+         * the screen to remove (round 17). A blank entry asks for nothing, and the job starts without it.
+         */
         fun configurationForStart(config: JobConfig, credentials: List<CredentialInfo>): JobConfig = config.copy(
             uploadApproved = config.mode != AcquisitionMode.CAPTIONS_ONLY && config.model != null &&
                 credentials.any { it.id == config.credentialId && it.provider == config.provider && it.region == config.region },
+            contextTerms = ContextTerms.withoutBlanks(config.contextTerms),
         )
 
         /**
@@ -475,9 +484,11 @@ class MainViewModel @Inject constructor(
             "NO_ACCEPTABLE_CAPTIONS", "PROVIDER_REQUIRED", "CREDENTIAL_REQUIRED", "NO_AUDIO", "CHOOSE_AUDIO_TRACK",
             // And the ones that come from `configError`. Not UPLOAD_APPROVAL_REQUIRED: the preview asks
             // `configError` only once a model and a key for the chosen provider and region are there, and exactly
-            // then `configurationForStart` has set the approval, so that branch never answers the preview.
+            // then `configurationForStart` has set the approval, so that branch never answers the preview. Not
+            // CONTEXT_TERM_BLANK either, since round 17: `configurationForStart` leaves blank terms out before
+            // `configError` sees the list.
             "AUDIO_DURATION_LIMIT", "BUDGET_INVALID", "PROVIDER_CAPABILITY_OR_CREDENTIAL_INVALID",
-            "CONTEXT_TERM_BLANK", "UNSUPPORTED_OPTION", "PRICE_UNKNOWN",
+            "UNSUPPORTED_OPTION", "PRICE_UNKNOWN",
         )
 
         fun previewError(preview: SourcePreview, credentials: List<CredentialInfo>): String? {

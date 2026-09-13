@@ -212,9 +212,11 @@ private fun PreviewCard(
                 // an untrue statement about the tariff rather than about the source; which of the two
                 // limits it is, and what to do about it, is what the line below says.
                 val tooLong = MainViewModel.sourceTooLong(source.durationMs, preview.config)
+                // Priced as Start will create the job, which is also what the error line below judges. A term list
+                // stored with a blank entry has no price as it stands, and Start drops that entry.
                 val estimate = source.durationMs
                     ?.takeIf { !tooLong }
-                    ?.let { MainViewModel.estimatedCostMicrousd(preview.config, it) }
+                    ?.let { MainViewModel.estimatedCostMicrousd(MainViewModel.configurationForStart(preview.config, state.credentials), it) }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     val priceDate = capability?.priceAsOf.orEmpty()
                     ReservedText(
@@ -360,7 +362,7 @@ private fun ConfigControls(
                     InfoButton(HelpTopic.CONTEXT_TERMS, openHelp)
                 }
                 DraftTextField(edits.epoch(TypedSetting.CONTEXT_TERMS), config.contextTerms.joinToString("\n"), { typed ->
-                    type(TypedSetting.CONTEXT_TERMS) { it.copy(contextTerms = typed.lines().filter(String::isNotBlank)) }
+                    type(TypedSetting.CONTEXT_TERMS) { it.copy(contextTerms = ContextTerms.withoutBlanks(typed.lines())) }
                 }, enabled && (cap?.contextTerms == true || config.contextTerms.isNotEmpty()), minLines = 2, maxLines = 4)
             }
             Toggle(R.string.retain_raw, config.retainRaw, enabled, info = HelpTopic.RETENTION, openHelp = openHelp) {

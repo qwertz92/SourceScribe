@@ -13,8 +13,10 @@ package app.sourcescribe.core
  * `["real term", ""]` that predicate is true, the estimate added the surcharge, and the submission would
  * still have been refused. Everything that decides what a term list means reads the rule from here
  * instead of restating it: both provider paths, the check `SttStep.validate` makes before anything is
- * sent, the cost formula in `SttStep`, and the preview's error line and price in `MainViewModel`. A
- * reader added later belongs on that list.
+ * sent, the cost formula in `SttStep`, the preview's error line and price in `MainViewModel`, and the two
+ * places that leave blank entries out through [withoutBlanks]: the field over the terms as they are typed,
+ * and `MainViewModel.configurationForStart` for a list stored before that field did. A reader added later
+ * belongs on that list.
  */
 object ContextTerms {
     /** True when the providers would refuse this list outright, which is on any blank entry. */
@@ -22,4 +24,7 @@ object ContextTerms {
 
     /** True when this list asks for a prompt a provider would accept, and so may carry a surcharge. */
     fun charged(terms: List<String>): Boolean = terms.isNotEmpty() && !refused(terms)
+
+    /** The same terms without their blank entries, which ask for nothing and which [refused] turns down. */
+    fun withoutBlanks(terms: List<String>): List<String> = terms.filterNot { it.isBlank() }
 }
