@@ -34,6 +34,7 @@ import app.sourcescribe.core.TranscriptScope
 import app.sourcescribe.core.TrackSelection
 import app.sourcescribe.core.TranscriptionRequest
 import app.sourcescribe.core.Translation
+import app.sourcescribe.core.confirmedComplete
 import app.sourcescribe.core.parseBounded
 import app.sourcescribe.core.retryDelayMillis
 import app.sourcescribe.extractor.AudioPreparation
@@ -1188,7 +1189,7 @@ class SttStep @Inject constructor(
             }
         }
         val outcome = when {
-            document.scope.missingChunks.isNotEmpty() || document.scope.technicallyComplete != true -> app.sourcescribe.core.Outcome.PARTIAL_SUCCESS
+            !document.scope.confirmedComplete -> app.sourcescribe.core.Outcome.PARTIAL_SUCCESS
             document.warnings.isNotEmpty() -> app.sourcescribe.core.Outcome.SUCCESS_WITH_WARNINGS
             else -> app.sourcescribe.core.Outcome.SUCCESS
         }

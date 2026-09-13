@@ -50,7 +50,7 @@ Verlauf den Fortschritt; Androids Hintergrundregeln gelten weiterhin.
 | Grenzen | Audiodauer und lokales Budget, Netzpolitik, 1–4 parallele Jobs, Speicherlimit und Audioaufbewahrung. Budgets sind lokale Schutzgrenzen, keine verbindliche Providerabrechnung. |
 | Verlauf | Suche, Phase/Ergebnis/Export getrennt, Abbruch, neue Ausführung, fehlende Arbeit nachholen soweit sicher, anderen Anbieter vorbereiten, Eintrag löschen. AssemblyAI-Remote-Löschung bei vorhandener passender Remote-ID. |
 | Ergebnisse | Herkunft, Quelle, Sprache, Modell-/Zeit-/Sprecherdaten soweit vorhanden, Warnungen, Suche auch in langen Transkripten, Kopieren und Android-Dateifreigabe. |
-| Export | Markdown, TXT, JSON; SRT/VTT nur mit geeigneten Zeitdaten; Roh-Captions soweit vorhanden. Fehlgeschlagener Export startet keine neue STT-Anfrage. |
+| Export | Markdown, TXT, JSON; SRT/VTT nur mit geeigneten Zeitdaten; ist ein Ergebnis nicht bestätigt vollständig, beginnt die Datei mit einem Hinweis-Cue, und nicht transkribierte Abschnitte stehen als eigene Cues darin. Roh-Captions soweit vorhanden. Fehlgeschlagener Export startet keine neue STT-Anfrage. |
 | Wartung | Redigierte Diagnose, geprüfte signierte yt-dlp-/EJS-Updates und Rollback. Python/JS-Runtime/FFmpeg benötigen APK-Updates; laufende Jobs behalten ihre Engine. |
 
 Für deinen eigenen STT-Test zuerst unter **Mehr → Zugangsdaten** Anbieter/Region

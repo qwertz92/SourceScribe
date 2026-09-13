@@ -439,6 +439,99 @@ class TranscriptExporterTest {
         }
     }
 
+    @Test
+    fun aTimedExportOfAPartialResultSaysSoAndMarksWhatWasNotTranscribed() {
+        val partial = document(
+            segments = listOf(
+                Segment("one", 0, 1000, timeEvidence = TimeEvidence.PROVIDER_SEGMENT),
+                Segment("three", 2000, 2500, speaker = "A", timeEvidence = TimeEvidence.PROVIDER_SEGMENT),
+            ),
+        ).copy(
+            scope = TranscriptScope(
+                requestedDurationMs = 4000,
+                // Recorded out of order on purpose: the stretches between them are found either way.
+                processedIntervals = listOf(Interval(2000, 3000), Interval(0, 1000)),
+                missingChunks = listOf(1, 3),
+                technicallyComplete = false,
+            ),
+        )
+        assertEquals(
+            "1\n00:00:00,000 --> 00:00:01,000\n$NOTICE\n\n" +
+                "2\n00:00:00,000 --> 00:00:01,000\none\n\n" +
+                "3\n00:00:01,000 --> 00:00:02,000\n$GAP\n\n" +
+                "4\n00:00:02,000 --> 00:00:02,500\nA: three\n\n" +
+                "5\n00:00:03,000 --> 00:00:04,000\n$GAP\n\n",
+            TranscriptExporter.render(partial, ExportFormat.SRT),
+        )
+        assertEquals(
+            "WEBVTT\n\n" +
+                "NOTE\nLimitations: technicallyComplete=false; requestedDurationMs=4000; " +
+                "processedIntervals=[2000..3000, 0..1000]; missingChunks=[1, 3]\n\n" +
+                "00:00:00.000 --> 00:00:01.000\n$NOTICE\n\n" +
+                "00:00:00.000 --> 00:00:01.000\none\n\n" +
+                "00:00:01.000 --> 00:00:02.000\n$GAP\n\n" +
+                "00:00:02.000 --> 00:00:02.500\nA: three\n\n" +
+                "00:00:03.000 --> 00:00:04.000\n$GAP\n\n",
+            TranscriptExporter.render(partial, ExportFormat.VTT),
+        )
+    }
+
+    @Test
+    fun aTimedExportWhoseCompletenessWasNeverConfirmedIsNotPresentedAsWhole() {
+        val unconfirmed = document(segments = listOf(Segment("one", 0, 1000, timeEvidence = TimeEvidence.CAPTION_CUE)))
+        assertNull(unconfirmed.scope.technicallyComplete)
+        assertEquals(
+            "1\n00:00:00,000 --> 00:00:01,000\n$NOTICE\n\n2\n00:00:00,000 --> 00:00:01,000\none\n\n",
+            TranscriptExporter.render(unconfirmed, ExportFormat.SRT),
+        )
+        assertEquals(
+            "WEBVTT\n\nNOTE\nLimitations: technicallyComplete=unknown; requestedDurationMs=unknown; " +
+                "processedIntervals=none; missingChunks=[]\n\n" +
+                "00:00:00.000 --> 00:00:01.000\n$NOTICE\n\n00:00:00.000 --> 00:00:01.000\none\n\n",
+            TranscriptExporter.render(unconfirmed, ExportFormat.VTT),
+        )
+        // A missing chunk leaves the result partial even where the scope calls it technically complete.
+        val missing = unconfirmed.copy(scope = TranscriptScope(technicallyComplete = true, missingChunks = listOf(0)))
+        assertTrue(TranscriptExporter.render(missing, ExportFormat.SRT).startsWith("1\n00:00:00,000 --> 00:00:01,000\n$NOTICE\n\n"))
+    }
+
+    @Test
+    fun aConfirmedWholeTimedExportCarriesNoNoticeAndItsWarningsOnlyAsAComment() {
+        val whole = document(
+            segments = listOf(
+                Segment("one", 0, 1000, timeEvidence = TimeEvidence.PROVIDER_SEGMENT),
+                Segment("two", 1000, 2500, timeEvidence = TimeEvidence.PROVIDER_SEGMENT),
+            ),
+        ).copy(scope = TranscriptScope(2500, listOf(Interval(0, 2500)), emptyList(), true))
+        val srt = "1\n00:00:00,000 --> 00:00:01,000\none\n\n2\n00:00:01,000 --> 00:00:02,500\ntwo\n\n"
+        val cues = "00:00:00.000 --> 00:00:01.000\none\n\n00:00:01.000 --> 00:00:02.500\ntwo\n\n"
+        assertEquals(srt, TranscriptExporter.render(whole, ExportFormat.SRT))
+        assertEquals("WEBVTT\n\n$cues", TranscriptExporter.render(whole, ExportFormat.VTT))
+
+        // SRT has no comments. In VTT a warning cannot break out of one: no blank line, no timing line.
+        val warned = whole.copy(warnings = listOf("LANGUAGE_UNCERTAIN\n\n00:00:05.000 --> 00:00:06.000 <b>"))
+        assertEquals(srt, TranscriptExporter.render(warned, ExportFormat.SRT))
+        assertEquals(
+            "WEBVTT\n\nNOTE\nLimitations: technicallyComplete=true; requestedDurationMs=2500; processedIntervals=[0..2500]; " +
+                "missingChunks=[]; warning=LANGUAGE_UNCERTAIN  00:00:05.000 --&gt; 00:00:06.000 &lt;b&gt;\n\n$cues",
+            TranscriptExporter.render(warned, ExportFormat.VTT),
+        )
+    }
+
+    @Test
+    fun onlyAConfirmedYesWithoutAMissingChunkCountsAsWhole() {
+        assertTrue(TranscriptScope(technicallyComplete = true).confirmedComplete)
+        assertFalse(TranscriptScope().confirmedComplete)
+        assertFalse(TranscriptScope(technicallyComplete = false).confirmedComplete)
+        assertFalse(TranscriptScope(technicallyComplete = true, missingChunks = listOf(2)).confirmedComplete)
+    }
+
+    private companion object {
+        const val NOTICE = "[SourceScribe: this transcript is not confirmed complete. " +
+            "Its limitations are listed in the Markdown, text and JSON exports.]"
+        const val GAP = "[SourceScribe: this part of the source was not transcribed.]"
+    }
+
     private fun document(
         title: String = "A title",
         sourceId: String = "youtube:BaW_jenozKc",

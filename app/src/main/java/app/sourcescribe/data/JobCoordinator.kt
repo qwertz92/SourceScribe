@@ -452,7 +452,7 @@ class JobCoordinator @Inject constructor(
             if (dao.artifact(document.artifactId) == null) dao.insertArtifact(ArtifactRow(document.artifactId, row.jobId, row.id, row.branch,
                 document.createdAt, stored.sha256, stored.bytes, document.language, null, document.scope.technicallyComplete, document.warnings.size))
         }
-        return row.copy(state = ExecutionState.FINISHED, outcome = if (!document.scope.technicallyComplete.orFalse()) Outcome.PARTIAL_SUCCESS
+        return row.copy(state = ExecutionState.FINISHED, outcome = if (!document.scope.confirmedComplete) Outcome.PARTIAL_SUCCESS
             else if (document.warnings.isNotEmpty()) Outcome.SUCCESS_WITH_WARNINGS else Outcome.SUCCESS, error = null)
     }
 
@@ -689,7 +689,7 @@ class JobCoordinator @Inject constructor(
                     document.provenance.reportedModel ?: document.provenance.requestedModel,
                     document.scope.technicallyComplete, document.warnings.size))
                 if (!job.cancelRequested) dao.updateAttempt(row.copy(state = ExecutionState.FINISHED,
-                    outcome = when { document.scope.technicallyComplete != true -> Outcome.PARTIAL_SUCCESS
+                    outcome = when { !document.scope.confirmedComplete -> Outcome.PARTIAL_SUCCESS
                         document.warnings.isNotEmpty() -> Outcome.SUCCESS_WITH_WARNINGS; else -> Outcome.SUCCESS },
                     error = null, leaseOwner = null, leaseUntil = 0))
             }
@@ -842,7 +842,6 @@ class JobCoordinator @Inject constructor(
         catch (failure: Exception) { target.failWrite(output); throw failure }
     }
     private fun sha256(bytes: ByteArray) = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
-    private fun Boolean?.orFalse() = this == true
     private companion object { val runnable = setOf(ExecutionState.QUEUED, ExecutionState.WAITING_NETWORK, ExecutionState.WAITING_RATE_LIMIT, ExecutionState.WAITING_REMOTE) }
 }
 

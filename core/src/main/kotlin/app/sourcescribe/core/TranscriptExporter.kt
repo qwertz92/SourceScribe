@@ -182,19 +182,62 @@ object TranscriptExporter {
                     TranscriptExportException.TIMESTAMPS_REQUIRED
                 },
             )
+        val srt = format == ExportFormat.SRT
+        val cues = segments.mapTo(ArrayList()) { segment ->
+            val speaker = segment.speaker?.let(::singleLineTimedValue)?.takeIf { it.isNotBlank() }
+            TimedCue(segment.startMs!!, segment.endMs!!, (if (speaker != null) "$speaker: " else "") + timedText(segment.text)!!)
+        }
+        val whole = document.scope.confirmedComplete
+        if (!whole) {
+            // A player shows cues and nothing else, so what Markdown, text and JSON carry as metadata has to be
+            // a cue here: before this, a partial result exported as SRT looked exactly like a whole one. The
+            // notice borrows the interval of the first cue instead of claiming a time of its own, and a stretch
+            // that was not transcribed gets the interval the scope records for it, nothing read from the text.
+            untranscribed(document.scope).forEach { cues += TimedCue(it.startMs, it.endMs, UNTRANSCRIBED_NOTICE) }
+            cues.sortWith(compareBy({ it.startMs }, { it.endMs }))
+            cues.add(0, cues.first().copy(text = PARTIAL_NOTICE))
+        }
         return buildString {
-            if (format == ExportFormat.VTT) append("WEBVTT\n\n")
-            segments.forEachIndexed { index, segment ->
-                if (format == ExportFormat.SRT) append(index + 1).append("\n")
-                append(timestamp(segment.startMs!!, format == ExportFormat.SRT))
-                    .append(" --> ")
-                    .append(timestamp(segment.endMs!!, format == ExportFormat.SRT))
-                    .append("\n")
-                val speaker = segment.speaker?.let(::singleLineTimedValue)?.takeIf { it.isNotBlank() }
-                if (speaker != null) append(speaker).append(": ")
-                append(timedText(segment.text)!!).append("\n\n")
+            if (!srt) {
+                append("WEBVTT\n\n")
+                // A comment is read by whoever opens the file rather than by the player, so the limitations go
+                // there in full. Line breaks become spaces and markup is escaped, which keeps `-->` out as well.
+                if (!whole || document.warnings.isNotEmpty()) {
+                    append("NOTE\n").append(singleLineTimedValue("Limitations: ${limitations(document)}")).append("\n\n")
+                }
+            }
+            cues.forEachIndexed { index, cue ->
+                if (srt) append(index + 1).append("\n")
+                append(timestamp(cue.startMs, srt)).append(" --> ").append(timestamp(cue.endMs, srt)).append("\n")
+                append(cue.text).append("\n\n")
             }
         }
+    }
+
+    /** The first cue of a timed export whose result is not confirmed whole, by [confirmedComplete]. */
+    internal const val PARTIAL_NOTICE = "[SourceScribe: this transcript is not confirmed complete. " +
+        "Its limitations are listed in the Markdown, text and JSON exports.]"
+    /** The cue over a stretch of the source that the scope records as not transcribed. */
+    internal const val UNTRANSCRIBED_NOTICE = "[SourceScribe: this part of the source was not transcribed.]"
+
+    private data class TimedCue(val startMs: Long, val endMs: Long, val text: String)
+
+    /**
+     * The stretches of the requested duration outside every processed interval. Known only where the scope
+     * records both, which a caption document does not; there the notice has to say it on its own.
+     */
+    private fun untranscribed(scope: TranscriptScope): List<Interval> {
+        val requested = scope.requestedDurationMs ?: return emptyList()
+        if (requested <= 0 || scope.processedIntervals.isEmpty()) return emptyList()
+        val gaps = ArrayList<Interval>()
+        var covered = 0L
+        for (interval in scope.processedIntervals.sortedBy { it.startMs }) {
+            val start = interval.startMs.coerceIn(0L, requested)
+            if (start > covered) gaps += Interval(covered, start)
+            covered = maxOf(covered, interval.endMs.coerceIn(0L, requested))
+        }
+        if (covered < requested) gaps += Interval(covered, requested)
+        return gaps
     }
 
     private fun hasUnrepresentableTimedText(document: TranscriptDocument): Boolean =

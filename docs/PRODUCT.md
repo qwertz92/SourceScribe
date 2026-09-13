@@ -65,7 +65,7 @@ Originaldaten auf Wunsch speichern; abgeleitete bereinigte Texte getrennt halten
 
 ### SS-08 — Speicherung und Exporte
 
-Intern eine kanonische, dauerhaft gespeicherte Fassung behalten. Externe Zielordner über Android Storage Access Framework auswählen, nicht als ungeprüften Dateisystempfad behandeln. Markdown ist Standard; TXT, strukturiertes JSON sowie SRT/VTT bei vorhandenen geeigneten Zeitdaten. Rohe Captions sind eine zusätzliche Ausgabe. Tatsächliches Rohformat erhalten; Konvertierungen kennzeichnen.
+Intern eine kanonische, dauerhaft gespeicherte Fassung behalten. Externe Zielordner über Android Storage Access Framework auswählen, nicht als ungeprüften Dateisystempfad behandeln. Markdown ist Standard; TXT, strukturiertes JSON sowie SRT/VTT bei vorhandenen geeigneten Zeitdaten. Ein Teilergebnis bleibt auch dort erkennbar, weil ein Player nur Cues zeigt: ein Hinweis-Cue am Anfang und eigene Cues über nicht transkribierte Abschnitte. Rohe Captions sind eine zusätzliche Ausgabe. Tatsächliches Rohformat erhalten; Konvertierungen kennzeichnen.
 
 Bei Verlust der Ordnerberechtigung bleibt das Transkript intern verfügbar und erhält `EXPORT_PENDING/FAILED`, keine erneute STT-Anfrage. Export wiederholbar, Kollisionen vermeiden. Dateinamen enthalten Video-/Source-ID, Quelle/Modell und Sprachangabe; Titel allein ist nicht eindeutig. Exportmetadaten bleiben auch nach Umbenennung aussagekräftig.
 

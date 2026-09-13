@@ -154,6 +154,14 @@ data class TranscriptScope(
     val technicallyComplete: Boolean? = null,
 )
 
+/**
+ * Whether a transcript may be presented as the whole of what was asked for. Nothing short of a confirmed yes
+ * counts: a completeness nobody confirmed is not a complete result, and a missing chunk is a part of the source
+ * nobody transcribed, whatever else the scope says. The outcome of an attempt and the timed exports both ask
+ * this, so a result the history calls partial is not exported as a whole one.
+ */
+val TranscriptScope.confirmedComplete: Boolean get() = technicallyComplete == true && missingChunks.isEmpty()
+
 @Serializable
 data class TranscriptDocument(
     val schemaVersion: Int = 1,
