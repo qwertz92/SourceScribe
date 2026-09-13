@@ -28,6 +28,7 @@ import okhttp3.ResponseBody.Companion.toResponseBody
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
@@ -138,6 +139,7 @@ class EngineUpdateManagerTest {
             createRegularSlot(harness, corrupt, "corrupt".toByteArray())
             writeState(harness, active = bundled, previous = corrupt, candidate = corrupt)
 
+            assertNull(newManager(harness).rollbackTarget())
             val failure = expectUpdateFailure { newManager(harness).rollback() }
             assertEquals(EngineUpdateCode.NO_PREVIOUS, failure.code)
         }
@@ -151,8 +153,31 @@ class EngineUpdateManagerTest {
             createSymlinkSlot(harness, symlinked)
             writeState(harness, active = bundled, previous = symlinked, candidate = symlinked)
 
+            assertNull(newManager(harness).rollbackTarget())
             val failure = expectUpdateFailure { newManager(harness).rollback() }
             assertEquals(EngineUpdateCode.NO_PREVIOUS, failure.code)
+        }
+    }
+
+    @Test
+    fun rollbackGoesOnlyWhereItsNamedTargetIs() = runBlocking {
+        withIsolatedManager { harness ->
+            val bundled = harness.manager.bundled()
+            val previous = createScriptedCandidate(harness, "never run")
+            writeState(harness, active = bundled, previous = previous, candidate = previous)
+            val manager = newManager(harness)
+
+            assertEquals(previous.id, manager.rollbackTarget()?.id)
+            // A confirmation given for another installation switches nothing.
+            val refused = expectUpdateFailure { manager.rollback(expectedId = bundled.id) }
+            assertEquals(EngineUpdateCode.ROLLBACK_TARGET_CHANGED, refused.code)
+            assertEquals(bundled.id, manager.active().id)
+            assertEquals(previous.id, manager.rollbackTarget()?.id)
+
+            assertEquals(previous.id, manager.rollback(expectedId = previous.id).id)
+            assertEquals(previous.id, manager.active().id)
+            // The installation just left is the one a rollback would now return to, and the target says so.
+            assertEquals(bundled.id, manager.rollbackTarget()?.id)
         }
     }
 

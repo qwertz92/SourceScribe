@@ -177,6 +177,29 @@ class ViewModelStateTest {
     }
 
     @Test
+    fun goingBackNamesItsTargetBeforeAnythingIsSwitched() = withFixture {
+        awaitInitialization()
+        // Only the bundled engine is installed and it is the active one, so there is nothing to name.
+        onMain { viewModel.prepareRollback() }
+        val refused = withTimeout(TIMEOUT_MS) { viewModel.screen.first { !it.busy && it.message != null } }
+        assertEquals("ENGINE_NO_PREVIOUS", refused.message)
+        assertNull(refused.rollbackTarget)
+
+        val named = refused.installations.single()
+        setScreen(refused.copy(message = null, rollbackTarget = named))
+        onMain { viewModel.cancelRollback() }
+        assertNull(viewModel.screen.value.rollbackTarget)
+
+        setScreen(viewModel.screen.value.copy(rollbackTarget = named))
+        onMain { viewModel.rollback(named.id) }
+        val confirmed = withTimeout(TIMEOUT_MS) { viewModel.screen.first { !it.busy && it.message != null } }
+        // The confirmation closes whatever the answer is, and the answer is the manager's, which still has
+        // nothing to go back to: a confirmed id is a condition on the switch, not a way around its checks.
+        assertNull(confirmed.rollbackTarget)
+        assertEquals("ENGINE_NO_PREVIOUS", confirmed.message)
+    }
+
+    @Test
     fun importingLocalAudioClearsPriorYoutubeTrackSelections() = withFixture {
         awaitInitialization()
         val requested = approvedConfig(captionTrackId = CAPTION_B, audioTrackId = AUDIO_B)

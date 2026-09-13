@@ -42,6 +42,7 @@ enum class EngineUpdateCode {
     PROBE_FAILED,
     UNCERTAIN_PROBE,
     NO_PREVIOUS,
+    ROLLBACK_TARGET_CHANGED,
 }
 
 internal enum class EngineHttpResponseKind { NOT_MODIFIED, REDIRECT, SUCCESS, OTHER }
@@ -271,19 +272,39 @@ class EngineUpdateManager internal constructor(
         candidate
     }
 
-    suspend fun rollback(): EngineInstallation = mutex.withLock {
+    /**
+     * The installation [rollback] would make active now, or null when there is nothing to go back to. It
+     * changes nothing, so the settings screen can name the version before anyone confirms going back to it.
+     */
+    suspend fun rollbackTarget(): EngineInstallation? = mutex.withLock {
+        rollbackTargetLocked(ensureBundledLocked(), stateLocked())
+    }
+
+    /**
+     * Makes the previous installation active again, or the bundled one when no usable previous one remains.
+     *
+     * [expectedId] is the target the reader confirmed after [rollbackTarget] named it. If the state has moved
+     * on since, nothing is switched: going back to a version nobody was shown is the one thing a confirmation
+     * is there to prevent, and an older version is not safer for being older.
+     */
+    suspend fun rollback(expectedId: String? = null): EngineInstallation = mutex.withLock {
         val bundled = ensureBundledLocked()
         val state = stateLocked()
         val current = state.activeId
-        val target = state.previousId?.let { state.installations[it] }
-            ?.takeIf { it.healthy && state.healthyIds.contains(it.id) && validSlot(it) }
-            ?: bundled.takeIf { it.id != current }
-            ?: throw EngineUpdateException(EngineUpdateCode.NO_PREVIOUS)
+        val target = rollbackTargetLocked(bundled, state) ?: throw EngineUpdateException(EngineUpdateCode.NO_PREVIOUS)
+        if (expectedId != null && target.id != expectedId) {
+            throw EngineUpdateException(EngineUpdateCode.ROLLBACK_TARGET_CHANGED)
+        }
         if (current != target.id) state.previousId = current?.takeIf { healthySlot(state, it) != null }
         state.activeId = target.id
         saveStateLocked(state)
         target
     }
+
+    private fun rollbackTargetLocked(bundled: EngineInstallation, state: ManagerState): EngineInstallation? =
+        state.previousId?.let { state.installations[it] }
+            ?.takeIf { it.healthy && state.healthyIds.contains(it.id) && validSlot(it) }
+            ?: bundled.takeIf { it.id != state.activeId }
 
     suspend fun installations(): List<EngineInstallation> = mutex.withLock {
         ensureBundledLocked()

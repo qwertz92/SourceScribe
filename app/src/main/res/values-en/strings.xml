@@ -79,6 +79,7 @@
     <string name="engines">Extraction components</string>
     <string name="engine_activate">Check and activate</string>
     <string name="engine_rollback">Restore previous engine</string>
+    <string name="engine_rollback_help">This becomes active again: %1$s. An older version can contain security flaws that a later one already fixes, and SourceScribe does not check for them. Only go back if the current engine does not work, and update again soon.</string>
     <string name="engine_probe">Public YouTube source for the functional test</string>
     <string name="engine_help">yt-dlp and EJS are signature-verified together. Python, the JavaScript runtime, and FFmpeg require an APK update. Running jobs keep their engine.</string>
     <string name="engine_current">No new update found</string>
@@ -422,6 +423,7 @@
     <string name="reason_engine_probe">The new component failed its self-test. The previous one stays active.</string>
     <string name="reason_engine_probe_uncertain">The self-test gave no clear result. The previous component stays active.</string>
     <string name="reason_engine_no_previous">There is no earlier component to go back to.</string>
+    <string name="reason_engine_rollback_target_changed">The component to go back to has changed in the meantime. Nothing was switched.</string>
     <string name="key_invalid_input">The key you entered does not have the expected shape. Copy it again from your provider account.</string>
     <string name="reason_import_invalid">This file is not an audio file the app can process.</string>
     <string name="reason_import_unavailable">The file can no longer be reached. It may have been moved or deleted.</string>

@@ -78,6 +78,8 @@ data class ScreenState(
     val documentName: String? = null,
     val credentials: List<CredentialInfo> = emptyList(),
     val installations: List<EngineInstallation> = emptyList(),
+    /** The installation a rollback would activate, while the confirmation that names it is open. */
+    val rollbackTarget: EngineInstallation? = null,
     val update: AvailableEngine? = null,
     val shareUri: String? = null,
     val shareMime: String = "text/markdown",
@@ -373,7 +375,20 @@ class MainViewModel @Inject constructor(
         refreshEngines()
         mutable.update { it.copy(update = null, message = "ENGINE_ACTIVE") }
     }
-    fun rollback() = action { engines.rollback(); refreshEngines(); mutable.update { it.copy(message = "ENGINE_ACTIVE") } }
+    /**
+     * Opens the confirmation for going back, named with the installation it would activate. Going back is not
+     * one tap: an older engine is not safer for being older, and it can lack fixes the current one has.
+     */
+    fun prepareRollback() = action {
+        val target = engines.rollbackTarget() ?: throw EngineUpdateException(EngineUpdateCode.NO_PREVIOUS)
+        mutable.update { it.copy(rollbackTarget = target) }
+    }
+    fun cancelRollback() { mutable.update { it.copy(rollbackTarget = null) } }
+    /** Goes back to [expectedId] and nowhere else: the installation the confirmation named. */
+    fun rollback(expectedId: String) {
+        mutable.update { it.copy(rollbackTarget = null) }
+        action { engines.rollback(expectedId); refreshEngines(); mutable.update { it.copy(message = "ENGINE_ACTIVE") } }
+    }
 
     private suspend fun refreshEngines() { val installed = engines.installations(); mutable.update { it.copy(installations = installed) } }
 

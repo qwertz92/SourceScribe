@@ -350,6 +350,7 @@ internal fun byteSize(bytes: Long): String {
     "ENGINE_PROBE_FAILED" -> stepText(code, R.string.reason_engine_probe)
     "ENGINE_UNCERTAIN_PROBE" -> stepText(code, R.string.reason_engine_probe_uncertain)
     "ENGINE_NO_PREVIOUS" -> stepText(code, R.string.reason_engine_no_previous)
+    "ENGINE_ROLLBACK_TARGET_CHANGED" -> stepText(code, R.string.reason_engine_rollback_target_changed)
 
     "KEY_INVALID_INPUT", "CREDENTIAL_INVALID_INPUT" -> stringResource(R.string.key_invalid_input)
 

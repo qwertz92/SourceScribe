@@ -264,7 +264,13 @@ internal fun SettingsScreen(
                 Button({ model.stageAndActivate(probe) }, Modifier.fillMaxWidth().heightIn(min = 52.dp),
                     enabled = probe.isNotBlank() && !state.busy) { Text(stringResource(R.string.engine_activate)) }
             }
-            TextButton(model::rollback, enabled = !state.busy) { Text(stringResource(R.string.engine_rollback)) }
+            TextButton(model::prepareRollback, enabled = !state.busy) { Text(stringResource(R.string.engine_rollback)) }
+        }
+    }
+    state.rollbackTarget?.let { target ->
+        ConfirmationDialog(stringResource(R.string.engine_rollback), stringResource(R.string.engine_rollback_help,
+            "yt-dlp ${target.version} · EJS ${target.ejsVersion} · ${channelName(target.channel)}"), model::cancelRollback) {
+            model.rollback(target.id)
         }
     }
 }
