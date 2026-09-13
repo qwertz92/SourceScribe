@@ -342,23 +342,27 @@ private fun ConfigControls(
                 DraftTextField(edits.epoch(TypedSetting.STT_LANGUAGE), config.language.orEmpty(), { typed ->
                     type(TypedSetting.STT_LANGUAGE) { it.copy(language = typed.ifBlank { null }) }
                 }, enabled, label = { Text(stringResource(R.string.stt_language)) })
-                Toggle(R.string.diarization, config.diarization, enabled && cap?.diarization == true,
+                // What the model cannot do stays operable while it is still set, because it was set for a model
+                // chosen before and the preview refuses the job as UNSUPPORTED_OPTION until it is gone. Enabled
+                // only by the capability, a switch that was on sat greyed out where it could not be turned off,
+                // and terms were hidden while they were the reason the job was refused.
+                Toggle(R.string.diarization, config.diarization, enabled && (cap?.diarization == true || config.diarization),
                     info = HelpTopic.DIARIZATION, openHelp = openHelp) { change(config.copy(diarization = it)) }
-                Toggle(R.string.word_times, config.wordTimestamps, enabled && cap?.wordTimestamps == true,
+                Toggle(R.string.word_times, config.wordTimestamps, enabled && (cap?.wordTimestamps == true || config.wordTimestamps),
                     info = HelpTopic.TIMESTAMPS, openHelp = openHelp) { change(config.copy(wordTimestamps = it)) }
-                Toggle(R.string.segment_times, config.segmentTimestamps, enabled && cap?.segmentTimestamps == true) {
+                Toggle(R.string.segment_times, config.segmentTimestamps,
+                    enabled && (cap?.segmentTimestamps == true || config.segmentTimestamps)) {
                     change(config.copy(segmentTimestamps = it))
                 }
-                if (cap?.contextTerms == true) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(stringResource(R.string.context_terms), Modifier.weight(1f),
-                            style = MaterialTheme.typography.labelLarge)
-                        InfoButton(HelpTopic.CONTEXT_TERMS, openHelp)
-                    }
-                    DraftTextField(edits.epoch(TypedSetting.CONTEXT_TERMS), config.contextTerms.joinToString("\n"), { typed ->
-                        type(TypedSetting.CONTEXT_TERMS) { it.copy(contextTerms = typed.lines().filter(String::isNotBlank)) }
-                    }, enabled, minLines = 2, maxLines = 4)
+                // Always in its place, so choosing a model that takes no terms moves nothing below it.
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(R.string.context_terms), Modifier.weight(1f),
+                        style = MaterialTheme.typography.labelLarge)
+                    InfoButton(HelpTopic.CONTEXT_TERMS, openHelp)
                 }
+                DraftTextField(edits.epoch(TypedSetting.CONTEXT_TERMS), config.contextTerms.joinToString("\n"), { typed ->
+                    type(TypedSetting.CONTEXT_TERMS) { it.copy(contextTerms = typed.lines().filter(String::isNotBlank)) }
+                }, enabled && (cap?.contextTerms == true || config.contextTerms.isNotEmpty()), minLines = 2, maxLines = 4)
             }
             Toggle(R.string.retain_raw, config.retainRaw, enabled, info = HelpTopic.RETENTION, openHelp = openHelp) {
                 change(config.copy(retainRaw = it))
