@@ -30,6 +30,7 @@ class ArtifactFilesException(
         const val INVALID_ID = INVALID_ARTIFACT_ID
         const val INVALID_RAW_EXTENSION = "INVALID_RAW_EXTENSION"
         const val RAW_EXTENSION_WITHOUT_DATA = "RAW_EXTENSION_WITHOUT_DATA"
+        const val RAW_DATA_WITHOUT_EXTENSION = "RAW_DATA_WITHOUT_EXTENSION"
         const val RAW_NOT_ALLOWED = "RAW_NOT_ALLOWED"
         const val RAW_NOT_RETAINED = RAW_NOT_ALLOWED
         const val RAW_REQUIRED = "RAW_REQUIRED"
@@ -255,11 +256,18 @@ class ArtifactFiles(private val root: File) {
         if (raw == null && rawExtension != null) {
             fail(ArtifactFilesException.RAW_EXTENSION_WITHOUT_DATA, "rawExtension requires raw bytes")
         }
+        // The mirror image of the check above, and it was missing. Every other violation in this function
+        // leaves through `fail` with a reason code a caller can read; `rawExtension!!` left through a bare
+        // NullPointerException instead. Both callers in the app happen to pass the two together, but that
+        // was their discipline, not this function's contract, and neither is what the module promises.
+        if (raw != null && rawExtension == null) {
+            fail(ArtifactFilesException.RAW_DATA_WITHOUT_EXTENSION, "raw bytes require a rawExtension")
+        }
         if (raw != null && !document.acquisition.retainRaw) {
             fail(ArtifactFilesException.RAW_NOT_ALLOWED, "raw retention is disabled for this document")
         }
         if (raw != null) {
-            validateRawExtension(rawExtension!!)
+            validateRawExtension(requireNotNull(rawExtension))
             if (raw.size > MAX_RAW_BYTES) {
                 fail(ArtifactFilesException.RAW_TOO_LARGE, "raw data exceeds $MAX_RAW_BYTES bytes")
             }

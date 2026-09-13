@@ -306,6 +306,18 @@ class ArtifactFilesTest {
         }
         assertEquals(ArtifactFilesException.RAW_NOT_ALLOWED, notRetained.reason)
         assertNull(store.rawFile(document().artifactId))
+
+        // Both directions of the pair, not just the one that had a code. Raw bytes without an extension
+        // used to leave as a NullPointerException, which tells a caller nothing it can act on; the
+        // function refused the reverse combination from the beginning.
+        val extensionWithoutData = assertThrows(ArtifactFilesException::class.java) {
+            store.write(retained, null, "txt")
+        }
+        assertEquals(ArtifactFilesException.RAW_EXTENSION_WITHOUT_DATA, extensionWithoutData.reason)
+        val dataWithoutExtension = assertThrows(ArtifactFilesException::class.java) {
+            store.write(retained, byteArrayOf(1), null)
+        }
+        assertEquals(ArtifactFilesException.RAW_DATA_WITHOUT_EXTENSION, dataWithoutExtension.reason)
     }
 
     private fun document(

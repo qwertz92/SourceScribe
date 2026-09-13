@@ -54,6 +54,7 @@ private val KNOWN_ERROR_CODES = buildSet {
         listOf(
             ArtifactFilesException.INVALID_ARTIFACT_ID, ArtifactFilesException.INVALID_RAW_EXTENSION,
             ArtifactFilesException.RAW_EXTENSION_WITHOUT_DATA, ArtifactFilesException.RAW_NOT_ALLOWED,
+            ArtifactFilesException.RAW_DATA_WITHOUT_EXTENSION,
             ArtifactFilesException.RAW_REQUIRED, ArtifactFilesException.CANONICAL_TOO_LARGE,
             ArtifactFilesException.RAW_TOO_LARGE, ArtifactFilesException.RAW_HASH_MISMATCH,
             ArtifactFilesException.CONFLICTING_CONTENT, ArtifactFilesException.NOT_FOUND,
