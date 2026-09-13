@@ -241,7 +241,7 @@ class StatedNumbersTest {
         )
         assertEquals(listOf("TYPED"), statedNumberNames("    internal const val TYPED: Long = 10\n"))
 
-        // Round 14 closed these five. The break can come before the `=` as well as after it; an
+        // Round 14 closed these four. The break can come before the `=` as well as after it; an
         // annotation's arguments can nest deeper than a pattern can count; a declaration can follow a
         // semicolon; and a block comment after the value used to put a quotation mark into it.
         assertEquals(listOf("EARLY"), statedNumberNames("    const val EARLY\n        = 5\n"))
@@ -251,6 +251,11 @@ class StatedNumbersTest {
         )
         assertEquals(listOf("AFTER"), statedNumberNames("    val other = 1; const val AFTER = 5\n"))
         assertEquals(listOf("COUNT"), statedNumberNames("    const val COUNT = 5 /* \"units\" */\n"))
+
+        // Two annotations in a row, which round 13's pattern already read correctly — its prefix group
+        // repeated, so it never needed to count anything. Round 14's version of the comment above put this
+        // case among the five forms it closed; running both patterns over every case in round 15 showed it
+        // was never one of them. It stays here as the guard it actually is.
         assertEquals(listOf("TWO"), statedNumberNames("    @JvmStatic @Suppress(\"F\") const val TWO = 5\n"))
 
         // Two of one name in one file are both reported, which is what lets the check above see the
@@ -267,34 +272,139 @@ class StatedNumbersTest {
         assertEquals(emptyList<String>(), statedNumberNames("/**\n * const val IN_KDOC = 5\n */\n"))
         assertEquals(emptyList<String>(), statedNumberNames("    val text = \"const val QUOTED = 5\"\n"))
 
-        // A real declaration after a block comment is still found, so stripping them loses nothing.
+        // A real declaration after a block comment is still found, so removing them loses nothing.
         assertEquals(listOf("AFTER_BLOCK"), statedNumberNames("/*\n c\n*/\nconst val AFTER_BLOCK = 7\n"))
+
+        // Round 15 closed four more. The first two were loud: a phantom declaration puts an entry into the
+        // list that nothing names, and the test above fails for a constant that does not exist. The last two
+        // were silent, which is worse: a declaration the scanner cannot see is missing from both sides of
+        // that comparison once nobody has listed it, so nothing fails and the number is never stated.
+        assertEquals(
+            emptyList<String>(),
+            statedNumberNames("val t = \"\"\"\n const val IN_A_RAW_STRING = 1\n\"\"\"\n"),
+        )
+        assertEquals(
+            emptyList<String>(),
+            statedNumberNames("/* a /* b */ still commented, const val IN_A_NESTED_BLOCK = 1 */\n"),
+        )
+        assertEquals(
+            listOf("PAST_A_SLASH_STAR"),
+            statedNumberNames(
+                "val a = \"opens /* c\"\nconst val PAST_A_SLASH_STAR = 42\nval b = \"closes */ c\"\n"
+            ),
+        )
+        assertEquals(listOf("ONE", "OTHER"), statedNumberNames("const val ONE = 1; const val OTHER = 2\n"))
+
+        // And three things the tokeniser has to read past, the first two because this module contains
+        // them: a character literal holding a quotation mark (`BoundedJson`), one holding a semicolon
+        // (`CaptionParser`), and an escaped quotation mark inside a string. Each case puts a declaration on
+        // the line after it and requires that declaration to be found. The version before round 15 read
+        // all three correctly; they are here so a later change to the tokeniser cannot stop doing so unseen.
+        assertEquals(
+            listOf("PAST_A_CHAR_QUOTE"),
+            statedNumberNames("when (c) {\n    '\"' -> quoted = true\n}\nconst val PAST_A_CHAR_QUOTE = 3\n"),
+        )
+        assertEquals(
+            listOf("PAST_A_CHAR_SEMICOLON"),
+            statedNumberNames("val s = ';'\nconst val PAST_A_CHAR_SEMICOLON = 4\n"),
+        )
+        assertEquals(
+            listOf("PAST_AN_ESCAPED_QUOTE"),
+            statedNumberNames("val a = \"one \\\" two\"\nconst val PAST_AN_ESCAPED_QUOTE = 6\n"),
+        )
     }
 
     /**
      * The names of the non-private `const val`s in one file whose value is a number.
      *
-     * The file is matched as a whole rather than line by line, because a declaration can be written over
-     * two lines and can have anything in front of it, and neither is unusual Kotlin. Round 13 closed three
-     * such forms — a value on the following line, an annotation in front, two constants of one name — and
-     * round 14 closed five more that the same reasoning had missed: a break before the `=` rather than
-     * after it, an annotation whose arguments nest, a declaration after a semicolon, a value followed by a
-     * block comment containing a quotation mark, and — the other direction — a declaration written inside
-     * a block comment, which was counted as real and would have failed this test for a constant that does
-     * not exist. Every one of them was reproduced before it was fixed; none occurs in the tree today.
+     * The file is tokenised rather than matched line by line, because a declaration can be written over
+     * two lines, can have anything in front of it, and can sit inside a comment or a literal — and none of
+     * that is unusual Kotlin. Round 13 closed three forms the line-by-line version walked past: a value on
+     * the following line, an annotation in front, two constants of one name. Round 14 closed four more and
+     * one in the other direction: a break before the `=` rather than after it, an annotation whose
+     * arguments nest, a declaration after a semicolon, a value followed by a block comment containing a
+     * quotation mark, and a declaration written inside a block comment, which was counted as real and
+     * would have failed this test for a constant that does not exist. Round 15 replaced the two patterns
+     * that did that work with `codeOnly` and closed four more, two of them silent. Every form was
+     * reproduced in a model before it was fixed, and none of them occurs in the tree today.
+     *
+     * What `codeOnly` does not model is written down rather than left to be found: a string template
+     * whose expression holds a string of its own, as in `"${x ?: "unknown"}"`. The inner quotation mark
+     * ends the outer literal early and the inner literal is read as code, so a comment opener inside it
+     * would start a comment that is not there. No line of this module that holds a template followed by a
+     * quotation mark has a comment opener in it, and the scanner reads the same 33 constants over the real
+     * tree as the version before it — measured, in a model, not assumed. DEFECTS 34 carries it.
      *
      * "A number" is decided by what is written after the `=`, not by a declared type: it must carry a digit
      * and no quotation mark. So `"whisper-1"` is passed over — a name that happens to contain a digit —
      * while `MAX_AUDIO_SECONDS / 60` is kept, because an expression over numbers still states one.
      */
-    private fun statedNumberNames(source: String): List<String> {
-        val withoutBlocks = BLOCK_COMMENT.replace(source, "\n")
-        val code = withoutBlocks.lineSequence().joinToString("\n") { it.substringBefore("//") }
-        return DECLARATION.findAll(code).mapNotNull { match ->
+    private fun statedNumberNames(source: String): List<String> =
+        DECLARATION.findAll(codeOnly(source)).mapNotNull { match ->
             val value = match.groupValues[3]
             if (match.groupValues[1].split(WHITESPACE).any { it == "private" }) return@mapNotNull null
             match.groupValues[2].takeIf { value.none { char -> char == '"' } && value.any(Char::isDigit) }
         }.toList()
+
+    /**
+     * The same file with its comments and literals blanked out, so that what is left is code.
+     *
+     * Round 14 approximated this with one pattern for block comments and a cut at `//` per line, and
+     * round 15 found three ways for that to be wrong. A `const val` inside a raw string was read as real.
+     * A nested block comment — legal Kotlin, and no regular expression can count brackets — ended at the
+     * inner closing delimiter, leaving the rest of the outer comment standing as code. And an opening
+     * delimiter inside a string literal began a comment that ran to the next closing delimiter in some
+     * later string, swallowing whatever stood between them. The first two were loud — a phantom entry
+     * fails the comparison in `everyNumberThisModuleStatesHasALineInThisFile` — and the third was
+     * silent: a declaration this function cannot see is missing from both sides of that comparison once
+     * nobody has listed it, so nothing fails and nobody is asked to state the number. Separating code from
+     * not-code is tokenising, so this tokenises instead of approximating.
+     *
+     * The delimiters are named rather than written here for the reason this function exists: a closing one
+     * inside a KDoc ends the KDoc, and the first draft of this paragraph contained one. Everything after
+     * it was compiled as code, which is how the build reported it.
+     *
+     * Character literals are read for a reason that has nothing to do with those three: this module holds
+     * a quotation mark as a character literal in `BoundedJson` and a semicolon as one in `CaptionParser`.
+     * A tokeniser that knew strings but not characters would open a string at the first and see a statement
+     * boundary at the second. Over this module that costs nothing today — a port of this function reads
+     * the same 33 constants without the branch — so the assertions for both do not show that the branch
+     * is needed. They hold that a declaration after either is still found, however the tokeniser changes.
+     *
+     * A comment becomes spaces and keeps its line breaks, so a declaration wrapped across lines still
+     * reads as one. A literal becomes an empty literal of its own kind, which is what lets the value test
+     * keep refusing `const val SOURCE = "whisper-1"` for the quotation mark rather than by accident.
+     */
+    private fun codeOnly(source: String): String {
+        val out = StringBuilder(source.length)
+        var index = 0
+        var depth = 0
+        while (index < source.length) {
+            val char = source[index]
+            when {
+                depth > 0 && source.startsWith("/*", index) -> { depth++; out.append("  "); index += 2 }
+                depth > 0 && source.startsWith("*/", index) -> { depth--; out.append("  "); index += 2 }
+                depth > 0 -> { out.append(if (char == '\n') '\n' else ' '); index++ }
+                source.startsWith("/*", index) -> { depth = 1; out.append("  "); index += 2 }
+                source.startsWith("//", index) ->
+                    while (index < source.length && source[index] != '\n') index++
+                source.startsWith(TRIPLE_QUOTE, index) -> {
+                    val end = source.indexOf(TRIPLE_QUOTE, index + TRIPLE_QUOTE.length)
+                    out.append("\"\"")
+                    index = if (end < 0) source.length else end + TRIPLE_QUOTE.length
+                }
+                char == '"' || char == '\'' -> {
+                    var scan = index + 1
+                    while (scan < source.length && source[scan] != char && source[scan] != '\n') {
+                        scan += if (source[scan] == '\\') 2 else 1
+                    }
+                    out.append(char).append(char)
+                    index = minOf(scan + 1, source.length)
+                }
+                else -> { out.append(char); index++ }
+            }
+        }
+        return out.toString()
     }
 
     /**
@@ -323,18 +433,17 @@ class StatedNumbersTest {
         // ReplaceWith("y()")) is three levels deep — which no regular expression can count. Since the
         // prefix is only ever read for the word `private`, it does not need to be understood.
         //
-        // Group two is the name, group three the value: whatever follows the `=` to the end of a line.
-        // The `\s*` on both sides of the `=` spans a line break, so a declaration wrapped before or
-        // after the `=` is still one match.
+        // Group two is the name, group three the value: whatever follows the `=` up to the end of the
+        // line or the next `;`, whichever comes first. The `\s*` on both sides of the `=` spans a line
+        // break, so a declaration wrapped before or after the `=` is still one match. Stopping at the
+        // semicolon is what round 15 added: a greedy group three ate `; const val OTHER = 2` as part of
+        // the first value, and the second declaration on that line was never found.
         private val DECLARATION = Regex(
             """(?m)(?:^|;)([^\n;]*?)\bconst[ \t]+val[ \t]+""" +
-                """([A-Z][A-Z0-9_]*)\s*(?::[^=\n]+)?\s*=\s*([^\n]+)"""
+                """([A-Z][A-Z0-9_]*)\s*(?::[^=\n]+)?\s*=\s*([^\n;]+)"""
         )
 
-        // A block comment, however many lines it runs. Line comments are cut per line instead, which is
-        // why a block comment needed its own pattern: a declaration inside one was read as real code,
-        // and a block comment after a value put a quotation mark into the value and hid it.
-        private val BLOCK_COMMENT = Regex("""/\*.*?\*/""", RegexOption.DOT_MATCHES_ALL)
+        private const val TRIPLE_QUOTE = "\"\"\""
 
         private val WHITESPACE = Regex("""\s+""")
 
