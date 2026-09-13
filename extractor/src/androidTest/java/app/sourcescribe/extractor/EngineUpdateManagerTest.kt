@@ -510,6 +510,30 @@ class EngineUpdateManagerTest {
         }
     }
 
+    @Test
+    fun anAppUpdateMakesItsBundledEngineActiveOnceAndKeepsTheOldOneAsTheWayBack() = runBlocking {
+        withIsolatedManager { harness ->
+            val bundled = harness.manager.bundled()
+            val oldBundled = createScriptedCandidate(harness, "an earlier app version's engine").copy(bundled = true)
+            removeBundledSlot(harness, bundled)
+            rewriteState(harness, listOf(oldBundled), active = oldBundled)
+
+            val updated = newManager(harness)
+            assertEquals(bundled.id, updated.active().id)
+            assertEquals(oldBundled.id, updated.rollbackTarget()?.id)
+
+            // Going back on purpose holds across the next start: the switch happens once per bundled engine.
+            assertEquals(oldBundled.id, updated.rollback(expectedId = oldBundled.id).id)
+            assertEquals(oldBundled.id, newManager(harness).active().id)
+
+            // An engine the reader activated was a choice, and an app update leaves it active.
+            val activated = createScriptedCandidate(harness, "an update the reader activated")
+            removeBundledSlot(harness, bundled)
+            rewriteState(harness, listOf(activated), active = activated)
+            assertEquals(activated.id, newManager(harness).active().id)
+        }
+    }
+
     private suspend fun withIsolatedManager(block: suspend (Harness) -> Unit) {
         requireEnabled()
         NativeRuntime(context).initialize()

@@ -395,6 +395,9 @@ class EngineUpdateManager internal constructor(
             val existing = state.installations[installation.id]
             val existingHealthy = existing?.healthy == true && state.healthyIds.contains(installation.id) &&
                 validSlot(existing)
+            // No healthy record says yet that this engine is the bundled one: the first start after an app update
+            // that ships it, or a start after a crash before the record below was saved (ADR 0010).
+            val newlyBundled = existing?.bundled != true || !existingHealthy
             if (!existingHealthy) {
                 state.installations[installation.id] = installation
                 saveStateLocked(state)
@@ -403,7 +406,15 @@ class EngineUpdateManager internal constructor(
             val healthy = (existing ?: installation).copy(healthy = true, bundled = true)
             state.installations[healthy.id] = healthy
             state.healthyIds += healthy.id
-            if (state.activeId == null) state.activeId = healthy.id
+            val current = state.activeId?.let { state.installations[it] }
+            if (state.activeId == null) {
+                state.activeId = healthy.id
+            } else if (newlyBundled && current != null && current.bundled && current.id != healthy.id) {
+                // The engine an earlier app version bundled is still the active one. Nobody chose it over this one,
+                // so the update takes effect, and the old engine stays as the way back.
+                state.previousId = current.id
+                state.activeId = healthy.id
+            }
             saveStateLocked(state)
             bundledCache = healthy
             healthy
