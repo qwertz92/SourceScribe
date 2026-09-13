@@ -351,6 +351,9 @@ internal fun byteSize(bytes: Long): String {
     "ENGINE_UNCERTAIN_PROBE" -> stepText(code, R.string.reason_engine_probe_uncertain)
     "ENGINE_NO_PREVIOUS" -> stepText(code, R.string.reason_engine_no_previous)
     "ENGINE_ROLLBACK_TARGET_CHANGED" -> stepText(code, R.string.reason_engine_rollback_target_changed)
+    "ENGINE_SLOTS_IN_USE" -> stepText(code, R.string.reason_engine_slots_in_use)
+    // No update step: the job is bound to an engine that is gone, so the step prefix `stepText` adds would be wrong.
+    "ENGINE_NOT_AVAILABLE" -> stringResource(R.string.engine_not_available)
 
     "KEY_INVALID_INPUT", "CREDENTIAL_INVALID_INPUT" -> stringResource(R.string.key_invalid_input)
 

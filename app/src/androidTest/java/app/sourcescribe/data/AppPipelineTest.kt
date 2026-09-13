@@ -1010,6 +1010,21 @@ class AppPipelineTest {
     }
 
     @Test
+    fun aCaptionAttemptWhoseEngineIsGoneWaitsWithThatReason() = withFixture {
+        // Until round 17 this lookup ended in `single`, which threw instead of naming the reason. SttStep has said
+        // ENGINE_NOT_AVAILABLE for the same situation all along, and the result screen has a sentence for it now.
+        val seeded = seedCaptionPinnedTo("0".repeat(64))
+
+        assertFalse(coordinator.run(seeded.attempt.id))
+
+        val attempt = requireNotNull(dao.attempt(seeded.attempt.id))
+        assertEquals(ExecutionState.WAITING_USER, attempt.state)
+        assertEquals("ENGINE_NOT_AVAILABLE", attempt.error)
+        assertTrue(dao.artifacts(seeded.job.id).isEmpty())
+        assertEquals(0, providerRequests())
+    }
+
+    @Test
     fun aResultWithAMissingChunkIsStoredAsPartialByBothArtifactWriters() = withFixture {
         // No writer produces this scope today: the flag says complete while a chunk is missing. The artifact row
         // asks the rule the attempt's outcome, the result screen and the exports ask, so a writer that someday does
@@ -1625,6 +1640,26 @@ class AppPipelineTest {
             }
             val job = JobRow(jobId, source.id, json.encodeToString(config), now)
             dao.createJob(SourceRow(source.id, json.encodeToString(source), "Fixture source"), job, attempts)
+            jobIds += jobId
+            return AttemptSeed(job, caption)
+        }
+
+        /** A caption attempt pinned to [engineId], with no normalized file yet, so its run starts by resolving. */
+        suspend fun seedCaptionPinnedTo(engineId: String): AttemptSeed {
+            prepareNativeRuntime()
+            val jobId = UUID.randomUUID().toString()
+            val now = System.currentTimeMillis()
+            val caption = AttemptRow(
+                id = UUID.randomUUID().toString(),
+                jobId = jobId,
+                branch = Branch.CAPTIONS,
+                number = 1,
+                createdAt = now,
+                checkpoint = json.encodeToString(AttemptCheckpoint(source = source)),
+                engineId = engineId,
+            )
+            val job = JobRow(jobId, source.id, json.encodeToString(captionConfig()), now)
+            dao.createJob(SourceRow(source.id, json.encodeToString(source), "Fixture source"), job, listOf(caption))
             jobIds += jobId
             return AttemptSeed(job, caption)
         }

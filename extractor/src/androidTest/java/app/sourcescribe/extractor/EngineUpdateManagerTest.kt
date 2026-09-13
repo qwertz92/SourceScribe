@@ -25,6 +25,7 @@ import okhttp3.Protocol
 import okhttp3.Request
 import okhttp3.Response
 import okhttp3.ResponseBody.Companion.toResponseBody
+import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
@@ -300,9 +301,12 @@ class EngineUpdateManagerTest {
                 assertEquals(expectedRequests.removeFirst(), request.url.toString())
                 response(request, 200)
             }
-            val manager = EngineUpdateManager(harness.storage, NativeRuntime(harness.storage), calls) { _, _ ->
-                throw IOException("controlled disk-full fixture")
-            }
+            val manager = EngineUpdateManager(
+                harness.storage,
+                NativeRuntime(harness.storage),
+                calls,
+                writeDownloadedFile = { _, _ -> throw IOException("controlled disk-full fixture") },
+            )
             assertEquals(active.id, manager.bundled().id)
             val slots = hashSlotNames(harness)
             val update = AvailableEngine(
@@ -379,6 +383,133 @@ class EngineUpdateManagerTest {
         }
     }
 
+    @Test
+    fun aNewBundledEngineMakesRoomByRemovingTheOldestInstallationNothingNeeds() = runBlocking {
+        withIsolatedManager { harness ->
+            val bundled = harness.manager.bundled()
+            val slots = List(5) { createScriptedCandidate(harness, "slot $it") }
+            removeBundledSlot(harness, bundled)
+            // slots[0] is the oldest, but a partial result would be continued with it.
+            rewriteState(harness, slots, active = slots[4], previous = slots[3])
+            val manager = newManager(harness, EngineReferences(retainedForRetry = setOf(slots[0].id)))
+
+            assertEquals(slots[4].id, manager.active().id)
+
+            // One slot was needed, and the oldest installation nothing refers to made it.
+            val kept = slots.map { it.id } - slots[1].id + bundled.id
+            assertEquals(kept.toSet(), hashSlotNames(harness))
+            assertEquals(kept.sorted(), manager.installations().map { it.id })
+            // Gone from the state file too, so no later start finds a record without its slot.
+            assertEquals(kept, recordedIds(harness))
+            assertEquals(slots[3].id, manager.rollbackTarget()?.id)
+        }
+    }
+
+    @Test
+    fun onlyAnEngineAPartialResultNeedsMakesRoomAsTheLastResortAndNeverTheActivePreviousOrAPinnedOne() = runBlocking {
+        withIsolatedManager { harness ->
+            val bundled = harness.manager.bundled()
+            val slots = List(5) { createScriptedCandidate(harness, "slot $it") }
+            removeBundledSlot(harness, bundled)
+            // The previous and the pinned installation are the two oldest, so age alone would pick one of them.
+            rewriteState(harness, slots, active = slots[4], previous = slots[0])
+            val manager = newManager(harness, EngineReferences(
+                inUse = setOf(slots[1].id),
+                retainedForRetry = setOf(slots[2].id, slots[3].id),
+            ))
+
+            assertEquals(slots[4].id, manager.active().id)
+
+            // Nothing else could go, so the older of the two installations kept for a retry did.
+            assertEquals((slots.map { it.id } - slots[2].id + bundled.id).toSet(), hashSlotNames(harness))
+            assertEquals(slots[0].id, manager.rollbackTarget()?.id)
+        }
+    }
+
+    @Test
+    fun aNewBundledEngineIsRefusedWithNothingRemovedWhenEveryInstallationIsNeeded() = runBlocking {
+        withIsolatedManager { harness ->
+            val bundled = harness.manager.bundled()
+            val slots = List(5) { createScriptedCandidate(harness, "slot $it") }
+            removeBundledSlot(harness, bundled)
+            rewriteState(harness, slots, active = slots[4], previous = slots[3])
+            val names = hashSlotNames(harness)
+            val records = recordedIds(harness)
+
+            val refused = expectUpdateFailure {
+                newManager(harness, EngineReferences(inUse = slots.take(3).map { it.id }.toSet())).active()
+            }
+            assertEquals(EngineUpdateCode.SLOTS_IN_USE, refused.code)
+            assertEquals(names, hashSlotNames(harness))
+            assertEquals(records, recordedIds(harness))
+
+            // Job records that cannot be read are no answer: their failure comes through as it is, and nothing goes.
+            val unanswered = try {
+                EngineUpdateManager(
+                    harness.storage,
+                    NativeRuntime(harness.storage),
+                    references = { throw IllegalStateException("fixture: job records unreadable") },
+                ).active()
+                null
+            } catch (failure: IllegalStateException) {
+                failure
+            }
+            assertEquals("fixture: job records unreadable", unanswered?.message)
+            assertEquals(names, hashSlotNames(harness))
+            assertEquals(records, recordedIds(harness))
+        }
+    }
+
+    @Test
+    fun anUnreadableStateStillLeavesRoomForTheBundledEngine() = runBlocking {
+        withIsolatedManager { harness ->
+            val bundled = harness.manager.bundled()
+            val ids = List(5) { createScriptedCandidate(harness, "slot $it").id }.sorted()
+            removeBundledSlot(harness, bundled)
+            stateFile(harness).writeText("{not-json", Charsets.UTF_8)
+
+            // Before round 17 this was permanent: an unreadable state keeps its unrecorded slots, and the bundled
+            // engine found none free, so no job could start again.
+            val manager = newManager(harness, EngineReferences(inUse = setOf(ids[0])))
+            assertEquals(bundled.id, manager.active().id)
+
+            // No record names any of them, so the first by name that no job is bound to made room.
+            assertEquals((ids - ids[1] + bundled.id).toSet(), hashSlotNames(harness))
+        }
+    }
+
+    @Test
+    fun anUpdateIsRefusedBeforeAnyRequestWithoutRoomAndAFailedDownloadCostsNoInstallation() = runBlocking {
+        withIsolatedManager { harness ->
+            val bundled = harness.manager.bundled()
+            val candidates = List(4) { createScriptedCandidate(harness, "slot $it") }
+            rewriteState(harness, listOf(bundled) + candidates, active = bundled)
+            val names = hashSlotNames(harness)
+            val update = AvailableEngine(id = "2026.09.01", version = "2026.09.01", channel = EngineChannel.STABLE)
+            val requests = AtomicInteger()
+            val calls = fixtureCalls { _ ->
+                requests.incrementAndGet()
+                throw IOException("offline fixture")
+            }
+
+            // An update is voluntary, so an installation a partial result would be continued with does not make
+            // room for it, and the refusal comes before anything is downloaded.
+            val refused = expectUpdateFailure {
+                newManager(harness, calls, EngineReferences(retainedForRetry = candidates.map { it.id }.toSet())).stage(update)
+            }
+            assertEquals(EngineUpdateCode.SLOTS_IN_USE, refused.code)
+            assertEquals(0, requests.get())
+            assertEquals(names, hashSlotNames(harness))
+
+            // With room that could be made, the download is tried, and its failure removes nothing.
+            val offline = expectUpdateFailure { newManager(harness, calls, EngineReferences()).stage(update) }
+            assertEquals(EngineUpdateCode.NETWORK, offline.code)
+            assertEquals(1, requests.get())
+            assertEquals(names, hashSlotNames(harness))
+            assertNoUpdateTemporaryDirectories(harness)
+        }
+    }
+
     private suspend fun withIsolatedManager(block: suspend (Harness) -> Unit) {
         requireEnabled()
         NativeRuntime(context).initialize()
@@ -403,6 +534,44 @@ class EngineUpdateManagerTest {
 
     private fun newManager(harness: Harness, calls: Call.Factory): EngineUpdateManager =
         EngineUpdateManager(harness.storage, NativeRuntime(harness.storage), calls, ::writeBytes)
+
+    private fun newManager(harness: Harness, references: EngineReferences): EngineUpdateManager =
+        EngineUpdateManager(harness.storage, NativeRuntime(harness.storage), references = { references })
+
+    private fun newManager(harness: Harness, calls: Call.Factory, references: EngineReferences): EngineUpdateManager =
+        EngineUpdateManager(harness.storage, NativeRuntime(harness.storage), calls, ::writeBytes) { references }
+
+    /**
+     * Replaces the recorded installations, the active and the previous one by exactly these, in this order. Slot
+     * directories are not touched.
+     */
+    private fun rewriteState(
+        harness: Harness,
+        installations: List<EngineInstallation>,
+        active: EngineInstallation?,
+        previous: EngineInstallation? = null,
+    ) {
+        val state = JSONObject(boundedJsonText(stateFile(harness).readText()))
+        state.put("active", active?.id ?: JSONObject.NULL)
+        state.put("previous", previous?.id ?: JSONObject.NULL)
+        state.put("installations", JSONArray().apply { installations.forEach { put(installationJson(it)) } })
+        state.put("healthy", JSONArray().apply { installations.filter { it.healthy }.forEach { put(it.id) } })
+        stateFile(harness).writeText(state.toString())
+    }
+
+    /**
+     * What the first start after an app update that bundles another engine finds: no slot for the engine the app
+     * bundles now. The real bundled engine stands in for the new one, since a test cannot swap the APK's resource;
+     * [rewriteState] without it removes its record.
+     */
+    private fun removeBundledSlot(harness: Harness, bundled: EngineInstallation) {
+        assertTrue(File(harness.root, "engines/${bundled.id}").deleteRecursively())
+    }
+
+    private fun recordedIds(harness: Harness): List<String> {
+        val records = JSONObject(boundedJsonText(stateFile(harness).readText())).getJSONArray("installations")
+        return List(records.length()) { records.getJSONObject(it).getString("id") }
+    }
 
     private fun fixtureCalls(response: (Request) -> Response): Call.Factory = OkHttpClient.Builder()
         .addInterceptor { chain -> response(chain.request()) }

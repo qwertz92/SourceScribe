@@ -411,7 +411,11 @@ class JobCoordinator @Inject constructor(
         val directory = attemptDirectory(row.id)
         val normalized = AtomicFile(File(directory, "normalized.json"))
         if (!normalized.baseFile.exists()) {
-            val installation = engines.installations().single { it.id == row.engineId }
+            // The lookup `SttStep.pinnedEngine` makes. A pinned installation can be missing from the list, for one
+            // because `installations()` leaves out a slot that no longer passes its hash check. That is said as a
+            // reason, the way SttStep says it, instead of ending in a `single` that throws without a name (round 17).
+            val installation = engines.installations().firstOrNull { it.id == row.engineId && it.healthy }
+                ?: return row.copy(state = ExecutionState.WAITING_USER, error = "ENGINE_NOT_AVAILABLE")
             val resolved = extractor.resolve(requireNotNull(checkpoint.source), engines.file(installation))
             val choices = TrackSelection.captions(resolved, config)
             if (choices.isEmpty()) {

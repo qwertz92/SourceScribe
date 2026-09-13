@@ -26,7 +26,9 @@ object AppModule {
     @Provides fun records(database: SourceScribeDatabase): SourceScribeDao = database.records()
     @Provides @Singleton fun runtime(@ApplicationContext context: Context): NativeRuntime = NativeRuntime(context)
     @Provides @Singleton fun extractor(runtime: NativeRuntime): ExtractorEngine = ExtractorEngine(runtime)
-    @Provides @Singleton fun engines(@ApplicationContext context: Context, runtime: NativeRuntime): EngineUpdateManager = EngineUpdateManager(context, runtime)
+    /** The manager asks the jobs which engines they still need only when a new engine finds every slot taken (ADR 0009). */
+    @Provides @Singleton fun engines(@ApplicationContext context: Context, runtime: NativeRuntime, records: SourceScribeDao): EngineUpdateManager =
+        EngineUpdateManager(context, runtime) { engineReferences(records) }
     @Provides @Singleton fun artifacts(@ApplicationContext context: Context): ArtifactFiles = ArtifactFiles(File(context.filesDir, "artifacts"))
     @Provides @Singleton fun credentials(@ApplicationContext context: Context): CredentialStore = CredentialStore(context)
     @Provides @Singleton fun providerHttp(): ProviderHttp = ProviderHttp()

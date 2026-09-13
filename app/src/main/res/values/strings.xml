@@ -426,6 +426,8 @@
     <string name="reason_engine_probe_uncertain">Der Selbsttest blieb ohne klares Ergebnis. Die bisherige Komponente bleibt aktiv.</string>
     <string name="reason_engine_no_previous">Es gibt keine frühere Komponente, zu der zurückgekehrt werden könnte.</string>
     <string name="reason_engine_rollback_target_changed">Die Komponente, zu der zurückgegangen würde, hat sich inzwischen geändert. Es wurde nichts umgestellt.</string>
+    <string name="reason_engine_slots_in_use">Alle fünf Plätze für Komponenten sind von Versionen belegt, die noch gebraucht werden: der aktiven, der vorherigen, der mitgelieferten oder einer, an die ein unfertiger Auftrag oder ein fortsetzbares Teilergebnis gebunden ist. Es wurde nichts entfernt. Ein Platz wird frei, sobald einer dieser Aufträge vollständig abgeschlossen oder gelöscht ist.</string>
+    <string name="engine_not_available">Die Extraktionskomponente, an die dieser Auftrag gebunden ist, ist nicht mehr installiert oder hat ihre Prüfung nicht bestanden. Ein neuer Versuch verwendet die aktive Komponente.</string>
     <string name="key_invalid_input">Der eingegebene Schlüssel hat nicht die erwartete Form. Kopiere ihn erneut aus deinem Anbieterkonto.</string>
     <string name="reason_import_invalid">Diese Datei ist keine Audiodatei, die die App verarbeiten kann.</string>
     <string name="reason_import_unavailable">Die Datei ist nicht mehr erreichbar. Möglicherweise wurde sie verschoben oder gelöscht.</string>

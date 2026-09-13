@@ -43,6 +43,8 @@ enum class EngineUpdateCode {
     UNCERTAIN_PROBE,
     NO_PREVIOUS,
     ROLLBACK_TARGET_CHANGED,
+    /** Every slot holds an installation that is still needed, so no new one can be added (ADR 0009). */
+    SLOTS_IN_USE,
 }
 
 internal enum class EngineHttpResponseKind { NOT_MODIFIED, REDIRECT, SUCCESS, OTHER }
@@ -85,22 +87,42 @@ data class EngineInstallation(
 )
 
 /**
+ * What work in the app still points at, asked for only when a new installation needs a slot and none is free.
+ *
+ * [inUse] are the installations an unfinished attempt is pinned to; they are never removed. [retainedForRetry] are
+ * those a partial result would be continued with, since a missing-chunk retry runs on the engine of the attempt it
+ * continues; they are removed only once nothing else makes room. ADR 0009 has the whole rule.
+ */
+data class EngineReferences(
+    val inUse: Set<String> = emptySet(),
+    val retainedForRetry: Set<String> = emptySet(),
+)
+
+/**
  * Manages the bundled and manually staged yt-dlp zipapps.
  *
  * A slot is addressed by its complete SHA-256 and is never overwritten. State is
  * the only mutable pointer, written through Android's crash-safe AtomicFile.
+ * At most five slots exist (`MAX_INSTALLATIONS`); [references] tells the manager
+ * which of them work in the app still needs when a new one has to make room.
  */
 class EngineUpdateManager internal constructor(
     context: Context,
     private val runtime: NativeRuntime,
     private val calls: Call.Factory,
     private val writeDownloadedFile: (File, ByteArray) -> Unit,
+    private val references: suspend () -> EngineReferences = { EngineReferences() },
 ) {
-    constructor(context: Context, runtime: NativeRuntime = NativeRuntime(context)) : this(
+    constructor(
+        context: Context,
+        runtime: NativeRuntime = NativeRuntime(context),
+        references: suspend () -> EngineReferences = { EngineReferences() },
+    ) : this(
         context,
         runtime,
         defaultClient(),
         ::writeSyncedBytes,
+        references,
     )
 
     private val appContext = context.applicationContext
@@ -173,9 +195,9 @@ class EngineUpdateManager internal constructor(
         val urls = releaseUrls(update)
         ensureBundledLocked()
         val engines = enginesDirectory()
-        if (slotDirectories(engines).size >= MAX_INSTALLATIONS) {
-            throw EngineUpdateException(EngineUpdateCode.STORAGE)
-        }
+        // Only asks whether a slot can be freed: nothing is removed for a download that may still fail. The room is
+        // made once the verified artifact is ready to take its slot (ADR 0009).
+        ensureRoomLocked(update.sha256, retainedMayGo = false, remove = false)
         val staging = File(engines, ".staging-${UUID.randomUUID()}")
         if (!staging.mkdirs()) throw EngineUpdateException(EngineUpdateCode.STORAGE)
         var candidate: EngineInstallation? = null
@@ -207,7 +229,7 @@ class EngineUpdateManager internal constructor(
                 bundled = false,
             )
             candidate = installation
-            createdSlot = materializeSlot(artifact, installation)
+            createdSlot = materializeSlot(artifact, installation, retainedMayGo = false)
             if (loaded.installations[installation.id] == null) {
                 loaded.installations[installation.id] = installation
                 recordAdded = true
@@ -366,7 +388,9 @@ class EngineUpdateManager internal constructor(
                 healthy = false,
                 bundled = true,
             )
-            materializeSlot(artifact, installation)
+            // Only here may an installation a partial result would be continued with make room, and only as the last
+            // resort: without this engine no job can start at all, which a voluntary update does not risk (ADR 0009).
+            materializeSlot(artifact, installation, retainedMayGo = true)
             if (!validSlot(installation)) throw EngineUpdateException(EngineUpdateCode.VERIFICATION)
             val existing = state.installations[installation.id]
             val existingHealthy = existing?.healthy == true && state.healthyIds.contains(installation.id) &&
@@ -401,7 +425,73 @@ class EngineUpdateManager internal constructor(
         return Unit
     }
 
-    private fun materializeSlot(artifact: File, installation: EngineInstallation): Boolean {
+    /**
+     * Makes sure a slot for [incoming] fits under MAX_INSTALLATIONS and, with [remove], removes old installations
+     * until it does (ADR 0009). Throws SLOTS_IN_USE, with nothing removed, when too few of them may go.
+     *
+     * Never removed: the active and the previous installation, the engine this app version bundles, [incoming]
+     * itself, and every installation an unfinished attempt is pinned to. Removed first are slot directories no record
+     * names, then the oldest recorded installations nothing refers to. One a partial result would be continued with
+     * goes only where [retainedMayGo], and only after all of those.
+     */
+    private suspend fun ensureRoomLocked(incoming: String?, retainedMayGo: Boolean, remove: Boolean) {
+        val root = enginesDirectory()
+        val slots = slotDirectories(root).map(File::getName)
+        if (incoming != null && incoming in slots) return
+        val needed = slots.size - MAX_INSTALLATIONS + 1
+        if (needed <= 0) return
+        val state = stateLocked()
+        // Asked only now that something has to go. A failure to answer is passed on as it is: without knowing what the
+        // jobs still need, no slot is safe to remove, and no reason is claimed that nobody checked.
+        val needs = references()
+        val kept = buildSet {
+            state.activeId?.let { add(it) }
+            state.previousId?.let { add(it) }
+            bundledCache?.let { add(it.id) }
+            incoming?.let { add(it) }
+            addAll(needs.inUse)
+        }
+        // The state keeps its records in the order they were first written, so the oldest come first.
+        val recorded = state.installations.keys.filter { it in slots && it !in kept }
+        val removable = slots.filter { it !in kept && it !in state.installations }.sorted() +
+            recorded.filter { it !in needs.retainedForRetry } +
+            (if (retainedMayGo) recorded.filter { it in needs.retainedForRetry } else emptyList())
+        if (removable.size < needed) throw EngineUpdateException(EngineUpdateCode.SLOTS_IN_USE)
+        if (!remove) return
+        for (id in removable) {
+            if (slotDirectories(root).size < MAX_INSTALLATIONS) break
+            removeSlotLocked(state, root, id)
+        }
+        // A directory the file system would not delete leaves the count where it was. That is a storage failure, not
+        // an installation anyone still needs.
+        if (slotDirectories(root).size >= MAX_INSTALLATIONS) throw EngineUpdateException(EngineUpdateCode.STORAGE)
+    }
+
+    /**
+     * Removes one installation, its record before its directory, so a crash in between leaves a slot no record names,
+     * which the next load of a readable state removes.
+     */
+    private fun removeSlotLocked(state: ManagerState, root: File, id: String) {
+        if (state.installations.containsKey(id) || state.healthyIds.contains(id)) {
+            val installations = LinkedHashMap(state.installations)
+            val healthyIds = LinkedHashSet(state.healthyIds)
+            state.installations.remove(id)
+            state.healthyIds.remove(id)
+            try {
+                saveStateLocked(state)
+            } catch (failure: EngineUpdateException) {
+                // The file still names the installation, so the state in memory goes on naming it too.
+                state.installations.clear()
+                state.installations.putAll(installations)
+                state.healthyIds.clear()
+                state.healthyIds.addAll(healthyIds)
+                throw failure
+            }
+        }
+        deleteHashSlot(root, id)
+    }
+
+    private suspend fun materializeSlot(artifact: File, installation: EngineInstallation, retainedMayGo: Boolean): Boolean {
         val root = enginesDirectory()
         requireHashId(installation.id)
         val destination = File(root, installation.id)
@@ -412,7 +502,7 @@ class EngineUpdateManager internal constructor(
             }
             return false
         }
-        if (slotDirectories(root).size >= MAX_INSTALLATIONS) throw EngineUpdateException(EngineUpdateCode.STORAGE)
+        ensureRoomLocked(installation.id, retainedMayGo, remove = true)
         val temporary = File(root, ".slot-${UUID.randomUUID()}")
         if (!temporary.mkdirs()) throw EngineUpdateException(EngineUpdateCode.STORAGE)
         try {
