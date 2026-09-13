@@ -215,22 +215,20 @@ private fun PreviewCard(
                     ?.takeIf { !tooLong }
                     ?.let { MainViewModel.estimatedCostMicrousd(preview.config, it) }
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
+                    val priceDate = capability?.priceAsOf.orEmpty()
+                    ReservedText(
                         if (estimate != null && capability != null) stringResource(R.string.estimated_cost,
-                            String.format(Locale.ROOT, "%.4f", estimate / 1_000_000.0),
-                            capability.priceAsOf.orEmpty())
+                            String.format(Locale.ROOT, "%.4f", estimate / 1_000_000.0), priceDate)
                         else if (tooLong) stringResource(R.string.cost_source_too_long)
                         else stringResource(R.string.price_unknown),
-                        // Two lines whatever it says, both bounds. Raising the limit on the button
-                        // below swaps a sentence here for a shorter price, and the rest of the screen
-                        // must not move while the reader is pressing it. Round 13 set only the lower
-                        // bound, which reserves two lines but does not stop a third — the same
-                        // convention as the title above, which sets both and accepts an ellipsis. All
-                        // three texts are kept short for that reason; whether any of them reaches a
-                        // third line at the largest font is not measured, and the cap makes that a
-                        // clipped word rather than a jumping screen.
-                        Modifier.weight(1f), style = MaterialTheme.typography.bodySmall,
-                        minLines = 2, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                        // As tall as the tallest of the three at this width and font, whichever is shown. Raising
+                        // the limit on the button below swaps a sentence here for a price, and the rest of the
+                        // screen must not move while the reader is pressing it. Until round 16 a two-line cap did
+                        // that job, and round 16 measured what its comment called unmeasured: at font scale 2.0 on
+                        // emulator-5556 the estimate lost its end to the ellipsis, in German the whole date.
+                        listOf(stringResource(R.string.estimated_cost, "000.0000", priceDate.ifEmpty { "0000-00-00" }),
+                            stringResource(R.string.cost_source_too_long), stringResource(R.string.price_unknown)),
+                        MaterialTheme.typography.bodySmall, Modifier.weight(1f),
                     )
                     InfoButton(HelpTopic.COST, openHelp)
                 }
