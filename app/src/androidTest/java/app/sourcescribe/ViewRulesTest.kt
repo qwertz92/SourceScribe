@@ -98,6 +98,19 @@ class ViewRulesTest {
     }
 
     @Test
+    fun theResultScreenCallsAResultPartialByTheRuleItsExportsFollow() {
+        val whole = TranscriptScope(requestedDurationMs = 2_000, processedIntervals = listOf(Interval(0, 2_000)),
+            technicallyComplete = true)
+        assertEquals(false, app.sourcescribe.ui.showsPartialNotice(whole))
+        // No writer produces a confirmed scope with a missing chunk today, which is exactly why the screen may not
+        // lean on that: the chunk is source nobody transcribed, whatever the flag beside it says. Until round 17
+        // the screen asked `technicallyComplete != true` and would have called this one whole.
+        assertTrue(app.sourcescribe.ui.showsPartialNotice(whole.copy(missingChunks = listOf(1))))
+        assertTrue(app.sourcescribe.ui.showsPartialNotice(whole.copy(technicallyComplete = false)))
+        assertTrue(app.sourcescribe.ui.showsPartialNotice(whole.copy(technicallyComplete = null)))
+    }
+
+    @Test
     fun damagedStoredConfigurationHasNoFallbackProviderOrDefaults() {
         for (raw in listOf("", "{", "{\"mode\":\"BROKEN\"}", "{\"provider\":\"UNKNOWN\"}")) {
             assertNull(app.sourcescribe.data.decodeStoredJobConfig(raw))

@@ -59,8 +59,18 @@ import app.sourcescribe.core.ExportFormat
 import app.sourcescribe.core.Segment
 import app.sourcescribe.core.TranscriptDocument
 import app.sourcescribe.core.TranscriptExporter
+import app.sourcescribe.core.TranscriptScope
+import app.sourcescribe.core.confirmedComplete
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+
+/**
+ * Whether the result screen marks a transcript with [scope] as technically partial. It asks the one rule for a
+ * whole result, [confirmedComplete], which the outcome of an attempt and the timed exports ask as well. Until
+ * round 17 the screen asked `technicallyComplete != true` on its own, which agrees with that rule only for as
+ * long as every writer of a scope keeps a missing chunk and the flag in step.
+ */
+internal fun showsPartialNotice(scope: TranscriptScope): Boolean = !scope.confirmedComplete
 
 /**
  * The result is a document, so it gets a full screen rather than a dialog: the list can use the whole
@@ -166,7 +176,7 @@ internal fun TranscriptScreen(
                                 style = countStyle, color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        if (document.scope.technicallyComplete != true) Text(stringResource(R.string.technically_partial),
+                        if (showsPartialNotice(document.scope)) Text(stringResource(R.string.technically_partial),
                             color = MaterialTheme.colorScheme.error)
                         // One sentence per thing that is actually wrong with the result, instead of the
                         // raw codes: a job of sixty sections can carry thousands of them, and they answer

@@ -1176,7 +1176,7 @@ class SttStep @Inject constructor(
                     bytes = stored.bytes,
                     language = document.language,
                     providerModel = document.provenance.reportedModel ?: document.provenance.requestedModel,
-                    complete = document.scope.technicallyComplete,
+                    complete = document.scope.confirmedComplete,
                     warningCount = document.warnings.size,
                 ))
             } else if (existing.jobId != row.jobId || existing.attemptId != row.id ||

@@ -450,7 +450,7 @@ class JobCoordinator @Inject constructor(
             val held = dao.attempt(row.id)
             if (held?.leaseOwner != owner || held.leaseUntil <= System.currentTimeMillis()) throw CancellationException()
             if (dao.artifact(document.artifactId) == null) dao.insertArtifact(ArtifactRow(document.artifactId, row.jobId, row.id, row.branch,
-                document.createdAt, stored.sha256, stored.bytes, document.language, null, document.scope.technicallyComplete, document.warnings.size))
+                document.createdAt, stored.sha256, stored.bytes, document.language, null, document.scope.confirmedComplete, document.warnings.size))
         }
         return row.copy(state = ExecutionState.FINISHED, outcome = if (!document.scope.confirmedComplete) Outcome.PARTIAL_SUCCESS
             else if (document.warnings.isNotEmpty()) Outcome.SUCCESS_WITH_WARNINGS else Outcome.SUCCESS, error = null)
@@ -687,7 +687,7 @@ class JobCoordinator @Inject constructor(
                 if (dao.artifact(artifactId) == null) dao.insertArtifact(ArtifactRow(artifactId,
                     job.id, row.id, row.branch, document.createdAt, stored.sha256, stored.bytes, document.language,
                     document.provenance.reportedModel ?: document.provenance.requestedModel,
-                    document.scope.technicallyComplete, document.warnings.size))
+                    document.scope.confirmedComplete, document.warnings.size))
                 if (!job.cancelRequested) dao.updateAttempt(row.copy(state = ExecutionState.FINISHED,
                     outcome = when { !document.scope.confirmedComplete -> Outcome.PARTIAL_SUCCESS
                         document.warnings.isNotEmpty() -> Outcome.SUCCESS_WITH_WARNINGS; else -> Outcome.SUCCESS },

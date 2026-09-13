@@ -21,6 +21,7 @@ import app.sourcescribe.core.ExecutionState
 import app.sourcescribe.core.Generation
 import app.sourcescribe.core.JobConfig
 import app.sourcescribe.core.Origin
+import app.sourcescribe.core.Outcome
 import app.sourcescribe.core.Phase
 import app.sourcescribe.core.Provenance
 import app.sourcescribe.core.Provider
@@ -1005,6 +1006,32 @@ class AppPipelineTest {
         assertEquals("NORMALIZED_ARTIFACT_INVALID", attempt.error)
         assertNull(dao.artifact(seeded.artifactId))
         assertFalse(artifacts.canonicalFile(seeded.artifactId).exists())
+        assertEquals(0, providerRequests())
+    }
+
+    @Test
+    fun aResultWithAMissingChunkIsStoredAsPartialByBothArtifactWriters() = withFixture {
+        // No writer produces this scope today: the flag says complete while a chunk is missing. The artifact row
+        // asks the rule the attempt's outcome, the result screen and the exports ask, so a writer that someday does
+        // cannot store a partial result as a whole one (round 17). First the run that persists a normalized result.
+        val persisted = seedCaption(state = ExecutionState.RUNNING, leaseOwner = "stale-owner")
+        writeAttemptFile(persisted.caption.id, "normalized.json",
+            json.encodeToString(persisted.document.copy(scope = persisted.document.scope.copy(missingChunks = listOf(1)))))
+
+        assertFalse(coordinator.run(persisted.caption.id))
+
+        assertEquals(Outcome.PARTIAL_SUCCESS, requireNotNull(dao.attempt(persisted.caption.id)).outcome)
+        assertEquals(false, requireNotNull(dao.artifact(persisted.artifactId)).complete)
+
+        // Then startup recovery, which finds the finalized files of a result whose row was never written. A new
+        // coordinator, because the run above has already recovered this one.
+        val recovered = seedCaption()
+        artifacts.write(recovered.document.copy(scope = recovered.document.scope.copy(missingChunks = listOf(1))))
+
+        restartedCoordinator().recover()
+
+        assertEquals(Outcome.PARTIAL_SUCCESS, requireNotNull(dao.attempt(recovered.caption.id)).outcome)
+        assertEquals(false, requireNotNull(dao.artifact(recovered.artifactId)).complete)
         assertEquals(0, providerRequests())
     }
 
