@@ -22,9 +22,9 @@ Zunächst drei Gradle-Module: `:app` für UI/Android-Integration/Persistenz/Sche
 
 `JobCoordinator`: langlebige Zustände, Claims, Checkpoints, Abbruch und Wiederaufnahme. Android-Ausführungsmechanismen sind austauschbare Treiber, nicht das Datenmodell.
 
-`ArtifactStore` und `Exporter`: interne Ergebnissicherung strikt vom Schreiben in externe Document-URIs trennen.
+`ArtifactFiles` und `ExportStore`: interne Ergebnissicherung strikt vom Schreiben in externe Document-URIs trennen; `TranscriptExporter` erzeugt die Exportformate, ohne selbst zu schreiben.
 
-`ExtractorUpdateManager`: vertrauensgeprüfte, kompatible Komponentenpakete und deren Aktivierung; kein Bestandteil des normalen Providers.
+`EngineUpdateManager`: vertrauensgeprüfte, kompatible Komponentenpakete und deren Aktivierung; kein Bestandteil des normalen Providers.
 
 UI kennt Use-Cases und Zustände, nicht Request Bodies, API-Schlüssel, yt-dlp-Pfade oder FFmpeg-Kommandos.
 
@@ -33,12 +33,19 @@ UI kennt Use-Cases und Zustände, nicht Request Bodies, API-Schlüssel, yt-dlp-P
 | Entität | Zweck |
 |---|---|
 | `Source` | UUID, Typ, Original-/kanonische URL, Video-ID oder Datei-Hash; beobachtete Metadaten |
-| `Job` | Nutzerauftrag, unveränderlicher Konfigurationssnapshot, gewünschte Zweige, Erstellungszeit |
-| `Attempt` | Ausführungsversuch pro Zweig: Versionen, Optionen, Stufe, Request-Zustand, Checkpoints, Fehler |
-| `TranscriptArtifact` | Unveränderliches intern persistiertes Ergebnis mit Provenienz, Umfang, Qualitätswarnungen |
-| `ExportRecord` | Format, Ziel-URI, Inhaltsversion, Schreibstatus und Exportfehler eines Artefakts |
-| `SubmissionRecord` | Provider, Account-Referenz, Region, Audio-/Konfigurationshash, Submission-Zustand und Remote-ID |
+| `JobRow` | Nutzerauftrag, unveränderlicher Konfigurationssnapshot, gewünschte Zweige, Erstellungszeit |
+| `AttemptRow` | Ausführungsversuch pro Zweig: Versionen, Optionen, Stufe, Request-Zustand, Checkpoints, Fehler |
+| `ArtifactRow` | Unveränderliches intern persistiertes Ergebnis mit Provenienz, Umfang, Qualitätswarnungen |
+| `ExportRow` | Format, Ziel-URI, Inhaltsversion, Schreibstatus und Exportfehler eines Artefakts |
+| `SubmissionRow` | Provider, Account-Referenz, Region, Audio-/Konfigurationshash, Submission-Zustand und Remote-ID |
 | `EngineInstallation` | Paketidentität, Versionen/Hashes, Vertrauensnachweis, Gesundheitszustand, Nutzung/Pinning |
+
+Die Namen in A2 und in dieser Tabelle sind die im Code umgesetzten. Die erste Fassung dieses Dokuments
+(`758186b`, 7. September 2026) nannte sie `ArtifactStore`, `Exporter`, `ExtractorUpdateManager`, `Job`,
+`Attempt`, `TranscriptArtifact`, `ExportRecord` und `SubmissionRecord`; keiner dieser Namen kommt im Code
+vor. Angeglichen am 13. September 2026, weil `AGENTS.md` verlangt, dieses Dokument vor Änderungen an seinem
+Bereich zu lesen. Die Sätze unter der Tabelle sprechen weiter von Jobs und Attempts als Begriffen, nicht als
+Typnamen.
 
 Modellnamen, die angefordert wurden, und tatsächlich vom Provider gemeldete Modelle getrennt speichern. Ohne gemeldeten Snapshot keine angeblich exakte Modellversion erfinden. Rückfalllisten und tatsächlich gewählte Alternativen protokollieren. UTC für gespeicherte Zeitpunkte; Anzeige lokal, feste Zeitzone gegebenenfalls in Exportmetadaten. Konfigurationssnapshots enthalten keine Secrets; Schlüsselrotation arbeitet über eine Credential-Referenz.
 

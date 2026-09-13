@@ -1,15 +1,15 @@
 # Tatsächlicher Projektstatus
 
-**Stand:** 12. September 2026. **Freigabe:** Persönliche Preview; vollständige v1 weiterhin blockiert.
+**Stand:** 13. September 2026. **Freigabe:** Persönliche Preview; vollständige v1 weiterhin blockiert.
 Der Preview-Abschluss vom 8. September steht unten; seither ist die Nutzerrückmeldung vom
 10. September eingearbeitet, siehe den nächsten Abschnitt. **Die Testzahlen weiter unten in diesem
-Abschnitt sind der Stand vom 8. September und nicht der heutige.** Heute sind es 177 JVM-Tests im Modul
-`core`, 193 Instrumentierungstests im Modul `app` und 39 im Modul `extractor`, zusammen 409, davon 403
-ausgeführt; die Runde-11-Passage sagt, warum die letzten 39 zehn Runden lang in keiner Gate-Meldung
-vorkamen. Diese vier Zahlen standen bis Runde 14 unter dem Wort „Heute“ auf dem Stand der zwölften
-Runde — die Gate-Zahlen einer Runde stehen in ihrer eigenen Passage, und dieser Satz oben muss
-mitwandern. App-Quellstand ist die Spitze von `main`,
-CI-Diagnose `f9d4f8b`, lokales `main` und öffentliches
+Abschnitt sind der Stand vom 8. September und nicht der heutige.** Heute, nach Runde 15, sind es 177
+JVM-Tests im Modul `core`, 195 Instrumentierungstests im Modul `app` und 39 im Modul `extractor`,
+zusammen 411, davon 405 ausgeführt; die Runde-11-Passage sagt, warum die letzten 39 zehn Runden lang in
+keiner Gate-Meldung vorkamen. Diese Zahlen standen bis Runde 14 unter dem Wort „Heute“ auf dem Stand der
+zwölften Runde — die Gate-Zahlen einer Runde stehen in ihrer eigenen Passage, und dieser Satz oben muss
+mitwandern. Eine Testzahl, die als heutige gelten soll, gehört nur hierher. App-Quellstand ist die Spitze
+von `main`, CI-Diagnose `f9d4f8b`, lokales `main` und öffentliches
 [GitHub-Repository](https://github.com/qwertz92/SourceScribe).
 
 Native Android-App mit Compose/Material 3, allen vier Beschaffungsmodi,
@@ -705,9 +705,9 @@ gewesen.
 Runde 12 sucht ein Nullbyte am Dateianfang. In UTF-16 wird jedes ASCII-Zeichen als zwei Bytes abgelegt, von
 denen eines Null ist — der erste Buchstabe einer solchen Datei löst die Heuristik aus, und die ganze Datei
 bleibt ungelesen. Auf einer Windows-Maschine ist das keine Exotik: Notepads „Unicode“-Option und ältere
-PowerShell-Umleitungen schreiben es. Im Baum liegt heute keine solche Datei: Von den 221 versionierten
-tragen genau 19 ein Nullbyte in den ersten 8192 Bytes — fünf PNG-Screenshots, zehn `.so`-Bibliotheken,
-die gepackte Extraktor-Engine, zwei Signaturdateien und das Wrapper-JAR —, und eine
+PowerShell-Umleitungen schreiben es. Im Baum lag zum Stand dieser Runde keine solche Datei: Von den 221
+versionierten tragen genau 19 ein Nullbyte in den ersten 8192 Bytes — fünf PNG-Screenshots, zehn
+`.so`-Bibliotheken, die gepackte Extraktor-Engine, zwei Signaturdateien und das Wrapper-JAR —, und eine
 Byte-Reihenfolge-Markierung trägt keine einzige. Ein Schlüssel in einer UTF-16-Datei wäre trotzdem an
 der Prüfung vorbeigelaufen, die `PASS repository checks` schreibt. Jetzt wird
 eine Byte-Reihenfolge-Markierung vor der Nullbyte-Probe gelesen; ohne Markierung bleibt UTF-16 von
@@ -748,7 +748,10 @@ ohne Zuschläge. Das ist für die zwei Anbieter, die sie heute erreichen, richti
 Sprechertrennung an, und OpenAIs diarisierendes Modell hat keinen veröffentlichten Preis und wird eine
 Zeile weiter abgelehnt —, wäre aber am Tag falsch, an dem einer von beiden einen bepreisten Zusatz bekommt.
 Der Kommentar sagt das jetzt; als Vorprüfung bleibt sie ungefährlich, weil `SttStep.submit` mit den
-Zuschlägen und über den ganzen Plan prüft, bevor etwas hinausgeht.
+Zuschlägen und über den ganzen Plan prüft, bevor etwas hinausgeht. Die Begründung für OpenAI in diesem
+Absatz ist falsch und bleibt als Protokoll stehen: `gpt-4o-transcribe-diarize` hat einen veröffentlichten
+Preis, je Million Token; einen Stundensatz, mit dem die App rechnen könnte, gibt es nicht. Was tatsächlich
+gilt, steht in der Runde-14-Passage.
 
 **Gegenprobe.** Jede Korrektur zurückgenommen, in zwei Läufen, weil die beiden Module getrennt gebaut
 werden. Im Modul `core` und im Prüfwerkzeug fielen drei Prüfungen: der neue Adaptertest, sobald der
@@ -789,7 +792,7 @@ Nicht der Fund war falsch, sondern die Korrektur.
 
 **Der UTF-16-Fix hat UTF-32 schlechter gemacht als vorher.** Eine UTF-32LE-Byte-Reihenfolge-Markierung
 lautet `ff fe 00 00`. Ihre ersten zwei Bytes sind genau eine UTF-16LE-Markierung. Runde 13 prüfte zwei
-Bytes, also wurde eine UTF-32-Datei als UTF-16 dekodiert: Text mit einem Nullbyte zwischen jedem Zeichen,
+Bytes, also wurde eine UTF-32LE-Datei als UTF-16 dekodiert: Text mit einem Nullbyte zwischen jedem Zeichen,
 an dem kein Geheimnismuster greift — **und sie wurde als gelesen gezählt**. Vor Runde 13 hätte die
 Nullbyte-Probe dieselbe Datei ehrlich als binär gemeldet und die Abschlusszeile es gesagt. Damit hat eine
 Korrektur, die Abdeckung hinzufügen sollte, an einer Stelle Abdeckung vorgetäuscht. Die vier Bytes werden
@@ -807,19 +810,21 @@ das Verweigern einer Schätzung ist die ehrliche Antwort, nicht eine Lücke. Das
 und die falsche Zeile daraus gelesen habe. Die Lehre lautet jetzt schärfer: Eine Randbedingung, die als
 „heute irrelevant“ abgehakt wird, braucht dieselbe Quellenprüfung wie die Zahl, um die es geht.
 
-**Die Zahlenprüfung ließ sich weiterhin umgehen, in fünf Formen, und fand eine, die es nicht gibt.**
+**Die Zahlenprüfung ließ sich weiterhin umgehen, in vier Formen, und fand eine, die es nicht gibt.**
 Runde 13 hatte das Präfix vor einer Deklaration ausgeschrieben: Name, optionale Klammer, Leerraum. Eine
 Annotation kann tiefer klammern — `@Deprecated("x", ReplaceWith("y()"))` ist drei Ebenen — und kein
 regulärer Ausdruck kann Klammern zählen. Dazu: ein Umbruch **vor** dem `=` statt danach, eine Deklaration
 hinter einem Semikolon, und ein Blockkommentar hinter dem Wert, dessen Anführungszeichen den Wert als
-Zeichenkette aussehen ließen. Die sechste Form ist die Gegenrichtung und wäre laut geworden: Ein
+Zeichenkette aussehen ließen. Die fünfte Form ist die Gegenrichtung und wäre laut geworden: Ein
 `const val` **innerhalb** eines Blockkommentars wurde als echt gezählt und hätte den Test für eine
 Konstante scheitern lassen, die es nicht gibt.
 
 Das Präfix wird jetzt gar nicht mehr gedeutet. Es wird nur auf das Wort `private` gelesen, also muss es
 nicht verstanden werden — „alles Übrige auf dieser Zeile“ genügt, und Blockkommentare werden vorher
-entfernt. Alle siebzehn Fälle standen erst als Python-Modell, bevor eine Zeile Kotlin geschrieben wurde;
-elf davon sind jetzt Zusicherungen im Test.
+entfernt. Alle siebzehn Fälle standen erst als Python-Modell, bevor eine Zeile Kotlin geschrieben wurde,
+und alle siebzehn sind Zusicherungen im Test, zehn davon neu. (Berichtigt in Runde 15: In diesen zwei
+Absätzen stand „fünf Formen“, „die sechste Form“ und „elf davon“. Wie es dazu kam, steht in der
+Runde-15-Passage.)
 
 **Die Kostenzeile reservierte ihre Höhe nur nach unten.** Runde 13 setzte `minLines = 2` und schrieb
 daneben „two lines whatever it says“. `minLines` verhindert eine erste, nicht eine dritte Zeile. Die
@@ -850,7 +855,7 @@ Testergänzung ohne begleitende Codeänderung: Es gibt nichts zurückzunehmen, w
 war und nur ungeprüft. Alle drei stehen hier, statt unter „Gegenprobe: sechs“ mitgezählt zu werden.
 
 **Und wieder fiel `everyNumberThisModuleStatesHasALineInThisFile` nicht**, obwohl der Scanner
-zurückgenommen war — dieselbe Beobachtung wie in Runde 13, aus demselben Grund: Keine der sechs Formen
+zurückgenommen war — dieselbe Beobachtung wie in Runde 13, aus demselben Grund: Keine der fünf Formen
 kommt im Baum vor. Der Test am Baum kann diese Lücke nicht zeigen, der Test an Textbeispielen schon.
 
 Gates nach Runde 14: **177 JVM-Tests** im Modul `core` ohne Fehler (unverändert zu Runde 13, weil diese
@@ -861,8 +866,213 @@ bestanden (202 Dateien gelesen, 19 als binär übersprungen), **193 Instrumentie
 — 35 bestanden, 4 per Annahme übersprungen, 0 Fehler. Von 409 Tests sind damit 403 ausgeführt, wie nach
 Runde 13; die sechs übrigen sind dieselben sechs.
 
-**Die Schleife ist nicht konvergiert.** Vierzehn Runden, keine davon leer. Solange eine Runde noch etwas
-findet, ist die nächste fällig — gerade weil die Funde der Runden 3 bis 13 jeweils in den Korrekturen der
+### Runde 15
+
+Commits: `8833d07` (eine Regel für Fachbegriffslisten), `b2286d5` (typisierter Fehler für Rohdaten ohne
+Endung), `089b184` (Lexer der Zahlenprüfung), `1f378a9` (UTF-32BE im Selbsttest), `e33ac54` (reservierte
+Höhen dreier Statuszeilen) und `ab9f36e` (Listenfelder behalten, was getippt wird), dazu der Doku-Commit,
+der diese Passage schreibt.
+
+**Die Korrektur der Zahlenprüfung aus Runde 14 hatte selbst zwei stille Lücken.** Runde 14 hatte das
+Präfix vor einer Deklaration nicht mehr gedeutet und Blockkommentare mit einem eigenen Muster entfernt.
+Vier Formen liefen daran vorbei. Alle vier hat der Code-Reviewer gefunden, die rohe Zeichenkette im Text
+seines Berichts und die übrigen drei in seiner Tabelle; die rohe Zeichenkette stand zudem als erste Frage im
+Auftrag, und alle vier waren am Python-Modell nachgestellt, bevor etwas geändert wurde. Zwei davon wären
+laut geworden: Ein `const val` in einer rohen Zeichenkette und einer im Rest eines verschachtelten
+Blockkommentars wurden als echt gezählt, und der Vergleich am Baum wäre an einer Konstante gescheitert,
+die es nicht gibt. Die anderen zwei wären still geblieben: Ein `/*` in einer gewöhnlichen Zeichenkette
+öffnete einen Kommentar bis zum nächsten `*/` in einer späteren Zeichenkette und verschluckte eine echte
+Deklaration dazwischen, und von zwei Deklarationen auf einer Zeile fand das gierige Wertmuster nur die
+erste. Eine Deklaration, die der Scanner nicht sieht, fehlt auf beiden Seiten des Vergleichs, sobald sie
+niemand eingetragen hat — der Test fällt nicht, und niemand wird aufgefordert, die Zahl zu belegen.
+
+Statt eines weiteren Musters liest die Prüfung den Quelltext jetzt mit einem kleinen Lexer, `codeOnly`, der
+Kommentare samt Verschachtelungstiefe, rohe und gewöhnliche Zeichenketten und Zeichenliterale kennt. Das
+Modell lief über 24 Fälle: die siebzehn bestehenden, die vier neuen und drei, über die der Lexer selbst
+hinweglesen muss — ein Anführungszeichen und ein Semikolon als Zeichenliteral, beide so im Modul vorhanden,
+und ein maskiertes Anführungszeichen in einer Zeichenkette. Der bisherige Scanner lag bei 4 der 24 falsch,
+der Lexer bei keinem, und über das echte Modul lesen beide dieselben 33 Konstanten. Der Test hat jetzt 24
+Zusicherungen. Die letzten drei belegen nicht, dass der Lexer Zeichenliterale braucht: Ein Nachbau ohne
+diesen Zweig liest über das Modul dieselben 33 Konstanten, weil eine gewöhnliche Zeichenkette am Zeilenende
+endet und auf den Zeilen mit diesen Zeichenliteralen keine Deklaration steht. Sie halten fest, dass eine
+Deklaration in der Zeile danach gefunden wird, wie auch immer sich der Lexer später ändert.
+
+Was der Lexer nicht modelliert, steht als [Punkt 34](DEFECTS.md): eine Zeichenkette innerhalb eines
+String-Templates, in der ein Kommentar-Anfang stünde. Heute folgenlos, und das ist gezählt: Von den 54
+Zeilen des Moduls, die ein Template und danach ein Anführungszeichen enthalten, enthält keine `/*` oder `//`.
+
+**Die Zählung der Runde 14 war falsch, und an drei Stellen verschieden.** In dieser Datei stand „fünf
+Formen“ und „die sechste Form“; die Commit-Nachricht von `8c16c0a` nannte eine Form und „Vier weitere
+Formen“ und schrieb dann „keine der sechs Formen“; und im Testkommentar stand „Round 14 closed these five“
+über einer Liste, die `TWO` enthielt. Der Konsistenzreviewer hat die Abweichung gefunden und `TWO` dabei als
+eigene Form mitgezählt. Entschieden hat es erst das Modell, das beide Scanner über alle siebzehn Fälle
+laufen ließ: Runde 13 lag bei fünf Fällen falsch — vier übersehene und einer, den sie fälschlich zählte —,
+und `TWO`, zwei Annotationen hintereinander, las schon Runde 13 richtig, weil ihr Präfixmuster sich
+wiederholen durfte. „Elf davon sind jetzt Zusicherungen“ passte zu keiner Aufteilung: Es waren alle
+siebzehn, zehn davon neu, wie Code- und Konsistenzreviewer unabhängig nachgezählt haben. Die
+Runde-14-Passage ist berichtigt und nennt, was vorher dort stand, und der Testkommentar führt `TWO` jetzt
+als Absicherung. Die Commit-Nachricht bleibt, wie sie ist.
+
+**Die Regel für Fachbegriffslisten war nur zur Hälfte geschlossen.** Runde 14 hatte die Bedingung für den
+Zuschlag auf `any { it.isNotBlank() }` gestellt. Das erfasst eine Liste aus lauter Leereinträgen, nicht
+aber eine gemischte wie `["Kubernetes", ""]`: Dafür ist die Bedingung wahr, die Kostenzeile rechnete den
+Zuschlag ein, und beide Anbieterpfade lehnen den ganzen Auftrag wegen des einen leeren Eintrags ab. Über das
+Eingabefeld entsteht so eine Liste nicht, weil es leere Zeilen verwirft. `SettingsStore.validateConfig`
+prüft gespeicherte Einstellungen aber nur auf Anzahl, Länge und Steuerzeichen, ein leerer Eintrag käme dort
+durch; welcher heutige Weg ihn schreiben würde, ist nicht belegt. Gemeldet hat es der Code-Reviewer.
+
+Die Regel steht jetzt einmal, in `ContextTerms`, und alle sechs Stellen, die über eine Liste entscheiden,
+fragen sie: beide Anbieterpfade, `SttStep.validate` vor jedem Versand, die Kostenformel in `SttStep` sowie
+Fehlerzeile und Preis der Vorschau in `MainViewModel`. `SttStep.validate` hatte der Code-Reviewer in seiner
+Liste aller Leser genannt; umgestellt wurde die Stelle trotzdem erst beim Schreiben dieses Absatzes. Das
+Verhalten hat es nicht geändert — sie prüfte schon dasselbe —, aber „jede Stelle fragt die eine Regel“
+wäre sonst falsch gewesen. Die Vorschau nennt den Fehler jetzt selbst, als `CONTEXT_TERM_BLANK` mit eigenem
+Text in beiden Sprachen, und zeigt für so einen Auftrag keinen Preis. Die Kostenformel in `SttStep` bleibt
+dabei eine reine Preisfunktion und liefert für so eine Liste den Preis ohne Zuschlag, keine unbekannte
+Schätzung: Die Budgetprüfung ruft dieselbe Formel vor jedem Abschnitt auf, der hinausgeht, und dort soll
+`null` weiter nur „kein geprüfter Tarif“ heißen. Dass so ein Auftrag nicht startet, sagen `SttStep.validate`
+vor dem Versand und `configError` in der Vorschau.
+`AssemblyAiAdapter.estimatedCostMicrousd` fragt weiter `isNotEmpty`; das genügt, weil es auf
+`ValidatedRequest` rechnet, einer Liste, die `validateConfig` schon geprüft hat. [Punkt 31](DEFECTS.md) ist
+damit geschlossen, und weiter, als er beschrieben war.
+
+**Außerhalb des zugewiesenen Diffs lagen sieben Funde; fünf sind behoben, zwei stehen als Punkte offen.**
+
+- Die Fehlerzeile der Vorschau in `NewSourceScreen` hatte keine reservierte Höhe, direkt unter der
+  Kostenzeile, die Runde 14 gerade begrenzt hatte. Ihr Text wechselt, während darüber Anbieter, Modell,
+  Schlüssel, Budget und Optionen eingestellt werden. Gemeldet vom Code-Reviewer. Die erste Korrektur
+  übernahm die feste Zweizeilengrenze der Kostenzeile und hätte jeden Fehlertext abgeschnitten, der mehr
+  als zwei Zeilen braucht: Die drei Kostentexte sind für diese Grenze kurz gehalten, die Fehlertexte nicht,
+  der längste hat 111 Zeichen im Deutschen und 108 im Englischen. Wie viele Zeilen sie am Gerät brauchen,
+  ist nicht gemessen. Aufgefallen ist das vor dem Commit, beim Nachprüfen der Commit-Nachricht. Jetzt
+  reserviert die Zeile mit `ReservedText` die Höhe des höchsten Textes, den sie zeigen kann, bei echter
+  Breite und Schriftgröße, und schneidet keinen ab. Welche Codes das sind, steht als
+  `PREVIEW_ERRORS_SHOWN_AS_TEXT` neben `previewError`; `ViewRulesTest` läuft `previewError` über alle Modi,
+  Anbieter, Modelle und Regionen, sechs Quellformen und neun Optionsvarianten, mit und ohne Schlüssel, und
+  verlangt jeden erreichten Code in der Liste. Dass die Zeile beim Verschwinden den Startknopf verschiebt,
+  steht als [Punkt 36](DEFECTS.md).
+- Die Wartezeit in der Verlaufskarte (`HistoryScreen`) ändert sich jede Sekunde und wächst von `9:59` über
+  `10:00` bis `1:00:00`, ohne reservierte Höhe, und der Bytezähler darunter zeigte rohe Bytes, ebenfalls
+  ohne. Beide reservieren jetzt mindestens die Höhe, die ein Platzhalter für ihren breitesten Fall bei der
+  echten Breite und Schriftgröße braucht — `ReservedText`, das Messverfahren aus `Choice` als eigene
+  Komponente —, und der Bytezähler zeigt `byteSize`. Gemeldet vom Invarianten-Reviewer, als zwei Funde.
+- `ArtifactFiles.validateRawArguments` prüfte „Endung ohne Daten“, nicht aber „Daten ohne Endung“, und
+  warf dafür über `rawExtension!!` eine rohe `NullPointerException` statt eines Fehlercodes. Kein heutiger
+  Aufrufer ruft die Funktion so auf; jetzt gibt es `RAW_DATA_WITHOUT_EXTENSION`, mit Test. Gemeldet vom
+  Invarianten-Reviewer.
+- `docs/ARCHITECTURE.md` nannte acht Komponenten- und Entitätsnamen aus seiner ersten Fassung, die es im
+  Code nicht gibt, darunter `ExtractorUpdateManager` für `EngineUpdateManager`. Der Konsistenzreviewer fand
+  sechs; `Job` und `Attempt` fehlten in seiner Liste und heißen im Code `JobRow` und `AttemptRow`.
+- Offen als [Punkt 32](DEFECTS.md): Ein grüner CI-Lauf zeigt nicht, wie viele Instrumentierungstests
+  übersprungen wurden. Gemeldet vom Invarianten-Reviewer.
+- Offen als [Punkt 33](DEFECTS.md): `setBackoffCriteria` im Erfassungsauftrag greift nie, weil kein Worker
+  `Result.retry()` zurückgibt. Gemeldet vom Invarianten-Reviewer.
+
+**Zwei weitere Fehler fanden sich erst beim Nachprüfen der Commit-Nachrichten, beide selbst gefunden.** Der
+eine ist die Zweizeilengrenze oben. Der andere ist älter als diese Runde: Die Felder für Fachbegriffe und für
+bevorzugte Untertitelsprachen waren direkt an die Liste gebunden, die sie bearbeiten. Ein getipptes
+Trennzeichen erzeugte einen leeren Eintrag, der sofort verworfen wurde, und das Feld zeigte die wieder
+zusammengefügte Liste ohne das Trennzeichen. Am Gerät (`emulator-5556`, App-Stand vor der Korrektur): Nach
+„Kubernetes“, Enter, „Docker“ zeigte das Fachbegriffsfeld `KubernetesDocker`, nach `de,en` das Sprachenfeld
+nur `de`. Einen zweiten Begriff konnte man also nur einfügen oder durch Teilen des ersten erzeugen.
+`ListField` hält jetzt den getippten Text und folgt der Liste nur, wenn sie sich von außen ändert. Die erste
+Fassung davon verlor bei schnellem Tippen Zeichen: „Kubernetes“, Enter, „Docker“ kam in zwei Läufen als
+`Kuberes`/`Dokern` und als `Kuberns`/`Docke` an, langsam getippt richtig. Eine weitergegebene Liste kommt
+erst Frames später zurück, und die Fassung hielt so eine verspätete Liste für eine Änderung von außen und
+setzte den Text mitten im Wort zurück. Jetzt merkt sich das Feld jede weitergegebene Liste, bis sie
+zurückkommt, und nur eine nie weitergegebene setzt den Text zurück. Am Gerät zeigen danach Fachbegriffs-,
+Sprachen-, Minuten- und Budgetfeld schnell wie langsam getippt genau das Getippte. Gefunden hat den Fehler
+der ersten Fassung erst die Gegenprobe am Gerät; die App-Suite war mit ihr grün.
+
+**Innerhalb des Diffs, kleiner.** Der Selbsttest von `check-repository.py` durchlief den Big-Endian-Eintrag
+der UTF-32-Markierungen nie, weil `.encode("utf-32")` die Markierung in der Bytereihenfolge der Maschine
+schreibt, hier Little-Endian; er enthält jetzt eine UTF-32BE-Datei. Und die Erzählung der Runde 14 gilt nur
+für Little-Endian: Eine UTF-32BE-Datei beginnt mit `00 00`, und die Zwei-Byte-Prüfung der Runde 13 hätte sie
+nie für UTF-16 gehalten. Beides vom Code-Reviewer; die Commit-Nachricht von `9021bf5` bleibt, wie sie ist.
+
+**Dokumentation.** Die Runde-13-Passage behauptete noch unmarkiert, OpenAIs diarisierendes Modell habe keinen
+veröffentlichten Preis — die Behauptung, die Runde 14 selbst zurückgenommen hatte. Sie trägt jetzt eine
+Protokollmarkierung wie die Runde-12-Passage. NEXT_STEPS nannte sich im Kopf „zuletzt nach der dreizehnten
+Reviewrunde nachgeführt“, wenige Zeilen über dem Auftrag für die fünfzehnte, und nannte
+`engineUpdateChannel` „die neunte Flagge“, die keine Schranke sei — es sind zwei: `sourcescribeProcessStage`
+wird mit `assertEquals` gelesen und lässt Tests rot werden, statt sie zu überspringen. Diese drei Funde
+stammen vom Konsistenzreviewer. Im Abschnitt „Artefakte und Grenzen“ dieser Datei stand außerdem noch
+„heute sind es 191“, ein zweites „heute“ mit veralteter Zahl, das keiner der drei Reviewer gemeldet hat.
+Die heutige Testzahl steht jetzt nur noch im Kopf dieser Datei, und NEXT_STEPS führt keine eigene Summe mehr.
+
+**Zwei Reviewerbehauptungen waren falsch, eine dritte zur Hälfte.** Der Konsistenzreviewer zählte hinter
+den sieben Schranken-Flaggen 27 statt der dokumentierten 24 Tests und markierte das selbst als spekulativ.
+Nachgezählt: Die 18 Übersprungenen des Moduls `extractor` enthalten die drei `publicSourceUrl`-Tests schon,
+und er hatte sie ein zweites Mal addiert; 18 und 6 sind 24. Dass `TWO` eine eigene Form sei, hat das Modell
+widerlegt (oben). Und der Invarianten-Reviewer schrieb, `cleanup()` im Workflow lese „nie `<skipped>`“: Das
+stimmt für die Elemente, aber das Skript gibt im Fehlerfall auch `root.attrib` aus, die Attribute des
+Wurzelelements, und ob darin eine Überspringzahl steht, ist an keinem echten Bericht geprüft. Am Befund
+ändert das nichts, weil ein grüner Lauf gar nichts ausgibt.
+
+**Geprüft und ohne Änderung gelassen, jeweils mit Grund:**
+
+- Eine auf genau drei Bytes gekürzte UTF-32LE-Markierung wird als UTF-16 gelesen (Code-Reviewer, von ihm
+  selbst als sehr unwahrscheinlich eingestuft). Drei Bytes können kein Geheimnismuster enthalten; es ändert
+  kein Ergebnis.
+- Kanal, Dauer, Datum und Adresse in der Vorschaukarte haben keine Zeilengrenze (Code-Reviewer, als
+  spekulativ markiert). Sie stammen aus der aufgelösten Quelle und ändern sich nicht, während jemand die
+  Einstellungen darunter bedient.
+- Aufklappbare Elemente schieben beim Öffnen, was darunter steht (Invarianten-Reviewer, als Hinweis). Das
+  steht jetzt mit seiner Abwägung unter den bewussten Entscheidungen in [DEFECTS.md](DEFECTS.md).
+- Ob die historischen Punktverweise der Runden 3 und 4 zur heutigen Nummerierung passen, hat der
+  Konsistenzreviewer nur stichprobenhaft geprüft. Die Frage steht im Auftrag für Runde 16.
+
+**Gegenprobe.** Jede Korrektur mit einem Test zurückgenommen, in sieben Läufen auf dem Stand von `ab9f36e`,
+jede Datei vor dem nächsten Lauf aus `HEAD` wiederhergestellt:
+
+- Modul `core`, Lauf 1: der Lexer ohne den Zweig für rohe Zeichenketten und `ArtifactFiles` ohne die neue
+  Prüfung. Es fielen genau `theScannerSeesTheDeclarationsThatUsedToSlipPastIt` und
+  `ArtifactFilesTest.sizeBoundsAndRetentionBoundaryAreEnforced`.
+- Lauf 2, der Lexer zählt verschachtelte Kommentare nicht mehr, und Lauf 3, das Wertmuster reicht wieder bis
+  zum Zeilenende: Beide Male fiel genau der Scannertest.
+- Lauf 4, der Lexer ohne Zeichenliterale: alles grün, wie das Modell vorhergesagt hatte. Die Zusicherungen
+  für Zeichenliterale zeigen also nicht, dass dieser Zweig gebraucht wird; der Kommentar über `codeOnly` sagt
+  das selbst.
+- Der Selbsttest von `check-repository.py` ohne den Big-Endian-Eintrag in `UTF32_BOMS`: gefallen.
+- Modul `app`, Lauf 1: der Zuschlag wieder an `any { it.isNotBlank() }`, `configError` ohne
+  `CONTEXT_TERM_BLANK` und `PREVIEW_ERRORS_SHOWN_AS_TEXT` ohne `CHOOSE_AUDIO_TRACK`. Es fielen genau
+  `estimateCostCeilsMinimumAndAssemblyAddonsAndBlocksUnknownPrice`,
+  `aTermListTheProviderRefusesIsNamedAsAnErrorAndNotPriced` und
+  `everyErrorThePreviewCanShowHasItsHeightReserved`.
+- Modul `app`, Lauf 2: `estimatedCostMicrousd` ohne die Ablehnung einer Liste mit leerem Eintrag. Es fiel
+  genau `aTermListTheProviderRefusesIsNamedAsAnErrorAndNotPriced`.
+
+Danach wurde der committete Stand neu gebaut und installiert; `core` lief vollständig grün, beide
+App-Testklassen ebenfalls, und der Baum war sauber. `everyNumberThisModuleStatesHasALineInThisFile` fiel in
+keinem der vier `core`-Läufe: Der Test am Baum kann diese Lücken nicht zeigen, der an Textbeispielen schon.
+
+**Für die Listenfelder ist der Gerätelauf die Gegenprobe.** Der App-Stand vor der Korrektur zeigte
+`KubernetesDocker` und `de`, die erste Fassung schnell getippt zweimal verstümmelte Begriffe, der Stand von
+`ab9f36e` alle acht Fälle wie getippt. Die Einzelwerte stehen weiter oben in dieser Passage.
+
+**Ohne Gegenprobe bleiben die reservierten Höhen.** Sie haben keinen UI-Test; dass sie wirken, ist am Code
+zu sehen, gemessen ist es nicht ([Punkt 35](DEFECTS.md)). Die berichtigten Kommentare in `StatedNumbersTest`
+und die Namen in ARCHITECTURE sind Prosa.
+
+Gates nach Runde 15: **177 JVM-Tests** im Modul `core` ohne Fehler (unverändert zu Runde 14, weil die neuen
+Zusicherungen in bestehenden Testmethoden stehen), alle vier Lintberichte ohne Befund, der unsignierte
+Release-Build gebaut, `tools/check-repository.py` mit Selbsttest bestanden (203 Dateien gelesen, 19 als
+binär übersprungen), **195 Instrumentierungstests** im Modul `app` — 189 im gemeinsamen Lauf, 4 weitere
+einzeln über ihre Stufen, 0 Fehler — und **39** im Modul `extractor` — 35 bestanden, 4 per Annahme
+übersprungen, 0 Fehler. Der erste Lauf um 18:37 nutzte eine Test-APK von 18:16, älter als die letzten
+Commits, und `extractor` wird mit `core` gebaut. Deshalb lief er nach der Gegenprobe noch einmal, um 20:26
+gegen den Stand von `ab9f36e`, mit demselben Ergebnis und denselben vier Übersprungenen. Gradle meldete dabei
+`:core:compileKotlin`, beide Kotlin-Übersetzungen von `extractor` und `:extractor:packageDebugAndroidTest`
+als `UP-TO-DATE`; die Test-APK von 18:16 war also schon die des committeten Stands. Von 411 Tests sind 405
+ausgeführt. Per Annahme übersprungen und nirgends einzeln nachgeholt sind im Modul `app` `EngineJobPinningTest#runningCoordinatorJobsFinishWithTheirPinnedEngineAcrossRealActivation`
+und `UiFixtureTest#seedSyntheticUiFixtureForAdbViewer`, im Modul `extractor`
+`EngineUpdateManagerTest#realReleaseStageActivateAndRollbackSurvivesManagerRestart`,
+`ExtractionChainTest#actualAudioIsDownloadedProbedAndPreparedForExactSource`,
+`ExtractionChainTest#actualCaptionIsFetchedAndParsedForExactSource` und
+`NativeRuntimeTest#publicSourceProbeUsesOnlyConfiguredSourceIdAndCounts`.
+
+**Die Schleife ist nicht konvergiert.** Fünfzehn Runden, keine davon leer. Solange eine Runde noch etwas
+findet, ist die nächste fällig — gerade weil die Funde der Runden 3 bis 15 jeweils in den Korrekturen der
 Vorrunde lagen. Runde 10 war der deutlichste Beleg dafür, dass eine Korrektur einen Fehler verschieben
 statt beheben kann; Runde 11 dafür, dass auch die Messung selbst geprüft gehört; Runde 12 dafür, dass ein
 Reviewer, der über den zugewiesenen Diff hinaussieht, den teuersten Fund macht — und dass zwei Listen, die
@@ -871,7 +1081,10 @@ Fund einer Runde kann selbst der Fehler sein. Eine Korrektur, die eine Anbietera
 belegt, wenn die Anbieterseite im Original gelesen wurde und nicht in einer Zusammenfassung. Und Runde 14
 sagt, warum das nicht reicht: Zwei ihrer drei Hauptfunde waren Fehler **in** den Korrekturen der Runde 13,
 einer davon schlimmer als die Lücke, die er schließen sollte. Eine Korrektur ist neuer, ungeprüfter Code,
-auch wenn sie eine Prüfung erweitert.
+auch wenn sie eine Prüfung erweitert. Runde 15 fügt hinzu, dass das auch für die Beschreibung einer
+Korrektur gilt: Ihre eigenen Zahlen — wie viele Formen, wie viele Zusicherungen, welche davon still — waren
+in Runde 14 an drei Stellen verschieden falsch, und der erste Entwurf der Kommentare in Runde 15 hat „still“
+und „laut“ noch einmal falsch verteilt, bevor das Nachzählen am Modell es fand.
 
 ## UI-Feedback umgesetzt
 
@@ -902,8 +1115,8 @@ Die GitHub-CI hat Build/JVM/Lint bestanden und den Emulator erfolgreich gestarte
 Run 34252821287 scheiterte anschließend im Gerätetest; der konkrete Einzelfehler
 ist noch unbekannt. Eine gezielte Berichtsausgabe ist vorbereitet, aber wegen
 Pause noch nicht in CI ausgeführt. Die abschließenden kleinen UI-Änderungen r80
-sind in r81 mit den damaligen 180 App-Tests (Stand 8. September; heute sind es 191), betrachtetem
-Screenshot und aktuellem statischen
+sind in r81 mit den damaligen 180 App-Tests (Stand 8. September; die heutige Zahl steht im Kopf
+dieser Datei), betrachtetem Screenshot und aktuellem statischen
 Releaseaudit nachgeprüft. Offizielle Signatur-/Ausrichtungsprüfung ebenfalls PASS.
 
 Nach dem belegten WSL-Speicherfehler sind 16 GiB Swap aktiv. Builds verwenden einen

@@ -2,26 +2,22 @@
 
 ## Wiederaufnahme: hier weitermachen
 
-Geschrieben am 11. September 2026, zuletzt nach der dreizehnten Reviewrunde nachgeführt, damit die
+Geschrieben am 11. September 2026, zuletzt nach der fünfzehnten Reviewrunde nachgeführt, damit die
 Arbeit ohne Wiedereinlesen der ganzen Sitzung weitergehen kann. Reihenfolge ist Absicht.
 
 **Wo der Stand steht:** Die Reviewrunden und was sie gefunden haben, stehen in
 [STATUS.md](STATUS.md); was offen ist, mit Stelle und fehlendem Nachweis, in
 [DEFECTS.md](DEFECTS.md). Die Punktnummern unten sind die Nummern dort.
 
-### 1. Fünfzehnte Reviewrunde über die Korrekturen der vierzehnten
+### 1. Sechzehnte Reviewrunde über die Korrekturen der fünfzehnten
 
-Runden 3 bis 14 haben ihren wichtigsten Fund jeweils in den Korrekturen der Vorrunde gehabt. Runde 14 ist
-die schärfste Fassung davon: **Zwei ihrer drei Hauptfunde waren Fehler in den Korrekturen der Runde 13, und
-einer war schlimmer als die Lücke, die er schließen sollte.** Der UTF-16-Fix ließ eine UTF-32-Datei als
-gelesen zählen, obwohl vorher die Nullbyte-Probe sie ehrlich als binär gemeldet hätte. Commits der
-vierzehnten Runde sind `9021bf5` (UTF-32), `8c16c0a` (Zahlenprüfung), `1b63860` (Preisgrund), `7e0b625`
-(Kostenzeile), `710c64f` (leere Begriffsliste), `538dfec` (Groqs Mindestabrechnung) und der
-Dokumentationscommit, der diesen Absatz trägt; einzeln benennen, nicht als Bereich, weil `a..b` den
-Anfangscommit
-auslässt.
+Runden 3 bis 15 haben ihren wichtigsten Fund jeweils in den Korrekturen der Vorrunde gehabt. In Runde 15
+war es die Zahlenprüfung, die Runde 14 permissiver gemacht hatte: Von ihren vier Lücken waren zwei still.
+Commits der fünfzehnten Runde sind `8833d07`, `b2286d5`, `089b184`, `1f378a9`, `e33ac54` und `ab9f36e` sowie
+der Doku-Commit direkt darüber; einzeln benennen, nicht als Bereich, weil `a..b` den Anfangscommit auslässt.
 
-Zwei rein lesende Reviewer zuerst, der verändernde danach allein. Neun Lehren gehören in den Auftrag:
+Rein lesende Reviewer zuerst, gleichzeitig; ein verändernder danach allein. Zwölf Lehren gehören in den
+Auftrag:
 
 - Ein Fund, den der Reviewer nicht ausführen konnte, gilt erst nach einer Gegenprobe als lebender Fehler.
 - **Eine Gegenprobe muss jede Stelle abschalten, die eine Regel durchsetzt, nicht die erstbeste.** Runde 11
@@ -36,28 +32,64 @@ Zwei rein lesende Reviewer zuerst, der verändernde danach allein. Neun Lehren g
 - **Frage bei jeder Korrektur: Was konnte die Prüfung vorher, das sie danach nicht mehr kann?** Nicht nur,
   was sie jetzt mehr kann. Und: Trennt sie „geprüft und sauber“ noch von „nicht geprüft“? Eine
   Erweiterung, die einen Fall still in die erste Kategorie schiebt, ist schlimmer als die Lücke davor.
+- **Zähle jede Zahl über eine Korrektur am Modell nach, nicht am eigenen Text.** Runde 14 hat ihre eigenen
+  Formen an drei Stellen verschieden gezählt, und die ersten Kommentare der Runde 15 haben „still“ und
+  „laut“ noch einmal falsch verteilt. Beide Male hat erst das Ausführen beider Fassungen über alle Fälle
+  gezeigt, was stimmt.
+- **Wird eine Regel an einer Stelle zusammengeführt, gehört jeder Leser auf die Liste.** Runde 15 hat
+  `ContextTerms` eingeführt und `SttStep.validate` erst beim Schreiben der Doku umgestellt, obwohl der
+  Code-Reviewer die Stelle in seiner Liste aller Leser genannt hatte.
 - **Ein Fund außerhalb des zugewiesenen Diffs ist ein Fund.** Der wichtigste Fund der Runden 12, 13 und 14
-  kam jedes Mal so zustande.
+  kam jedes Mal so zustande, und in Runde 15 lagen sieben Funde außerhalb.
+- **Eine Commit-Nachricht ist eine Prüfung, und eine Korrektur braucht ihre eigene Gegenprobe am Gerät.**
+  Beim Nachprüfen jeder Behauptung der Commit-Nachrichten fanden sich in Runde 15 zwei Fehler, die kein
+  Reviewer gemeldet hatte, einer davon in einer Korrektur derselben Runde. Die erste Korrektur des zweiten
+  verlor bei schnellem Tippen Zeichen, bei grüner App-Suite; gezeigt hat das erst das Tippen am Gerät.
 - Jede Zahl wird nachgezählt und nennt den Stand, für den sie gilt. Eine laufende Summe, die sich nicht
-  aus dem Dokument heraus nachrechnen lässt, gehört gestrichen statt korrigiert.
+  aus dem Dokument heraus nachrechnen lässt, gehört gestrichen statt korrigiert — deshalb steht die
+  heutige Testzahl seit Runde 15 nur im Kopf von [STATUS.md](STATUS.md).
 - Ein Reviewer, der für Gegenproben Dateien verändert, läuft nicht neben einem, der liest. Jeder
-  Symbolname im Auftrag wird vorher gegen den Baum geprüft.
+  Symbolname im Auftrag wird vorher gegen den Baum geprüft. Und nach jeder Installation auf dem Emulator
+  wird die Ausgabe auf `Success` geprüft: Ein voller Speicher ließ in Runde 15 neue Tests gegen alten
+  App-Code laufen (Wartungshinweis in [DEFECTS.md](DEFECTS.md)).
 
 Die Jagdliste:
 
-- **Der neue reguläre Ausdruck in `StatedNumbersTest` deutet das Präfix nicht mehr**
-  (`(?:^|;)([^\n;]*?)\bconst[ \t]+val`) und ist damit deutlich permissiver als die Fassung aus Runde 13.
-  Was findet er jetzt, das keine Deklaration ist? Eine mehrzeilige rohe Zeichenkette mit `const val` darin
-  wäre der erste Kandidat — im Modul `core` gibt es heute keine, aber die Frage gehört gestellt, weil die
-  vorige Fassung diesen Fall nicht haben konnte. Das ist die Umkehrung des Runde-14-Funds und genau die
-  Richtung, die eine Erweiterung gefährlich macht.
-- **Die Kostenzeile hat jetzt `minLines = 2`, `maxLines = 2` und einen Auslassungspunkt.** Ungemessen ist,
-  ob einer der drei Texte bei 200 % Schrift drei Zeilen braucht und also abgeschnitten wird. Am Gerät
-  nachsehen, in beiden Sprachen, bei 200 % Schrift und im Querformat — die einzige offene Frage der
-  Runde 14, die ein Gerät braucht.
-- **DEFECTS 30 und 31 sind mit Absicht offen und zeigen auf dieselbe Frage:** die Mindestdauer eines Modells
-  als dritte Längenschranke, die die Anzeige nicht kennt, und eine leere Fachbegriffsliste, die erst bei der
-  Übermittlung abgelehnt wird. Sollte `configError` die Adapterprüfung aufrufen statt sie nachzubauen?
+- **`codeOnly` in `StatedNumbersTest` ist ein kleiner Lexer, und ein Lexer hat Zustände, die er nicht
+  kennt.** Eine Zeichenkette innerhalb eines String-Templates steht als [Punkt 34](DEFECTS.md). Welche
+  Kotlin-Lexik fehlt noch? Jede Lücke mit einem Beispiel am Python-Modell nachstellen, bevor jemand sie
+  schließt, und die Gegenfrage stellen: Liest er über den Baum weiterhin genau die 33 Konstanten?
+- **`ContextTerms` wird an sechs Stellen gefragt.** Gibt es eine siebte, die über eine Liste urteilt, ohne
+  zu fragen? Und ist eine gespeicherte Liste mit leerem Eintrag auf jedem Modell behebbar, auch auf einem,
+  das kein Fachbegriffsfeld zeigt? `CONTEXT_TERM_BLANK` steht in `configError` vor der Frage, ob das
+  Modell überhaupt Fachbegriffe kann.
+- **`ReservedText` misst bei jeder Textänderung neu**, bei der Wartezeit also jede Sekunde, in einer Karte
+  eines scrollenden Verlaufs. Kostet das spürbar? Und sind `000:00:00` und `0000.0 GB` breit genug, auch
+  in einer Schrift, deren Ziffern nicht gleich breit sind?
+- **`ListField` merkt sich jede weitergegebene Liste, bis sie zurückkommt.** Kann eine Änderung von
+  außen verloren gehen, die zufällig einer noch nicht zurückgekommenen Liste gleicht? Kommt eine
+  weitergegebene Liste je verändert zurück, sodass sie nie gleich ankommt? Und `LimitFields` hat noch die
+  Bauart der verworfenen ersten Fassung, einen `LaunchedEffect`, der jedem abweichenden Wert folgt: Am
+  Gerät mit `120` und `0.25` schnell getippt nicht reproduziert, ausgeschlossen ist der Fehler damit nicht.
+  Geprüft ist nur Tippen über `adb shell input`, keine echte Bildschirmtastatur.
+- **`PREVIEW_ERRORS_SHOWN_AS_TEXT` ist eine zweite Liste neben `previewError`.** Das Raster in
+  `ViewRulesTest` erreicht neun der zwölf Codes nachweislich. Erreicht es die übrigen drei, und welcher
+  künftige Zweig läge außerhalb des Rasters?
+- **Die Zeilengrenzen auf zwei Bildschirmen sind nicht gemessen** ([Punkt 35](DEFECTS.md)): am Gerät oder
+  mit einem Compose-UI-Test, in beiden Sprachen, bei 200 % Schrift und im Querformat — die offene Frage aus
+  Runde 14, jetzt für vier Zeilen statt einer.
+- **`RAW_DATA_WITHOUT_EXTENSION` ist ein interner Integritätscode ohne eigenen Text**, wie seine Geschwister
+  in `ArtifactFilesException`. Gehört er unter [Punkt 4](DEFECTS.md)?
+- **Die historischen Punktverweise der Runden 3 und 4 in STATUS** hat in Runde 15 niemand vollständig gegen
+  die Nummerierung in DEFECTS geprüft, nur stichprobenhaft.
+- **Aufklappen schiebt, was darunter steht**, und steht jetzt als bewusste Entscheidung in
+  [DEFECTS.md](DEFECTS.md). Trägt die Abwägung, oder gibt es eine der vier Stellen, an der sich etwas bewegt,
+  das niemand angetippt hat?
+- **Die Fehlerzeile der Vorschau erscheint und verschwindet** ([Punkt 36](DEFECTS.md)). Eine
+  Gestaltungsfrage mit Vorschlag; nicht ohne Rückfrage entscheiden.
+- **DEFECTS 30 bleibt offen:** die Mindestdauer eines Modells als dritte Längenschranke, die die Anzeige
+  nicht kennt. Seit 31 geschlossen ist, lässt sich fragen, ob dieselbe Bauart — eine Regel in `core`, jeder
+  Leser fragt sie — auch dort trägt.
 - **Die Module `app` und `extractor` haben keine Zahlenliste.** Seit Runde 12 offen. Taugt die Bauart aus
   `core` für ein Androidmodul, dessen Tests auf dem Gerät laufen und den Quelltext dort nicht sehen?
 - **`Source.originalLanguage` hat kein Gegenstück zu `AudioTrack.languageRefused`.** Seit Runde 12 offen,
@@ -71,8 +103,11 @@ Die Jagdliste:
   zehn Sekunden, 25 MB gegen 100 MB; OpenAI 0,0045 und 0,006 je Minute. Alle acht stimmen mit dem Code
   überein. Ebenfalls geprüft und leer: Es gibt keinen weiteren AssemblyAI-Zusatz, den die App mitschickt und
   nicht berechnet — der gesendete Rumpf enthält nur `audio_url`, `speech_models`, `punctuate`,
-  `speaker_labels`, Sprachfelder und `keyterms_prompt`.
-- Und die Doku: Jede Zahl der Runde-14-Passage nachzählen, mit dem Stand, für den sie gilt.
+  `speaker_labels`, Sprachfelder und `keyterms_prompt`. In Runde 15 hat der Code-Reviewer die OpenAI-Seite
+  noch einmal selbst geladen und die Tokenpreise für `gpt-4o-transcribe-diarize` samt der Spaltenüberschrift
+  „Estimated cost“ bestätigt.
+- Und die Doku: Jede Zahl der Runde-15-Passage nachzählen, mit dem Stand, für den sie gilt, und jedes
+  „heute“ neben einer Zahl in allen Dokumenten.
 
 ### 2. Warncodes lesbar machen (DEFECTS 9) — erledigt
 
@@ -171,14 +206,17 @@ nötig machte. Und `EngineJobPinningTest` braucht **zwei** Flaggen: `-e sourcesc
 schaltet ihn überhaupt erst frei, und `-e engineProbeSource <URL>` gibt ihm das echte Release. Die erste
 wird im Test zuerst geprüft, also bleibt er ohne sie übersprungen, gleichgültig welche URL dabeisteht.
 
-**Die neunte Flagge ist keine Schranke.** `engineUpdateChannel` wählt in `EngineJobPinningTest` und in
+**Zwei der neun Flaggen sind keine Schranke.** `engineUpdateChannel` wählt in `EngineJobPinningTest` und in
 `EngineUpdateManagerTest` den Kanal eines echten Releases und fällt ohne Angabe auf `NIGHTLY` zurück.
 Sie überspringt nichts und fehlt deshalb zu Recht in der Liste der Schranken — aber sie stand bis
-Runde 14 nur in zwei datierten Berichten vom 7. September, also nirgends, wo jemand nachsieht.
-Zusammengerechnet sind damit
-von 409 Tests 403 ausgeführt; die sechs übrigen stehen als `BLOCKED/NOT_RUN` in
-[DEFECTS.md](DEFECTS.md). Es bleiben dieselben sechs; die drei Tests, die Runde 13 hinzugefügt hat,
-laufen alle.
+Runde 14 nur in zwei datierten Berichten vom 7. September, also nirgends, wo jemand nachsieht. Die zweite
+ist `sourcescribeProcessStage`: `ProcessRecoveryTest` prüft zuerst die Schranke `sourcescribeProcessFixture`
+und liest die Stufe danach mit `assertEquals`, sodass eine fehlende oder falsche Stufe die Tests rot werden
+lässt, statt sie zu überspringen. Bis Runde 15 stand hier „die neunte Flagge“, als gäbe es nur eine.
+
+Wie viele Tests es heute sind und wie viele davon laufen, steht im Kopf von [STATUS.md](STATUS.md) und nur
+dort; die Tests, die nicht laufen, stehen als `BLOCKED/NOT_RUN` in [DEFECTS.md](DEFECTS.md). Bis Runde 15
+stand hier eine eigene Summe, die jede Runde an zwei Orten nachgezogen werden musste.
 
 ## Restarbeiten nach der ersten persönlichen Preview
 

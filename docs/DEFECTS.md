@@ -1,6 +1,6 @@
 # Bekannte Probleme und offene Punkte
 
-**Stand:** 12. September 2026, nach vierzehn Runden adversarischer Reviews. Diese Datei ist für den
+**Stand:** 13. September 2026, nach fünfzehn Runden adversarischer Reviews. Diese Datei ist für den
 nächsten Agenten gedacht und listet, was **nicht** vollständig erledigt ist. Ein geschlossener Punkt
 behält seine Nummer und einen kurzen Vermerk, damit Verweise aus anderen Dokumenten gültig bleiben. Was hier nicht steht, ist entweder erledigt oder in
 [STATUS.md](STATUS.md) beschrieben.
@@ -457,9 +457,13 @@ Gewinn und deshalb nicht gemacht.
   Geheimnisscan sie nie sieht.
 - **Was Runde 14 hier geschlossen hat, und warum es schlimmer war als die Lücke davor:** Eine
   UTF-32LE-Markierung lautet `ff fe 00 00`, und ihre ersten zwei Bytes sind genau eine UTF-16LE-Markierung.
-  Runde 13 prüfte zwei Bytes, also wurde eine UTF-32-Datei als UTF-16 dekodiert — Text mit einem Nullbyte
+  Runde 13 prüfte zwei Bytes, also wurde eine UTF-32LE-Datei als UTF-16 dekodiert — Text mit einem Nullbyte
   zwischen jedem Zeichen, an dem kein Muster greift — und **als gelesen gezählt**. Vor Runde 13 hätte die
   Nullbyte-Probe dieselbe Datei ehrlich als binär gemeldet. Die vier Bytes werden jetzt zuerst geprüft.
+- **Was Runde 15 dazu nachgetragen hat:** Das gilt nur für Little-Endian. Eine UTF-32BE-Datei beginnt mit
+  `00 00 fe ff`, und die Zwei-Byte-Prüfung der Runde 13 hätte sie nie für UTF-16 gehalten. Den
+  Big-Endian-Eintrag in `UTF32_BOMS` durchlief aber kein Test, weil `.encode("utf-32")` auf den Maschinen
+  hier die Little-Endian-Markierung schreibt; der Selbsttest enthält jetzt eine UTF-32BE-Datei.
 - **Warum der Rest offen bleibt:** Alle drei sind heute leer — keine Datei im Baum trägt eine UTF-16- oder
   UTF-32-Markierung, die einzige Datei über einem Mebibyte ist die gepackte Extraktor-Engine und echt
   binär, und `.github/workflows/` enthält nur Versioniertes. Die Reihenfolge ist Absicht: Die weitere
@@ -497,21 +501,108 @@ Gewinn und deshalb nicht gemacht.
   kurze Quelle braucht eine andere Aussage, nicht dieselbe. Bewusst als Punkt notiert statt beiläufig
   mitgefixt. Gefunden vom lesenden Reviewer in Runde 14.
 
-### 31. Eine leere Fachbegriffsliste wird erst bei der Übermittlung abgelehnt (niedrig)
+### 31. Eine leere Fachbegriffsliste wird erst bei der Übermittlung abgelehnt — erledigt am 13. September 2026
 
-- **Stelle:** `MainViewModel.configError` gegen `AssemblyAiAdapter.validateConfig`
-  (`core/src/main/kotlin/app/sourcescribe/core/providers/AssemblyAiAdapter.kt`, `trimmed.isEmpty()`).
-- **Voraussetzung:** Ein `JobConfig`, dessen `contextTerms` nur leere oder blanke Einträge enthält. Über den
-  Bildschirm nicht erreichbar — die Eingabe filtert jede Leerzeile beim Tippen weg —, wohl aber über einen
-  gespeicherten oder übernommenen Auftrag: `SettingsStore` prüft beim Laden Länge und Steuerzeichen, nicht
-  Leere.
-- **Erwartet gegen tatsächlich:** `configError` nennt keinen Fehler, die Vorschau sieht startbereit aus,
-  und die Übermittlung lehnt den Auftrag dann mit `INVALID_INPUT` ab. Runde 14 hat den Teil geschlossen,
-  der Geld betraf: Die Kostenzeile rechnete für so eine Liste den Zuschlag für Fachbegriffe mit ein.
-- **Warum es offen bleibt:** Die Vorschau vollständig gegen die Adapterprüfungen zu spiegeln wäre die
-  vierte Stelle, die dieselbe Regel führt — genau die Bauart, die diese Reviewschleife sonst abbaut. Der
-  richtige Zug wäre, `configError` die Adapterprüfung aufrufen zu lassen, und das ist eine
-  Vertragsänderung. Gefunden vom lesenden Reviewer in Runde 14.
+Aufgenommen in Runde 14, geschlossen in Runde 15, und weiter als beschrieben: Der Punkt nannte Listen aus
+lauter Leereinträgen, der Mechanismus traf aber jede Liste mit einem leeren Eintrag, auch eine gemischte wie
+`["Kubernetes", ""]` — und für die rechnete die Kostenzeile trotz der Runde-14-Korrektur den Zuschlag noch
+ein. Erreichbar blieb beides nur über einen gespeicherten oder übernommenen Auftrag, weil das Eingabefeld
+Leerzeilen beim Tippen entfernt. Die Regel steht jetzt einmal, in
+`core/src/main/kotlin/app/sourcescribe/core/ContextTerms.kt`, und jede Stelle, die über eine Liste
+entscheidet, fragt sie: beide Anbieterpfade, `SttStep.validate`, die Kostenformel in `SttStep` sowie
+`configError` und `estimatedCostMicrousd` in `MainViewModel`. Die Vorschau meldet `CONTEXT_TERM_BLANK` mit
+eigenem Text und zeigt keinen Preis. Die Vertragsänderung, die dieser Punkt für den richtigen Zug hielt —
+`configError` ruft die Adapterprüfung auf —, war nicht nötig: Eine gemeinsame Regel in `core` ersetzt die
+Kopien, statt eine weitere hinzuzufügen. Belegt durch
+`ViewRulesTest.aTermListTheProviderRefusesIsNamedAsAnErrorAndNotPriced` und zwei Zusicherungen in
+`SttStepTest.estimateCostCeilsMinimumAndAssemblyAddonsAndBlocksUnknownPrice`. Gefunden vom lesenden Reviewer
+in Runde 14, verbreitert vom Code-Reviewer in Runde 15.
+
+### 32. Ein grüner CI-Lauf zeigt nicht, wie viele Instrumentierungstests übersprungen wurden (niedrig)
+
+- **Stelle:** `.github/workflows/android.yml`, der Schritt mit `:app:connectedDebugAndroidTest` und
+  `:extractor:connectedDebugAndroidTest` und seine Funktion `cleanup()`.
+- **Voraussetzung:** Ein CI-Lauf, der grün endet.
+- **Erwartet gegen tatsächlich:** Ein Instrumentierungslauf endet grün, auch wenn Tests per Annahme
+  übersprungen werden — ohne `sourcescribeEngineUpdate` sind es im Modul `extractor` achtzehn, siehe den
+  Wartungshinweis zu Instrumentierungstests unten. Der Workflow setzt diese Flagge, aber sichtbar wird eine
+  Überspringung dort nicht: `cleanup()` gibt die Testberichte nur aus, wenn der Lauf gescheitert ist, und
+  einen `upload-artifact`-Schritt gibt es nicht. Kippt künftig ein größerer Teil der Suite unbemerkt ins
+  Überspringen, etwa weil eine Flagge nicht mehr durchgereicht wird, bleibt CI grün, und die Zahl steht nur
+  in Dateien, die mit dem Runner verworfen werden.
+- **Warum es offen bleibt:** Die Änderung wäre klein — eine Zusammenfassung von `tests`, `failures`,
+  `errors` und `skipped` je Bericht, unabhängig vom Ausgang —, aber nicht lokal ausführbar, und ein
+  Workflowschritt, dessen Wirkung niemand gesehen hat, wäre genau die ungeprüfte Behauptung, die diese
+  Schleife sonst abbaut. Gemeldet vom Invarianten-Reviewer in Runde 15. Seine Fassung, `cleanup()` lese
+  „nie `<skipped>`“, stimmt nur für die Elemente: Im Fehlerfall gibt das Skript auch `root.attrib` aus, und
+  ob darin eine Überspringzahl steht, ist an keinem echten Bericht geprüft.
+
+### 33. `setBackoffCriteria` im Erfassungsauftrag greift nie (niedrig, informativ)
+
+- **Stelle:** `app/src/main/java/app/sourcescribe/data/JobCoordinator.kt`,
+  `.setBackoffCriteria(BackoffPolicy.LINEAR, 30, TimeUnit.SECONDS)`.
+- **Voraussetzung:** Keine; die Zeile steht in jedem eingereihten Erfassungsauftrag.
+- **Erwartet gegen tatsächlich:** WorkManager wendet eine Rückzugsregel nach `Result.retry()` an. Kein
+  Worker gibt `Result.retry()` zurück — `git grep` findet es weder in `app/src/main` noch in
+  `extractor/src/main` —, und die App plant Wiederholungen selbst: `nextAt` in der Datenbank und frisches
+  Einreihen mit `setInitialDelay`. Die Zeile legt einen Mechanismus nahe, der hier nicht arbeitet.
+- **Warum es offen bleibt:** Ob WorkManager die Regel auch auf einen vom System gestoppten und neu
+  eingeplanten Worker anwendet, ist nicht am Gerät geprüft. Die Zeile zu entfernen könnte genau diesen Pfad
+  verändern, und ein ungemessenes Verhalten zu ändern wäre schlimmer als eine irreführende Zeile. Gemeldet
+  vom Invarianten-Reviewer in Runde 15.
+
+### 34. Der Lexer der Zahlenprüfung kennt keine Zeichenkette innerhalb eines String-Templates (niedrig, heute folgenlos)
+
+- **Stelle:** `codeOnly` in `core/src/test/kotlin/app/sourcescribe/core/StatedNumbersTest.kt`.
+- **Voraussetzung:** Ein String-Template, dessen Ausdruck selbst eine Zeichenkette enthält, und in dieser
+  inneren Zeichenkette ein Kommentar-Anfang, etwa `"${x ?: "/*"}"`.
+- **Erwartet gegen tatsächlich:** Der Lexer beendet die äußere Zeichenkette am ersten inneren
+  Anführungszeichen und liest den Inhalt der inneren als Code. Ein `/*` dort öffnet einen Kommentar, den es
+  nicht gibt, bis zum nächsten `*/` irgendwo dahinter; ein `//` verwirft den Rest der Zeile. Beides kann eine
+  echte Deklaration verschlucken, still, aus demselben Grund wie die zwei stillen Formen der Runde 15.
+- **Warum es offen bleibt:** Eine Suche nach Zeilen mit `${` und einem späteren Anführungszeichen findet im
+  Modul `core` 54, darunter Templates mit innerer Zeichenkette in `TranscriptExporter`, `ExtractorMetadata`
+  und `SyncTranscriptParser`, und in keiner steht `/*` oder `//`. Über den Baum liest der Lexer dieselben 33
+  Konstanten wie der Scanner davor, am Modell gemessen. Verschachtelte Templates zu modellieren hieße, einen
+  Stapel von Lexerzuständen zu führen — mehr Code, der selbst geprüft werden müsste, für einen Fall, den es
+  nicht gibt. Die Fassung der Runde 14 hatte denselben Fall schlechter: Ihr Blockkommentarmuster griff in
+  jeder Zeichenkette, nicht nur in Templates. Selbst gefunden beim Nachfragen, was die Korrektur der
+  Runde 15 nicht kann.
+
+### 35. Die Zeilengrenzen auf zwei Bildschirmen sind nicht am Gerät gemessen (niedrig)
+
+- **Stelle:** Kostenzeile in `NewSourceScreen.kt` (`minLines = 2, maxLines = 2`); Fehlerzeile der Vorschau
+  in `NewSourceScreen.kt`, Wartezeit und Bytezähler in `HistoryScreen.kt` (`ReservedText`).
+- **Voraussetzung:** 200 % Schriftgröße, schmales Gerät, eine der beiden Sprachen.
+- **Erwartet gegen tatsächlich:** Dass nichts springt, folgt aus dem Code: Eine Zeile mit festen zwei Zeilen
+  kann nicht wachsen, und `ReservedText` reserviert mindestens die Höhe des höchsten seiner Kandidaten und
+  schneidet nichts ab. Nicht gemessen ist, ob einer der Kostentexte bei großer Schrift abgeschnitten wird
+  und ob die Platzhalter der Verlaufskarte wirklich die höchsten Fälle sind. Welcher Text am ehesten
+  betroffen ist, hat sich in Runde 14 verschoben: Gekürzt wurde damals `cost_source_too_long`, vorher der
+  längste der drei Kostentexte; seitdem ist es `estimated_cost` mit eingesetztem Betrag und Tarifdatum, nach
+  Zeichen gezählt 53 gegen höchstens 50 im Deutschen und 53 gegen höchstens 40 im Englischen. Das hat der
+  Code-Reviewer in Runde 15 nachgezählt.
+- **Warum es offen bleibt:** Es braucht ein Gerät bei 200 % Schrift oder einen Compose-UI-Test, der über
+  `onTextLayout` Zeilenzahl und Abschneiden prüft. Beides fehlt; der Test wäre der bessere Weg, weil er
+  bleibt. Vorschlag des Code-Reviewers in Runde 15.
+
+### 36. Die Fehlerzeile der Vorschau erscheint und verschwindet (niedrig)
+
+- **Stelle:** `PreviewCard` in `NewSourceScreen.kt`, der Zweig unter der Kostenzeile.
+- **Voraussetzung:** Eine Vorschau, deren Einstellungen erst unvollständig und dann vollständig sind, oder
+  eine Quelle, die länger ist als die Grenze des Auftrags.
+- **Ablauf:** Anbieter, Modell und Schlüssel wählen. Solange etwas fehlt, steht die Fehlerzeile da; sobald
+  nichts mehr fehlt, verschwindet sie, und der Startknopf unter der Karte rückt um ihre Höhe nach oben —
+  der Knopf, den man als Nächstes antippt. Die Längenwarnung (`SOURCE_LONGER_THAN_LIMIT`) ersetzt die Zeile
+  durch einen Satz mit eigenem Knopf und anderer Höhe.
+- **Erwartet gegen tatsächlich:** Erwartet ist, dass sich unter der Karte nichts bewegt. Seit Runde 15
+  bewegt sich nichts mehr, wenn ein Fehlertext einen anderen ablöst; beim Erscheinen und Verschwinden
+  ändert die Karte ihre Höhe weiterhin.
+- **Warum es offen bleibt:** Die Höhe auch ohne Fehler freizuhalten, ließe im häufigsten Zustand eine
+  leere Fläche von der Höhe des längsten Fehlertextes stehen. Ein Vorschlag wäre, den Platz im gültigen
+  Zustand mit einem kurzen Satz wie „Diese Quelle ist startklar“ zu füllen und die Längenwarnung in
+  dieselbe reservierte Höhe zu legen. Das ist eine Gestaltungsentscheidung und keine Korrektur, deshalb
+  nicht eigenmächtig getroffen. Gefunden in Runde 15 beim Umbau der Zeile.
 
 ## Bewusste Entscheidungen, die wie Fehler aussehen
 
@@ -571,6 +662,17 @@ einer Phasenbehandlung entkommt, und die Schrittangabe („Beim Absenden an den 
 diesem Fall richtig. Anders lag der Fall bei den acht `AUDIO_*`-Zweigen, die nach `ExtractionFailure`
 modelliert waren: dort gab es keinen denkbaren Erzeuger, und sie sind entfernt.
 
+### Aufklappen schiebt, was darunter steht
+
+Der Invarianten-Reviewer hat in Runde 15 als Hinweis gemeldet, dass aufklappbare Elemente beim Öffnen und
+Schließen ihre Nachbarn verschieben: die Auftragskarte im Verlauf, die Einträge der Hilfe und die
+Herkunftsangaben in der Ergebnisansicht; in der Vorschau erscheinen Modell- und Schlüsselauswahl erst, wenn
+ein Anbieter gewählt ist. Das bleibt so, und die Abwägung steht hier, damit sie nicht jede Runde neu gemeldet
+wird. Diese Datei liest die Regel, dass nichts springt, als Regel gegen Bewegung, die niemand ausgelöst hat:
+eine Zeile, die wächst, während jemand liest oder etwas anderes bedient. Hier ändert sich der Platz dort, wo
+gerade getippt wurde, und zeigt, worum gebeten wurde; Platz für eingeklappten Inhalt freizuhalten, hebt das
+Einklappen auf. Wer das anders entscheidet, ändert alle vier Stellen zugleich.
+
 ## Wartungshinweise, die keine Defekte sind
 
 ### Eine Anbieterzahl wird aus dem Markup gelesen, nicht aus einer Zusammenfassung
@@ -627,6 +729,18 @@ ein echtes Release und bleiben `BLOCKED/NOT_RUN`. Einer von ihnen,
 `EngineUpdateManagerTest.realReleaseStageActivateAndRollbackSurvivesManagerRestart`, braucht dazu noch
 `-e sourcescribeEngineLiveUpdate true` und `-e engineProbeSource <URL>`; der Ablauf in
 [NEXT_STEPS.md](NEXT_STEPS.md) nennt alle drei.
+
+**Eine gescheiterte Installation sieht aus wie ein Codefehler.** Am 13. September 2026 war `/data` auf
+`emulator-5556` zu 91 % belegt, und `adb install -r` scheiterte für die App-APK und die Test-APK des Moduls
+`extractor` mit `INSTALL_FAILED_INSUFFICIENT_STORAGE`, während die kleine Test-APK der App installiert wurde.
+Die Instrumentierung lief also mit neuen Tests gegen die App einer früheren Runde und meldete zwei
+Fehlschläge, die nach einem Defekt aussahen. Nach jeder Installation die Ausgabe auf `Success` prüfen, im
+Zweifel `adb shell dumpsys package app.sourcescribe.debug | grep lastUpdateTime` lesen, und bei vollem
+Speicher die alten Debug- und Testpakete zuerst deinstallieren. Am selben Abend scheiterte die Installation
+ein zweites Mal, diesmal mit 523 MB frei, und der Prüflauf brach wie vorgesehen ab, bevor ein Test lief.
+`adb shell pm trim-caches 4G` und das Deinstallieren von `app.sourcescribe.extractor.test` brachten `/data`
+von 609 MB auf 933 MB frei. Für die Wiederholung des `extractor`-Laufs am selben Abend kam das Testpaket
+zurück; danach waren 607 MB frei. Die zweite gescheiterte Installation hatte bei 523 MB stattgefunden.
 
 ### Abhängigkeitsprüfung nach jedem Versionswechsel neu erzeugen
 
