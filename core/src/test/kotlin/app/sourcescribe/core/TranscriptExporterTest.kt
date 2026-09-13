@@ -477,6 +477,58 @@ class TranscriptExporterTest {
     }
 
     @Test
+    fun aStretchNotTranscribedIsMarkedOnlyWhereNoTranscribedTextRuns() {
+        // Chunk 0 is the window 0..1000 and its provider timed the last words to 1150; chunk 1, 1000..2000, is
+        // missing. Round 17 found the notice starting at 1000, so a player showed "not transcribed" beside "one".
+        val overhang = document(
+            segments = listOf(
+                Segment("one", 0, 1150, timeEvidence = TimeEvidence.PROVIDER_SEGMENT),
+                Segment("three", 2000, 3000, timeEvidence = TimeEvidence.PROVIDER_SEGMENT),
+            ),
+        ).copy(
+            scope = TranscriptScope(
+                requestedDurationMs = 3000,
+                processedIntervals = listOf(Interval(0, 1000), Interval(2000, 3000)),
+                missingChunks = listOf(1),
+                technicallyComplete = false,
+            ),
+        )
+        assertEquals(
+            "1\n00:00:00,000 --> 00:00:01,150\n$NOTICE\n\n" +
+                "2\n00:00:00,000 --> 00:00:01,150\none\n\n" +
+                "3\n00:00:01,150 --> 00:00:02,000\n$GAP\n\n" +
+                "4\n00:00:02,000 --> 00:00:03,000\nthree\n\n",
+            TranscriptExporter.render(overhang, ExportFormat.SRT),
+        )
+        // Text running through the whole stretch leaves no notice there, only the one at the start.
+        val covered = overhang.copy(segments = listOf(
+            Segment("one", 0, 2100, timeEvidence = TimeEvidence.PROVIDER_SEGMENT),
+            Segment("three", 2000, 3000, timeEvidence = TimeEvidence.PROVIDER_SEGMENT),
+        ))
+        assertEquals(
+            "1\n00:00:00,000 --> 00:00:02,100\n$NOTICE\n\n" +
+                "2\n00:00:00,000 --> 00:00:02,100\none\n\n" +
+                "3\n00:00:02,000 --> 00:00:03,000\nthree\n\n",
+            TranscriptExporter.render(covered, ExportFormat.SRT),
+        )
+        // And a cue inside a stretch splits the notice around it instead of being overlaid by it.
+        val inside = overhang.copy(segments = listOf(
+            Segment("one", 0, 1000, timeEvidence = TimeEvidence.PROVIDER_SEGMENT),
+            Segment("stray", 1400, 1600, timeEvidence = TimeEvidence.PROVIDER_SEGMENT),
+            Segment("three", 2000, 3000, timeEvidence = TimeEvidence.PROVIDER_SEGMENT),
+        ))
+        assertEquals(
+            "1\n00:00:00,000 --> 00:00:01,000\n$NOTICE\n\n" +
+                "2\n00:00:00,000 --> 00:00:01,000\none\n\n" +
+                "3\n00:00:01,000 --> 00:00:01,400\n$GAP\n\n" +
+                "4\n00:00:01,400 --> 00:00:01,600\nstray\n\n" +
+                "5\n00:00:01,600 --> 00:00:02,000\n$GAP\n\n" +
+                "6\n00:00:02,000 --> 00:00:03,000\nthree\n\n",
+            TranscriptExporter.render(inside, ExportFormat.SRT),
+        )
+    }
+
+    @Test
     fun aTimedExportWhoseCompletenessWasNeverConfirmedIsNotPresentedAsWhole() {
         val unconfirmed = document(segments = listOf(Segment("one", 0, 1000, timeEvidence = TimeEvidence.CAPTION_CUE)))
         assertNull(unconfirmed.scope.technicallyComplete)

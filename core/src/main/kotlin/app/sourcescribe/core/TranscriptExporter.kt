@@ -191,9 +191,11 @@ object TranscriptExporter {
         if (!whole) {
             // A player shows cues and nothing else, so what Markdown, text and JSON carry as metadata has to be
             // a cue here: before this, a partial result exported as SRT looked exactly like a whole one. The
-            // notice borrows the interval of the first cue instead of claiming a time of its own, and a stretch
-            // that was not transcribed gets the interval the scope records for it, nothing read from the text.
-            untranscribed(document.scope).forEach { cues += TimedCue(it.startMs, it.endMs, UNTRANSCRIBED_NOTICE) }
+            // notice borrows the interval of the first cue instead of claiming a time of its own. A stretch the
+            // scope records as not transcribed gets a notice over the part of it that no transcribed cue runs
+            // through: a provider may time the last words of a chunk past the chunk's end, and a player showing
+            // "not transcribed" beside those words would contradict itself (round 17).
+            untranscribed(document.scope, cues).forEach { cues += TimedCue(it.startMs, it.endMs, UNTRANSCRIBED_NOTICE) }
             cues.sortWith(compareBy({ it.startMs }, { it.endMs }))
             cues.add(0, cues.first().copy(text = PARTIAL_NOTICE))
         }
@@ -217,16 +219,22 @@ object TranscriptExporter {
     /** The first cue of a timed export whose result is not confirmed whole, by [confirmedComplete]. */
     internal const val PARTIAL_NOTICE = "[SourceScribe: this transcript is not confirmed complete. " +
         "Its limitations are listed in the Markdown, text and JSON exports.]"
-    /** The cue over a stretch of the source that the scope records as not transcribed. */
+    /** The cue over a stretch the scope records as not transcribed, where no transcribed cue runs. */
     internal const val UNTRANSCRIBED_NOTICE = "[SourceScribe: this part of the source was not transcribed.]"
 
     private data class TimedCue(val startMs: Long, val endMs: Long, val text: String)
 
     /**
-     * The stretches of the requested duration outside every processed interval. Known only where the scope
-     * records both, which a caption document does not; there the notice has to say it on its own.
+     * The stretches of the requested duration outside every processed interval, less the time a cue in
+     * [transcribed] runs through. Known only where the scope records both, which a caption document does not;
+     * there the notice has to say it on its own.
+     *
+     * The processed intervals are the windows the chunks were cut to, and the cues carry the times a provider
+     * reported, which `SyncTranscriptParser` shifts by the start of the chunk without cutting them at its end.
+     * Words timed to 1.15 s in a chunk that ends at 1 s are transcribed text, and the stretch after them begins
+     * where they end.
      */
-    private fun untranscribed(scope: TranscriptScope): List<Interval> {
+    private fun untranscribed(scope: TranscriptScope, transcribed: List<TimedCue>): List<Interval> {
         val requested = scope.requestedDurationMs ?: return emptyList()
         if (requested <= 0 || scope.processedIntervals.isEmpty()) return emptyList()
         val gaps = ArrayList<Interval>()
@@ -237,7 +245,19 @@ object TranscriptExporter {
             covered = maxOf(covered, interval.endMs.coerceIn(0L, requested))
         }
         if (covered < requested) gaps += Interval(covered, requested)
-        return gaps
+        val cues = transcribed.sortedBy { it.startMs }
+        return gaps.flatMap { gap ->
+            val open = ArrayList<Interval>()
+            var start = gap.startMs
+            for (cue in cues) {
+                if (cue.startMs >= gap.endMs || start >= gap.endMs) break
+                if (cue.endMs <= start) continue
+                if (cue.startMs > start) open += Interval(start, cue.startMs)
+                start = maxOf(start, cue.endMs)
+            }
+            if (start < gap.endMs) open += Interval(start, gap.endMs)
+            open
+        }
     }
 
     private fun hasUnrepresentableTimedText(document: TranscriptDocument): Boolean =
