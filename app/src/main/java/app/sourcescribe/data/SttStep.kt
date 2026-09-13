@@ -6,6 +6,7 @@ import app.sourcescribe.core.ArtifactFiles
 import app.sourcescribe.core.ArtifactFilesException
 import app.sourcescribe.core.AudioTrack
 import app.sourcescribe.core.Branch
+import app.sourcescribe.core.ContextTerms
 import app.sourcescribe.core.ExecutionState
 import app.sourcescribe.core.Generation
 import app.sourcescribe.core.Interval
@@ -1666,7 +1667,7 @@ class SttStep @Inject constructor(
         val provider = config.provider ?: return null
         val model = config.model?.takeIf { it.isNotBlank() } ?: return null
         if (!config.uploadApproved || config.credentialId.isNullOrBlank() || config.maxCostMicrousd?.let { it < 0 } == true) return null
-        if (config.contextTerms.any { it.isBlank() } || config.language?.isBlank() == true) return null
+        if (ContextTerms.refused(config.contextTerms) || config.language?.isBlank() == true) return null
         if (config.maxAudioSeconds !in 1..MAX_AUDIO_SECONDS) return null
         val adapter = adapter(provider)
         val capabilities = try {
@@ -2216,12 +2217,13 @@ class SttStep @Inject constructor(
             // Only Universal-3.5 Pro is charged for a keyterms prompt; Universal-2 has it included in its
             // base rate, which is what the provider's add-on table says in the column beside it.
             //
-            // `isNotBlank`, not `isNotEmpty`: the adapter refuses a blank term outright, so a list holding
-            // only blanks is not a prompt the provider would charge for — it is a request it would reject.
-            // Counting it here showed a surcharge for a job that cannot run.
+            // `ContextTerms.charged`, not a predicate spelled out here: a blank entry makes the providers
+            // refuse the whole request, so no list holding one is a prompt anybody is charged for. Round 14
+            // wrote `any { it.isNotBlank() }` in this spot and closed only the all-blank half — for
+            // `["real term", ""]` it still added five cents an hour to a job that cannot start.
             if (capabilities.provider == Provider.ASSEMBLYAI &&
                 config.model == app.sourcescribe.core.providers.AssemblyAiAdapter.MODEL_U35 &&
-                config.contextTerms.any { it.isNotBlank() }
+                ContextTerms.charged(config.contextTerms)
             ) {
                 hourly = saturatedAdd(hourly, app.sourcescribe.core.providers.AssemblyAiAdapter.KEYTERMS_U35_MICRO_USD_PER_HOUR)
             }

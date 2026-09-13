@@ -2,6 +2,7 @@ package app.sourcescribe.core.providers
 
 import app.sourcescribe.core.parseBounded
 
+import app.sourcescribe.core.ContextTerms
 import app.sourcescribe.core.PollResult
 import app.sourcescribe.core.Provider
 import app.sourcescribe.core.ProviderAdapter
@@ -203,9 +204,10 @@ class AssemblyAiAdapter(private val http: ProviderHttp = ProviderHttp()) : Provi
         val model = request.config.model?.takeIf { it.isNotBlank() } ?: invalidInput()
         if (model !in SUPPORTED_MODELS) unsupported()
         if (requireApiKey) validateApiKey(apiKey ?: "")
+        if (ContextTerms.refused(request.config.contextTerms)) invalidInput()
         val terms = request.config.contextTerms.map { term ->
             val trimmed = term.trim()
-            if (trimmed.isEmpty() || trimmed.split(WHITESPACE).size > MAX_WORDS_PER_TERM) invalidInput()
+            if (trimmed.split(WHITESPACE).size > MAX_WORDS_PER_TERM) invalidInput()
             trimmed
         }
         val maxTerms = if (model == MODEL_U2) MAX_TERMS_U2 else MAX_TERMS_U35

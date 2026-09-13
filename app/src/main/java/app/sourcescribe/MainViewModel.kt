@@ -410,6 +410,9 @@ class MainViewModel @Inject constructor(
                 val cap = capabilities(config)
                 when {
                     cap == null || config.region !in cap.regions -> "PROVIDER_CAPABILITY_OR_CREDENTIAL_INVALID"
+                    // Before the capability question, the way both provider paths order it: a blank entry is
+                    // refused as invalid input whether or not the model supports a prompt at all.
+                    ContextTerms.refused(config.contextTerms) -> "CONTEXT_TERM_BLANK"
                     config.diarization && !cap.diarization || config.wordTimestamps && !cap.wordTimestamps ||
                         config.segmentTimestamps && !cap.segmentTimestamps || config.contextTerms.isNotEmpty() && !cap.contextTerms -> "UNSUPPORTED_OPTION"
                     config.maxCostMicrousd != null && cap.priceMicrousdPerHour == null -> "PRICE_UNKNOWN"
@@ -440,6 +443,11 @@ class MainViewModel @Inject constructor(
         fun estimatedCostMicrousd(config: JobConfig, durationMs: Long): Long? {
             val capability = capabilities(config) ?: return null
             if (durationMs !in 1..SttStep.MAX_AUDIO_DURATION_MS) return null
+            // A term list the providers refuse has no price, the same way a source past the ceiling has
+            // none: quoting one would put a figure in dollars above the line that says the run is refused.
+            // The formula below stays a pure price function so that nothing can reach the budget gate with
+            // an unknown estimate; this screen is where the question „is this job runnable“ belongs.
+            if (ContextTerms.refused(config.contextTerms)) return null
             var total = 0L
             for (window in SttStep.chunkPlan(durationMs)) {
                 val part = SttStep.estimateCostMicrousd(capability, config, window.durationMs) ?: return null

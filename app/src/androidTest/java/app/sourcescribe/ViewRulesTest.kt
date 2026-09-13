@@ -2,6 +2,7 @@ package app.sourcescribe
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.sourcescribe.core.*
+import app.sourcescribe.core.providers.AssemblyAiAdapter
 import app.sourcescribe.core.providers.GroqAdapter
 import app.sourcescribe.data.CredentialInfo
 import org.junit.Assert.assertEquals
@@ -50,6 +51,38 @@ class ViewRulesTest {
 
         // A source whose length nobody knows is not too long. It has no price either, for another reason.
         assertEquals(false, MainViewModel.sourceTooLong(null, config))
+    }
+
+    @Test
+    fun aTermListTheProviderRefusesIsNamedAsAnErrorAndNotPriced() {
+        val config = JobConfig(mode = AcquisitionMode.STT_ONLY, provider = Provider.ASSEMBLYAI,
+            model = AssemblyAiAdapter.MODEL_U35, credentialId = "c", uploadApproved = true,
+            maxAudioSeconds = 3_600L)
+
+        // Both provider paths refuse a list over a single blank entry, so a blank one among real terms is
+        // not a smaller prompt — it is a job that cannot start. DEFECTS 31 had the preview silent about
+        // exactly this while the submission would answer INVALID_INPUT.
+        assertEquals(null, MainViewModel.configError(config))
+        assertEquals("CONTEXT_TERM_BLANK", MainViewModel.configError(config.copy(contextTerms = listOf(""))))
+        assertEquals(
+            "CONTEXT_TERM_BLANK",
+            MainViewModel.configError(config.copy(contextTerms = listOf("Kubernetes", "  "))),
+        )
+        assertEquals(null, MainViewModel.configError(config.copy(contextTerms = listOf("Kubernetes"))))
+
+        // And the cost row says nothing rather than quoting one, the way it says nothing for a source past
+        // the limit. A figure in dollars above a line that refuses the run is the defect round 13 closed.
+        val oneBlank = config.copy(contextTerms = listOf(""))
+        assertEquals(null, MainViewModel.estimatedCostMicrousd(oneBlank, 3_600_000L))
+        val mixed = config.copy(contextTerms = listOf("Kubernetes", ""))
+        assertEquals(null, MainViewModel.estimatedCostMicrousd(mixed, 3_600_000L))
+        // 260 004, not 260 000: the shown figure is the sum over the six chunks an hour is submitted in,
+        // and each one rounds up on its own. The same hour through the per-chunk formula is 260 000 exactly,
+        // which is why the two numbers differ by four and neither is a typo.
+        assertEquals(
+            260_004L,
+            MainViewModel.estimatedCostMicrousd(config.copy(contextTerms = listOf("Kubernetes")), 3_600_000L),
+        )
     }
 
     @Test

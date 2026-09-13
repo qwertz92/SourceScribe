@@ -135,6 +135,7 @@
     <string name="invalid_duration">Bitte eine maximale Audiodauer zwischen 1 und 600 Minuten eingeben.</string>
     <string name="source_beyond_ceiling">Diese Quelle dauert %1$s. SourceScribe verarbeitet höchstens %2$s am Stück, deshalb hilft hier auch ein höheres Limit nicht.</string>
     <string name="unsupported_options">Die gewählten Optionen passen nicht zum Modell. Bitte die erweiterten Einstellungen prüfen.</string>
+    <string name="context_term_blank">Ein Fachbegriff ist leer. Der Anbieter lehnt die ganze Liste ab — Eintrag ausfüllen oder entfernen.</string>
     <string name="retry_missing">Fehlenden Zweig neu ausführen</string>
     <string name="retry_all">Neue Ausführung</string>
     <string name="resume_job">Sicher fortsetzen</string>

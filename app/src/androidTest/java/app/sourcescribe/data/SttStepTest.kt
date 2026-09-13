@@ -91,6 +91,32 @@ class SttStepTest {
             ),
         )
 
+        // And a list with one real term beside one blank one, which is the half round 14 left open: its
+        // predicate asked whether any term was not blank, which is true here, so the surcharge was still
+        // added — while both provider paths refuse the whole request over the single blank entry. The rule
+        // now says what they say, in `ContextTerms`, and the same figure comes back for both lists.
+        val mixedTerms = assemblyConfig.copy(contextTerms = listOf("Kubernetes", ""), diarization = false)
+        assertEquals(
+            210_000L,
+            SttStep.estimateCostMicrousd(
+                assembly.capabilities(AssemblyAiAdapter.MODEL_U35),
+                mixedTerms,
+                3_600_000L,
+            ),
+        )
+
+        // A real list is charged, so the assertion above is about the blank entry and not about the
+        // surcharge having quietly stopped working.
+        val realTerms = assemblyConfig.copy(contextTerms = listOf("Kubernetes"), diarization = false)
+        assertEquals(
+            260_000L,
+            SttStep.estimateCostMicrousd(
+                assembly.capabilities(AssemblyAiAdapter.MODEL_U35),
+                realTerms,
+                3_600_000L,
+            ),
+        )
+
         val groq = GroqAdapter()
         val groqConfig = JobConfig(provider = Provider.GROQ, model = GroqAdapter.MODEL_TURBO)
         assertEquals(

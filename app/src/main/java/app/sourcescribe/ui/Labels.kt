@@ -302,6 +302,7 @@ internal fun byteSize(bytes: Long): String {
     "UNSUPPORTED_OPTION", "PROVIDER_UNSUPPORTED_OPTION", "RESPONSE_UNSUPPORTED_OPTION",
     "PROVIDER_CAPABILITY_OR_CREDENTIAL_INVALID" -> stringResource(R.string.unsupported_options)
     "PRICE_UNKNOWN" -> stringResource(R.string.price_unknown)
+    "CONTEXT_TERM_BLANK" -> stringResource(R.string.context_term_blank)
 
     // What the reader typed or shared could not be turned into exactly one finished video.
     "INVALID_URL", "INVALID_HOST", "INVALID_PATH", "INVALID_QUERY", "INVALID_VIDEO_ID" ->

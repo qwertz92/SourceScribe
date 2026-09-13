@@ -2,6 +2,7 @@ package app.sourcescribe.core.providers
 
 import app.sourcescribe.core.parseBounded
 
+import app.sourcescribe.core.ContextTerms
 import app.sourcescribe.core.JobConfig
 import app.sourcescribe.core.Provider
 import app.sourcescribe.core.ProviderCapabilities
@@ -78,8 +79,8 @@ internal object SyncProviderSupport {
         if (request.config.wordTimestamps && !capabilities.wordTimestamps) unsupported()
         if (request.config.segmentTimestamps && !capabilities.segmentTimestamps) unsupported()
         if (request.config.diarization && !capabilities.diarization) unsupported()
-        if (request.config.contextTerms.any { it.isBlank() }) invalidInput()
-        if (request.config.contextTerms.any { it.isNotBlank() } && !capabilities.contextTerms) unsupported()
+        if (ContextTerms.refused(request.config.contextTerms)) invalidInput()
+        if (request.config.contextTerms.isNotEmpty() && !capabilities.contextTerms) unsupported()
         if (promptLimited && request.config.contextTerms.isNotEmpty()) contextText(request.config.contextTerms)
         if (minimumDurationMs <= 0 || request.config.maxAudioSeconds <= 0 || request.durationMs < minimumDurationMs ||
             request.chunkStartMs < 0 || request.chunkIndex < 0
