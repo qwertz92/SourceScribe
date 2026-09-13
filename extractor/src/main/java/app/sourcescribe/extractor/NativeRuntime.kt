@@ -391,6 +391,11 @@ class NativeRuntime(context: Context) {
         environment.remove("PYTHONSTARTUP")
         environment.remove("PYTHONINSPECT")
         environment["PYTHONNOUSERSITE"] = "1"
+        // yt-dlp loads no plugin today without this: `--no-plugin-dirs` leaves the loader an empty search
+        // list, and PYTHONPATH, where it would also look, is removed above. Both rest on how one version reads
+        // its options, and an engine staged later is another version. This switches the loader itself off,
+        // checked in 2026.08.19 at `load_plugins` in `yt_dlp/plugins.py`, before any search list is read.
+        environment["YTDLP_NO_PLUGINS"] = "1"
     }
 
     private fun awaitProcessGroupId(pidFile: File, process: Process): Int? {

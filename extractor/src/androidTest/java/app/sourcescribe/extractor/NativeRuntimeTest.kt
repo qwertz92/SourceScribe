@@ -53,6 +53,17 @@ class NativeRuntimeTest {
     }
 
     @Test
+    fun childProcessesStartWithPluginsAndTheUserSiteSwitchedOff() = runBlocking {
+        runtime.initialize()
+        val result = runtime.pythonForTest(listOf("-c",
+            "import os, sys; print(os.environ.get('YTDLP_NO_PLUGINS')); print(os.environ.get('PYTHONNOUSERSITE')); " +
+                "print(os.environ.get('PYTHONPATH')); print(sys.flags.no_user_site)"))
+        assertEquals(result.stderr, 0, result.exitCode)
+        // Read inside a child process, which is where yt-dlp and the interpreter see the environment.
+        assertEquals(listOf("1", "1", "None", "1"), result.stdout.trim().lines())
+    }
+
+    @Test
     fun ffmpegGeneratesAudioAndFfprobeReadsDuration() = runBlocking {
         runtime.initialize()
         val audio = File.createTempFile("sourcescribe-runtime-", ".wav", context.cacheDir)
