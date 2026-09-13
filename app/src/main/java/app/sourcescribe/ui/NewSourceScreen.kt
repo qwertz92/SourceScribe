@@ -155,7 +155,8 @@ private fun PreviewCard(
                 source.durationMs?.let(::duration) ?: stringResource(R.string.unknown),
                 source.publishedDate?.let(::publishedDate) ?: stringResource(R.string.unknown),
             ).joinToString(" · "))
-            Text(source.canonicalUrl.orEmpty(), style = MaterialTheme.typography.bodySmall)
+            // An imported file has no address, and an empty text in its place still took a line of height.
+            source.canonicalUrl?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
             if (source.kind == SourceKind.YOUTUBE) Text(stringResource(R.string.whole_video), style = MaterialTheme.typography.labelLarge)
             if (preview.previousJob != null) Text(stringResource(R.string.duplicate_warning), color = MaterialTheme.colorScheme.error)
 
