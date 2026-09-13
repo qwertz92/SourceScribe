@@ -373,6 +373,20 @@ class MainViewModel @Inject constructor(
                 credentials.any { it.id == config.credentialId && it.provider == config.provider && it.region == config.region },
         )
 
+        /**
+         * Every code [previewError] returns that the preview card shows as a sentence: all of them except
+         * `SOURCE_LONGER_THAN_LIMIT`, which gets a warning with a button of its own. The card reserves the
+         * height of the tallest of their texts, so switching from one to another moves nothing below it. A
+         * code missing here is still shown in full and only moves the card when it appears;
+         * `ViewRulesTest.everyErrorThePreviewCanShowHasItsHeightReserved` is there to notice one.
+         */
+        val PREVIEW_ERRORS_SHOWN_AS_TEXT = listOf(
+            "NO_ACCEPTABLE_CAPTIONS", "PROVIDER_REQUIRED", "CREDENTIAL_REQUIRED", "NO_AUDIO", "CHOOSE_AUDIO_TRACK",
+            // And the ones that come from `configError`.
+            "AUDIO_DURATION_LIMIT", "BUDGET_INVALID", "UPLOAD_APPROVAL_REQUIRED", "PROVIDER_CAPABILITY_OR_CREDENTIAL_INVALID",
+            "CONTEXT_TERM_BLANK", "UNSUPPORTED_OPTION", "PRICE_UNKNOWN",
+        )
+
         fun previewError(preview: SourcePreview, credentials: List<CredentialInfo>): String? {
             val config = configurationForStart(preview.config, credentials)
             val captions = TrackSelection.captions(preview.resolved, config)

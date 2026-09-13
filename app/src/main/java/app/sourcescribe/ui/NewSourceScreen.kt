@@ -21,6 +21,7 @@ import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -237,7 +238,19 @@ private fun PreviewCard(
             if (error == "SOURCE_LONGER_THAN_LIMIT") {
                 LengthLimitWarning(requireNotNull(source.durationMs), preview.config, change, openHelp, enabled = !state.starting)
             } else if (error != null) {
-                Text(messageText(error), color = MaterialTheme.colorScheme.error)
+                // The text here switches while the reader works the controls above: a missing provider
+                // reads as one sentence, a blank keyterm as another, an ambiguous audio track as a third.
+                // So the line reserves the height of the tallest sentence it can say, measured at this
+                // width and font scale, and never cuts the one it does say. The cost row's two-line cap
+                // would not do here: its three texts were kept short for that cap, and these were not —
+                // the longest runs past a hundred characters in both languages. Where the error goes away
+                // altogether, the button under this card still moves up; DEFECTS 36 carries that.
+                ReservedText(
+                    messageText(error),
+                    MainViewModel.PREVIEW_ERRORS_SHOWN_AS_TEXT.map { messageText(it) },
+                    LocalTextStyle.current,
+                    color = MaterialTheme.colorScheme.error,
+                )
             }
         }
     }

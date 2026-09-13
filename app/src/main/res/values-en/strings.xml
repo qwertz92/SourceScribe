@@ -158,7 +158,7 @@
     <string name="remote_delete_confirmed">AssemblyAI confirmed the data deletion. This does not confirm a refund.</string>
     <string name="no_remote_handle">No undeleted AssemblyAI job ID is available.</string>
     <string name="provider_elapsed">Provider is processing · %1$s since job started</string>
-    <string name="processed_bytes">Processed: %1$d B</string>
+    <string name="processed_bytes">Processed: %1$s</string>
     <string name="provenance_details">Source and model details</string>
     <string name="model_requested">Requested model: %1$s</string>
     <string name="model_reported">Model reported by provider: %1$s</string>

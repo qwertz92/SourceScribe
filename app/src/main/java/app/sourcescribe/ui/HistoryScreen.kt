@@ -201,6 +201,15 @@ internal fun HistoryScreen(
     }
 }
 
+// Stand-ins as wide as what `duration` and `byteSize` put into those two labels. `duration` has no unit
+// above hours, so a three-digit hour count is what the first reserves for; `byteSize` has none above GB,
+// so a terabyte prints as four digits of gigabytes, which is what the second reserves for. Neither is a
+// ceiling on the value: `ReservedText` measures the real text as well and gives it the room it needs, so a
+// longer one only costs the no-jump guarantee for that one case. Zeros stand in for every digit, which
+// holds exactly in a font whose digits share one width and approximately in any other.
+private const val LONGEST_ELAPSED = "000:00:00"
+private const val LONGEST_BYTE_SIZE = "0000.0 GB"
+
 @Composable
 private fun JobCard(
     job: JobRow,
@@ -253,14 +262,25 @@ private fun JobCard(
                             savedConfig.maxCostMicrousd?.let { budgetText(it) } ?: stringResource(R.string.budget_none)),
                             style = MaterialTheme.typography.bodySmall)
                     }
-                    if (job.state == ExecutionState.WAITING_REMOTE) Text(
+                    // The one line on this screen that changes without anybody touching it: `now` is
+                    // refreshed every second while a job waits, and the time inside it grows from 9:59 to
+                    // 10:00 to 1:00:00. Whether a wrap point falls inside that range depends on the width
+                    // and the font scale, and it has not been measured on a device. Reserving the widest
+                    // case is what makes the answer not matter: the card cannot gain a line mid-wait.
+                    if (job.state == ExecutionState.WAITING_REMOTE) ReservedText(
                         stringResource(R.string.provider_elapsed, duration((now - job.createdAt).coerceAtLeast(0))),
-                        style = MaterialTheme.typography.bodySmall)
+                        listOf(stringResource(R.string.provider_elapsed, LONGEST_ELAPSED)),
+                        MaterialTheme.typography.bodySmall)
                     attempts.forEach { attempt ->
                         Text("${if (attempt.branch == Branch.CAPTIONS) stringResource(R.string.mode_captions_only) else stringResource(R.string.mode_stt_only)} · ${stringResource(phaseLabel(attempt.phase))}",
                             style = MaterialTheme.typography.bodySmall)
-                        if (attempt.processedBytes > 0) Text(stringResource(R.string.processed_bytes, attempt.processedBytes),
-                            style = MaterialTheme.typography.bodySmall)
+                        // In the units the rest of this app uses for a download — `byteSize`, which is
+                        // what an audio track's size is shown in two screens away — rather than a raw digit
+                        // count that grew a character at a time and had no reserved height either.
+                        if (attempt.processedBytes > 0) ReservedText(
+                            stringResource(R.string.processed_bytes, byteSize(attempt.processedBytes)),
+                            listOf(stringResource(R.string.processed_bytes, LONGEST_BYTE_SIZE)),
+                            MaterialTheme.typography.bodySmall)
                         attempt.error?.let { AttemptError(it, openHelp) }
                     }
                     val artifactIds = jobArtifacts.map { it.id }.toSet()

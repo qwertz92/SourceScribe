@@ -137,4 +137,42 @@ class ViewRulesTest {
         assertNull(MainViewModel.previewError(SourcePreview(resolved, config, null), listOf(key)))
     }
 
+    @Test
+    fun everyErrorThePreviewCanShowHasItsHeightReserved() {
+        val source = SourceResolver.youtube("https://www.youtube.com/watch?v=jNQXAC9IVRw")
+        val id = requireNotNull(source.videoId)
+        val caption = CaptionTrack("en", id, "en", null, "json3", Generation.UPLOADER_PROVIDED, Translation.NONE, "fixture")
+        val audio = listOf(AudioTrack("a", id, "en", null, null, "fixture"), AudioTrack("b", id, "de", null, null, "fixture"))
+        val sources = listOf(emptyList(), listOf(caption)).flatMap { captions ->
+            listOf(emptyList(), audio.take(1), audio).map { ResolvedSource(source, captions, it, emptyMap()) }
+        }
+        val options = listOf<(JobConfig) -> JobConfig>(
+            { it }, { it.copy(diarization = true) }, { it.copy(wordTimestamps = true) }, { it.copy(segmentTimestamps = true) },
+            { it.copy(contextTerms = listOf("Kubernetes")) }, { it.copy(contextTerms = listOf("Kubernetes", "")) },
+            { it.copy(maxCostMicrousd = -1L) }, { it.copy(maxCostMicrousd = 1L) }, { it.copy(maxAudioSeconds = 0L) },
+        )
+        // Every mode, provider, model, region and source shape against each option, with and without a key.
+        val seen = mutableSetOf<String>()
+        for (mode in AcquisitionMode.entries) for (provider in listOf(null) + Provider.entries) {
+            val models = listOf(null) + (provider?.let { MainViewModel.models(it) } ?: emptyList())
+            for (model in models) for (region in Region.entries) for (option in options) for (resolved in sources) {
+                val key = CredentialInfo("fixture-key", provider ?: Provider.GROQ, region)
+                val config = option(JobConfig(mode = mode, provider = provider, model = model, region = region, credentialId = key.id))
+                for (keys in listOf(emptyList(), listOf(key))) {
+                    MainViewModel.previewError(SourcePreview(resolved, config, null), keys)?.let { seen += it }
+                }
+            }
+        }
+        assertEquals(
+            "The preview card reserves room for the texts in PREVIEW_ERRORS_SHOWN_AS_TEXT. A code it can show " +
+                "that the list lacks is still shown in full, but it moves the card when it appears. Add it there.",
+            emptySet<String>(),
+            seen - MainViewModel.PREVIEW_ERRORS_SHOWN_AS_TEXT.toSet() - "SOURCE_LONGER_THAN_LIMIT",
+        )
+        // The grid has to reach the branches, or the assertion above is about nothing. These are the codes it
+        // is built to reach — the early ones in `previewError` and the first checks in `configError`.
+        val reached = listOf("NO_ACCEPTABLE_CAPTIONS", "PROVIDER_REQUIRED", "CREDENTIAL_REQUIRED", "NO_AUDIO",
+            "CHOOSE_AUDIO_TRACK", "AUDIO_DURATION_LIMIT", "BUDGET_INVALID", "CONTEXT_TERM_BLANK", "UNSUPPORTED_OPTION")
+        assertEquals("Codes the grid failed to reach", emptyList<String>(), reached.filterNot { it in seen })
+    }
 }

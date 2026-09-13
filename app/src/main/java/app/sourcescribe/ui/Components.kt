@@ -30,12 +30,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
@@ -205,5 +207,43 @@ internal fun StatusChip(text: String, container: androidx.compose.ui.graphics.Co
         Box(Modifier.heightIn(min = 28.dp).padding(horizontal = 10.dp), contentAlignment = Alignment.Center) {
             Text(text, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
+    }
+}
+
+/**
+ * Text whose height is reserved for the tallest thing it could say.
+ *
+ * A status line that grows from one rendered line to two pushes everything under it down, and a line
+ * whose content changes on a timer, or while the reader works a control above it, does that while the
+ * reader is looking at something else. Reserving the height of the tallest of `reserveFor` costs nothing
+ * when the text is short and moves nothing when it changes. Every candidate is measured at the real width
+ * and the real font scale, so the answer holds at 200 % as well, where a label that fits on one line at
+ * default size does not.
+ *
+ * The actual text is measured too, which means a text taller than every candidate still gets the room it
+ * needs rather than being cut — the reservation is a floor, not a cap. A missing candidate costs the
+ * no-jump guarantee for that one text, never a word of it. `Choice` and the match count in
+ * `TranscriptScreen` hold hand-written versions of this that predate it.
+ */
+@Composable
+internal fun ReservedText(
+    text: String,
+    reserveFor: List<String>,
+    style: TextStyle,
+    modifier: Modifier = Modifier,
+    color: Color = Color.Unspecified,
+) {
+    val textMeasurer = rememberTextMeasurer()
+    BoxWithConstraints(modifier.fillMaxWidth()) {
+        val heightPx = remember(text, reserveFor, style, constraints.maxWidth, textMeasurer) {
+            val room = Constraints(maxWidth = constraints.maxWidth)
+            (reserveFor + text).maxOf { textMeasurer.measure(it, style, constraints = room).size.height }
+        }
+        Text(
+            text,
+            Modifier.heightIn(min = with(LocalDensity.current) { heightPx.toDp() }),
+            style = style,
+            color = color,
+        )
     }
 }
