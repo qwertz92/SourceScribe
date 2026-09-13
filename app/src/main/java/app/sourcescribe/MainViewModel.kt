@@ -185,16 +185,20 @@ class MainViewModel @Inject constructor(
         }
     }
     /** A change to the draft from a control that picks a value, a preset, or the button that raises the limit. */
-    fun updatePreviewConfig(config: JobConfig) = changeDraft(null) { config }
+    fun updatePreviewConfig(config: JobConfig) { changeDraft(null) { config } }
 
     /**
      * A keystroke in the field over [setting]. [change] is applied to the draft as it is at this moment rather
      * than to the copy the field was composed with, which can be a frame older, and the field keeps its text.
+     *
+     * False when the draft did not take it. While a start is under way the draft is what that start reads, so a
+     * keystroke that reached a field still composed as enabled is refused, and the field must then not keep the
+     * text as typed: it would go on showing a value that neither this start nor a later one uses (round 17).
      */
-    fun typeIntoDraft(setting: TypedSetting, change: (JobConfig) -> JobConfig) = changeDraft(setting, change)
+    fun typeIntoDraft(setting: TypedSetting, change: (JobConfig) -> JobConfig): Boolean = changeDraft(setting, change)
 
-    private fun changeDraft(typed: TypedSetting?, change: (JobConfig) -> JobConfig) {
-        if (screen.value.starting) return
+    private fun changeDraft(typed: TypedSetting?, change: (JobConfig) -> JobConfig): Boolean {
+        if (screen.value.starting) return false
         previewRevision.incrementAndGet()
         mutable.update { state ->
             val config = change(state.draft ?: settings.value.defaults)
@@ -207,6 +211,7 @@ class MainViewModel @Inject constructor(
                     audioTrackId = preview.resolved.audio.firstOrNull { it.id == preview.config.audioTrackId }?.id ?: TrackSelection.audio(preview.resolved, null)?.id))
             })
         }
+        return true
     }
 
     /**
@@ -384,10 +389,16 @@ class MainViewModel @Inject constructor(
         mutable.update { it.copy(rollbackTarget = target) }
     }
     fun cancelRollback() { mutable.update { it.copy(rollbackTarget = null) } }
-    /** Goes back to [expectedId] and nowhere else: the installation the confirmation named. */
-    fun rollback(expectedId: String) {
+    /**
+     * Goes back to [expectedId] and nowhere else: the installation the confirmation named. The confirmation closes
+     * once the switch is actually under way. While another action holds the screen, the tap is answered with
+     * ACTION_BUSY and the confirmation stays, so the version it names can still be confirmed (round 17).
+     */
+    fun rollback(expectedId: String) = action {
         mutable.update { it.copy(rollbackTarget = null) }
-        action { engines.rollback(expectedId); refreshEngines(); mutable.update { it.copy(message = "ENGINE_ACTIVE") } }
+        engines.rollback(expectedId)
+        refreshEngines()
+        mutable.update { it.copy(message = "ENGINE_ACTIVE") }
     }
 
     private suspend fun refreshEngines() { val installed = engines.installations(); mutable.update { it.copy(installations = installed) } }

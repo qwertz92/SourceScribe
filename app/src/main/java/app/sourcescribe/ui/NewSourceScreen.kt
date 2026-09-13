@@ -57,7 +57,7 @@ internal fun NewSourceScreen(
     setInput: (String) -> Unit,
     config: JobConfig,
     change: (JobConfig) -> Unit,
-    type: (TypedSetting, (JobConfig) -> JobConfig) -> Unit,
+    type: (TypedSetting, (JobConfig) -> JobConfig) -> Boolean,
     state: ScreenState,
     settings: AppSettings,
     openHelp: (HelpTopic) -> Unit,
@@ -287,7 +287,7 @@ private fun LengthLimitWarning(
 private fun ConfigControls(
     config: JobConfig,
     change: (JobConfig) -> Unit,
-    type: (TypedSetting, (JobConfig) -> JobConfig) -> Unit,
+    type: (TypedSetting, (JobConfig) -> JobConfig) -> Boolean,
     edits: DraftEdits,
     credentials: List<Triple<String, Provider, Region>>,
     localAudio: Boolean,
@@ -417,7 +417,7 @@ private fun ConfigControls(
 private fun DraftTextField(
     epoch: String,
     shown: String,
-    type: (String) -> Unit,
+    type: (String) -> Boolean,
     enabled: Boolean,
     label: (@Composable () -> Unit)? = null,
     isError: Boolean = false,
@@ -431,9 +431,12 @@ private fun DraftTextField(
     var typedEpoch by rememberSaveable { mutableStateOf<String?>(null) }
     var typedText by rememberSaveable { mutableStateOf("") }
     OutlinedTextField(if (typedEpoch == epoch) typedText else shown, { value ->
-        typedEpoch = epoch
-        typedText = value
-        type(value)
+        // Only text the draft took becomes the field's own. A keystroke refused while a start is under way leaves
+        // the field on what the draft holds, so it never shows a value that nothing is going to use.
+        if (type(value)) {
+            typedEpoch = epoch
+            typedText = value
+        }
     }, Modifier.fillMaxWidth(), enabled = enabled, label = label, isError = isError, keyboardOptions = keyboardOptions,
         minLines = minLines, maxLines = maxLines)
 }
@@ -445,7 +448,7 @@ private fun DraftTextField(
 @Composable
 private fun LimitFields(
     config: JobConfig,
-    type: (TypedSetting, (JobConfig) -> JobConfig) -> Unit,
+    type: (TypedSetting, (JobConfig) -> JobConfig) -> Boolean,
     edits: DraftEdits,
     openHelp: (HelpTopic) -> Unit,
     enabled: Boolean,

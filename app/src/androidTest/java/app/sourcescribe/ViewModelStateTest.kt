@@ -344,6 +344,56 @@ class ViewModelStateTest {
         }
     }
 
+    @Test
+    fun aKeystrokeTheDraftRefusesDuringAStartIsReportedAsRefused() = withFixture {
+        awaitInitialization()
+        val config = approvedConfig()
+        setScreen(ScreenState(draft = config, previews = listOf(preview(config))))
+        fun draft() = requireNotNull(viewModel.screen.value.draft)
+        var taken: Boolean? = null
+        onMain { taken = viewModel.typeIntoDraft(TypedSetting.BUDGET) { it.copy(maxCostMicrousd = 500_000) } }
+        assertEquals(true, taken)
+        assertEquals(500_000L, draft().maxCostMicrousd)
+
+        // A start is under way, and the field was still composed as enabled when the keystroke reached it. The
+        // draft keeps what the start reads, and the answer says so: a field that kept its "0.56" over a draft of
+        // 0.5 went on showing a budget no start would use (round 17).
+        setScreen(viewModel.screen.value.copy(starting = true))
+        val edits = viewModel.screen.value.draftEdits
+        onMain { taken = viewModel.typeIntoDraft(TypedSetting.BUDGET) { it.copy(maxCostMicrousd = 560_000) } }
+        assertEquals(false, taken)
+        assertEquals(500_000L, draft().maxCostMicrousd)
+        assertEquals(500_000L, viewModel.screen.value.previews.single().config.maxCostMicrousd)
+        assertEquals(edits, viewModel.screen.value.draftEdits)
+        setScreen(viewModel.screen.value.copy(starting = false))
+    }
+
+    @Test
+    fun aConfirmedRollbackTheScreenIsTooBusyForKeepsItsConfirmationOpen() = withFixture {
+        awaitInitialization()
+        val named = viewModel.screen.value.installations.single()
+        setScreen(viewModel.screen.value.copy(rollbackTarget = named))
+        // Another action holds the screen. Until round 17 the confirmation closed before the gate answered, and a
+        // tap that confirmed a named version went nowhere, with nothing left on screen to tap again.
+        val gate = MainViewModel::class.java.getDeclaredField("actionGate").apply { isAccessible = true }.get(viewModel)
+        check(gate is kotlinx.coroutines.sync.Mutex)
+        check(gate.tryLock())
+        try {
+            onMain { viewModel.rollback(named.id) }
+            assertEquals("ACTION_BUSY", viewModel.screen.value.message)
+            assertEquals(named, viewModel.screen.value.rollbackTarget)
+        } finally {
+            gate.unlock()
+        }
+        // Tapped again once the screen is free, it closes and the manager answers: only the bundled engine exists.
+        onMain { viewModel.rollback(named.id) }
+        val answered = withTimeout(TIMEOUT_MS) {
+            viewModel.screen.first { !it.busy && it.message != null && it.message != "ACTION_BUSY" }
+        }
+        assertNull(answered.rollbackTarget)
+        assertEquals("ENGINE_NO_PREVIOUS", answered.message)
+    }
+
     private fun <T> withFixture(block: suspend Fixture.() -> T): T {
         val base = InstrumentationRegistry.getInstrumentation().targetContext
         runBlocking { NativeRuntime(base).initialize() }
