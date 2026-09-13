@@ -173,7 +173,7 @@ private fun SourceScribeApp(incoming: String, shareSerial: Int, model: MainViewM
                     fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp).semantics { heading() })
                 Box(Modifier.fillMaxWidth().height(4.dp)) { if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth()) }
                 pageState.SaveableStateProvider(page.name) { when (page) {
-                    Page.NEW -> NewSourceScreen(input, { input = it; model.clearPreview() }, config, change, state, settings,
+                    Page.NEW -> NewSourceScreen(input, { input = it; model.clearPreview() }, config, change, model::typeIntoDraft, state, settings,
                         openHelp = openHelp,
                         inspect = { model.inspect(input, config) }, onPreset = { change(it) }, onTrack = model::selectTrack,
                         onStart = {

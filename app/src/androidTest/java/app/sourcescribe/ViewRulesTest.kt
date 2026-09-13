@@ -6,6 +6,7 @@ import app.sourcescribe.core.providers.AssemblyAiAdapter
 import app.sourcescribe.core.providers.GroqAdapter
 import app.sourcescribe.data.CredentialInfo
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -174,5 +175,39 @@ class ViewRulesTest {
         val reached = listOf("NO_ACCEPTABLE_CAPTIONS", "PROVIDER_REQUIRED", "CREDENTIAL_REQUIRED", "NO_AUDIO",
             "CHOOSE_AUDIO_TRACK", "AUDIO_DURATION_LIMIT", "BUDGET_INVALID", "CONTEXT_TERM_BLANK", "UNSUPPORTED_OPTION")
         assertEquals("Codes the grid failed to reach", emptyList<String>(), reached.filterNot { it in seen })
+    }
+
+    @Test
+    fun aDraftChangeMovesTheEpochOfEveryTypedSettingItChangesButTheOneBeingTyped() {
+        val before = JobConfig()
+        for (setting in TypedSetting.entries) {
+            // Exhaustive, so a setting added later cannot pass here without a change of its own.
+            val after = when (setting) {
+                TypedSetting.AUDIO_LIMIT -> before.copy(maxAudioSeconds = 120)
+                TypedSetting.BUDGET -> before.copy(maxCostMicrousd = 1)
+                TypedSetting.CAPTION_LANGUAGES -> before.copy(preferredLanguages = listOf("de"))
+                TypedSetting.STT_LANGUAGE -> before.copy(language = "de")
+                TypedSetting.CONTEXT_TERMS -> before.copy(contextTerms = listOf("Kubernetes"))
+            }
+            assertNotEquals(setting.name, setting.of(before), setting.of(after))
+            val edits = DraftEdits()
+            val fromOutside = edits.after(before, after, typed = null)
+            val typed = edits.after(before, after, typed = setting)
+            for (other in TypedSetting.entries) {
+                assertEquals("$setting set from outside, epoch of $other moved", other == setting,
+                    fromOutside.epoch(other) != edits.epoch(other))
+                assertEquals("$setting typed, epoch of $other", edits.epoch(other), typed.epoch(other))
+            }
+            // Set back to where it started, the epoch does not return with it: text typed under the first
+            // epoch must not become current again over a value it was never typed against.
+            val back = fromOutside.after(after, before, typed = null)
+            assertNotEquals(edits.epoch(setting), back.epoch(setting))
+            assertNotEquals(fromOutside.epoch(setting), back.epoch(setting))
+        }
+        // A change to nothing a field shows moves nothing, so a half-typed entry survives a switch being flipped.
+        val edits = DraftEdits()
+        assertEquals(edits, edits.after(JobConfig(), JobConfig(retainRaw = true, diarization = true), typed = null))
+        // Every view model draws its own session, so an epoch saved before the process died is not current after.
+        assertNotEquals(DraftEdits().epoch(TypedSetting.BUDGET), DraftEdits().epoch(TypedSetting.BUDGET))
     }
 }

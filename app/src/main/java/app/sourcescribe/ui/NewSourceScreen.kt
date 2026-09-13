@@ -28,7 +28,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -43,10 +42,12 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import app.sourcescribe.DraftEdits
 import app.sourcescribe.MainViewModel
 import app.sourcescribe.R
 import app.sourcescribe.ScreenState
 import app.sourcescribe.SourcePreview
+import app.sourcescribe.TypedSetting
 import app.sourcescribe.core.*
 import java.util.Locale
 
@@ -56,6 +57,7 @@ internal fun NewSourceScreen(
     setInput: (String) -> Unit,
     config: JobConfig,
     change: (JobConfig) -> Unit,
+    type: (TypedSetting, (JobConfig) -> JobConfig) -> Unit,
     state: ScreenState,
     settings: AppSettings,
     openHelp: (HelpTopic) -> Unit,
@@ -95,7 +97,7 @@ internal fun NewSourceScreen(
             }
         }
         item {
-            ConfigControls(config, change, state.credentials.map { Triple(it.id, it.provider, it.region) },
+            ConfigControls(config, change, type, state.draftEdits, state.credentials.map { Triple(it.id, it.provider, it.region) },
                 state.previews.any { it.resolved.source.kind == SourceKind.LOCAL_AUDIO }, openHelp, enabled = !state.starting)
         }
         item {
@@ -286,6 +288,8 @@ private fun LengthLimitWarning(
 private fun ConfigControls(
     config: JobConfig,
     change: (JobConfig) -> Unit,
+    type: (TypedSetting, (JobConfig) -> JobConfig) -> Unit,
+    edits: DraftEdits,
     credentials: List<Triple<String, Provider, Region>>,
     localAudio: Boolean,
     openHelp: (HelpTopic) -> Unit,
@@ -317,7 +321,7 @@ private fun ConfigControls(
                 }
             }
             if (config.credentialId == null) Text(stringResource(R.string.no_provider_help), style = MaterialTheme.typography.bodySmall)
-            LimitFields(config, change, openHelp, enabled)
+            LimitFields(config, type, edits, openHelp, enabled)
         }
         TextButton({ advanced = !advanced }, enabled = enabled) { Text(stringResource(R.string.advanced)) }
         if (advanced) {
@@ -328,16 +332,16 @@ private fun ConfigControls(
                     info = HelpTopic.CAPTION_TRACK, openHelp = openHelp) { change(config.copy(allowUploaderCaptions = it)) }
                 Toggle(R.string.automatic_captions, config.allowAutomaticCaptions, enabled) { change(config.copy(allowAutomaticCaptions = it)) }
                 Toggle(R.string.translated_captions, config.allowTranslatedCaptions, enabled) { change(config.copy(allowTranslatedCaptions = it)) }
-                ListField(config.preferredLanguages, { it.joinToString(",") },
-                    { typed -> typed.split(',').map(String::trim).filter(String::isNotBlank) },
-                    { change(config.copy(preferredLanguages = it)) }, Modifier.fillMaxWidth(), enabled,
-                    label = { Text(stringResource(R.string.languages)) })
+                DraftTextField(edits.epoch(TypedSetting.CAPTION_LANGUAGES), config.preferredLanguages.joinToString(","), { typed ->
+                    type(TypedSetting.CAPTION_LANGUAGES) { it.copy(preferredLanguages = typed.split(',').map(String::trim).filter(String::isNotBlank)) }
+                }, enabled, label = { Text(stringResource(R.string.languages)) })
             }
             if (AcquisitionPlanner.mayUseSpeechToText(config.mode)) {
                 val cap = MainViewModel.capabilities(config)
                 Toggle(R.string.fallback_errors, config.fallbackOnCaptionError, enabled) { change(config.copy(fallbackOnCaptionError = it)) }
-                OutlinedTextField(config.language.orEmpty(), { change(config.copy(language = it.ifBlank { null })) },
-                    Modifier.fillMaxWidth(), enabled = enabled, label = { Text(stringResource(R.string.stt_language)) })
+                DraftTextField(edits.epoch(TypedSetting.STT_LANGUAGE), config.language.orEmpty(), { typed ->
+                    type(TypedSetting.STT_LANGUAGE) { it.copy(language = typed.ifBlank { null }) }
+                }, enabled, label = { Text(stringResource(R.string.stt_language)) })
                 Toggle(R.string.diarization, config.diarization, enabled && cap?.diarization == true,
                     info = HelpTopic.DIARIZATION, openHelp = openHelp) { change(config.copy(diarization = it)) }
                 Toggle(R.string.word_times, config.wordTimestamps, enabled && cap?.wordTimestamps == true,
@@ -351,10 +355,9 @@ private fun ConfigControls(
                             style = MaterialTheme.typography.labelLarge)
                         InfoButton(HelpTopic.CONTEXT_TERMS, openHelp)
                     }
-                    ListField(config.contextTerms, { it.joinToString("\n") },
-                        { typed -> typed.lines().filter(String::isNotBlank) },
-                        { change(config.copy(contextTerms = it)) }, Modifier.fillMaxWidth(), enabled,
-                        minLines = 2, maxLines = 4)
+                    DraftTextField(edits.epoch(TypedSetting.CONTEXT_TERMS), config.contextTerms.joinToString("\n"), { typed ->
+                        type(TypedSetting.CONTEXT_TERMS) { it.copy(contextTerms = typed.lines().filter(String::isNotBlank)) }
+                    }, enabled, minLines = 2, maxLines = 4)
                 }
             }
             Toggle(R.string.retain_raw, config.retainRaw, enabled, info = HelpTopic.RETENTION, openHelp = openHelp) {
@@ -387,52 +390,50 @@ private fun ConfigControls(
 }
 
 /**
- * A text field over a list the configuration stores already split, which keeps what is being typed.
+ * A text field over one [TypedSetting] of the draft that shows what was typed into it, not the draft as it
+ * comes back.
  *
- * Bound straight to the list, the field lost every separator the moment it was typed: a line break after
- * "Kubernetes" split into "Kubernetes" and an empty entry, the empty entry was dropped, the list joined
- * back to "Kubernetes", and that is what the field showed. A second term could only be pasted, or typed by
- * breaking the first one in two. The field now holds what was typed and hands on the list it splits into,
- * and it follows the list only when the list changes from outside — a preset, or a job prepared again.
+ * A keystroke hands its value to the view model at once, and the draft reaches the screen a frame or two
+ * later. Several keys can be typed in between, so the value a field is composed with can be older than its
+ * own text, and every earlier version of these fields went wrong on that. Bound straight to the draft, a
+ * field can be handed the older value, and the next key then lands after it. Holding the text and comparing
+ * the draft that comes back against it, to follow a change made elsewhere — a preset, a job prepared again,
+ * the button that raises the limit — cannot tell such a change from a late value of the field's own: the
+ * list fields reset the text to a late list mid-word ("Kubernetes" came out as "Kuberes" on a device in
+ * round 15), and the budget typed fast as `0.123456` read `0.134562` in round 16. Remembering the lists
+ * handed on until they came back narrowed that, and could still leave a change from outside unshown when it
+ * matched one of them.
  *
- * Telling "from outside" apart is the hard part, because a list handed on comes back late. Several keys
- * can be typed between two frames, and the effect below can run for a list that is already out of date. A
- * version that followed every list differing from the text took such a late list for a change from
- * outside and reset the text to it mid-word: typed fast on a device, "Kubernetes", Enter, "Docker" came out
- * as "Kuberes" and "Dokern". So every list handed on is remembered until it comes back, and only a list
- * that was never handed on moves the text.
+ * So this field does not compare. [epoch] is the one [DraftEdits] holds for the setting, which the view model
+ * moves whenever anything but a keystroke here changes it, and the text typed under an epoch is shown for
+ * exactly as long as that epoch is current. After that the field shows [shown], the setting as the draft
+ * holds it, and the next keystroke continues from there. Nothing is rewritten while it is being typed, an
+ * entry the setting cannot take included.
  */
 @Composable
-private fun ListField(
-    values: List<String>,
-    join: (List<String>) -> String,
-    split: (String) -> List<String>,
-    change: (List<String>) -> Unit,
-    modifier: Modifier,
+private fun DraftTextField(
+    epoch: String,
+    shown: String,
+    type: (String) -> Unit,
     enabled: Boolean,
+    modifier: Modifier = Modifier.fillMaxWidth(),
+    label: (@Composable () -> Unit)? = null,
+    isError: Boolean = false,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     minLines: Int = 1,
     maxLines: Int = Int.MAX_VALUE,
-    label: (@Composable () -> Unit)? = null,
 ) {
-    var text by rememberSaveable { mutableStateOf(join(values)) }
-    // Oldest first. A list comes back at most once and possibly never, because two quick changes can reach
-    // the next frame as one; the newest one coming back settles everything handed on before it.
-    val handedOn = remember { mutableListOf<List<String>>() }
-    LaunchedEffect(values) {
-        when {
-            values == handedOn.lastOrNull() -> handedOn.clear()
-            values in handedOn -> repeat(handedOn.indexOf(values) + 1) { handedOn.removeAt(0) }
-            split(text) != values -> { handedOn.clear(); text = join(values) }
-        }
-    }
-    OutlinedTextField(text, { typed ->
-        text = typed
-        val list = split(typed)
-        if (list != (handedOn.lastOrNull() ?: values)) {
-            handedOn += list
-            change(list)
-        }
-    }, modifier, enabled = enabled, label = label, minLines = minLines, maxLines = maxLines)
+    // Saved together with its epoch. A rotation keeps the view model and the epoch, so the text comes back
+    // exactly as typed, separators included. After the process died both are new, so a restored text is not
+    // shown over a draft it was never typed into.
+    var typedEpoch by rememberSaveable { mutableStateOf<String?>(null) }
+    var typedText by rememberSaveable { mutableStateOf("") }
+    OutlinedTextField(if (typedEpoch == epoch) typedText else shown, { value ->
+        typedEpoch = epoch
+        typedText = value
+        type(value)
+    }, modifier, enabled = enabled, label = label, isError = isError, keyboardOptions = keyboardOptions,
+        minLines = minLines, maxLines = maxLines)
 }
 
 /**
@@ -440,34 +441,26 @@ private fun ListField(
  * visible wherever speech-to-text is involved instead of hiding behind the advanced switch.
  */
 @Composable
-private fun LimitFields(config: JobConfig, change: (JobConfig) -> Unit, openHelp: (HelpTopic) -> Unit, enabled: Boolean) {
-    var minutes by rememberSaveable { mutableStateOf((config.maxAudioSeconds / 60).toString()) }
-    var budget by rememberSaveable {
-        mutableStateOf(config.maxCostMicrousd?.toBigDecimal()?.movePointLeft(6)?.stripTrailingZeros()?.toPlainString().orEmpty())
-    }
-    // Both directions run through the same mapping. When they disagreed, an out-of-range entry was
-    // rewritten to "0" while the reader was still typing it.
-    LaunchedEffect(config.maxAudioSeconds) {
-        if (config.maxAudioSeconds > 0 && limitSeconds(minutes) != config.maxAudioSeconds) {
-            minutes = (config.maxAudioSeconds / 60).toString()
-        }
-    }
-    LaunchedEffect(config.maxCostMicrousd) {
-        if (budgetValue(budget) != config.maxCostMicrousd) {
-            budget = config.maxCostMicrousd?.toBigDecimal()?.movePointLeft(6)?.stripTrailingZeros()?.toPlainString().orEmpty()
-        }
-    }
+private fun LimitFields(
+    config: JobConfig,
+    type: (TypedSetting, (JobConfig) -> JobConfig) -> Unit,
+    edits: DraftEdits,
+    openHelp: (HelpTopic) -> Unit,
+    enabled: Boolean,
+) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(stringResource(R.string.limits), Modifier.weight(1f), style = MaterialTheme.typography.labelLarge)
         InfoButton(HelpTopic.LIMITS, openHelp)
     }
-    OutlinedTextField(minutes,
-        { text -> minutes = text; change(config.copy(maxAudioSeconds = limitSeconds(text) ?: 0)) },
-        Modifier.fillMaxWidth(), enabled = enabled, isError = config.maxAudioSeconds !in 1..JobLimits.MAX_AUDIO_SECONDS,
+    DraftTextField(edits.epoch(TypedSetting.AUDIO_LIMIT), (config.maxAudioSeconds / 60).toString(), { typed ->
+        type(TypedSetting.AUDIO_LIMIT) { it.copy(maxAudioSeconds = limitSeconds(typed) ?: 0) }
+    }, enabled, isError = config.maxAudioSeconds !in 1..JobLimits.MAX_AUDIO_SECONDS,
         label = { Text(stringResource(R.string.duration_limit)) },
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-    OutlinedTextField(budget, { text -> budget = text; change(config.copy(maxCostMicrousd = budgetValue(text))) },
-        Modifier.fillMaxWidth(), enabled = enabled, isError = config.maxCostMicrousd?.let { it < 0 } == true,
+    DraftTextField(edits.epoch(TypedSetting.BUDGET),
+        config.maxCostMicrousd?.toBigDecimal()?.movePointLeft(6)?.stripTrailingZeros()?.toPlainString().orEmpty(), { typed ->
+            type(TypedSetting.BUDGET) { it.copy(maxCostMicrousd = budgetValue(typed)) }
+        }, enabled, isError = config.maxCostMicrousd?.let { it < 0 } == true,
         label = { Text(stringResource(R.string.cost_limit)) },
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
 }

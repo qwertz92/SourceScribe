@@ -25,10 +25,52 @@ import kotlinx.coroutines.withContext
 
 /** The UI sees source metadata and durable records, never signed media URLs or saved API keys. */
 data class SourcePreview(val resolved: ResolvedSource, val config: JobConfig, val previousJob: String?)
+
+/** The settings of the draft a reader types rather than picks, each in a text field of the new-source screen. */
+enum class TypedSetting {
+    AUDIO_LIMIT, BUDGET, CAPTION_LANGUAGES, STT_LANGUAGE, CONTEXT_TERMS;
+
+    fun of(config: JobConfig): Any? = when (this) {
+        AUDIO_LIMIT -> config.maxAudioSeconds
+        BUDGET -> config.maxCostMicrousd
+        CAPTION_LANGUAGES -> config.preferredLanguages
+        STT_LANGUAGE -> config.language
+        CONTEXT_TERMS -> config.contextTerms
+    }
+}
+
+/**
+ * Moves the epoch of a [TypedSetting] whenever anything other than a keystroke in its own field changes it.
+ *
+ * A field over the draft cannot find that out by comparing. A keystroke reaches the draft at once, the draft
+ * reaches the screen a frame or two later, and in between the value a field is composed with is older than
+ * the text it holds — a late value that looks exactly like one a preset or a re-prepared job put there. The
+ * field shows its own text for as long as the epoch it was typed under is current, and the setting as the
+ * draft holds it once it is not.
+ *
+ * [session] is drawn fresh for every view model. A field saves its text with the epoch it was typed under,
+ * and after the process died the draft that text was typed into is gone; a new session keeps the restored
+ * text from counting as typed into the draft that replaced it.
+ */
+data class DraftEdits(
+    val session: String = java.util.UUID.randomUUID().toString(),
+    val changes: Map<TypedSetting, Long> = emptyMap(),
+) {
+    fun epoch(setting: TypedSetting): String = "$session:${changes[setting] ?: 0L}"
+
+    /** The edits once the draft went from [before] to [after]; [typed] is the setting a keystroke changed, if any. */
+    fun after(before: JobConfig, after: JobConfig, typed: TypedSetting?): DraftEdits {
+        val moved = TypedSetting.entries.filter { it != typed && it.of(before) != it.of(after) }
+        return if (moved.isEmpty()) this else copy(changes = changes + moved.associateWith { (changes[it] ?: 0L) + 1 })
+    }
+}
+
 data class ScreenState(
     val busy: Boolean = false,
     val starting: Boolean = false,
+    /** Written only through `MainViewModel.withDraft`, which keeps [draftEdits] in step with it. */
     val draft: JobConfig? = null,
+    val draftEdits: DraftEdits = DraftEdits(),
     val message: String? = null,
     val previews: List<SourcePreview> = emptyList(),
     val document: TranscriptDocument? = null,
@@ -86,7 +128,7 @@ class MainViewModel @Inject constructor(
         }
         if (revision == previewRevision.get()) {
             abandonCurrentImports()
-            mutable.update { it.copy(draft = selected, previews = previews, message = null) }
+            mutable.update { it.withDraft(selected).copy(previews = previews, message = null) }
         }
         }
     }
@@ -95,7 +137,7 @@ class MainViewModel @Inject constructor(
         if (screen.value.starting) return
         previewRevision.incrementAndGet()
         val audioChanged = audio != null && screen.value.previews.any { it.resolved.source.id == sourceId && it.config.audioTrackId != audio }
-        mutable.update { state -> state.copy(draft = if (audioChanged) state.draft?.copy(uploadApproved = false) else state.draft, previews = state.previews.map {
+        mutable.update { state -> state.withDraft(if (audioChanged) state.draft?.copy(uploadApproved = false) else state.draft).copy(previews = state.previews.map {
             if (it.resolved.source.id != sourceId) it else it.copy(config = it.config.copy(
                 captionTrackId = caption ?: it.config.captionTrackId, audioTrackId = audio ?: it.config.audioTrackId,
                 uploadApproved = it.config.uploadApproved && (audio == null || audio == it.config.audioTrackId)))
@@ -117,14 +159,14 @@ class MainViewModel @Inject constructor(
         previews.forEach { preview ->
             SourceFiles.releasePreview(preview.resolved.source.id, previewOwner)
         }
-        mutable.update { it.copy(previews = emptyList(), draft = it.draft?.copy(uploadApproved = false), message = "JOBS_CREATED") }
+        mutable.update { it.withDraft(it.draft?.copy(uploadApproved = false)).copy(previews = emptyList(), message = "JOBS_CREATED") }
     }
 
     fun clearPreview() {
         if (screen.value.starting) return
         previewRevision.incrementAndGet()
         abandonCurrentImports()
-        mutable.update { it.copy(previews = emptyList(), draft = it.draft?.copy(uploadApproved = false)) }
+        mutable.update { it.withDraft(it.draft?.copy(uploadApproved = false)).copy(previews = emptyList()) }
         if (abandonedImports.isNotEmpty()) action { }
     }
     private fun abandonCurrentImports() {
@@ -140,18 +182,41 @@ class MainViewModel @Inject constructor(
             abandonedImports.remove(id)
         }
     }
-    fun updatePreviewConfig(config: JobConfig) {
+    /** A change to the draft from a control that picks a value, a preset, or the button that raises the limit. */
+    fun updatePreviewConfig(config: JobConfig) = changeDraft(null) { config }
+
+    /**
+     * A keystroke in the field over [setting]. [change] is applied to the draft as it is at this moment rather
+     * than to the copy the field was composed with, which can be a frame older, and the field keeps its text.
+     */
+    fun typeIntoDraft(setting: TypedSetting, change: (JobConfig) -> JobConfig) = changeDraft(setting, change)
+
+    private fun changeDraft(typed: TypedSetting?, change: (JobConfig) -> JobConfig) {
         if (screen.value.starting) return
         previewRevision.incrementAndGet()
-        val effective = if (screen.value.previews.any { it.resolved.source.kind == SourceKind.LOCAL_AUDIO }) config.copy(mode = AcquisitionMode.STT_ONLY) else config
-        mutable.update { state -> state.copy(draft = effective, previews = state.previews.map { preview ->
-            val selected = effective.copy(mode = if (preview.resolved.source.kind == SourceKind.LOCAL_AUDIO) AcquisitionMode.STT_ONLY else config.mode,
-                captionTrackId = null, audioTrackId = null)
-            val captions = TrackSelection.captions(preview.resolved, selected)
-            preview.copy(config = selected.copy(captionTrackId = captions.firstOrNull { it.id == preview.config.captionTrackId }?.id ?: captions.firstOrNull()?.id,
-                audioTrackId = preview.resolved.audio.firstOrNull { it.id == preview.config.audioTrackId }?.id ?: TrackSelection.audio(preview.resolved, null)?.id))
-        }) }
+        mutable.update { state ->
+            val config = change(state.draft ?: settings.value.defaults)
+            val effective = if (state.previews.any { it.resolved.source.kind == SourceKind.LOCAL_AUDIO }) config.copy(mode = AcquisitionMode.STT_ONLY) else config
+            state.withDraft(effective, typed).copy(previews = state.previews.map { preview ->
+                val selected = effective.copy(mode = if (preview.resolved.source.kind == SourceKind.LOCAL_AUDIO) AcquisitionMode.STT_ONLY else config.mode,
+                    captionTrackId = null, audioTrackId = null)
+                val captions = TrackSelection.captions(preview.resolved, selected)
+                preview.copy(config = selected.copy(captionTrackId = captions.firstOrNull { it.id == preview.config.captionTrackId }?.id ?: captions.firstOrNull()?.id,
+                    audioTrackId = preview.resolved.audio.firstOrNull { it.id == preview.config.audioTrackId }?.id ?: TrackSelection.audio(preview.resolved, null)?.id))
+            })
+        }
     }
+
+    /**
+     * Every write to the draft goes through here, so that [DraftEdits] moves for each typed setting the write
+     * changes; [typed] names the one a keystroke changed, whose field keeps its text. Before a draft exists the
+     * screen shows the stored defaults, so a first draft is compared against those.
+     */
+    private fun ScreenState.withDraft(next: JobConfig?, typed: TypedSetting? = null): ScreenState {
+        val defaults = settings.value.defaults
+        return copy(draft = next, draftEdits = draftEdits.after(draft ?: defaults, next ?: defaults, typed))
+    }
+
     fun importAudio(uri: Uri, config: JobConfig) {
         val revision = previewRevision.incrementAndGet()
         action(revision) {
@@ -163,7 +228,7 @@ class MainViewModel @Inject constructor(
             }
             abandonCurrentImports()
             val selected = config.copy(mode = AcquisitionMode.STT_ONLY, uploadApproved = false, captionTrackId = null, audioTrackId = null)
-            mutable.update { it.copy(draft = selected, previews = listOf(SourcePreview(
+            mutable.update { it.withDraft(selected).copy(previews = listOf(SourcePreview(
                 ResolvedSource(source, emptyList(), emptyList(), emptyMap()), selected, previousJob))) }
         }
     }
@@ -237,7 +302,7 @@ class MainViewModel @Inject constructor(
         )
         if (revision == previewRevision.get()) {
             abandonCurrentImports()
-            mutable.update { it.copy(draft = selected, previews = listOf(SourcePreview(resolved, selected, jobId))) }
+            mutable.update { it.withDraft(selected).copy(previews = listOf(SourcePreview(resolved, selected, jobId))) }
         } else if (source.kind == SourceKind.LOCAL_AUDIO) {
             abandonedImports += source.id
         }
@@ -281,7 +346,7 @@ class MainViewModel @Inject constructor(
         credentialStore.delete(id)
         fun clear(config: JobConfig) = if (config.credentialId == id) config.copy(credentialId = null, uploadApproved = false) else config
         settingsStore.update { it.copy(defaults = clear(it.defaults), presets = it.presets.mapValues { entry -> clear(entry.value) }) }
-        mutable.update { it.copy(draft = it.draft?.let(::clear), previews = it.previews.map { preview -> preview.copy(config = clear(preview.config)) }) }
+        mutable.update { it.withDraft(it.draft?.let(::clear)).copy(previews = it.previews.map { preview -> preview.copy(config = clear(preview.config)) }) }
         refreshCredentials()
     }
     fun restoreCredential(jobId: String, key: String) = action {

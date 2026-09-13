@@ -58,6 +58,7 @@ import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -256,6 +257,68 @@ class ViewModelStateTest {
         }
         assertEquals(selected, failed.draft)
         assertEquals(preservedPreviews, failed.previews)
+    }
+
+    @Test
+    fun aKeystrokeLeavesItsFieldTheTextAndEveryOtherChangeMovesTheEpochOfWhatItChanges() = withFixture {
+        awaitInitialization()
+        val config = approvedConfig()
+        setScreen(ScreenState(draft = config, previews = listOf(preview(config))))
+        fun epochs() = TypedSetting.entries.associateWith { viewModel.screen.value.draftEdits.epoch(it) }
+        fun draft() = requireNotNull(viewModel.screen.value.draft)
+        val start = epochs()
+
+        // Applied to the draft as it is, carried into the preview Start reads, and no epoch moves.
+        onMain { viewModel.typeIntoDraft(TypedSetting.BUDGET) { it.copy(maxCostMicrousd = 123_456) } }
+        assertEquals(123_456L, draft().maxCostMicrousd)
+        assertEquals(123_456L, viewModel.screen.value.previews.single().config.maxCostMicrousd)
+        assertEquals(start, epochs())
+
+        // A preset that replaces the budget and the terms moves the epochs of those two and of nothing else.
+        onMain { viewModel.updatePreviewConfig(draft().copy(maxCostMicrousd = 5, contextTerms = listOf("Kubernetes"))) }
+        val preset = epochs()
+        val replaced = setOf(TypedSetting.BUDGET, TypedSetting.CONTEXT_TERMS)
+        replaced.forEach { assertNotEquals(it.name, start.getValue(it), preset.getValue(it)) }
+        assertEquals(start - replaced, preset - replaced)
+
+        // Terms typed empty and then "NewTerm", then a preset setting them empty: a value one of the keystrokes
+        // handed on, which no comparison of values could tell from that keystroke coming back late.
+        onMain { viewModel.typeIntoDraft(TypedSetting.CONTEXT_TERMS) { it.copy(contextTerms = emptyList()) } }
+        onMain { viewModel.typeIntoDraft(TypedSetting.CONTEXT_TERMS) { it.copy(contextTerms = listOf("NewTerm")) } }
+        assertEquals(preset, epochs())
+        onMain { viewModel.updatePreviewConfig(draft().copy(contextTerms = emptyList())) }
+        assertNotEquals(preset.getValue(TypedSetting.CONTEXT_TERMS), epochs().getValue(TypedSetting.CONTEXT_TERMS))
+
+        // Controls that change nothing a field shows move nothing, so a half-typed entry survives them.
+        val settled = epochs()
+        onMain { viewModel.updatePreviewConfig(draft().copy(retainRaw = true, diarization = true)) }
+        onMain { viewModel.selectTrack(SOURCE_ID, audio = AUDIO_B) }
+        onMain { viewModel.clearPreview() }
+        assertEquals(settled, epochs())
+    }
+
+    @Test
+    fun aJobPreparedAgainMovesTheEpochOfEveryTypedSettingItReplaces() = withFixture {
+        awaitInitialization()
+        val stored = approvedConfig().copy(maxCostMicrousd = 250_000, contextTerms = listOf("SourceScribe"))
+        val jobId = seedRetainedLocalJob(stored)
+        setScreen(ScreenState(draft = approvedConfig()))
+        onMain { viewModel.typeIntoDraft(TypedSetting.BUDGET) { it.copy(maxCostMicrousd = 999) } }
+        val before = viewModel.screen.value
+        val typed = requireNotNull(before.draft)
+
+        onMain { viewModel.prepareAgain(jobId, typed) }
+        val completed = withTimeout(TIMEOUT_MS) {
+            viewModel.screen.first { !it.busy && it.previews.singleOrNull()?.previousJob == jobId }
+        }
+
+        val prepared = requireNotNull(completed.draft)
+        assertEquals(250_000L, prepared.maxCostMicrousd)
+        assertEquals(listOf("SourceScribe"), prepared.contextTerms)
+        for (setting in TypedSetting.entries) {
+            assertEquals(setting.name, setting.of(typed) != setting.of(prepared),
+                before.draftEdits.epoch(setting) != completed.draftEdits.epoch(setting))
+        }
     }
 
     private fun <T> withFixture(block: suspend Fixture.() -> T): T {
