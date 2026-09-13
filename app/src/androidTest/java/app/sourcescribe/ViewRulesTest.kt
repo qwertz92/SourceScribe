@@ -170,11 +170,12 @@ class ViewRulesTest {
             emptySet<String>(),
             seen - MainViewModel.PREVIEW_ERRORS_SHOWN_AS_TEXT.toSet() - "SOURCE_LONGER_THAN_LIMIT",
         )
-        // The grid has to reach the branches, or the assertion above is about nothing. These are the codes it
-        // is built to reach — the early ones in `previewError` and the first checks in `configError`.
-        val reached = listOf("NO_ACCEPTABLE_CAPTIONS", "PROVIDER_REQUIRED", "CREDENTIAL_REQUIRED", "NO_AUDIO",
-            "CHOOSE_AUDIO_TRACK", "AUDIO_DURATION_LIMIT", "BUDGET_INVALID", "CONTEXT_TERM_BLANK", "UNSUPPORTED_OPTION")
-        assertEquals("Codes the grid failed to reach", emptyList<String>(), reached.filterNot { it in seen })
+        // The other direction, over the whole list: the grid has to reach every code it names, or the assertion
+        // above is about nothing, and a code no preview can return reserves room for a text that never appears.
+        // A hand-picked subset stood here until round 16, and one of the three codes it left out,
+        // UPLOAD_APPROVAL_REQUIRED, turned out to be unreachable from the preview.
+        assertEquals("Codes the grid failed to reach", emptyList<String>(),
+            MainViewModel.PREVIEW_ERRORS_SHOWN_AS_TEXT.filterNot { it in seen })
     }
 
     @Test

@@ -462,8 +462,10 @@ class MainViewModel @Inject constructor(
          */
         val PREVIEW_ERRORS_SHOWN_AS_TEXT = listOf(
             "NO_ACCEPTABLE_CAPTIONS", "PROVIDER_REQUIRED", "CREDENTIAL_REQUIRED", "NO_AUDIO", "CHOOSE_AUDIO_TRACK",
-            // And the ones that come from `configError`.
-            "AUDIO_DURATION_LIMIT", "BUDGET_INVALID", "UPLOAD_APPROVAL_REQUIRED", "PROVIDER_CAPABILITY_OR_CREDENTIAL_INVALID",
+            // And the ones that come from `configError`. Not UPLOAD_APPROVAL_REQUIRED: the preview asks
+            // `configError` only once a model and a key for the chosen provider and region are there, and exactly
+            // then `configurationForStart` has set the approval, so that branch never answers the preview.
+            "AUDIO_DURATION_LIMIT", "BUDGET_INVALID", "PROVIDER_CAPABILITY_OR_CREDENTIAL_INVALID",
             "CONTEXT_TERM_BLANK", "UNSUPPORTED_OPTION", "PRICE_UNKNOWN",
         )
 
