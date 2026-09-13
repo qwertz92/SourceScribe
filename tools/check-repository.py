@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import codecs
 import hashlib
 import os
 import re
@@ -282,6 +283,14 @@ def _self_test() -> None:
         # Four bytes per character, and a mark whose first two bytes are a UTF-16 mark. Read as UTF-16 it
         # decodes into text with a NUL between every character, which matches nothing and looks scanned.
         (root / "src/main/utf32.kt").write_bytes(('val key = "gsk_' + "F" * 24 + '"\n').encode("utf-32"))
+        # The same thing the other way round, because `.encode("utf-32")` writes the little-endian mark on
+        # every machine this runs on: the big-endian entry of UTF32_BOMS had no test through it at all.
+        # Its first two bytes are 00 00, so the two-byte check round 13 shipped would not have mistaken
+        # this file for UTF-16 — it would have left it to the NUL probe and been honest about it. Which is
+        # why the round-14 story holds for little-endian only, and why this line exists.
+        (root / "src/main/utf32be.kt").write_bytes(
+            codecs.BOM_UTF32_BE + ('val key = "gsk_' + "G" * 24 + '"\n').encode("utf-32-be")
+        )
         tally = Tally()
         issues = check_repository(root, tracked_only=False, tally=tally)
         reasons = {issue.reason for issue in issues}
@@ -295,9 +304,10 @@ def _self_test() -> None:
         assert not any(issue.path == "src/main/blob.bin" for issue in issues), "binary file was read as text"
         assert any(issue.path == "src/main/utf16.kt" for issue in issues), "UTF-16 file went unread"
         assert any(issue.path == "src/main/utf32.kt" for issue in issues), "UTF-32 file went unread"
+        assert any(issue.path == "src/main/utf32be.kt" for issue in issues), "UTF-32BE file went unread"
         # Exactly, not at least. A lower bound is satisfied by a file going unread, which is the one
         # thing this counter exists to make visible.
-        assert tally == Tally(scanned=7, binary=1), str(tally)
+        assert tally == Tally(scanned=8, binary=1), str(tally)
     print("PASS self-test")
 
 
