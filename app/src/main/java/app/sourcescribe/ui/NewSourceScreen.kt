@@ -419,7 +419,6 @@ private fun DraftTextField(
     shown: String,
     type: (String) -> Unit,
     enabled: Boolean,
-    modifier: Modifier = Modifier.fillMaxWidth(),
     label: (@Composable () -> Unit)? = null,
     isError: Boolean = false,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
@@ -435,7 +434,7 @@ private fun DraftTextField(
         typedEpoch = epoch
         typedText = value
         type(value)
-    }, modifier, enabled = enabled, label = label, isError = isError, keyboardOptions = keyboardOptions,
+    }, Modifier.fillMaxWidth(), enabled = enabled, label = label, isError = isError, keyboardOptions = keyboardOptions,
         minLines = minLines, maxLines = maxLines)
 }
 
