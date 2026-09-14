@@ -60,11 +60,14 @@ MAIN_FORBIDDEN = (
 
 # A line number is right for one version of a file and points at other code after the next change above it. By round
 # 19, eight of the thirteen in docs/DEFECTS.md did, one of them sending a reader who looked for a hash check into
-# `rollback`. The documents name the function or quote the expression instead.
+# `rollback`. The documents name the function or quote the expression instead. The patterns take the forms such a
+# reference comes in, a link anchor like `#L314` among them, and so also fire on text that only looks like one, a
+# port alone in backticks or a stack frame quoted whole; such text is reworded, not let through.
 DOCS_FORBIDDEN = (
-    ("line-number", re.compile(r"\.(?:kts?|java|py|xml|toml|ya?ml|sh|md|json|properties|pro|gradle):\d+")),
+    ("line-number", re.compile(r"\.(?:kts?|java|py|xml|toml|ya?ml|sh|md|json|properties|pro|gradle)(?::| ?L)\d+")),
     ("line-number", re.compile(r"`:\d+`")),
-    ("line-number", re.compile(r"\b(?:[Zz]eilen?|[Ll]ines?) \d+")),
+    ("line-number", re.compile(r"#L\d+")),
+    ("line-number", re.compile(r"(?i)\b(?:zeilen?|lines?) \d+|\bz\. ?\d+")),
 )
 
 
@@ -354,12 +357,19 @@ def _self_test() -> None:
         (root / "src/main/utf32be.kt").write_bytes(
             codecs.BOM_UTF32_BE + ('val key = "gsk_' + "G" * 24 + '"\n').encode("utf-32-be")
         )
-        # The three forms of line number docs/DEFECTS.md used until round 19, one per line, then words that only
-        # look like one, and a line number outside docs/, which this rule leaves alone.
+        # The three forms of line number docs/DEFECTS.md used until round 19 and the ones a reviewer of round 20 got
+        # past them, one per line, then words that only look like one, and a line number outside docs/, which this
+        # rule leaves alone.
         (root / "docs").mkdir()
-        (root / "docs/Defects.md").write_text("`Manager.kt:314`\nund `:271`\ngeprüft in Zeile 24\n", encoding="utf-8")
+        (root / "docs/Defects.md").write_text(
+            "`Manager.kt:314`\nund `:271`\ngeprüft in Zeile 24\n[Code](../extractor/Manager.kt#L314)\n"
+            "steht in Manager.kt L314\nsiehe gradlew#L12\nsteht in Z. 24\nZEILE 24 ist betroffen\n",
+            encoding="utf-8",
+        )
         (root / "docs/Fine.md").write_text(
-            "Die Kostenzeile ist zweizeilig, und Zeilennummern wandern; `file()` prüft `validSlot`.\n", encoding="utf-8"
+            "Die Kostenzeile ist zweizeilig, und Zeilennummern wandern; `file()` prüft `validSlot`.\n"
+            "Das gilt z. B. für L10n, Level L2, eine Pipeline 2 und die Headline 3.\n",
+            encoding="utf-8",
         )
         (root / "src/androidTest/Notes.md").write_text("`Manager.kt:314`\n", encoding="utf-8")
         tally = Tally()
@@ -380,7 +390,7 @@ def _self_test() -> None:
             issue.line for issue in issues
             if issue.path == "docs/Defects.md" and issue.reason == "forbidden in docs: line-number"
         }
-        assert flagged == {1, 2, 3}, f"line numbers in docs flagged on lines {sorted(flagged)}"
+        assert flagged == set(range(1, 9)), f"line numbers in docs flagged on lines {sorted(flagged)}"
         assert not any(issue.path in ("docs/Fine.md", "src/androidTest/Notes.md") for issue in issues)
         # Exactly, not at least. A lower bound is satisfied by a file going unread, which is the one
         # thing this counter exists to make visible.
