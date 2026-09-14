@@ -178,6 +178,11 @@ class StatedNumbersTest {
         // How long the warning list may grow, and how many kinds of warning it keeps room for past that.
         assertEquals(64, Warnings.LIMIT)
         assertEquals(160, Warnings.KIND_LIMIT)
+
+        // How long a copy made for sharing stays in the cache before a start removes it. The receiving app reads it
+        // at once; the 24 hours come from the fix order for defect 42, and no source outside this program states
+        // such a figure.
+        assertEquals(24L * 60L * 60L * 1_000L, ShareCache.MAX_AGE_MS)
     }
 
     /**
@@ -471,6 +476,7 @@ class StatedNumbersTest {
             "JobLimits.MAX_AUDIO_SECONDS", "JobLimits.MAX_AUDIO_MINUTES",
             "OpenAiAdapter.MAX_UPLOAD_BYTES", "OpenAiAdapter.PRICE_GPT_TRANSCRIBE_MICRO_USD_PER_HOUR",
             "OpenAiAdapter.PRICE_WHISPER_MICRO_USD_PER_HOUR", "OpenAiAdapter.DIARIZATION_AUTO_CHUNKING_MS",
+            "ShareCache.MAX_AGE_MS",
             "SyncTranscriptParser.MAX_PROMPT_BYTES",
             "TranscriptExporter.SHORT_ID_BYTES",
             "Warnings.LIMIT", "Warnings.KIND_LIMIT",

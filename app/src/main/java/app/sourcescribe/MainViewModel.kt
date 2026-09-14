@@ -136,7 +136,14 @@ class MainViewModel @Inject constructor(
         preparation.invokeOnCompletion { _ -> mutable.update { state -> state.copy(preparingEngine = false) } }
     }
 
-    init { viewModelScope.launch(Dispatchers.IO) { startUpStep { refreshCredentials() } } }
+    init {
+        viewModelScope.launch(Dispatchers.IO) { startUpStep { refreshCredentials() } }
+        // A shared copy has done its job once the receiving app read it; a day later it only keeps a transcript in
+        // the cache (defect 42). Best effort: a copy that cannot be removed now is left for a later start.
+        viewModelScope.launch(Dispatchers.IO) {
+            ShareCache.deleteExpired(File(context.cacheDir, ShareCache.DIRECTORY), System.currentTimeMillis())
+        }
+    }
 
     fun inspect(text: String, config: JobConfig) {
         val revision = previewRevision.incrementAndGet()
@@ -280,7 +287,7 @@ class MainViewModel @Inject constructor(
     fun shareArtifact(id: String) = action {
         val document = artifactFiles.read(id)
         val chosen = records.artifact(id)?.displayName
-        val directory = File(context.cacheDir, "shares").also { check(it.isDirectory || it.mkdirs()) }
+        val directory = File(context.cacheDir, ShareCache.DIRECTORY).also { check(it.isDirectory || it.mkdirs()) }
         val file = File(directory, TranscriptExporter.fileName(document, ExportFormat.MARKDOWN, chosen))
         FileOutputStream(file).use { output -> output.write(TranscriptExporter.render(document, ExportFormat.MARKDOWN).toByteArray()); output.fd.sync() }
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", file)
@@ -300,7 +307,7 @@ class MainViewModel @Inject constructor(
     fun shareDiagnostics() = action {
         check(screen.value.informationShareable)
         val text = requireNotNull(screen.value.information)
-        val directory = File(context.cacheDir, "shares").also { check(it.isDirectory || it.mkdirs()) }
+        val directory = File(context.cacheDir, ShareCache.DIRECTORY).also { check(it.isDirectory || it.mkdirs()) }
         val file = File(directory, "sourcescribe-diagnostics.txt")
         FileOutputStream(file).use { it.write(text.toByteArray()); it.fd.sync() }
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", file)
