@@ -22,6 +22,19 @@ class SourceAndPlannerTest {
         assertThrows(InvalidSource::class.java) { SourceResolver.requireMatchingVideo(SourceResolver.youtube("youtu.be/$id"), "abcdefghijk") }
     }
 
+    @Test fun theNoCookieEmbedAddressIsTheSameVideoAndNothingElseOfThatHostIs() {
+        listOf("https://www.youtube-nocookie.com/embed/$id", "https://youtube-nocookie.com/embed/$id?start=10", "www.youtube-nocookie.com/embed/$id").forEach {
+            assertEquals(it, "youtube:$id", SourceResolver.youtube(it).id)
+            assertEquals(it, "https://www.youtube.com/watch?v=$id", SourceResolver.youtube(it).canonicalUrl)
+        }
+        assertEquals(listOf("youtube:$id"), SourceResolver.sharedText("Eingebettet: https://www.youtube-nocookie.com/embed/$id https://youtu.be/$id").map { it.id })
+        assertEquals(listOf("youtube:$id"), SourceResolver.sharedText("youtube-nocookie.com/embed/$id").map { it.id })
+        // The host serves the embedded player; no other path of it names a video, and no look-alike host does either.
+        listOf("https://www.youtube-nocookie.com/watch?v=$id", "https://www.youtube-nocookie.com/shorts/$id", "https://m.youtube-nocookie.com/embed/$id", "https://youtube-nocookie.com.evil.test/embed/$id").forEach {
+            assertThrows(it, InvalidSource::class.java) { SourceResolver.youtube(it) }
+        }
+    }
+
     @Test fun aShareBatchIsExplicitAndDeduplicated() {
         assertEquals(1, SourceResolver.sharedText("Titel https://youtu.be/$id https://youtu.be/$id?t=2").size)
         assertThrows(InvalidSource::class.java) { SourceResolver.sharedText("https://youtu.be/$id https://evil.test/") }

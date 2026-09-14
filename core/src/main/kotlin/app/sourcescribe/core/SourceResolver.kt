@@ -9,6 +9,8 @@ class InvalidSource(val reason: String) : IllegalArgumentException(reason)
 object SourceResolver {
     private val videoIdPattern = Regex("[A-Za-z0-9_-]{11}")
     private val youtubeHosts = setOf("youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com")
+    /** YouTube's host for embedded players that set no tracking cookies. Only its `/embed/<id>` path names a video. */
+    private val noCookieHosts = setOf("youtube-nocookie.com", "www.youtube-nocookie.com")
 
     fun youtube(input: String): Source {
         val value = input.trim()
@@ -21,7 +23,7 @@ object SourceResolver {
             throw InvalidSource("INVALID_URL")
         }
         val host = uri.host?.lowercase() ?: throw InvalidSource("INVALID_HOST")
-        if (host !in youtubeHosts && host != "youtu.be") throw InvalidSource("INVALID_HOST")
+        if (host !in youtubeHosts && host != "youtu.be" && host !in noCookieHosts) throw InvalidSource("INVALID_HOST")
         if ('%' in (uri.rawPath ?: "") || '\\' in value) throw InvalidSource("INVALID_PATH")
         val params = try {
             uri.rawQuery.orEmpty().split('&').filter { it.isNotEmpty() }.map { part ->
@@ -36,6 +38,7 @@ object SourceResolver {
             host == "youtu.be" && path.size == 1 -> path.single()
             host in youtubeHosts && uri.path == "/watch" -> params.singleOrNull { it.first == "v" }?.second
             host in youtubeHosts && path.size == 2 && path[0] in setOf("shorts", "live", "embed") -> path[1]
+            host in noCookieHosts && path.size == 2 && path[0] == "embed" -> path[1]
             else -> null
         } ?: throw InvalidSource("EXPLICIT_VIDEO_REQUIRED")
         if (!videoIdPattern.matches(id)) throw InvalidSource("INVALID_VIDEO_ID")
@@ -47,7 +50,10 @@ object SourceResolver {
     fun sharedText(text: String): List<Source> {
         if (text.length > 32768) throw InvalidSource("INPUT_TOO_LARGE")
         val tokens = text.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
-        val urls = tokens.filter { "://" in it || it.startsWith("youtu.be/") || it.startsWith("www.youtube.com/") || it.startsWith("youtube.com/") }
+        val urls = tokens.filter {
+            "://" in it || listOf("youtu.be/", "www.youtube.com/", "youtube.com/", "www.youtube-nocookie.com/", "youtube-nocookie.com/")
+                .any(it::startsWith)
+        }
         if (urls.isEmpty()) throw InvalidSource("EXPLICIT_VIDEO_REQUIRED")
         if (urls.size > 20) throw InvalidSource("TOO_MANY_VIDEOS")
         return urls.map(::youtube).distinctBy { it.id }
