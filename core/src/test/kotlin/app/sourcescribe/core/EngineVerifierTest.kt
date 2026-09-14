@@ -31,12 +31,27 @@ class EngineVerifierTest {
         // parser of Bouncy Castle and is then verified like the binary form. Until a reviewer of round 21 noticed,
         // the trusted key, read from the app's own resources, was the only armor any test parsed.
         val binary = resource("SHA2-256SUMS.sig")
-        val armored = ByteArrayOutputStream().also { output ->
-            ArmoredOutputStream(output).use { it.write(binary) }
-        }.toByteArray()
+        val armored = armor(binary)
         assertTrue(String(armored, Charsets.US_ASCII).startsWith("-----BEGIN PGP SIGNATURE-----"))
 
         assertEquals(verifyCopyOfFixture(binary), verifyCopyOfFixture(armored))
+    }
+
+    @Test
+    fun onlyWhitespaceMayFollowAnArmoredSignature() {
+        // ASCII armor ends at its footer line, and Bouncy Castle reads nothing behind it: until a reviewer of round 22
+        // tried it, a second armored block or a line of text behind the official signature verified like the
+        // signature alone. duplicateDetachedSignaturesAreRejected is the same case in binary.
+        val armored = armor(resource("SHA2-256SUMS.sig"))
+        for (behind in listOf(armored, "not a signature\n".toByteArray(Charsets.US_ASCII))) {
+            val failure = assertThrows(EngineVerificationException::class.java) {
+                EngineVerifier.verify(File("missing-engine"), resource("SHA2-256SUMS"), armored + behind)
+            }
+            assertEquals("SIGNATURE: signature must contain exactly one detached signature", failure.message)
+        }
+
+        val whitespace = " \t\r\n\n".toByteArray(Charsets.US_ASCII)
+        assertEquals(verifyCopyOfFixture(armored), verifyCopyOfFixture(armored + whitespace))
     }
 
     @Test
@@ -324,6 +339,10 @@ class EngineVerifierTest {
             directory.deleteRecursively()
         }
     }
+
+    /** The ASCII armor Bouncy Castle writes around [binary]. */
+    private fun armor(binary: ByteArray): ByteArray =
+        ByteArrayOutputStream().also { output -> ArmoredOutputStream(output).use { it.write(binary) } }.toByteArray()
 
     /** ASCII armor around as many checksum lines "=twTO" as fit into [bytes]. */
     private fun armoredChecksumLines(bytes: Int): ByteArray {

@@ -207,11 +207,16 @@ object EngineVerifier {
         val provider = BouncyCastleProvider()
         try {
             val key = trustedPublicKey(provider)
-            val decoder = PGPUtil.getDecoderStream(ByteArrayInputStream(encodedSignature))
+            val encoded = ByteArrayInputStream(encodedSignature)
+            val decoder = PGPUtil.getDecoderStream(encoded)
             val factory = PGPObjectFactory(decoder, JcaKeyFingerprintCalculator().setProvider(provider))
             factory.setThrowForUnknownCriticalPackets(true)
             val first = factory.nextObject()
-            if (first !is PGPSignatureList || first.size() != 1 || factory.nextObject() != null) {
+            // ASCII armor ends at its footer line, and the factory reads nothing behind it, so a second armored block
+            // or any other text there would pass unseen. Only whitespace may follow what the factory has read.
+            if (first !is PGPSignatureList || first.size() != 1 || factory.nextObject() != null ||
+                !onlyWhitespaceRemains(encoded)
+            ) {
                 fail(EngineVerificationCode.SIGNATURE, "signature must contain exactly one detached signature")
             }
 
@@ -241,6 +246,12 @@ object EngineVerifier {
         } catch (failure: Exception) {
             fail(EngineVerificationCode.SIGNATURE, "signature is malformed or unverifiable", failure)
         }
+    }
+
+    private fun onlyWhitespaceRemains(input: ByteArrayInputStream): Boolean {
+        val rest = ByteArray(input.available())
+        val read = input.read(rest, 0, rest.size).coerceAtLeast(0)
+        return (0 until read).all { index -> rest[index].toInt().toChar() in " \t\r\n" }
     }
 
     private fun trustedPublicKey(provider: BouncyCastleProvider): PGPPublicKey {
