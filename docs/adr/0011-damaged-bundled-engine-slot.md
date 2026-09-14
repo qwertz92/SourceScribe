@@ -37,8 +37,10 @@ jeder Anfrage an einen Anbieter; eine kostenrelevante Anfrage wiederholt ein sol
 ## Verworfene Alternativen
 
 - **Auch in `stage` ersetzen:** Ein Update ist freiwillig, und die Ablehnung blockiert dort nur dieses Update. Der
-  Slot kann einer heruntergeladenen Engine gehören, an die ein laufender Auftrag gebunden ist, und für den Weg bis
-  zum Slot gibt es keinen deterministischen Test, weil eine gültige Signatur zu einem echten Release gehört.
+  Slot kann einer heruntergeladenen Engine gehören, an die ein laufender Auftrag gebunden ist. Bis Runde 19 stand
+  hier außerdem, für den Weg bis zum Slot gebe es keinen deterministischen Test, weil eine gültige Signatur zu einem
+  echten Release gehöre. Die gebündelte Engine ist aber selbst ein signiertes Release, und ein Test liefert sie
+  `stage` über eine Attrappe des Netzes aus.
 - **Beim Laden jeden ungültigen Slot löschen:** trifft auch Slots, an die Aufträge gebunden sind, und ersetzt nichts.
 - **Den Fehler hinnehmen:** Die einzige Abhilfe war, die App-Daten zu löschen.
 
@@ -47,3 +49,7 @@ jeder Anfrage an einen Anbieter; eine kostenrelevante Anfrage wiederholt ein sol
 `EngineUpdateManagerTest.aDamagedBundledSlotIsReplacedWithTheVerifiedEngineInsteadOfStoppingEveryCall` kürzt die
 Datei, während der Manager läuft, der sie geprüft hat, entfernt sie vor einem Neustart und legt an ihre Stelle eine
 symbolische Verknüpfung, deren Ziel unverändert bleiben muss.
+
+`EngineUpdateManagerTest.stageRefusesADamagedSlotOfTheEngineItDownloadedInsteadOfReplacingIt` liefert `stage` die
+gebündelte Engine über eine Attrappe des Netzes, beschädigt ihren Slot während des Downloads und verlangt
+`VERIFICATION` und den Slot, wie er war; erst der nächste Aufruf, der die gebündelte Engine einrichtet, ersetzt ihn.

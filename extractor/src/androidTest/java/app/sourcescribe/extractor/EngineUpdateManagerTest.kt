@@ -560,6 +560,51 @@ class EngineUpdateManagerTest {
         }
     }
 
+    @Test
+    fun stageRefusesADamagedSlotOfTheEngineItDownloadedInsteadOfReplacingIt() = runBlocking {
+        withIsolatedManager { harness ->
+            val bundled = harness.manager.bundled()
+            val file = File(harness.root, "engines/${bundled.id}/yt-dlp")
+            val repository = when (bundled.channel) {
+                EngineChannel.STABLE -> "yt-dlp/yt-dlp"
+                EngineChannel.NIGHTLY -> "yt-dlp/yt-dlp-nightly-builds"
+            }
+            val releaseBase = "https://github.com/$repository/releases/download/${bundled.version}"
+            // The bundled engine is a signed release itself, so the fixture serves an update that verifies.
+            val served = linkedMapOf(
+                "$releaseBase/SHA2-256SUMS" to raw(R.raw.ytdlp_checksums),
+                "$releaseBase/SHA2-256SUMS.sig" to raw(R.raw.ytdlp_checksums_sig),
+                "$releaseBase/yt-dlp" to raw(R.raw.ytdlp),
+            )
+            val requested = mutableListOf<String>()
+            val calls = fixtureCalls { request ->
+                val url = request.url.toString()
+                requested += url
+                // stage found the slot valid before its first request; it is damaged while the engine downloads.
+                if (url == "$releaseBase/yt-dlp") RandomAccessFile(file, "rw").use { it.setLength(it.length() / 2) }
+                response(request, 200, body = requireNotNull(served[url]) { url })
+            }
+            val update = AvailableEngine(
+                id = bundled.version,
+                version = bundled.version,
+                ejsVersion = bundled.ejsVersion,
+                channel = bundled.channel,
+                gitHead = bundled.gitHead,
+                sha256 = bundled.sha256,
+            )
+
+            val failure = expectUpdateFailure { newManager(harness, calls).stage(update) }
+
+            assertEquals(EngineUpdateCode.VERIFICATION, failure.code)
+            assertEquals(served.keys.toList(), requested)
+            assertNotEquals(bundled.id, sha256(file))
+            assertNoUpdateTemporaryDirectories(harness)
+            // Setting up the bundled engine is what replaces the slot.
+            assertEquals(bundled.id, newManager(harness).bundled().id)
+            assertEquals(bundled.id, sha256(file))
+        }
+    }
+
     private suspend fun withIsolatedManager(block: suspend (Harness) -> Unit) {
         requireEnabled()
         NativeRuntime(context).initialize()
@@ -627,15 +672,22 @@ class EngineUpdateManagerTest {
         .addInterceptor { chain -> response(chain.request()) }
         .build()
 
-    private fun response(request: Request, code: Int, header: Pair<String, String>? = null): Response =
+    private fun response(
+        request: Request,
+        code: Int,
+        header: Pair<String, String>? = null,
+        body: ByteArray = ByteArray(0),
+    ): Response =
         Response.Builder()
             .request(request)
             .protocol(Protocol.HTTP_1_1)
             .code(code)
             .message("fixture")
-            .body(ByteArray(0).toResponseBody())
+            .body(body.toResponseBody())
             .apply { header?.let { addHeader(it.first, it.second) } }
             .build()
+
+    private fun raw(id: Int): ByteArray = context.resources.openRawResource(id).use { it.readBytes() }
 
     private fun writeBytes(destination: File, bytes: ByteArray) {
         destination.writeBytes(bytes)
