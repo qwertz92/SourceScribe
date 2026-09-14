@@ -1,6 +1,6 @@
 # Bekannte Probleme und offene Punkte
 
-**Stand:** 14. September 2026, nach neunzehn Runden adversarischer Reviews. Diese Datei ist für den
+**Stand:** 14. September 2026, nach zwanzig Runden adversarischer Reviews. Diese Datei ist für den
 nächsten Agenten gedacht und listet, was **nicht** vollständig erledigt ist. Ein geschlossener Punkt
 behält seine Nummer und einen kurzen Vermerk, damit Verweise aus anderen Dokumenten gültig bleiben. Was hier nicht steht, ist entweder erledigt oder in
 [STATUS.md](STATUS.md) beschrieben.
@@ -869,6 +869,22 @@ Kostenzeile urteilen über die Konfiguration, die Start anlegt. Ein vor Runde 17
 - **Was zum Schließen fehlt:** den DataStore erst beim ersten Lesen oder Schreiben suchen, ohne dass zwei Stores für
   dieselbe Datei entstehen können. Gemeldet vom Code-Reviewer der Runde 19; dass der alte Delegat die Datei ebenso
   im Konstruktor fragte, wie er schrieb, trifft nicht zu.
+
+### 53. Nach einer gescheiterten zweiten Umbenennung bleiben alte Metadaten im Slot (niedrig, heute folgenlos)
+
+- **Stelle:** `replaceInSlot` in `extractor/src/main/java/app/sourcescribe/extractor/EngineUpdateManager.kt`, seit
+  `a1a5af1`.
+- **Was geschieht:** Beim Reparieren eines beschädigten Slots der gebündelten Engine benennt `replaceInSlot` erst die
+  geprüfte Datei in den Slot und dann `metadata.json`. Scheitert nur die zweite Umbenennung, endet der Aufruf mit
+  `STORAGE`, und im Slot liegt die geprüfte Datei neben den Metadaten, die vorher dort lagen. Der nächste Aufruf
+  findet den Slot gültig, weil `validSlot` nur die Datei prüft, und schreibt die Metadaten nicht neu.
+- **Warum folgenlos:** `metadata.json` wird nur geschrieben und verschoben, nirgends gelesen. Im Normalfall hat die
+  alten Metadaten eine frühere Einrichtung desselben Hashes geschrieben.
+- **Was zum Schließen fehlt:** Wer `metadata.json` künftig liest, muss mit Metadaten einer früheren Einrichtung
+  rechnen oder sie beim Prüfen des Slots abgleichen. Der Ausgang steht in
+  [ADR 0011](adr/0011-damaged-bundled-engine-slot.md), und
+  `aSlotRepairWhoseMetadataCannotFollowFailsWithStorageAndLeavesTheEngineRepaired` hält ihn fest. Gemeldet vom
+  Invarianten-Reviewer der Runde 20.
 
 ## Bewusste Entscheidungen, die wie Fehler aussehen
 

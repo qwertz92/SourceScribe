@@ -3,9 +3,9 @@
 **Stand:** 14. September 2026. **Freigabe:** Persönliche Preview; vollständige v1 weiterhin blockiert.
 Der Preview-Abschluss vom 8. September steht unten; seither ist die Nutzerrückmeldung vom
 10. September eingearbeitet, siehe den nächsten Abschnitt. **Die Testzahlen weiter unten in diesem
-Abschnitt sind der Stand vom 8. September und nicht der heutige.** Heute, nach Runde 19, sind es 182
-JVM-Tests im Modul `core`, 207 Instrumentierungstests im Modul `app` und 49 im Modul `extractor`,
-zusammen 438, davon 432 ausgeführt, die Module `core` und `app` zuletzt im Gate der Runde 18; die
+Abschnitt sind der Stand vom 8. September und nicht der heutige.** Heute, nach Runde 20, sind es 182
+JVM-Tests im Modul `core`, 207 Instrumentierungstests im Modul `app` und 50 im Modul `extractor`,
+zusammen 439, davon 433 ausgeführt, `core` zuletzt im Build für Bouncy Castle 1.86, `app` im Gate der Runde 18; die
 Runde-11-Passage sagt, warum die Tests im Modul `extractor` zehn Runden lang in keiner Gate-Meldung vorkamen.
 Diese Zahlen standen bis Runde 14 unter dem Wort „Heute“ auf dem Stand der
 zwölften Runde — die Gate-Zahlen einer Runde stehen in ihrer eigenen Passage, und dieser Satz oben muss
@@ -1556,6 +1556,95 @@ SHA-256.
 über das Verhalten einer Bibliothek gilt nur für die Version, die er beschreibt: Der Reviewer beschrieb JUnit 4.12,
 das Projekt nutzt 4.13.2. Und eine Korrektur, die ein Fenster schließt, zählt auf, wo es offen bleibt; die erste
 Fassung des ADR für das Ersetzen im Slot ließ einen Fall aus.
+
+### Runde 20
+
+Gelesen haben die fünf Commits der Runde 19 ein Code- und ein Invarianten-Reviewer auf einem Export von
+`0f6db67`, beide als `claude-sonnet-5`, abgelesen an den Antworten in ihren Transkripten. Keiner meldete einen
+kritischen oder hohen Fund, der Code-Reviewer zwei mittlere und drei niedrige, der Invarianten-Reviewer vier niedrige.
+Zwei Befunde fanden beide: das verlorene Ausführungsbit und den Ausgang, wenn beim Reparieren eines Slots nur die
+zweite Umbenennung scheitert.
+
+**Ein Aufruf meldete `STORAGE`, obwohl er den Slot schon repariert hatte.** Code-Reviewer, mittel, und
+Invarianten-Reviewer, niedrig. `replaceInSlot` benennt erst die geprüfte Datei in den beschädigten Slot und dann seine
+Metadaten. Scheitert nur die zweite Umbenennung, endet der Aufruf mit `STORAGE`, obwohl im Slot schon die geprüften
+Bytes liegen; der nächste Aufruf findet den Slot gültig und benutzt ihn, und die alten Metadaten bleiben liegen. So
+bleibt es: Der Speicher hat versagt, und der Aufrufer erfährt es. Der Code-Reviewer schlug vor, den Aufruf gelingen zu
+lassen; dann bliebe der Fehler unbemerkt. Hier ist der Fund als niedrig eingestuft, weil er einen Aufruf kostet und
+`metadata.json` nirgends gelesen wird. Ein neuer Test legt an die Stelle der Metadaten ein Verzeichnis, über das keine
+Umbenennung einer Datei geht, und hält den Ausgang fest; ADR 0011, das bisher nur zwei Ausgänge kannte
+(Code-Reviewer, niedrig), und die KDoc von `materializeSlot` beschreiben ihn (`dc9e6dd`). Die alten
+Metadaten stehen als [Punkt 53](DEFECTS.md) in DEFECTS.
+
+**Die Regel gegen Zeilennummern kannte die Formen nicht, die als Nächstes kommen.** Code-Reviewer, mittel. Ein
+Linkanker auf eine Zeile, ein großes L vor der Zahl hinter einem Dateinamen, die Abkürzung „Z.“ vor einer Zahl und
+ein groß geschriebenes „ZEILE“ kamen durch. Die Regel weist sie jetzt ab; der Selbsttest hat eine Zeile je Form und
+Beinahe-Treffer wie „z. B.“, `L10n` und „Pipeline 2“, die durchgehen müssen (`203114f`). Dass die Regel auch
+Text trifft, der nur so aussieht, etwa einen Port allein in Backticks oder eine ganz zitierte Zeile eines
+Stacktraces, meldeten der Code-Reviewer als niedrig und der Invarianten-Reviewer als spekulativ. Das gilt und bleibt
+so: Solcher Text wird umformuliert, und der Kommentar über den Mustern sagt das. In `docs/` trifft es heute nichts.
+
+**`tools/check-repository.py` hatte sein Ausführungsbit verloren.** Beide Reviewer, niedrig. Es ging mit
+`0f6db67` verloren, weil das Hilfsskript, das die Commits der Runde 19 in den Index schrieb, jede Datei als
+100644 eintrug; das der Runde 20 übernimmt den Modus aus HEAD. `tools/build-webp-android.sh` hatte das Bit nie,
+obwohl sein Bericht es direkt über seinen Pfad startet. Beide sind wieder 100755, und `tools/check-repository.py`
+meldet jetzt ein versioniertes Skript mit Shebang außerhalb eines Verzeichnisses `src`, das git nicht als ausführbar
+führt. Die Schlusszeile nennt, wie viele Skripte es prüfte, oder dass kein Git-Index da war (`3bca289`).
+
+**Der Testhelfer übersah das Arbeitsverzeichnis der gebündelten Engine.** Invarianten-Reviewer, niedrig.
+`assertNoUpdateTemporaryDirectories` suchte nach Verzeichnissen, die mit `.staging-` oder `.slot-` beginnen, nicht
+nach `.bundled-`, in dem `ensureBundledLocked` arbeitet, und jeder der sieben Tests, die den Helfer heute rufen,
+richtet zuerst die gebündelte Engine ein. Jetzt schlägt er bei jedem Eintrag in `engines/` fehl, dessen Name mit
+einem Punkt beginnt, und nennt ihn (`8b3ffb8`). In der Suite ließ kein Aufruf ein solches Verzeichnis zurück.
+
+**Nicht bestätigt hat sich eine Testlücke, die der Code-Reviewer nannte:** Kein Test halte fest, dass `stage` einen
+beschädigten Slot nie ersetzt. Das tut `stageRefusesADamagedSlotOfTheEngineItDownloadedInsteadOfReplacingIt` aus
+Runde 19; die Gegenprobe der Runde 19 ließ `stage` den Slot ersetzen, und genau dieser Test fiel.
+
+**Konsistenz der Doku der Runde 19.** Ein dritter Reviewer, ebenfalls `claude-sonnet-5`, prüfte jede
+Tatsachenbehauptung von `b204a47` gegen Code, Git und die Rohbelege der Runde 19 und fand nichts. Fünf Aussagen
+konnte er mit den Belegen, die er hatte, nicht prüfen; vier davon sind seither nachgeprüft. Die vier übersprungenen
+Tests im Modul `extractor` sind dieselben wie im Gate der Runde 18. JUnit 4.12 ruft `after()` von `ExternalResource`
+in einem `finally`, so steht es in der Quelle beim Tag `r4.12`. Die drei Reviewer der Runde 19 liefen laut ihren
+Transkripten als `claude-sonnet-5`, und in den Transkripten der ersten beiden liegt eine Pause von siebeneinhalb
+Stunden, die zur Unterbrechung durch das Windows-Update passt. Dass die Reviewer der Runde 20 beim Schreiben noch
+nichts gemeldet hatten, stimmte, als der Text entstand; die Datei des Invarianten-Berichts ist allerdings zwölf
+Sekunden älter als der Commit. Offen bleibt, ob beim Build der Runde 19 wirklich nur noch ein Kommentar ausstand: Die
+Zeitstempel zeigen es nicht und widerlegen es nicht.
+
+**Gegenprobe der Runde 20.**
+Zurückgenommen, was die Korrekturen der Runde 20 festhalten, auf dem Stand von `dc9e6dd`: zwei Builds für
+das Modul `extractor`, danach die Test-APK des committeten Stands neu gebaut und installiert; kein Build lief neben
+einem Gerätelauf. Jeder Lauf hatte dieselben zehn Tests aus `EngineUpdateManagerTest` und `NativeRuntimeTest`, von
+denen nur die betroffenen fallen durften. So kam es in beiden Sätzen.
+
+- Satz 1, `ensureBundledLocked` lässt sein Verzeichnis `.bundled-` liegen: genau die sieben Tests, die den Helfer
+  rufen, jeder mit dem Namen des liegen gebliebenen Verzeichnisses in der Meldung.
+- Satz 2, der Aufruf gelingt, wenn die Metadaten der Datei nicht folgen: genau der neue Test, dem die erwartete
+  `EngineUpdateException` fehlte.
+
+Die Prüfung der Dateimodi meldete über das Repository, solange git beide Skripte noch als 100644 führte, genau diese
+zwei und sonst nichts. Meldet sie nichts, scheitert ihr Selbsttest an dem Teil mit dem eigenen Git-Index; mit den
+Mustern der Runde 19 scheitert er an der Zusicherung über die Zeilen, weil nur die ersten drei abgewiesen werden. Vor
+und nach den Geräteläufen hatte die Einstellungsdatei der App denselben SHA-256.
+
+**Gates der Runde 20.**
+Runde 20 ändert Tests und einen Kommentar im Modul `extractor`, `tools/check-repository.py`, zwei Dateimodi und
+die Doku. Gelaufen sind Build und beide Lintberichte des Moduls `extractor`, beide ohne Befund,
+`tools/check-repository.py` mit Selbsttest und die ganze Suite des Moduls auf `emulator-5556`: **50 Tests**, 46
+bestanden, 4 per Annahme übersprungen, dieselben vier wie nach Runde 19, 0 Fehler. Runde 20 hat im Modul `extractor`
+einen Test hinzugefügt. Build und Suite liefen auf dem Stand vor den Commits; der Fingerabdruck des Diffs war am
+Anfang und am Ende des Builds und vor der Suite derselbe. Die Fassung von `tools/check-repository.py` in jedem der
+zwei Commits, die sie ändern, bestand ihren Selbsttest, bevor der Commit entstand, und nach dem letzten Commit bestand
+der Lauf über das Repository mit fünf geprüften Skripten. Die Module `core` und `app` sind in Runde 20 unverändert und
+liefen zuletzt im Gate der Runde 18. Vor und nach der Suite hatte die Einstellungsdatei der App denselben SHA-256.
+Danach liefen die 182 JVM-Tests von `core` noch einmal, im Build für Bouncy Castle 1.86 (`d994c23`), und bestanden
+alle.
+
+**Die Schleife ist nicht konvergiert.** Zwanzig Runden, keine davon leer. Runde 20 fügt zwei Dinge hinzu. Ein
+Werkzeug, das Commits aus Textersetzungen baut, schreibt mehr als Text: Das der Runde 19 legte den Dateimodus fest,
+und keine Prüfung sah Dateimodi an. Und eine neue Regel braucht Gegenbeispiele in beide Richtungen, bevor sie gilt:
+Die gegen Zeilennummern kannte genau die Formen, die das Dokument schon benutzt hatte.
 
 ## UI-Feedback umgesetzt
 

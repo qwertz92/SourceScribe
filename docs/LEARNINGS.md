@@ -93,3 +93,12 @@ Stand: 14. September 2026. Fehlversuche und Korrekturen im
   dreizehn Zeilenangaben in `docs/DEFECTS.md` auf anderen Code, eine davon auf `rollback` statt auf die Prüfung eines
   Hashes. Eine Stelle nennt die Funktion oder zitiert den Ausdruck; `tools/check-repository.py` weist Zeilennummern
   in `docs/` ab.
+- **Wer einen Commit aus Textersetzungen baut, trägt auch den Dateimodus ein.** `git update-index --cacheinfo`
+  verlangt ihn, und das Stage-Skript der Runde 19 setzte fest 100644 ein. So verlor `tools/check-repository.py` sein
+  Ausführungsbit, ohne dass sich eine Zeile änderte; im Diff steht das nur als `old mode 100755` und
+  `new mode 100644`. Den Modus aus HEAD übernehmen; `tools/check-repository.py` prüft seit Runde 20 Skripte mit
+  Shebang.
+- **Eine Datei lässt sich nicht über ein Verzeichnis umbenennen.** `rename(2)` lehnt das ab, laut Handbuch mit
+  `EISDIR`, und `Files.move` mit `ATOMIC_MOVE` meldet eine `IOException`. Auf dem Emulator mit API 37 zeigt das
+  `aSlotRepairWhoseMetadataCannotFollowFailsWithStorageAndLeavesTheEngineRepaired`, der mit `STORAGE` endet. Ein Test
+  kann so die zweite von zwei Umbenennungen gezielt scheitern lassen: Er legt ein Verzeichnis an ihr Ziel.

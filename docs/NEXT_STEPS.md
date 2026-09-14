@@ -2,26 +2,40 @@
 
 ## Wiederaufnahme: hier weitermachen
 
-Geschrieben am 11. September 2026, zuletzt nach der neunzehnten Reviewrunde nachgeführt, damit die
+Geschrieben am 11. September 2026, zuletzt nach der zwanzigsten Reviewrunde nachgeführt, damit die
 Arbeit ohne Wiedereinlesen der ganzen Sitzung weitergehen kann. Reihenfolge ist Absicht.
 
 **Wo der Stand steht:** Die Reviewrunden und was sie gefunden haben, stehen in
 [STATUS.md](STATUS.md); was offen ist, mit Stelle und fehlendem Nachweis, in
 [DEFECTS.md](DEFECTS.md). Die Punktnummern unten sind die Nummern dort.
 
-### 1. Zwanzigste Reviewrunde über die Korrekturen der neunzehnten
+### 1. Einundzwanzigste Reviewrunde über die Korrekturen der zwanzigsten
 
 Runden 3 bis 16 haben ihren wichtigsten Fund jeweils in den Korrekturen der Vorrunde gehabt, Runde 17 in einer nie
-umgesetzten Vorgabe aus S7 in [SECURITY_UPDATES.md](SECURITY_UPDATES.md), Runde 18 in der Begründung eines ADR und
-Runde 19 wieder in einer Korrektur der Vorrunde, dem Ersetzen eines beschädigten Slots. Commits der neunzehnten Runde
-sind `3fc97aa`, `fbd83ce`, `a1a5af1`, `1ef195d` und `0f6db67`, dazu der Doku-Commit direkt
-darüber; einzeln benennen, nicht als Bereich, weil `a..b` den Anfangscommit auslässt. Den Doku-Commit
-`51329fb` mit den Passagen der Runden 16 bis 18 hat Runde 19 gelesen.
+umgesetzten Vorgabe aus S7 in [SECURITY_UPDATES.md](SECURITY_UPDATES.md), Runde 18 in der Begründung eines ADR,
+Runde 19 und Runde 20 wieder in Korrekturen der Vorrunde, dem Ersetzen eines beschädigten Slots und der Regel gegen
+Zeilennummern. Commits der zwanzigsten Runde sind `3bca289`, `203114f`, `8b3ffb8` und
+`dc9e6dd`, dazu ihr Doku-Commit über `152d7a6`; einzeln benennen, nicht als Bereich, weil `a..b` den
+Anfangscommit auslässt.
 
-**Stand am 14. September 2026:** Der Code- und der Invarianten-Reviewer der zwanzigsten Runde lesen die fünf
-Commits auf einem Export von `0f6db67`, beide als `claude-sonnet-5`, abgelesen an den Antworten in ihren
-Transkripten; als diese Zeilen entstanden, hatten sie noch nichts gemeldet. Den Doku-Commit direkt über den fünf
-liest danach ein Konsistenz-Reviewer.
+**Stand am 14. September 2026:** Die Code- und Invarianten-Reviewer der Runde 21 haben die vier Commits
+der Runde 20 auf einem Export von `dc9e6dd` gelesen, beide als `claude-sonnet-5`. Jeder meldete einen
+niedrigen Fund, keiner einen höheren. Der Code-Reviewer zeigte, dass `_check_executable_scripts` bei einem ungelösten
+Merge-Konflikt jeden Eintrag eines Pfades im Git-Index einzeln auswertet: Es zählt eine Datei dreimal und übersieht
+einen falschen Modus, wenn der Konflikt in der Shebang-Zeile liegt. Dasselbe gilt für `git ls-files --cached`, aus
+dem `_tracked_paths` die Liste der gelesenen Dateien nimmt. Der Invarianten-Reviewer bemerkte, dass die Belege der
+Runde 20 `HEAD=b204a47` tragen, obwohl Build und Suite schon den Code von `dc9e6dd` liefen. In der Sache ist
+das ausgeräumt: Aus dem Baum von `dc9e6dd` gegen `b204a47` nachgerechnet, ergibt sich genau der
+aufgezeichnete Fingerabdruck. Danach kamen Bouncy Castle 1.86 (`d994c23`) und die Version 0.2.0 (`152d7a6`)
+hinzu; ihre Commits liest ein weiterer Reviewer. Offen für Runde 21 sind die Korrektur des Merge-Fundes und zwei
+eigene Funde: `THIRD_PARTY_NOTICES.md` und die Hinweise in der App nennen noch Bouncy Castle 1.85, und
+`EngineVerifierTest` prüft das Fixture direkt in `extractor/src/main/res/raw`, neben das `EngineVerifier` seine
+Prüfansicht legt, sodass ein abgebrochener Testlauf dort eine Datei zurücklassen kann. Dazu kommt ein Gerätefehler der
+CI: `ChoiceAccessibilityTest` wartete am 10. September vergeblich auf die Wahl der App-Sprache, und ebenso im ersten
+CI-Lauf mit Bouncy Castle 1.86, Run 34838928729. Der bestand Build und Lint und scheiterte im Geräteschritt allein an
+diesem Test; die übrigen sechs Fehlschläge im Bericht sind Tests, deren Annahme nicht erfüllt war, und die Suite des
+Moduls `extractor` lief danach nicht mehr. Der Emulator der CI zeigt 320 × 640 Pixel, `emulator-5556` 1080 × 2424 bei
+420 dpi.
 
 Rein lesende Reviewer zuerst, gleichzeitig; ein verändernder danach allein. Diese Lehren gehören in den
 Auftrag:
@@ -89,13 +103,22 @@ Auftrag:
 - **Eine Korrektur, die ein Fenster schließt, zählt auf, wo es offen bleibt.** Runde 19: Die erste Fassung von
   ADR 0011 zum Ersetzen im Slot ließ aus, dass eine gescheiterte Umbenennung über eine intakte Datei den Slot weiter
   entfernt und neu anlegt.
+- **Ein Werkzeug, das Commits aus Textersetzungen baut, schreibt mehr als Text.** Runde 20: Das Stage-Skript der
+  Runde 19 trug jede Datei als 100644 in den Index ein und nahm `tools/check-repository.py` das Ausführungsbit;
+  beide Reviewer fanden es an den Modi in Git. Den Modus aus HEAD übernehmen und `git show --summary` lesen.
+- **Eine neue Regel braucht Gegenbeispiele in beide Richtungen, bevor sie gilt.** Runde 20: Die Regel gegen
+  Zeilennummern kannte die drei Formen aus DEFECTS, nicht den Linkanker auf eine Zeile.
 
 Die Jagdliste:
 
-- **`replaceInSlot`** (`a1a5af1`, [ADR 0011](adr/0011-damaged-bundled-engine-slot.md)): Erst die Engine, dann die
-  Metadaten, zwei Umbenennungen. Was hinterlässt ein Absturz zwischen beiden? `metadata.json` liest heute niemand;
-  stimmt das noch? Ist `Files.move` mit `ATOMIC_MOVE` auf Android an dieser Stelle für jede Art von Eintrag ein
-  einziges `rename(2)`?
+- **`_check_executable_scripts`** (`3bca289`): Die Modi kommen aus dem Git-Index, der Inhalt aus dem
+  Arbeitsbaum. Was meldet die Prüfung für ein Skript, das im Index anders aussieht als im Baum, und für eines unter
+  einem Verzeichnis, das nur zufällig `src` heißt? Ohne Git-Index sagt es die Schlusszeile; kann die CI je ohne Index
+  laufen, ohne dass es auffällt?
+- **Die Muster gegen Zeilennummern** (`203114f`): Welche Form eines Zeilenverweises kommt noch durch, und welcher
+  gewöhnliche Satz in `docs/` wird fälschlich abgewiesen?
+- **Der Test der gescheiterten Umbenennung der Metadaten** (`dc9e6dd`) setzt voraus, dass `rename(2)` eine
+  Datei nicht über ein Verzeichnis benennt. Gilt das auf jedem Dateisystem, auf dem App-Daten liegen können?
 - **Die Testlücken des Code-Reviewers der Runde 19:** eine symbolische Verknüpfung auf eine Verknüpfung an der Stelle
   des Slots, ein Lesefehler beim Hashen einer intakten Datei und zwei gleichzeitige Aufrufer des Managers, von denen
   einer den Slot ersetzt, während der andere die Engine startet. Keine davon hat einen Test.
