@@ -3,7 +3,7 @@
 Compact chronological work log, kept so that a later agent does not repeat a mistake. For the full
 round-by-round text it condenses (in German), run `git show 1118adc:docs/STATUS.md`. Reusable technical lessons
 live in [LEARNINGS.md](LEARNINGS.md) and are referenced below by title, not repeated. Open items are in
-[BUGS.md](BUGS.md) and [DEFECTS.md](DEFECTS.md). Entries stay one to three lines; when the file nears 12 KB, the
+[BUGS.md](BUGS.md) and [DEFECTS.md](DEFECTS.md). Entries stay one to three lines; when the file nears 16 KB, the
 oldest period is condensed into a short summary.
 
 ## 2026-09-07 - Project start
