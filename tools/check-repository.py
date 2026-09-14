@@ -83,11 +83,18 @@ class Tally:
     binary: int = 0
     truncated: int = 0
     unreadable: int = 0
+    # None where no git index says which files may run, and then the closing line says that instead.
+    scripts: int | None = None
 
     def __str__(self) -> str:
+        modes = (
+            "no git index to read file modes from"
+            if self.scripts is None
+            else f"{self.scripts} scripts checked for their executable bit"
+        )
         return (
             f"{self.scanned} files read, {self.binary} skipped as binary, "
-            f"{self.truncated} read only to {MAX_SCAN_BYTES} bytes, {self.unreadable} unreadable"
+            f"{self.truncated} read only to {MAX_SCAN_BYTES} bytes, {self.unreadable} unreadable, {modes}"
         )
 
 
@@ -258,6 +265,46 @@ def _check_dependency_verification(root: Path) -> list[Issue]:
     return []
 
 
+def _check_executable_scripts(root: Path, tally: Tally) -> list[Issue]:
+    """Flag a tracked script that starts with a shebang but that git records as not executable.
+
+    Git keeps one permission of a file, whether it may run, and a checkout on Linux or macOS restores it.
+    `0f6db67` took it from this file, because the script that staged that commit wrote every file as
+    100644, and nothing noticed: every documented call starts with `python3`. A shebang in a `src`
+    directory belongs to a resource such as the packed yt-dlp, which nothing runs from the tree.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(root), "ls-files", "--stage", "-z", "--"],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=30,
+        )
+    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
+        return []
+    issues: list[Issue] = []
+    scripts = 0
+    for entry in result.stdout.decode().split("\0"):
+        if not entry:
+            continue
+        details, path = entry.split("\t", 1)
+        mode = details.split(" ", 1)[0]
+        if mode not in ("100644", "100755") or "src" in Path(path).parts or _skipped(Path(path)):
+            continue
+        try:
+            with (root / path).open("rb") as handle:
+                if handle.read(2) != b"#!":
+                    continue
+        except OSError:
+            continue
+        scripts += 1
+        if mode != "100755":
+            issues.append(Issue(path, None, f"script with a shebang has git mode {mode}, not 100755"))
+    tally.scripts = scripts
+    return issues
+
+
 def check_repository(root: Path, *, tracked_only: bool = True, tally: Tally | None = None) -> list[Issue]:
     counter = tally if tally is not None else Tally()
     issues: list[Issue] = []
@@ -267,6 +314,9 @@ def check_repository(root: Path, *, tracked_only: bool = True, tally: Tally | No
     issues.extend(_check_actions(root))
     issues.extend(_check_wrapper(root))
     issues.extend(_check_dependency_verification(root))
+    # Only a run over what git tracks has modes to check; the walk over a plain directory has none.
+    if tracked_only:
+        issues.extend(_check_executable_scripts(root, counter))
     return sorted(set(issues), key=lambda issue: (issue.path, issue.line or 0, issue.reason))
 
 
@@ -335,6 +385,28 @@ def _self_test() -> None:
         # Exactly, not at least. A lower bound is satisfied by a file going unread, which is the one
         # thing this counter exists to make visible.
         assert tally == Tally(scanned=11, binary=1), str(tally)
+    # Modes live in the git index, so this part builds one: a script git may run, one it may not, a file without a
+    # shebang and a shebang under src/, of which only the second is flagged.
+    with tempfile.TemporaryDirectory(prefix="sourcescribe-modes-") as directory:
+        root = Path(directory)
+        (root / "tools").mkdir()
+        (root / "src/main/res/raw").mkdir(parents=True)
+        (root / "tools/runs.sh").write_bytes(b"#!/bin/sh\n")
+        (root / "tools/stopped.py").write_bytes(b"#!/usr/bin/env python3\n")
+        (root / "tools/notes.txt").write_bytes(b"no shebang\n")
+        (root / "src/main/res/raw/packed").write_bytes(b"#!/usr/bin/env python3\n")
+        for arguments in (
+            ["init", "-q"],
+            ["add", "--", "."],
+            ["update-index", "--chmod=+x", "--", "tools/runs.sh"],
+            ["update-index", "--chmod=-x", "--", "tools/stopped.py", "src/main/res/raw/packed"],
+        ):
+            subprocess.run(["git", "-C", str(root), *arguments], check=True, capture_output=True, timeout=30)
+        tally = Tally()
+        issues = check_repository(root, tally=tally)
+        flagged = [issue.path for issue in issues if "git mode" in issue.reason]
+        assert flagged == ["tools/stopped.py"], str(issues)
+        assert tally.scripts == 2, str(tally)
     print("PASS self-test")
 
 
