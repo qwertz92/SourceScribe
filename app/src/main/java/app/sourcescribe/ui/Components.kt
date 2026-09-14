@@ -31,9 +31,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
@@ -245,5 +247,34 @@ internal fun ReservedText(
             style = style,
             color = color,
         )
+    }
+}
+
+/**
+ * Content whose height is reserved for the tallest of [alternatives], for a slot that holds more than text.
+ *
+ * [ReservedText] measures strings. A slot that can also hold a row with a button needs its alternatives measured as
+ * the composables they are: each is composed and measured at the slot's width but never placed, so it is neither
+ * drawn nor reachable by touch, and it is kept out of the semantics tree. The content is measured too and keeps its
+ * full height where it is taller than every alternative; the reservation is a floor, not a cap.
+ */
+@Composable
+internal fun ReservedBox(
+    alternatives: List<@Composable () -> Unit>,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    SubcomposeLayout(modifier.fillMaxWidth()) { constraints ->
+        val room = Constraints(maxWidth = constraints.maxWidth)
+        val reserved = alternatives.withIndex().maxOfOrNull { (index, alternative) ->
+            subcompose("reserve-$index") { Box(Modifier.clearAndSetSemantics {}) { alternative() } }
+                .maxOfOrNull { it.measure(room).height } ?: 0
+        } ?: 0
+        val placeables = subcompose("content", content).map { it.measure(room) }
+        val width = if (constraints.hasBoundedWidth) constraints.maxWidth else placeables.maxOfOrNull { it.width } ?: 0
+        val height = maxOf(reserved, placeables.maxOfOrNull { it.height } ?: 0)
+        layout(width, height.coerceIn(constraints.minHeight, constraints.maxHeight)) {
+            placeables.forEach { it.placeRelative(0, 0) }
+        }
     }
 }

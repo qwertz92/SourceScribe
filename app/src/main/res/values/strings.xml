@@ -135,6 +135,7 @@
     <string name="export_permission_required">Das Transkript bleibt intern erhalten. Zum Export bitte einen beschreibbaren Ordner wählen.</string>
     <string name="invalid_budget">Bitte ein gültiges Kostenlimit eingeben oder das Feld leer lassen.</string>
     <string name="invalid_duration">Bitte eine maximale Audiodauer zwischen 1 und 600 Minuten eingeben.</string>
+    <string name="preview_ready">Bereit zum Start</string>
     <string name="source_beyond_ceiling">Diese Quelle dauert %1$s. SourceScribe verarbeitet höchstens %2$s am Stück, deshalb hilft hier auch ein höheres Limit nicht.</string>
     <string name="unsupported_options">Die gewählten Optionen passen nicht zum Modell. Bitte die erweiterten Einstellungen prüfen.</string>
     <string name="context_term_blank">Ein Fachbegriff ist leer. Der Anbieter lehnt die ganze Liste ab — Eintrag ausfüllen oder entfernen.</string>

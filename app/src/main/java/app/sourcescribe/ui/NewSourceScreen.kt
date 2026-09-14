@@ -243,24 +243,48 @@ private fun PreviewCard(
                 }
             }
 
-            val error = MainViewModel.previewError(preview, state.credentials)
-            if (error == "SOURCE_LONGER_THAN_LIMIT") {
-                LengthLimitWarning(requireNotNull(source.durationMs), preview.config, change, openHelp, enabled = !state.starting)
-            } else if (error != null) {
-                // The text here switches while the reader works the controls above: a missing provider
-                // reads as one sentence, a blank keyterm as another, an ambiguous audio track as a third.
-                // So the line reserves the height of the tallest sentence it can say, measured at this
-                // width and font scale, and never cuts the one it does say. The cost row's two-line cap
-                // would not do here: its three texts were kept short for that cap, and these were not —
-                // the longest runs past a hundred characters in both languages. Where the error goes away
-                // altogether, the button under this card still moves up; DEFECTS 36 carries that.
-                ReservedText(
-                    messageText(error),
-                    MainViewModel.PREVIEW_ERRORS_SHOWN_AS_TEXT.map { messageText(it) },
-                    LocalTextStyle.current,
-                    color = MaterialTheme.colorScheme.error,
-                )
-            }
+            PreviewStatus(
+                MainViewModel.previewError(preview, state.credentials),
+                source.durationMs,
+                preview.config,
+                change,
+                openHelp,
+                enabled = !state.starting,
+            )
+        }
+    }
+}
+
+/**
+ * The line under a preview's settings: whether this source can start and, where it cannot, why.
+ *
+ * What it says switches while the reader works the controls above: a missing provider reads as one sentence, a
+ * blank keyterm as another, a source longer than the limit as a warning with a button, and a source that can start
+ * as a short sentence of its own. The line always keeps the height of the tallest of them, measured at this width
+ * and font scale, so the start button under the card stays where it is whatever the line says (defect 36). The cost
+ * row's two-line cap would not do here: these texts were not kept short for a cap, and the longest runs past a
+ * hundred characters in both languages.
+ */
+@Composable
+internal fun PreviewStatus(
+    error: String?,
+    durationMs: Long?,
+    config: JobConfig,
+    change: (JobConfig) -> Unit,
+    openHelp: (HelpTopic) -> Unit,
+    enabled: Boolean,
+) {
+    val ready = stringResource(R.string.preview_ready)
+    val sentences = listOf(ready) + MainViewModel.PREVIEW_ERRORS_SHOWN_AS_TEXT.map { messageText(it) }
+    // The warning only appears for a source of known length, and then with this source's numbers in it.
+    val warning = durationMs?.let { length -> @Composable { LengthLimitWarning(length, config, {}, {}, enabled = false) } }
+    val alternatives: List<@Composable () -> Unit> =
+        sentences.map { sentence -> @Composable { Text(sentence) } } + listOfNotNull(warning)
+    ReservedBox(alternatives) {
+        when (error) {
+            null -> Text(ready, color = MaterialTheme.colorScheme.primary)
+            "SOURCE_LONGER_THAN_LIMIT" -> LengthLimitWarning(requireNotNull(durationMs), config, change, openHelp, enabled)
+            else -> Text(messageText(error), color = MaterialTheme.colorScheme.error)
         }
     }
 }
