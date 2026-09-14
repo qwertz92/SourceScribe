@@ -2,21 +2,29 @@
 
 ## Wiederaufnahme: hier weitermachen
 
-Geschrieben am 11. September 2026, zuletzt nach der fünfzehnten Reviewrunde nachgeführt, damit die
+Geschrieben am 11. September 2026, zuletzt nach der achtzehnten Reviewrunde nachgeführt, damit die
 Arbeit ohne Wiedereinlesen der ganzen Sitzung weitergehen kann. Reihenfolge ist Absicht.
 
 **Wo der Stand steht:** Die Reviewrunden und was sie gefunden haben, stehen in
 [STATUS.md](STATUS.md); was offen ist, mit Stelle und fehlendem Nachweis, in
 [DEFECTS.md](DEFECTS.md). Die Punktnummern unten sind die Nummern dort.
 
-### 1. Sechzehnte Reviewrunde über die Korrekturen der fünfzehnten
+### 1. Neunzehnte Reviewrunde über die Korrekturen der achtzehnten
 
-Runden 3 bis 15 haben ihren wichtigsten Fund jeweils in den Korrekturen der Vorrunde gehabt. In Runde 15
-war es die Zahlenprüfung, die Runde 14 permissiver gemacht hatte: Von ihren vier Lücken waren zwei still.
-Commits der fünfzehnten Runde sind `8833d07`, `b2286d5`, `089b184`, `1f378a9`, `e33ac54` und `ab9f36e` sowie
-der Doku-Commit direkt darüber; einzeln benennen, nicht als Bereich, weil `a..b` den Anfangscommit auslässt.
+Runden 3 bis 16 haben ihren wichtigsten Fund jeweils in den Korrekturen der Vorrunde gehabt. Runde 17 fand ihren in
+einer Vorgabe aus S7 in [SECURITY_UPDATES.md](SECURITY_UPDATES.md), die seit dem ersten Commit nie umgesetzt war,
+Runde 18 ihren in der Begründung eines ADR der Runde 17. Commits der achtzehnten Runde sind `cb4afb9`,
+`89eecad`, `8fe0dd5` und `39a1cdc`, dazu der Doku-Commit direkt darüber, der auch die Passagen der
+Runden 16 und 17 schreibt; einzeln benennen, nicht als Bereich, weil `a..b` den Anfangscommit auslässt.
 
-Rein lesende Reviewer zuerst, gleichzeitig; ein verändernder danach allein. Zwölf Lehren gehören in den
+**Stand am 14. September 2026:** Code- und Invarianten-Reviewer der Runde 19 haben berichtet; der
+Konsistenz-Reviewer liest den Doku-Commit, der diese Zeile schreibt. Bestätigt sind eine zu weite Aussage über
+`ensureBundledLocked` in ADR 0010 und im Code, ein Fenster beim Ersetzen eines Slots der gebündelten Engine, eine
+Testlücke bei `stage` und zwei niedrige Punkte zu `SettingsStore` und `MigrationTest`. Nicht bestätigt hat sich,
+dass die Aufräumregel in `MigrationTest` einen Testfehler verdeckt: `ExternalResource` meldet in JUnit 4.13.2 beide
+Fehler. Korrekturen und die Passage der Runde 19 folgen.
+
+Rein lesende Reviewer zuerst, gleichzeitig; ein verändernder danach allein. Diese Lehren gehören in den
 Auftrag:
 
 - Ein Fund, den der Reviewer nicht ausführen konnte, gilt erst nach einer Gegenprobe als lebender Fehler.
@@ -48,54 +56,69 @@ Auftrag:
 - Jede Zahl wird nachgezählt und nennt den Stand, für den sie gilt. Eine laufende Summe, die sich nicht
   aus dem Dokument heraus nachrechnen lässt, gehört gestrichen statt korrigiert — deshalb steht die
   heutige Testzahl seit Runde 15 nur im Kopf von [STATUS.md](STATUS.md).
-- Ein Reviewer, der für Gegenproben Dateien verändert, läuft nicht neben einem, der liest. Jeder
-  Symbolname im Auftrag wird vorher gegen den Baum geprüft. Und nach jeder Installation auf dem Emulator
-  wird die Ausgabe auf `Success` geprüft: Ein voller Speicher ließ in Runde 15 neue Tests gegen alten
+- Ein Reviewer, der für Gegenproben Dateien verändert, läuft nicht neben einem, der liest, es sei denn, der
+  lesende liest einen Export (`git archive`) statt des Arbeitsbaums; so liefen seit Runde 18 die Gegenproben neben
+  den Reviewern. Jeder Symbolname im Auftrag wird vorher gegen den Baum geprüft. Und nach jeder Installation auf dem
+  Emulator wird die Ausgabe auf `Success` geprüft: Ein voller Speicher ließ in Runde 15 neue Tests gegen alten
   App-Code laufen (Wartungshinweis in [DEFECTS.md](DEFECTS.md)).
+- **Ein Gerätelauf belegt nur die Werte, die er tippt.** `0.25` blieb in Runde 15 heil, `0.123456` in Runde 16
+  nicht. Lange Werte, mehrzeilige Felder und jedes Feld einzeln.
+- **Ein Reviewer, der eine Erreichbarkeit „durchgerechnet“ hat, kann einen Vorschritt übersehen.** Runde 16:
+  `configurationForStart` setzt die Freigabe, bevor `configError` gefragt wird. Runde 18: Zwei Fenster, die der
+  Code-Reviewer für offen hielt, schließt heute innerhalb eines View-Models die Sperre von `MainViewModel.action`.
+- **Lint vor dem Commit, nicht erst im Gate.** Runde 17: `1b2dc45`.
+- **Die Vorgaben der Dokumente gegen den Code lesen, nicht nur den Diff.** Runde 17: S7 verlangte seit dem ersten
+  Commit, alte Engines zu bereinigen, und nichts tat es.
+- **Die Begründung eines ADR ist eine Behauptung über den Code.** Runde 18: ADR 0009 schützte eine Engine für einen
+  Weg, der sie nie ausführt, und ADR 0010 beschrieb einen Grenzfall, den der Code nicht erreichen ließ. Jede
+  genannte Stelle lesen.
+- **Eine Gegenprobe braucht Tests, die die Schutzregeln einzeln unterscheiden.** Die ersten Slot-Tests der
+  Runde 17 hätten nicht gezeigt, welche von zwei Regeln fehlt, die Reihenfolge oder der Schutz der vorherigen
+  Engine; sie wurden umgebaut, bevor sie liefen.
+- **Ein Messskript kann eine Zahl liefern, die nach Befund aussieht, und ein Prüfskript trägt sein Urteil im
+  Exitcode.** Runde 17 maß die Kostenzeile bei 130 % Schrift mit 41 px, weniger als bei 100 %: Die
+  Navigationsleiste verdeckte sie, und uiautomator meldet nur den sichtbaren Teil. Und `r16_typing.py` meldete einen
+  abweichenden Fall und endete mit 0.
+- **Keine Instrumentierung neben einem Gradle-Build.** Runde 17: Ein Selbsttest der Laufzeit lief in seine
+  30 Sekunden, während ein Build anlief.
+- **Nach Tests auf dem Gerät die Daten der App lesen, nicht nur die Testberichte, und eine geänderte Testklasse vor
+  dem Gate laufen lassen.** Runde 18: Einstellungen und 24 Datenbankdateien aus Tests lagen seit Tagen in der
+  Debug-App, und die Korrektur der Einstellungen brach sieben Tests einer Nachbarklasse, die erst das Gate lief.
 
 Die Jagdliste:
 
-- **`codeOnly` in `StatedNumbersTest` ist ein kleiner Lexer, und ein Lexer hat Zustände, die er nicht
-  kennt.** Eine Zeichenkette innerhalb eines String-Templates steht als [Punkt 34](DEFECTS.md). Welche
-  Kotlin-Lexik fehlt noch? Jede Lücke mit einem Beispiel am Python-Modell nachstellen, bevor jemand sie
-  schließt, und die Gegenfrage stellen: Liest er über den Baum weiterhin genau die 33 Konstanten?
-- **`ContextTerms` wird an sechs Stellen gefragt.** Gibt es eine siebte, die über eine Liste urteilt, ohne
-  zu fragen? Und ist eine gespeicherte Liste mit leerem Eintrag auf jedem Modell behebbar, auch auf einem,
-  das kein Fachbegriffsfeld zeigt? `CONTEXT_TERM_BLANK` steht in `configError` vor der Frage, ob das
-  Modell überhaupt Fachbegriffe kann.
-- **`ReservedText` misst bei jeder Textänderung neu**, bei der Wartezeit also jede Sekunde, in einer Karte
-  eines scrollenden Verlaufs. Kostet das spürbar? Und sind `000:00:00` und `0000.0 GB` breit genug, auch
-  in einer Schrift, deren Ziffern nicht gleich breit sind?
-- **`ListField` merkt sich jede weitergegebene Liste, bis sie zurückkommt.** Kann eine Änderung von
-  außen verloren gehen, die zufällig einer noch nicht zurückgekommenen Liste gleicht? Kommt eine
-  weitergegebene Liste je verändert zurück, sodass sie nie gleich ankommt? Und `LimitFields` hat noch die
-  Bauart der verworfenen ersten Fassung, einen `LaunchedEffect`, der jedem abweichenden Wert folgt: Am
-  Gerät mit `120` und `0.25` schnell getippt nicht reproduziert, ausgeschlossen ist der Fehler damit nicht.
-  Geprüft ist nur Tippen über `adb shell input`, keine echte Bildschirmtastatur.
-- **`PREVIEW_ERRORS_SHOWN_AS_TEXT` ist eine zweite Liste neben `previewError`.** Das Raster in
-  `ViewRulesTest` erreicht neun der zwölf Codes nachweislich. Erreicht es die übrigen drei, und welcher
-  künftige Zweig läge außerhalb des Rasters?
-- **Die Zeilengrenzen auf zwei Bildschirmen sind nicht gemessen** ([Punkt 35](DEFECTS.md)): am Gerät oder
-  mit einem Compose-UI-Test, in beiden Sprachen, bei 200 % Schrift und im Querformat — die offene Frage aus
-  Runde 14, jetzt für vier Zeilen statt einer.
-- **`RAW_DATA_WITHOUT_EXTENSION` ist ein interner Integritätscode ohne eigenen Text**, wie seine Geschwister
-  in `ArtifactFilesException`. Gehört er unter [Punkt 4](DEFECTS.md)?
-- **Die historischen Punktverweise der Runden 3 und 4 in STATUS** hat in Runde 15 niemand vollständig gegen
-  die Nummerierung in DEFECTS geprüft, nur stichprobenhaft.
-- **Aufklappen schiebt, was darunter steht**, und steht jetzt als bewusste Entscheidung in
-  [DEFECTS.md](DEFECTS.md). Trägt die Abwägung, oder gibt es eine der vier Stellen, an der sich etwas bewegt,
-  das niemand angetippt hat?
-- **Die Fehlerzeile der Vorschau erscheint und verschwindet** ([Punkt 36](DEFECTS.md)). Eine
-  Gestaltungsfrage mit Vorschlag; nicht ohne Rückfrage entscheiden.
-- **DEFECTS 30 bleibt offen:** die Mindestdauer eines Modells als dritte Längenschranke, die die Anzeige
-  nicht kennt. Seit 31 geschlossen ist, lässt sich fragen, ob dieselbe Bauart — eine Regel in `core`, jeder
-  Leser fragt sie — auch dort trägt.
-- **Die Module `app` und `extractor` haben keine Zahlenliste.** Seit Runde 12 offen. Taugt die Bauart aus
-  `core` für ein Androidmodul, dessen Tests auf dem Gerät laufen und den Quelltext dort nicht sehen?
-- **`Source.originalLanguage` hat kein Gegenstück zu `AudioTrack.languageRefused`.** Seit Runde 12 offen,
-  von niemandem geprüft: Ein verworfener Wert sieht dort wie ein nie genannter aus.
-- **`ProviderCapabilities.pricingSource` erreicht niemanden** (DEFECTS 24), und DEFECTS 29 hängt daran: Die
-  Preisseite von OpenAI nennt `whisper-1` gar nicht.
+- **`SettingsStore` hält je Datei einen DataStore in einer Map des Prozesses** (`8fe0dd5`). `canonicalPath`
+  liest das Dateisystem; geschieht das auf dem Hauptthread, und kostet es? Kann derselbe Speicherort unter zwei
+  Pfaden zwei DataStores bekommen, die DataStore verbietet?
+- **`materializeSlot(replaceInvalid = true)`** ([ADR 0011](adr/0011-damaged-bundled-engine-slot.md)): `validSlot`
+  wertet jede Ausnahme als ungültig. Was sieht ein Auftrag, dessen Engine gerade ersetzt wird, und hält die Folge
+  Kopieren, Prüfen, Entfernen, Umbenennen einem Absturz an jeder Stelle stand?
+- **`MigrationTest`:** Räumt die äußere Regel auch, wenn ein Test oder der Helfer scheitert, und verdeckt ihre
+  Zusicherung dann den eigentlichen Fehler?
+- **Die Sperre von `MainViewModel.action`** trägt die Punkte [48](DEFECTS.md) und [49](DEFECTS.md). Entsteht eine
+  zweite Instanz der Aktivität mit eigenem View-Model tatsächlich, etwa nach dem Teilen aus einer anderen App, und
+  gibt es einen Aufrufer von `stage`, `activate`, `rollback` oder `retry` außerhalb der Sperre?
+- **[Punkt 46](DEFECTS.md) (b):** Soll eine dritte Engine nach einem App-Update erreichbar bleiben? Eine
+  Gestaltungsfrage; nicht ohne Rückfrage entscheiden.
+- **Der Selbsttest der Laufzeit in `ensureBundledLocked`** hat 30 Sekunden. Was geschieht auf einem langsamen Gerät
+  beim ersten Start nach einem App-Update, wenn er sie überschreitet, und kommt die App dann wieder heraus?
+- **`engineReferences`** lädt jetzt nur noch Versuche, aber alle. Tragbar bei vielen Aufträgen?
+- **[Punkt 47](DEFECTS.md)** und ein Rollback, während ein Auftrag mit gebundener Engine läuft: kein
+  deterministischer Test, nur der Live-Test für das Aktivieren.
+- **[Punkt 50](DEFECTS.md):** Sollen die Tests eine eigene WorkManager-Instanz bekommen, und läuft dann noch, was
+  sechs Testklassen heute über echte Worker prüfen?
+- **`typeIntoDraft` und eine IME-Komposition** während eines Starts: geprüft ist nur `adb shell input`. Und der
+  Lückenhinweis im VTT-Export hat keinen eigenen Test; dass die Lückenberechnung das Format nicht kennt, hat nur der
+  Code-Reviewer der Runde 18 nachgelesen.
+- **Die Epochen** (`DraftEdits`, [Punkt 38](DEFECTS.md)), **die reservierten Höhen** ([Punkte 35](DEFECTS.md) und
+  [39](DEFECTS.md)) und ob `ReservedText` in einer scrollenden Liste mit sekündlich wechselnder Wartezeit spürbar
+  kostet.
+- **Weiter offen:** DEFECTS 30 (die Mindestdauer eines Modells als dritte Längenschranke), die fehlende
+  Zahlenliste der Module `app` und `extractor`, `Source.originalLanguage` ohne Gegenstück zu
+  `AudioTrack.languageRefused`, `ProviderCapabilities.pricingSource` mit DEFECTS 24 und 29, die historischen
+  Punktverweise der Runden 3 und 4 in STATUS, ob `RAW_DATA_WITHOUT_EXTENSION` unter [Punkt 4](DEFECTS.md) gehört,
+  der Lexer der Zahlenprüfung ([Punkt 34](DEFECTS.md)) und, als Gestaltungsfragen, die nicht ohne Rückfrage
+  entschieden werden, DEFECTS 36 und „Aufklappen schiebt“.
 - **Nicht mehr offen, damit es niemand ein zweites Mal aufmacht:** Alle acht Preiszahlen sind am
   12. September 2026 aus dem Markup der drei Anbieterseiten nachgelesen worden, in Runde 13 und in Runde 14
   unabhängig voneinander — AssemblyAI 0,21/0,15 je Stunde, Sprechertrennung 0,02 in beiden Spalten,
@@ -106,7 +129,7 @@ Die Jagdliste:
   `speaker_labels`, Sprachfelder und `keyterms_prompt`. In Runde 15 hat der Code-Reviewer die OpenAI-Seite
   noch einmal selbst geladen und die Tokenpreise für `gpt-4o-transcribe-diarize` samt der Spaltenüberschrift
   „Estimated cost“ bestätigt.
-- Und die Doku: Jede Zahl der Runde-15-Passage nachzählen, mit dem Stand, für den sie gilt, und jedes
+- Und die Doku: Jede Zahl der Passagen der Runden 16 bis 18 nachzählen, mit dem Stand, für den sie gilt, und jedes
   „heute“ neben einer Zahl in allen Dokumenten.
 
 ### 2. Warncodes lesbar machen (DEFECTS 9) — erledigt
@@ -117,7 +140,8 @@ Sprungfreiheit der Kopfzeilen über drei Suchzustände nachgemessen.
 
 ### 3. Codes ohne eigenen Text (DEFECTS 4, mittel)
 
-Mindestens 43 Codes fallen in den `else`-Zweig von `messageText`. **Sie bedeuten nicht alle dasselbe** —
+Mindestens 43 Codes fielen am 11. September in den `else`-Zweig von `messageText`; `ENGINE_NOT_AVAILABLE`, eines
+der Beispiele in DEFECTS 4, hat seit Runde 17 einen eigenen Text. **Sie bedeuten nicht alle dasselbe** —
 diese Annahme stand bis Runde 8 hier und in DEFECTS 4 und ist dort widerlegt: Ein guter Teil sind
 gewöhnliche Betriebsausgänge wie `INTERRUPTED`, `REMOTE_TIMEOUT` oder `NO_TRANSCRIPT`, für die ein Satz
 über einen fehlgeschlagenen internen Prüfschritt schlicht falsch wäre. Ein gemeinsamer Satz für den ganzen
@@ -142,6 +166,8 @@ anfängst; diese Zusammenfassung ersetzt ihn nicht.
 - DEFECTS 1: Querformat und ein zweites Gerät für den gemeldeten Scrollfehler. Am Emulator ist er
   nicht reproduzierbar; ob er auf dem Gerät des Nutzers noch auftritt, ist ungeprüft.
 - DEFECTS 3: Die Aussage zu AssemblyAI-Regionen gegen die aktuelle Anbieterdokumentation prüfen.
+- DEFECTS 36, „Aufklappen schiebt“ unter den bewussten Entscheidungen in DEFECTS und DEFECTS 46 (b):
+  Gestaltungsfragen, die nicht ohne den Nutzer entschieden werden; am 14. September zur Entscheidung vorgelegt.
 - Die drei Live-Providerläufe, ARM64 und TalkBack bleiben blockiert wie in der Tabelle unten, und mit
   ihnen die sechs Tests, die eine echte Quelle oder ein echtes Release brauchen.
 

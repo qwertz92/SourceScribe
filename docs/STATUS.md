@@ -1,12 +1,12 @@
 # Tatsächlicher Projektstatus
 
-**Stand:** 13. September 2026. **Freigabe:** Persönliche Preview; vollständige v1 weiterhin blockiert.
+**Stand:** 14. September 2026. **Freigabe:** Persönliche Preview; vollständige v1 weiterhin blockiert.
 Der Preview-Abschluss vom 8. September steht unten; seither ist die Nutzerrückmeldung vom
 10. September eingearbeitet, siehe den nächsten Abschnitt. **Die Testzahlen weiter unten in diesem
-Abschnitt sind der Stand vom 8. September und nicht der heutige.** Heute, nach Runde 15, sind es 177
-JVM-Tests im Modul `core`, 195 Instrumentierungstests im Modul `app` und 39 im Modul `extractor`,
-zusammen 411, davon 405 ausgeführt; die Runde-11-Passage sagt, warum die letzten 39 zehn Runden lang in
-keiner Gate-Meldung vorkamen. Diese Zahlen standen bis Runde 14 unter dem Wort „Heute“ auf dem Stand der
+Abschnitt sind der Stand vom 8. September und nicht der heutige.** Heute, nach Runde 18, sind es 182
+JVM-Tests im Modul `core`, 207 Instrumentierungstests im Modul `app` und 48 im Modul `extractor`,
+zusammen 437, davon 431 ausgeführt; die Runde-11-Passage sagt, warum die Tests im Modul `extractor` zehn
+Runden lang in keiner Gate-Meldung vorkamen. Diese Zahlen standen bis Runde 14 unter dem Wort „Heute“ auf dem Stand der
 zwölften Runde — die Gate-Zahlen einer Runde stehen in ihrer eigenen Passage, und dieser Satz oben muss
 mitwandern. Eine Testzahl, die als heutige gelten soll, gehört nur hierher. App-Quellstand ist die Spitze
 von `main`, CI-Diagnose `f9d4f8b`, lokales `main` und öffentliches
@@ -1085,6 +1085,380 @@ auch wenn sie eine Prüfung erweitert. Runde 15 fügt hinzu, dass das auch für 
 Korrektur gilt: Ihre eigenen Zahlen — wie viele Formen, wie viele Zusicherungen, welche davon still — waren
 in Runde 14 an drei Stellen verschieden falsch, und der erste Entwurf der Kommentare in Runde 15 hat „still“
 und „laut“ noch einmal falsch verteilt, bevor das Nachzählen am Modell es fand.
+
+### Runde 16
+
+Commits: `1b2dc45` (Epochen für getippte Einstellungen), `eaba2d4` (Plugin-Lader in jedem Kindprozess aus),
+`23d8a0c` (Rollback nennt sein Ziel und stellt nur darauf um), `5da4530` (Platz nur für Vorschaufehler, die die
+Vorschau zeigen kann), `0fdf8c0` (was einen Auftrag blockiert, bleibt nach einem Modellwechsel erreichbar),
+`579f972` (Kostenzeile reserviert statt gekappt), `c5a6564` (keine leere Adresszeile) und `c3ae9e5`
+(Teilergebnis in SRT und VTT). Einen eigenen Doku-Commit hat Runde 16 nicht: Diese Passage ist mit denen der
+Runden 17 und 18 in einem Commit entstanden. Gates und Gegenprobe liefen für die Runden 16 und 17 zusammen auf dem
+Stand von `8e41bf4` und stehen in der Passage der Runde 17; ein Teil der Messungen am Gerät lief erst in Runde 18.
+Wo eine spätere Runde einen hier beschriebenen Mechanismus geändert hat, steht das dabei.
+
+Drei Reviewer, alle nur lesend und gleichzeitig: Code, Konsistenz, Invarianten. Modell und Weg aus
+`meta.json` gelesen, nicht aus dem Auftrag: `"agentType":"general-purpose"`, `"model":"sonnet"`,
+`"requestShape":"background"`.
+
+**Die Listenfelder der Runde 15 haben das Budgetfeld nicht erreicht, und dessen Bauart vertauschte Ziffern.**
+Der Code-Reviewer hat zwei Dinge gezeigt. Erstens verschluckte `ListField` eine Änderung von außen, wenn sie
+zufällig einer weitergegebenen Liste glich, die noch nicht zurückgekommen war. Zweitens hatte `LimitFields`
+genau die Bauart der Zwischenfassung, die Runde 15 verworfen hatte. Runde 15 hatte `120` und `0.25` schnell
+ins Budgetfeld getippt und nichts gefunden. Am Stand von `ab9f36e` auf `emulator-5556` wurde aus schnell
+getipptem `0.123456` zuerst `0.134562`. In drei Durchgängen von je acht Fällen wich es danach zweimal ab:
+`0.123456` wurde zu `023456.1`, `12.345678` zu `1245678.3`. Ein kurzer Wert belegt nichts über einen langen.
+Der dritte Durchgang blieb am Fachbegriffsfeld stehen, weil das Prüfskript ein mehrzeiliges Feld nur bis
+zum Ende der Zeile leerte. Das war ein Fehler des Skripts, nicht der App, und ist dort behoben.
+
+Der Mechanismus erklärt, warum kein Vergleich das lösen kann. `collectAsStateWithLifecycle` liefert den
+Entwurf ein bis zwei Frames nach dem Tastendruck. Ein Feld, das den zurückkommenden Wert mit seinem Text
+vergleicht, kann eine Änderung von außen nicht von einem verspäteten eigenen Wert unterscheiden. Seit
+`1b2dc45` vergleicht es deshalb nicht mehr. Jede Schreibstelle des Entwurfs läuft über `withDraft`, das die
+Epoche jeder getippten Einstellung weiterrückt, die sich ändert, außer der gerade getippten. Das Feld zeigt
+seinen Text genau so lange, wie seine Epoche gilt. Dass alle Schreibstellen das tun, ist eine Absprache und
+keine Schranke; das steht als [Punkt 38](DEFECTS.md). Seit `67c2c44` übernimmt das Feld getippten Text
+außerdem nur, wenn der Entwurf ihn genommen hat. Am Gerät nach beiden Korrekturen, auf `8e41bf4`: alle acht Fälle
+in drei Durchgängen wie getippt, 24 von 24, darunter `0.123456`, `12.345678` und `7.654321` im Budgetfeld,
+`de-AT,en-GB,fr-CA,es-419` bei den Untertitelsprachen und drei Fachbegriffe in drei Zeilen. Die Änderung von außen
+ließ sich am Gerät nicht prüfen: Den Knopf, der die Längengrenze anhebt, zeigt die Vorschau erst mit einem
+gespeicherten Schlüssel, und auf diesem Gerät wird keiner eingegeben. Sie ist dort `NOT_RUN` und nur durch die
+Epochentests in `ViewRulesTest` und `ViewModelStateTest` belegt, nicht am Feld selbst.
+Die Drehung ist in Runde 18 am Gerät geprüft, auf dem Stand von `39a1cdc`: `Kubernetes` mit einem Zeilenumbruch
+dahinter stand nach einer Drehung ins Querformat und zurück unverändert im Fachbegriffsfeld, der Umbruch eingeschlossen.
+
+**Nach einem Prozesstod zeigen die Felder den Entwurf.** Der Code-Reviewer hatte gemeldet, dass ein über
+`rememberSaveable` geretteter Text sofort wieder verschwand. Das ist jetzt Absicht und steht als bewusste
+Entscheidung in [DEFECTS.md](DEFECTS.md): Der Entwurf ist mit dem Prozess fort, und ein Feld, das den alten
+Text zeigte, zeigte einen Wert, mit dem kein Auftrag starten würde. Runde 18 hat das am Gerät geprüft, das Ergebnis
+steht ebenfalls dort.
+
+**Ein Teilergebnis sah als SRT oder VTT aus wie ein ganzes.** Das war der mittlere Fund des
+Invarianten-Reviewers. Markdown, Text und JSON tragen die Einschränkungen als Metadaten; ein Player zeigt
+nur Cues. Seit `c3ae9e5` beginnt ein nicht bestätigt vollständiges Ergebnis mit einem Hinweis-Cue, jeder
+Abschnitt, den der Umfang als nicht transkribiert führt, bekommt einen eigenen Cue über genau dieses
+Intervall, und VTT trägt die Einschränkungen zusätzlich als `NOTE`. Die Regel steht einmal in `core`,
+`TranscriptScope.confirmedComplete`, und der Ausgang eines Versuchs fragt sie an drei Stellen. Für Dokumente
+der App ändert sich am Ausgang nichts, weil `SttStep` `technicallyComplete` nur ohne fehlenden Chunk setzt;
+nachgelesen an `allComplete`. Ein ganzes Ergebnis ohne Warnung wird Byte für Byte wie vorher exportiert.
+Runde 17 hat zwei Stellen nachgezogen: Ergebnisansicht und gespeichertes `complete` eines Artefakts fragen
+seit `4ddca61` dieselbe Regel, und der Cue über einem nicht transkribierten Abschnitt liegt seit `ab34dd1` nur
+dort, wo kein transkribierter Text läuft.
+
+**Zurück zu einer älteren Engine war ein Tap ohne jeden Hinweis.** Der zweite mittlere Fund desselben
+Reviewers, gegen die eigene Vorgabe in `docs/SECURITY_UPDATES.md` (S7). Seit `23d8a0c` öffnet der Knopf eine
+Bestätigung, die die Version nennt, und umgestellt wird nur auf die genannte Installation. Gesperrt wird
+nichts, weil nichts im Baum sagt, welche Version eine bekannte Lücke hat ([Punkt 37](DEFECTS.md)). Seit
+`67c2c44` schließt die Bestätigung erst, wenn die Umstellung läuft.
+
+**Der Plugin-Lader von yt-dlp ist jetzt selbst aus.** Bisher lud yt-dlp kein Plugin, aber nur über zwei
+Bedingungen einer Version. Seit `eaba2d4` setzt die Laufzeit `YTDLP_NO_PLUGINS=1`. Der Reviewer hatte die
+Variable nur im README geprüft; nachgelesen ist sie im gebündelten 2026.08.19: `load_plugins` in
+`yt_dlp/plugins.py` kehrt bei gesetzter Variable zurück, bevor es eine Suchliste liest, und der Weg, den
+`YoutubeDL` für die API selbst nimmt, endet an derselben Prüfung.
+
+**Was sonst gefunden und korrigiert ist:**
+
+- Ein Schalter, der für das vorige Modell an war, lag nach einem Modellwechsel grau und unbedienbar da, und
+  das Fachbegriffsfeld war verborgen, während seine Einträge den Auftrag als `UNSUPPORTED_OPTION` oder
+  `CONTEXT_TERM_BLANK` blockierten (Code-Reviewer). `0fdf8c0`.
+- Die Kostenzeile schnitt bei Schriftgröße 2.0 ab, im Englischen das Tarifdatum zur Hälfte, im Deutschen ganz;
+  gemessen vor jeder Änderung auf `emulator-5556`. `579f972` reserviert die Höhe des höchsten Texts.
+  Nachgemessen am 14. September auf dem Stand von `39a1cdc`, jedes Mal ganz innerhalb des scrollenden Formulars: In
+  beiden Sprachen ist die Zeile bei Schriftgröße 1.0 und 1.3 zweizeilig, 84 und 110 px hoch, bei 2.0 dreizeilig und
+  252 px hoch, und auf allen sechs Bildschirmfotos steht ihr Text vollständig, das Tarifdatum eingeschlossen.
+- Eine importierte Datei hat keine Adresse, und die Karte zeichnete trotzdem eine leere Zeile. `c5a6564`.
+- `PREVIEW_ERRORS_SHOWN_AS_TEXT` reservierte Platz für `UPLOAD_APPROVAL_REQUIRED`, das keine Vorschau liefern
+  kann, und der Test prüfte nur neun von zwölf Codes auf Erreichbarkeit. `5da4530`.
+- Die vierte Stelle unter „Aufklappen schiebt“ war falsch zugeschrieben und falsch verortet
+  (Konsistenz-Reviewer), und „alle vier Stellen“ war keine vollständige Zählung. In
+  [DEFECTS.md](DEFECTS.md) berichtigt.
+
+**Zwei Aussagen von Reviewern stimmten nicht und stehen berichtigt.** Der Code-Reviewer hielt alle zwölf
+Vorschaufehler für erreichbar, auch `UPLOAD_APPROVAL_REQUIRED`. `previewError` fragt `configError` aber nur
+mit einem passenden Schlüssel und einem Modell, und genau unter dieser Bedingung hat `configurationForStart`
+die Freigabe schon gesetzt. Der Test verlangt jetzt alle elf gelisteten Codes und fällt, wenn der zwölfte
+wieder in der Liste steht (Gegenprobe in der Passage der Runde 17). Und zur Wartezeit schrieb er,
+`1000:00:00` habe 11 Zeichen; es sind 10 gegen 9 des Platzhalters ([Punkt 39](DEFECTS.md)).
+
+**Offen und eingetragen:** [Punkt 34](DEFECTS.md) um die zweite Richtung des Lexerfehlers ergänzt, dazu neu
+die Punkte 37 bis 42: Rollback ohne Sperre, `withDraft` als Absprache, die Wartezeit ab 1000 Stunden, das
+Fenster zwischen Prüfsumme und Start einer Engine, `youtube-nocookie.com` und geteilte Exporte im Cache.
+
+**Der Weg zum Gate fand einen Fehler, den das Review nicht gefunden hatte.** Der erste Gate-Build scheiterte
+an `:app:mergeDexRelease` mit dem Dexing-Fehler, dessen Pfad sich nur in der Groß- und Kleinschreibung
+unterscheidet ([LEARNINGS.md](LEARNINGS.md)). Nach dem Leeren von `extractor/build` aus WSL heraus und mit
+`--no-watch-fs` kam der Build bis zu den Lintläufen. Der erste davon endete mit „Internal error: Unexpected
+lint invalid arguments“; die Ursache war Speichermangel in WSL beim Lesen eines Verzeichnisses über 9p, nicht
+der Code. Der Lauf danach fand einen echten Fehler: `1b2dc45` war ohne Lintlauf committet und verletzte
+`ModifierParameter` in `DraftTextField`. Das korrigiert `610c4fa`, der erste Commit der Runde 17.
+
+**Die Schleife ist nicht konvergiert.** Sechzehn Runden, keine davon leer. Runde 16 fügt hinzu, dass ein
+Gerätelauf nur die Werte belegt, die er tippt: `0.25` blieb heil, `0.123456` nicht, und die erste Korrektur
+hätte ohne den längeren Wert als belegt gegolten.
+
+### Runde 17
+
+Commits: `610c4fa` (Lint: `DraftTextField` ohne optionalen Modifier), `67c2c44` (ein abgewiesener Tastendruck
+und die Rollback-Bestätigung bleiben, wie sie waren), `85a2a50` (Start lässt leere Fachbegriffe weg), `4ddca61`
+(Ergebnisansicht und Artefaktzeile fragen dieselbe Regel), `ab34dd1` (Hinweis-Cue nur, wo kein Text läuft),
+`23aab99` (Platz für eine neue Engine, [ADR 0009](adr/0009-engine-slot-cleanup.md)) und `8e41bf4` (neu
+gebündelte Engine wird aktiv, [ADR 0010](adr/0010-bundled-engine-after-app-update.md)). Den Doku-Commit teilt sie
+mit den Runden 16 und 18.
+
+Zwei Reviewer, nur lesend und gleichzeitig, auf dem Stand von `c3ae9e5` mit den Punkten 37 bis 42 im
+Arbeitsbaum: Code und Invarianten. Modell und Weg aus `meta.json` gelesen: `"agentType":"general-purpose"`,
+`"model":"sonnet"`, `"requestShape":"background"`. Der Konsistenz-Reviewer sollte über den Doku-Commit der
+Runde 16 laufen, den es nicht gab; er läuft in Runde 19 über den Doku-Commit, der die Passagen der Runden 16 bis
+18 schreibt.
+
+**Eine App-Aktualisierung mit neuer gebündelter Engine konnte die App dauerhaft lahmlegen.** Der
+Invarianten-Reviewer fand es am Rand seines Auftrags und stufte es niedriger ein, als es ist. `EngineUpdateManager`
+hält höchstens fünf Slots und entfernte nie eine gesunde Installation. Bei fünf belegten Slots fand die gebündelte
+Engine einer neuen App-Version keinen Platz, und `ensureBundledLocked` warf `STORAGE`. Weil `bundled()`,
+`active()`, `installations()`, `stage()`, `activate()` und beide Rollback-Aufrufe zuerst dort vorbeikommen, ließ
+sich danach keine Quelle mehr prüfen und kein Auftrag starten. Die Vorgabe, die das verhindert hätte, steht seit
+dem ersten Commit in `docs/SECURITY_UPDATES.md` (S7): alte Versionen erst ohne aktive Referenzen bereinigen.
+Seit `23aab99` räumt der Manager, wenn ein neuer Slot entstehen soll und keiner frei ist. Nie entfernt werden die
+aktive, die vorherige und die gebündelte Installation und jede, an die ein unfertiger Versuch gebunden ist. Eine
+Engine, mit der ein Teilergebnis fortgesetzt würde, wich zunächst nur als letzter Ausweg und nur für die gebündelte
+Engine; diese Ausnahme beruhte auf einer falschen Annahme und ist in Runde 18 entfallen. Was Aufträge brauchen,
+fragt der Manager über Room, und nur, wenn etwas weg muss. Reicht es nicht, heißt der Fehler jetzt `SLOTS_IN_USE`
+statt `STORAGE`, mit eigenem Text, und nichts ist entfernt. Entscheidung und Restrisiken:
+[ADR 0009](adr/0009-engine-slot-cleanup.md) und [Punkte 43 und 44](DEFECTS.md).
+
+**Nach einem App-Update blieb die alte gebündelte Engine aktiv.** Kein Reviewerfund; gefunden beim Lesen von
+`ensureBundledLocked` für ADR 0009. Die aktive Engine wurde nur gesetzt, wenn keine gesetzt war. Wer nie selbst
+eine andere aktiviert hatte, extrahierte deshalb nach jedem App-Update weiter mit der Engine, die beim ersten
+Start aktiv geworden war. Seit `8e41bf4` wird die neu gebündelte beim ersten Start aktiv, wenn die bisher aktive
+Engine selbst eine gebündelte war; die alte bleibt als vorherige der Weg zurück, eine selbst aktivierte
+heruntergeladene Engine bleibt aktiv, und ein späteres bewusstes Zurückgehen hält.
+[ADR 0010](adr/0010-bundled-engine-after-app-update.md), Grenzfälle in [Punkt 46](DEFECTS.md); einen davon hatte
+ADR 0010 falsch beschrieben, berichtigt in Runde 18.
+
+**Ein während eines Starts abgewiesener Tastendruck blieb im Feld stehen.** Code-Reviewer. `DraftTextField`
+übernahm den getippten Text, bevor feststand, ob der Entwurf ihn nimmt, und `changeDraft` kehrte während eines
+Starts ohne Rückmeldung zurück. Ein Tastendruck, der das Feld in den ein bis zwei Frames erreichte, bevor es für
+den Start gesperrt wurde, ließ es danach einen Wert zeigen, mit dem weder dieser noch ein späterer Start lief.
+Seit `67c2c44` meldet `typeIntoDraft`, ob der Entwurf den Wert genommen hat, und nur dann wird er der Text des
+Feldes.
+
+**Die Rollback-Bestätigung schloss sich auch, wenn der Tap abgewiesen wurde.** Code-Reviewer. `rollback` leerte
+das Ziel vor `action`; hielt eine andere Aktion die Sperre, kam `ACTION_BUSY`, und die Bestätigung mit der
+genannten Version war fort. Seit `67c2c44` schließt sie erst, wenn die Umstellung läuft.
+
+**Eine gespeicherte Fachbegriffsliste mit leerem Eintrag ließ sich auf dem Bildschirm nicht beheben.**
+Code-Reviewer. `[""]` zeigt sich als leeres Feld, und jeder Anbieter lehnt die ganze Liste ab; die Vorschau
+meldete `CONTEXT_TERM_BLANK`, ohne dass auf dem Bildschirm etwas zu entfernen war. Erreichbar ist das nur über
+eine Liste, die gespeichert wurde, bevor das Feld Leerzeilen entfernte, in einem neu vorbereiteten Auftrag oder
+einer Voreinstellung. Seit `85a2a50` lässt Start leere Einträge weg, und Fehlerzeile wie Kostenzeile urteilen über
+genau die Konfiguration, die Start anlegt. Die Vorschau kann `CONTEXT_TERM_BLANK` damit nicht mehr zeigen, und der
+Code steht nicht mehr in `PREVIEW_ERRORS_SHOWN_AS_TEXT`. Ein Auftrag, der vor Runde 17 so gespeichert wurde, bleibt
+bei `SttStep.validate` mit diesem Code stehen ([Punkt 31](DEFECTS.md)).
+
+**Ergebnisansicht und Artefaktzeile fragten nicht die Regel der Runde 16.** Beide Reviewer. Die Ergebnisansicht
+prüfte `technicallyComplete != true`, und `ArtifactRow.complete` wurde an drei Stellen aus dem rohen Flag
+geschrieben, das der Ausgang des Auftrags, die Wiederholung und die Aufbewahrung des Audios lesen. Heute
+gleichwertig, weil kein Schreiber das Flag bei einem fehlenden Chunk setzt; eine künftige Änderung an einer der
+beiden Formeln hätte aber ein Teilergebnis als ganzes gezeigt und gespeichert. Seit `4ddca61` fragen alle
+`confirmedComplete`. Belegt für die Ansicht und die beiden Schreiber in `JobCoordinator`; der Schreiber in
+`SttStep` hat keinen eigenen Test ([Punkt 45](DEFECTS.md)).
+
+**Der Hinweis-Cue über einem fehlenden Abschnitt lag auch über transkribiertem Text.** Code-Reviewer. Der Umfang
+zählt Chunkfenster, und `SyncTranscriptParser` verschiebt die Anbieterzeiten um den Chunkbeginn, ohne sie am
+Chunkende zu kappen; ein Cue kann also über die Fenstergrenze in die Lücke reichen. Seit `ab34dd1` liegt der
+Hinweis nur über dem Teil der Lücke, den kein transkribierter Cue abdeckt. Belegt am konstruierten Fall, nicht an
+echten Anbieterdaten.
+
+**Der Untertitelzweig suchte seine Engine mit `single`.** Kein Reviewerfund; gefunden beim Lesen für ADR 0009.
+Fehlte die gebundene Engine, warf das eine Ausnahme ohne Grund. Jetzt wartet der Auftrag mit
+`ENGINE_NOT_AVAILABLE` wie der STT-Zweig, und der Code hat einen eigenen Text ([Punkt 4](DEFECTS.md)). Teil von
+`23aab99`.
+
+**Offen geblieben:** Die Testlücke, die der Invarianten-Reviewer meldete — ein Rollback, während ein Auftrag mit
+gebundener Engine läuft —, deckt nur der Live-Test `EngineJobPinningTest` ab, und der nur für das Aktivieren; im
+Gate-Lauf überspringt er sich per Annahme. Sie stand in der Jagdliste der Runde 18 und steht in der der Runde 19.
+Neu in DEFECTS aus Runde 17: 43 bis 47.
+
+**Gegenprobe der Runden 16 und 17.** Jede Korrektur mit Test zurückgenommen, auf dem Stand von `8e41bf4`: sieben
+Builds für die Module `app` und `extractor`, drei Läufe für `core`, danach der committete Stand neu gebaut. Jeder
+Lauf im Modul `app` hatte einen Kontrolltest, der bestehen musste, und jeder im Modul `extractor` dieselben acht
+Tests aus `EngineUpdateManagerTest` und `NativeRuntimeTest`, von denen nur die betroffenen fallen durften.
+
+- App, Satz 1, Epochen und Liste der Vorschaufehler aus Runde 16 zusammen mit Ergebnisregel, Untertitel-Schreibern,
+  `single` und Engine-Referenzen aus Runde 17: Es fielen genau die acht erwarteten Tests. Fall A von
+  `r16_outside.py` ließ sich auf diesem Build so wenig ausführen wie auf dem committeten Stand, aus demselben Grund.
+- App, Satz 2, ein Tastendruck rückt die Epoche seines eigenen Feldes: genau
+  `aKeystrokeLeavesItsFieldTheTextAndEveryOtherChangeMovesTheEpochOfWhatItChanges`. `r16_typing.py` zeigte auf
+  diesem Build einen von 24 Fällen abweichend, `7.654321` als `7654321`, und endete trotzdem mit 0; seitdem endet
+  das Skript mit 1, wenn ein Fall abweicht.
+- App, Satz 3, ein abgewiesener Tastendruck gilt als angenommen, die Rollback-Bestätigung schließt vor der Sperre,
+  Start behält leere Fachbegriffe: genau die vier erwarteten.
+- Extractor, Satz 1, Rollback ohne Ziel, Plugin-Lader an, keine Umstellung nach einem App-Update: genau drei.
+  Satz 3, die vorherige Engine ungeschützt und ein Trockenlauf, der entfernt: genau drei. Satz 4, unfertige
+  Versuche ungeschützt: genau drei.
+- Extractor, Satz 2, Reihenfolge verkehrt und ein verschluckter Fehler der Referenzabfrage: im ersten Lauf vier
+  statt drei. Der vierte, `anAppUpdateMakesItsBundledEngineActiveOnceAndKeepsTheOldOneAsTheWayBack`, endete mit
+  `PROBE_FAILED` aus `native_runtime:TIMED_OUT`, dem Selbsttest der Laufzeit mit 30 Sekunden, während daneben ein
+  Gradle-Build anlief. Mit derselben Test-APK ohne Build fielen genau die drei, und er bestand. Dass die Last die
+  Ursache war, legt das nahe; bewiesen ist es nicht.
+- `core`, der Zeitexport hält jedes Ergebnis für ganz: die zwei erwarteten Tests und dazu
+  `aStretchNotTranscribedIsMarkedOnlyWhereNoTranscribedTextRuns`, der seit Runde 17 ebenfalls die Hinweis-Cues
+  eines Teilergebnisses verlangt. Die Regel übersieht fehlende Abschnitte: genau die zwei erwarteten. Der Hinweis
+  liegt wieder über der ganzen Lücke: genau der eine.
+
+**Am Gerät, auf `8e41bf4`.** Getippt: 24 von 24 wie getippt, die Werte stehen in der Passage der Runde 16. Die
+Kostenzeile hat `r16_cost_font.py` auf diesem Stand gemessen, aber bei 130 % Schrift im Englischen und bei 200 % im
+Deutschen lag sie zum Teil unter der Navigationsleiste, und uiautomator meldet nur den sichtbaren Teil; das Skript
+nahm diese Höhen trotzdem. Die Messung ist in Runde 18 wiederholt, mit einem Skript, das die Zeile erst ganz über
+die Leiste schiebt. Drehen und Prozesstod liefen ebenfalls erst in Runde 18.
+
+Gates nach Runde 17, auf dem Stand von `8e41bf4`: **182 JVM-Tests** im Modul `core` ohne Fehler, alle vier
+Lintberichte ohne Befund, der unsignierte Release-Build gebaut, `tools/check-repository.py` mit Selbsttest
+bestanden (207 Dateien gelesen, 19 als binär übersprungen), **205 Instrumentierungstests** im Modul `app` — 199 im
+gemeinsamen Lauf, 4 weitere einzeln über ihre Stufen, 0 Fehler — und **47** im Modul `extractor` — 43 bestanden,
+4 per Annahme übersprungen, 0 Fehler. Von 434 Tests sind 428 ausgeführt; übersprungen und nirgends nachgeholt
+sind dieselben sechs wie nach Runde 15. Runde 16 hat in `core`, `app` und `extractor` 4, 4 und 2 Tests
+hinzugefügt, Runde 17 1, 6 und 6. Gebaut und gelintet wurde der Arbeitsbaum vor den Commits; die sechs
+Code-Commits der Runde 17 enthalten ihn Datei für Datei, und nach dem letzten war nur `docs/DEFECTS.md` noch
+geändert. Die erste Installation, ein Vorabtest der neuen Tests, scheiterte mit
+`INSTALL_FAILED_INSUFFICIENT_STORAGE`: Der Play Store hatte auf `emulator-5556` am 12. September vorinstallierte
+Apps aktualisiert. Seitdem werden beide Testpakete vor jeder Installation deinstalliert (Wartungshinweis in
+[DEFECTS.md](DEFECTS.md)).
+
+**Die Schleife ist nicht konvergiert.** Siebzehn Runden, keine davon leer. Runde 17 fügt zwei Dinge hinzu. Ihr
+schwerster Fund lag nicht in einer Korrektur der Vorrunde, sondern in einer Vorgabe, die seit dem ersten Commit im
+Sicherheitsdokument stand und nie umgesetzt war; ein Review, das nur den Diff liest, findet so etwas nicht. Und
+Lint gehört vor den Commit: `1b2dc45` ging mit einem Lintfehler in den Baum, weil Lint erst im Gate danach lief.
+
+### Runde 18
+
+Commits: `cb4afb9` (die Engine eines Teilergebnisses macht Platz wie jede andere), `89eecad` (ein
+beschädigter Slot der gebündelten Engine wird ersetzt, [ADR 0011](adr/0011-damaged-bundled-engine-slot.md)),
+`8fe0dd5` (jeder Einstellungsspeicher liest die Datei seines eigenen Kontexts) und `39a1cdc` (die
+Migrationstests löschen ihre Datenbanken), dazu der Doku-Commit, der diese Passage und die der Runden 16 und 17
+schreibt.
+
+Zwei Reviewer, nur lesend und gleichzeitig, auf einem Export (`git archive`) von `8e41bf4` über die Commits
+`1b2dc45` bis `8e41bf4`: Code und Invarianten. Modell und Weg aus `meta.json` gelesen:
+`"agentType":"general-purpose"`, `"model":"sonnet"`, `"requestShape":"background"`. Ein Konsistenz-Reviewer lief
+nicht: Der Doku-Commit, den er lesen sollte, entsteht erst mit dieser Passage. Er läuft in Runde 19.
+
+**Die Engine eines Teilergebnisses hielt ein Update auf, ohne gebraucht zu werden.** Invarianten-Reviewer, mittel.
+Runde 17 hatte die Engine des jüngsten STT-Versuchs eines Auftrags mit Teilergebnis vor dem Räumen geschützt, weil
+„Nur Fehlendes“ mit ihr weiterlaufe. Das stimmte nicht: `SttStep.prepareMissingRetry` legt den neuen Versuch in
+`Phase.SUBMIT` an, mit den Audioabschnitten, die sein Vorgänger vorbereitet hat, und nur `resolve` und `download`
+fragen die gebundene Engine. Waren fünf Slots belegt und nur eine solche Engine entbehrlich, lehnte `stage` ein
+freiwilliges Update deshalb mit `SLOTS_IN_USE` ab, und der Text verlangte, das Teilergebnis abzuschließen oder zu
+löschen. Seit `cb4afb9` hält nur ein unfertiger Versuch seine Engine; `EngineReferences` kennt nur noch
+`inUse`, und der Text von `ENGINE_SLOTS_IN_USE` nennt, was tatsächlich hilft.
+`SttMissingRetryTest.aMissingChunkRetryOfAVideoCompletesWithoutTheEngineItIsBoundTo` lässt „Nur Fehlendes“ für ein
+Video bis zum Ergebnis laufen, während die Engine, an die es gebunden ist, nicht installiert ist.
+[ADR 0009](adr/0009-engine-slot-cleanup.md) ist berichtigt.
+
+**Ein beschädigter Slot der gebündelten Engine hätte Vorschau und Start dauerhaft verhindert.** Kein Reviewerfund;
+gefunden beim Nachprüfen des ersten Grenzfalls in ADR 0010. `materializeSlot` lehnt seit `06b996a` einen
+vorhandenen Slot ab, dessen Datei nicht die Bytes seines Namens enthält, auch eine symbolische Verknüpfung an
+seiner Stelle. Alle Aufrufe des Managers außer `check()`, `discardUnhealthyCandidate()` und `file()` durchlaufen
+zuerst `ensureBundledLocked`. Bei einem solchen Slot der gebündelten Engine endete deshalb jeder davon mit
+`VERIFICATION`, darunter jede Vorschau und jeder Start eines Auftrags, und das nach jedem Start der App, bis jemand
+die App-Daten und mit ihnen den Verlauf löschte. Beobachtet ist das nicht. Seit `89eecad` ersetzt
+`ensureBundledLocked` den Slot durch die Bytes, die es gerade aus dem APK kopiert und geprüft hat; eine symbolische
+Verknüpfung wird selbst entfernt, nie ihr Ziel, und `stage` lehnt weiter ab. Test:
+`aDamagedBundledSlotIsReplacedWithTheVerifiedEngineInsteadOfStoppingEveryCall`. Der Grenzfall in ADR 0010 war damit
+falsch beschrieben: Ein ungültiger Slot stellte nicht erneut um, sondern hielt Vorschau und Start an, und nach einem
+Absturz zwischen den zwei Speicherungen kann niemand zurückgehen, bevor die Umstellung nachgeholt ist. ADR 0010 ist
+berichtigt.
+
+**Instrumentierungstests haben die Einstellungen der App auf dem Gerät geändert.** Kein Reviewerfund; gefunden beim
+Lesen der Einstellungsdatei von `app.sourcescribe.debug` auf `emulator-5556`. Darin standen Werte aus Tests, etwa
+der Fachbegriff `mutated-default` aus `ParallelJobsTest`, zuletzt geschrieben am 14. September um 00:47, während der
+Gates der Runde 17. Der Delegat `preferencesDataStore` hält einen DataStore für den ganzen Prozess, auf den Dateien
+des Kontexts, der ihn zuerst benutzt; ein `SettingsStore` für einen Testkontext mit eigenen Dateien las und schrieb
+deshalb die der App. Seit `8fe0dd5` gibt es einen DataStore je Datei. Die App hat nur einen Kontext und behält
+damit ihre Datei. `SettingsStoreTest` prüft, dass zwei Kontexte zwei Dateien benutzen und die Datei der App
+unberührt bleibt. Die Werte auf dem Gerät bleiben stehen, weil niemand weiß, was vorher darin stand
+(Wartungshinweis in [DEFECTS.md](DEFECTS.md)).
+
+**Die Migrationstests ließen ihre Datenbanken liegen.** Kein Reviewerfund, gefunden beim selben Blick in die
+App-Daten. `MigrationTest` legt je Test eine Datenbank zwischen den Datenbanken der App an, und jede Ausführung ließ
+zwei zurück, jede mit Journal und Sperrdatei: 24 Dateien aus vier Läufen am 13. und 14. September. Seit
+`39a1cdc` löscht eine Regel, die die Regel des Helfers umschließt, beide nach dem Test, samt der Sperrdatei,
+die nicht zu den Dateien gehört, die `Context.deleteDatabase` entfernt, und verlangt, dass keine Datei mit ihrem
+Namen bleibt.
+Nach den beiden Gate-Läufen der Runde 18 lag auf `emulator-5556` keine neue Datei der Migrationstests. Die 24 alten
+und die zwei Sperrdateien aus der Gegenprobe sind danach gelöscht, nachdem sie aufgelistet waren; in `databases/`
+liegen nur noch die Datenbank der App mit `-shm` und `-wal`.
+
+**Die Gates fanden einen Fehler in einer Korrektur dieser Runde.** Der erste Gate-Lauf meldete sieben Fehlschläge in
+`AudioImportTest`, alle mit `DEVICE_STORAGE_LOW`, bei 560 MB freiem Speicher. Die Ursache war die Korrektur der
+Einstellungen: Damit `AudioImportTest` die Einstellungen seines eigenen Kontexts liest, bekam dessen Attrappe ein
+eigenes `filesDir`, legte das Verzeichnis aber nicht an, wie es `Context.getFilesDir` tut. Die Speicherprüfung misst
+den freien Platz jedes ihrer Verzeichnisse mit `File.usableSpace`, und das ist für einen Pfad, der nicht existiert,
+0. Die Attrappe legt das Verzeichnis jetzt an; der zweite Lauf steht unten. Vor dem Gate war kein Test über die
+geänderte Klasse gelaufen.
+
+**Offen und eingetragen:** die übrigen Funde des Code-Reviewers. Ein App-Update verdrängt eine dritte Engine aus der
+Rolle der vorherigen; er stufte das als mittel ein, hier steht es als niedrig, mit dem Grund, in
+[Punkt 46](DEFECTS.md). `stage` fragt die Referenzen vor dem Download und beim Räumen getrennt
+([Punkt 48](DEFECTS.md)), und eine Vorschau hält ihre Engine nicht ([Punkt 49](DEFECTS.md)). Beides hielt er für
+offen; heute verhindert es die Sperre von `MainViewModel.action`, die aber je View-Model gilt. Dazu
+[Punkt 50](DEFECTS.md): Instrumentierungstests reihen Arbeit in den WorkManager der App ein. Zwei Testlücken, die er
+nannte, bleiben offen und stehen in der Jagdliste: eine IME-Komposition während eines abgewiesenen Tastendrucks und
+der Lückenhinweis im VTT-Export.
+
+**Gegenprobe der Runde 18.**
+Jede Korrektur mit Test zurückgenommen, auf dem Stand von `39a1cdc`: fünf Builds, zwei für das Modul `app` und drei
+für das Modul `extractor`, danach der committete Stand neu gebaut und installiert; kein Build lief neben einem
+Gerätelauf. Jeder Lauf im Modul `app` hatte einen Kontrolltest, jeder im Modul `extractor` dieselben neun Tests aus
+`EngineUpdateManagerTest` und `NativeRuntimeTest`, von denen nur die betroffenen fallen durften. So kam es in allen
+fünf Sätzen.
+
+- App, Satz 1, fertige Versuche halten ihre Engine wieder, und der Schritt `SUBMIT` fragt die gebundene Engine:
+  genau `EngineReferencesTest.unfinishedAttemptsKeepTheirEnginesAndAPartialResultKeepsNone` und
+  `SttMissingRetryTest.aMissingChunkRetryOfAVideoCompletesWithoutTheEngineItIsBoundTo`, der zweite mit `SUBMIT`
+  statt `NORMALIZE`.
+- App, Satz 2, ein Einstellungsspeicher für den ganzen Prozess, und die Migrationstests löschen ihre Sperrdateien
+  nicht: genau `SettingsStoreTest.aStoreReadsAndWritesTheSettingsInTheFilesOfItsOwnContext` und beide
+  Migrationstests, diese mit je einer übrig gebliebenen `.lck`-Datei, obwohl `Context.deleteDatabase` weiter lief.
+  `AudioImportTest` bestand, und die Einstellungsdatei der App blieb unverändert.
+- Extractor, Satz 1, geräumt wird zuerst die neueste Installation, und die gebündelte Engine lehnt einen
+  beschädigten Slot wieder ab: genau drei, der Test des beschädigten Slots mit `VERIFICATION` aus
+  `materializeSlot`.
+- Extractor, Satz 2, die vorherige Installation ist ungeschützt, und das Ersetzen eines Slots löscht, worauf seine
+  Dateien zeigen: genau drei; der Test des beschädigten Slots fand das Ziel der symbolischen Verknüpfung nicht mehr.
+- Extractor, Satz 3, Installationen unfertiger Versuche sind ungeschützt: genau die fünf erwarteten.
+
+**Am Gerät, auf dem Stand von `39a1cdc`.**
+Die Kostenzeile ist in beiden Sprachen bei drei Schriftgrößen nachgemessen, jede Messung mit der Zeile ganz
+innerhalb des scrollenden Formulars; die Zahlen stehen in der Passage der Runde 16. `r16_outside.py` fand im ersten
+Lauf in der Dateiauswahl des Systems binnen 17 Sekunden weder die Datei noch die Seitenleiste und brach ab, bevor
+es zu Drehung und Prozesstod kam. Seitdem wartet es bis zu 30 Sekunden, bis die Auswahl offen ist, sichert sonst
+Bildschirm und Hierarchie und prüft Drehung und Prozesstod auch ohne Import. Der zweite Lauf, nach einem Neustart
+des Rechners durch ein Windows-Update, kam durch die Auswahl: Die Änderung von außen blieb `NOT_RUN`, weil ohne
+gespeicherten Schlüssel kein Knopf die Längengrenze anhebt, die Drehung bestand, und nach dem Prozesstod war das
+Budgetfeld leer (Passage der Runde 16 und [DEFECTS.md](DEFECTS.md)). Vor und nach beiden Läufen hatte die
+Einstellungsdatei der App denselben SHA-256.
+
+Gates nach Runde 18: **182 JVM-Tests** im Modul `core` ohne Fehler, alle vier Lintberichte ohne Befund, der
+unsignierte Release-Build gebaut, `tools/check-repository.py` mit Selbsttest bestanden (209 Dateien gelesen, 19 als
+binär übersprungen), **207 Instrumentierungstests** im Modul `app` — 201 im gemeinsamen Lauf, 4 weitere einzeln über
+ihre Stufen, 0 Fehler — und **48** im Modul `extractor` — 44 bestanden, 4 per Annahme übersprungen, 0 Fehler. Von
+437 Tests sind 431 ausgeführt; übersprungen und nirgends nachgeholt sind dieselben sechs wie nach Runde 15. Runde 18
+hat im Modul `app` 2 Tests hinzugefügt und im Modul `extractor` 1. Der erste Lauf der App-Suite um 02:32 endete mit
+den sieben Fehlschlägen oben, der zweite um 02:46, nach dem Neubau der Test-APK, ohne Fehler. Vor und nach beiden
+Läufen hatte die Einstellungsdatei der App denselben SHA-256, und es lagen 24 Migrationsdateien in den App-Daten.
+Gebaut, gelintet und geprüft wurde der Arbeitsbaum vor den Commits. Der Code der vier Commits ist dieser
+Arbeitsbaum, nachgeprüft über einen Fingerabdruck des Diffs unmittelbar vor dem ersten Commit; nach den Gates
+geändert wurde nur der Absatz zu den Restrisiken in ADR 0009.
+
+**Die Schleife ist nicht konvergiert.** Achtzehn Runden, keine davon leer. Runde 18 fügt zwei Dinge hinzu. Die
+Begründung einer Architekturentscheidung ist selbst eine Behauptung über den Code: ADR 0009 schützte eine Engine für
+einen Weg, der sie nie ausführt, und ADR 0010 beschrieb einen Grenzfall, den der Code nie erreichen ließ; beides
+zeigte sich erst beim Lesen der Stellen, die die ADRs nennen. Und eine Testisolierung wirkt nur so weit, wie der Code
+den Kontext fragt, den der Test ihm gibt, und eine Attrappe muss die Verträge des Originals halten: Der Delegat der
+Einstellungen kannte nur den ersten Kontext, und die Korrektur brach sieben Nachbartests, weil ihre Attrappe ein
+Verzeichnis nannte, das es nicht gab.
 
 ## UI-Feedback umgesetzt
 

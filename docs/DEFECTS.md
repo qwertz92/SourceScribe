@@ -1,6 +1,6 @@
 # Bekannte Probleme und offene Punkte
 
-**Stand:** 13. September 2026, nach fünfzehn Runden adversarischer Reviews. Diese Datei ist für den
+**Stand:** 14. September 2026, nach achtzehn Runden adversarischer Reviews. Diese Datei ist für den
 nächsten Agenten gedacht und listet, was **nicht** vollständig erledigt ist. Ein geschlossener Punkt
 behält seine Nummer und einen kurzen Vermerk, damit Verweise aus anderen Dokumenten gültig bleiben. Was hier nicht steht, ist entweder erledigt oder in
 [STATUS.md](STATUS.md) beschrieben.
@@ -85,6 +85,9 @@ belegt. Diese drei sind offen oder nur teilweise geschlossen:
   Punkt 16 für `RESPONSE_` bereits als Risiko führt. Die Betriebsausgänge brauchen eigene Texte oder bleiben
   bewusst beim generischen. Elf weitere Namen in der Auszählung sind Exportzustände und Prüfwerte, von denen
   erst zu belegen ist, dass sie `messageText` überhaupt erreichen.
+- **Seit Runde 17** hat `ENGINE_NOT_AVAILABLE`, eines der Beispiele oben, einen eigenen Text, ohne Schrittangabe,
+  weil kein Update-Schritt gescheitert ist, und `ENGINE_SLOTS_IN_USE` ist mit eigenem Text neu hinzugekommen. Neu
+  gezählt ist die Untergrenze von 43 nicht.
 
 ### 5. Vorabprüfung und tatsächliche Grenze messen zwei verschiedene Dauern (mittel, teilweise unbestätigt)
 
@@ -518,6 +521,13 @@ Kopien, statt eine weitere hinzuzufügen. Belegt durch
 `SttStepTest.estimateCostCeilsMinimumAndAssemblyAddonsAndBlocksUnknownPrice`. Gefunden vom lesenden Reviewer
 in Runde 14, verbreitert vom Code-Reviewer in Runde 15.
 
+Runde 17 hat eine Lücke dahinter geschlossen: Eine gespeicherte Liste `[""]` zeigte sich als leeres Feld, und die
+Vorschau meldete `CONTEXT_TERM_BLANK`, ohne dass sich auf dem Bildschirm etwas entfernen ließ. Start lässt leere
+Einträge jetzt weg (`MainViewModel.configurationForStart` über `ContextTerms.withoutBlanks`), und Fehlerzeile wie
+Kostenzeile urteilen über die Konfiguration, die Start anlegt. Ein vor Runde 17 so gespeicherter Auftrag bleibt bei
+`SttStep.validate` mit `CONTEXT_TERM_BLANK` stehen, auch nach einer Wiederholung, die die gespeicherte Konfiguration
+übernimmt; „Neu vorbereiten“ und ein Start danach legen einen Auftrag ohne leere Einträge an.
+
 ### 32. Ein grüner CI-Lauf zeigt nicht, wie viele Instrumentierungstests übersprungen wurden (niedrig)
 
 - **Stelle:** `.github/workflows/android.yml`, der Schritt mit `:app:connectedDebugAndroidTest` und
@@ -568,23 +578,34 @@ in Runde 14, verbreitert vom Code-Reviewer in Runde 15.
   nicht gibt. Die Fassung der Runde 14 hatte denselben Fall schlechter: Ihr Blockkommentarmuster griff in
   jeder Zeichenkette, nicht nur in Templates. Selbst gefunden beim Nachfragen, was die Korrektur der
   Runde 15 nicht kann.
+- **Nachtrag aus Runde 16, die zweite Richtung:** Derselbe Fehler kann eine Deklaration auch erfinden. Endet
+  die äußere Zeichenkette am öffnenden Anführungszeichen der inneren, beginnt am schließenden eine neue, die
+  erst am nächsten echten Anführungszeichen endet, und was zwischen beiden steht, liest der Lexer als Code.
+  Stünde dort `; const val FAKE = 1`, fände `DECLARATION` eine Konstante, die es nicht gibt, ganz ohne `/*`
+  oder `//`. Diese Richtung wäre laut, weil der Vergleich am Baum an einem Namen scheitert, der in der Liste
+  fehlt. Der Code-Reviewer der Runde 16 hat den Ablauf am Code von Hand nachgerechnet, nicht ausgeführt.
+  Nachgezählt am 13. September 2026: `grep -rnoE '\$\{[^}]*"[^}]*\}' core/src/main/kotlin` findet 16 Templates
+  mit innerer Zeichenkette, vor und nach den Änderungen der Runde 16 gleich viele, und in keinem steht mehr
+  als ein kurzes Wort wie `unknown`, `WORD` oder `;hls-vtt-assembled`.
 
-### 35. Die Zeilengrenzen auf zwei Bildschirmen sind nicht am Gerät gemessen (niedrig)
+### 35. Die Zeilengrenzen auf zwei Bildschirmen sind nur zum Teil am Gerät gemessen (niedrig)
 
-- **Stelle:** Kostenzeile in `NewSourceScreen.kt` (`minLines = 2, maxLines = 2`); Fehlerzeile der Vorschau
-  in `NewSourceScreen.kt`, Wartezeit und Bytezähler in `HistoryScreen.kt` (`ReservedText`).
-- **Voraussetzung:** 200 % Schriftgröße, schmales Gerät, eine der beiden Sprachen.
-- **Erwartet gegen tatsächlich:** Dass nichts springt, folgt aus dem Code: Eine Zeile mit festen zwei Zeilen
-  kann nicht wachsen, und `ReservedText` reserviert mindestens die Höhe des höchsten seiner Kandidaten und
-  schneidet nichts ab. Nicht gemessen ist, ob einer der Kostentexte bei großer Schrift abgeschnitten wird
-  und ob die Platzhalter der Verlaufskarte wirklich die höchsten Fälle sind. Welcher Text am ehesten
-  betroffen ist, hat sich in Runde 14 verschoben: Gekürzt wurde damals `cost_source_too_long`, vorher der
-  längste der drei Kostentexte; seitdem ist es `estimated_cost` mit eingesetztem Betrag und Tarifdatum, nach
-  Zeichen gezählt 53 gegen höchstens 50 im Deutschen und 53 gegen höchstens 40 im Englischen. Das hat der
-  Code-Reviewer in Runde 15 nachgezählt.
-- **Warum es offen bleibt:** Es braucht ein Gerät bei 200 % Schrift oder einen Compose-UI-Test, der über
-  `onTextLayout` Zeilenzahl und Abschneiden prüft. Beides fehlt; der Test wäre der bessere Weg, weil er
-  bleibt. Vorschlag des Code-Reviewers in Runde 15.
+- **Stelle:** Kostenzeile in `NewSourceScreen.kt`, seit `579f972` ein `ReservedText` mit der Höhe des höchsten
+  ihrer Texte; Fehlerzeile der Vorschau in `NewSourceScreen.kt`, Wartezeit und Bytezähler in `HistoryScreen.kt`
+  (`ReservedText`).
+- **Gemessen:** Vor `579f972` schnitt die Kostenzeile bei 200 % Schrift ab, im Englischen das Tarifdatum zur Hälfte,
+  im Deutschen ganz (`emulator-5556`, 1080 × 2424 px, 420 dpi).
+  Nachgemessen am 14. September auf dem Stand von `39a1cdc`, jedes Mal ganz innerhalb des scrollenden Formulars: In
+  beiden Sprachen ist die Zeile bei Schriftgröße 1.0 und 1.3 zweizeilig, 84 und 110 px hoch, bei 2.0 dreizeilig und
+  252 px hoch, und auf allen sechs Bildschirmfotos steht ihr Text vollständig, das Tarifdatum eingeschlossen.
+  Gemessen ist nur `estimated_cost`, nicht `cost_source_too_long` und nicht `price_unknown`.
+- **Nicht gemessen:** ob die Platzhalter der Verlaufskarte (`LONGEST_ELAPSED`, `LONGEST_BYTE_SIZE`) die höchsten
+  Fälle sind, und die Fehlerzeile der Vorschau bei 200 % Schrift.
+- **Eine Messfalle:** uiautomator meldet von einem Knoten nur den sichtbaren Teil. Auf `8e41bf4` lag die Kostenzeile
+  bei 130 % im Englischen und bei 200 % im Deutschen zum Teil unter der Navigationsleiste und maß weniger, als sie
+  hoch ist. Eine Messung gilt erst, wenn die Zeile ganz innerhalb des scrollenden Formulars liegt.
+- **Warum es offen bleibt:** Es fehlt ein Compose-UI-Test, der über `onTextLayout` Zeilenzahl und Abschneiden prüft;
+  er wäre der bessere Weg, weil er bleibt. Vorschlag des Code-Reviewers in Runde 15.
 
 ### 36. Die Fehlerzeile der Vorschau erscheint und verschwindet (niedrig)
 
@@ -603,6 +624,217 @@ in Runde 14, verbreitert vom Code-Reviewer in Runde 15.
   Zustand mit einem kurzen Satz wie „Diese Quelle ist startklar“ zu füllen und die Längenwarnung in
   dieselbe reservierte Höhe zu legen. Das ist eine Gestaltungsentscheidung und keine Korrektur, deshalb
   nicht eigenmächtig getroffen. Gefunden in Runde 15 beim Umbau der Zeile.
+
+### 37. Zurück zu einer älteren Engine warnt, sperrt aber nichts (niedrig)
+
+- **Stelle:** `EngineUpdateManager.rollbackTarget` und `rollback(expectedId)` in
+  `extractor/src/main/java/app/sourcescribe/extractor/EngineUpdateManager.kt`, die Bestätigung über
+  `MainViewModel.prepareRollback` in `SettingsScreen.kt`. Vorgabe in `docs/SECURITY_UPDATES.md`, Abschnitt S7:
+  „Rollback auf bekannte Sicherheitslücken warnend kennzeichnen und ggf. sperren.“
+- **Voraussetzung:** Eine aktualisierte Engine ist aktiv, und eine frühere gesunde oder die gebündelte ist da.
+- **Stand seit Runde 16:** Bis dahin stellte ein einzelner Tap um, ohne jeden Hinweis; gemeldet hat das der
+  Invarianten-Reviewer der Runde 16 als mittleren Fund. Jetzt öffnet der Knopf eine Bestätigung, die nennt,
+  welche Version wieder aktiv würde, und sagt, dass eine ältere Version Lücken enthalten kann, die eine
+  spätere schon schließt, und dass SourceScribe das nicht prüft. Umgestellt wird nur auf die genannte
+  Installation: Hat sich das Ziel seit dem Öffnen geändert, endet `rollback` mit `ROLLBACK_TARGET_CHANGED`
+  (in der App `ENGINE_ROLLBACK_TARGET_CHANGED`) und stellt nichts um.
+- **Was fehlt:** Das Wissen, welche Version eine bekannte Lücke hat. Im Baum gibt es dafür nichts, weder eine
+  Mindestversion noch eine Liste betroffener Versionen; gesucht am 13. September 2026 nach `CVE-`,
+  `vulnerab`, `blocklist`, `denylist`, `minVersion` und `Sicherheitslück`. Also gibt es nichts, woran sich
+  eine Sperre halten könnte. Eine Liste im App-Code wäre mit der nächsten bekannt gewordenen Lücke veraltet;
+  es bräuchte ein signiertes Feld im Engine-Paket, und das ist eine Entscheidung über das Updateformat, nicht
+  über diesen Knopf.
+
+### 38. Dass jede Änderung des Entwurfs über `withDraft` geht, ist eine Absprache, keine Schranke (niedrig, heute folgenlos)
+
+- **Stelle:** `ScreenState.draft` und `withDraft` in `app/src/main/java/app/sourcescribe/MainViewModel.kt`,
+  `DraftTextField` in `app/src/main/java/app/sourcescribe/ui/NewSourceScreen.kt`.
+- **Voraussetzung:** Eine künftige Stelle im View-Model setzt den Entwurf mit `copy(draft = …)` statt über
+  `withDraft`.
+- **Erwartet gegen tatsächlich:** Ein Textfeld der Auftragseinstellungen zeigt seinen getippten Text nur,
+  solange die Epoche seiner Einstellung dieselbe ist, und `withDraft` rückt die Epoche jeder Einstellung
+  weiter, die eine Änderung verschiebt. Eine Änderung an `withDraft` vorbei rückt nichts weiter. Ein Feld, in
+  das zuvor getippt wurde, zeigt dann weiter den alten Text über einem Entwurf, der ihn nicht mehr enthält —
+  der Fehler, den die Epochen in Runde 16 geschlossen haben.
+- **Warum es offen bleibt:** Heute schreiben acht Stellen den Entwurf, alle über `withDraft`: `inspect`,
+  `selectTrack`, `startPreviews`, `clearPreview`, `changeDraft`, `importAudio`, `prepareAgain` und
+  `deleteCredential`. Eine Suche nach `draft =` außerhalb von `withDraft` findet nichts. `ViewModelStateTest`
+  prüft die Epochen beim Tippen, bei einer Voreinstellung, bei der Spurwahl, beim Schließen der Vorschau und
+  bei „Neu vorbereiten“, nicht aber einzeln für `inspect`, `startPreviews`, `importAudio` und
+  `deleteCredential`. Eine Schranke wäre eine Klasse für Entwurf und Epochen mit privatem Konstruktor, deren
+  einzige Änderung beide zugleich fortschreibt. Das berührt jede Stelle, die `ScreenState(draft = …)` baut,
+  darunter viele Tests, und ist deshalb nicht in derselben Runde gemacht worden wie die Epochen selbst.
+
+### 39. Die Wartezeit im Verlauf reserviert Platz für höchstens dreistellige Stunden (niedrig)
+
+- **Stelle:** `LONGEST_ELAPSED = "000:00:00"` in `app/src/main/java/app/sourcescribe/ui/HistoryScreen.kt:210`
+  gegen `duration` in `app/src/main/java/app/sourcescribe/ui/Labels.kt:124`.
+- **Voraussetzung:** Ein Auftrag steht 1000 Stunden oder länger, also gut 41 Tage, auf `WAITING_REMOTE`.
+- **Erwartet gegen tatsächlich:** `duration` begrenzt die Stunden nicht, ab 1000 Stunden steht dort
+  `1000:00:00`, ein Zeichen breiter als der Platzhalter. `ReservedText` schneidet nichts ab und misst den
+  gezeigten Text mit. Höher wird die Karte also nur, wenn dieses eine Zeichen eine neue Zeile braucht, und
+  dann einmal, beim Übergang. Der Code-Reviewer der Runde 16 hat den Fall berechnet und dabei „11 Zeichen“
+  geschrieben; es sind 10 gegen 9.
+- **Warum es offen bleibt:** Ein breiterer Platzhalter verschiebt die Grenze nur, bei vier Stellen auf gut
+  416 Tage, und kann bei großer Schrift eine Zeile reservieren, die im Regelfall leer bleibt. Ob ein Anbieter
+  einen Auftrag so lange offen hält, ist nicht geprüft.
+
+### 40. Zwischen Prüfsumme und Start einer Engine liegt ein kurzes Fenster (niedrig, Restrisiko aus S1)
+
+- **Stelle:** `EngineUpdateManager.file` in
+  `extractor/src/main/java/app/sourcescribe/extractor/EngineUpdateManager.kt:314` prüft bei jedem Aufruf über
+  `validSlot` (Zeile 468) den SHA-256 des Slots. Gestartet wird die Datei danach in `NativeRuntime`.
+- **Voraussetzung:** Ein Prozess, der mit der UID der App schreiben darf, ersetzt die Datei genau zwischen
+  Prüfung und Start.
+- **Warum es offen bleibt:** Wer mit derselben UID schreibt, braucht dieses Fenster nicht, er kann App-Daten
+  und Slots ohnehin ändern. `docs/SECURITY_UPDATES.md` nennt genau das in S1 als akzeptiertes Restrisiko: Ein
+  Prozess mit eigener PID, aber derselben Android-UID bleibt im selben Vertrauensbereich. Einen Weg darüber
+  hinaus hat niemand gezeigt; der Invarianten-Reviewer der Runde 16 hat den Punkt selbst als spekulativ
+  eingestuft.
+
+### 41. `youtube-nocookie.com` wird nicht als YouTube-Quelle erkannt (niedrig, sichere Richtung)
+
+- **Stelle:** `youtubeHosts` in `core/src/main/kotlin/app/sourcescribe/core/SourceResolver.kt:11`, geprüft in
+  Zeile 24.
+- **Voraussetzung:** Ein Link der Form `https://www.youtube-nocookie.com/embed/<id>`.
+- **Erwartet gegen tatsächlich:** Die Einbettungsadresse wird mit `INVALID_HOST` abgelehnt, während
+  `youtube.com/embed/<id>` angenommen wird (Zeile 38). Nichts wird falsch verarbeitet, der Link wird nur nicht
+  angenommen.
+- **Warum es offen bleibt:** Nicht verlangt und nicht ohne einen Test für genau diese Form aufzunehmen, der
+  auch zeigt, dass die kanonische Adresse dieselbe bleibt. Gefunden vom Invarianten-Reviewer der Runde 16.
+
+### 42. Geteilte Exporte bleiben im Cache liegen (niedrig, Hygiene)
+
+- **Stelle:** `shareArtifact` und `shareDiagnostics` in `app/src/main/java/app/sourcescribe/MainViewModel.kt:251`
+  und `:271` schreiben nach `cacheDir/shares/`.
+- **Erwartet gegen tatsächlich:** Die Datei bleibt nach dem Teilen liegen, bis Android den Cache räumt, auch
+  ein vollständiges Transkript. Der Ordner liegt im app-privaten Cache; ein neuer Abflussweg entsteht dadurch
+  nicht.
+- **Warum es offen bleibt:** Wann die empfangende App die Datei gelesen hat, erfährt SourceScribe nicht.
+  Löschen beim nächsten Teilen oder beim Start der App kann einer App die Datei entziehen, die sie erst später
+  liest; denkbar, nicht geprüft, etwa bei einem Mailentwurf. Eine Frist wäre möglich, jede Zahl dafür aber
+  geraten. Gefunden vom Invarianten-Reviewer der Runde 16.
+
+### 43. Scheitert ein Update nach dem Räumen, bleibt die entfernte Installation entfernt (niedrig)
+
+- **Stelle:** `EngineUpdateManager.stage` in
+  `extractor/src/main/java/app/sourcescribe/extractor/EngineUpdateManager.kt`: `materializeSlot` räumt, danach läuft
+  `verifyRuntimeCompatibility`.
+- **Ablauf:** Geräumt wird erst nach Download und Signaturprüfung, aber vor dem Selbsttest der Laufzeit. Besteht die
+  neue Engine ihn nicht, ist der neue Slot fort und der geräumte ebenso.
+- **Warum es offen bleibt:** Den Selbsttest vor dem Räumen laufen zu lassen hieße, eine Datei außerhalb ihres
+  Hash-Slots auszuführen, und `file()` erlaubt das bewusst nicht. Geräumt wird ohnehin nur eine Installation, auf die
+  nichts verweist ([ADR 0009](adr/0009-engine-slot-cleanup.md)). Aufgenommen in Runde 17.
+
+### 44. `ENGINE_SLOTS_IN_USE` nennt auch dort einen Update-Schritt, wo niemand aktualisiert (niedrig)
+
+- **Stelle:** `stepText` in `app/src/main/java/app/sourcescribe/ui/Labels.kt`, das jedem Code mit dem Präfix `ENGINE_`
+  „Beim Aktualisieren der Extraktionskomponente“ voranstellt.
+- **Ablauf:** Findet die gebündelte Engine nach einem App-Update keinen Platz, endet mit diesem Code jeder Aufruf des
+  Managers, der zuerst `ensureBundledLocked` durchläuft, darunter Vorschau, Start und ein Auftrag, der seine Engine
+  sucht, und die Anzeige nennt den Update-Schritt.
+  Aktualisiert hat der Nutzer nichts; die App hat ihre mitgelieferte Engine eingerichtet.
+- **Warum es offen bleibt:** Der Satz danach stimmt, nur der Schritt ist ungenau, und der Fall setzt voraus, dass
+  unfertige Aufträge an mindestens drei Engines gebunden sind, die weder aktiv noch vorherig sind. Aufgenommen in
+  Runde 17.
+
+### 45. Der STT-Schreiber von `ArtifactRow.complete` hat keinen eigenen Test (niedrig, heute folgenlos)
+
+- **Stelle:** `app/src/main/java/app/sourcescribe/data/SttStep.kt`, `complete = document.scope.confirmedComplete`.
+- **Warum es offen bleibt:** Der Unterschied zu `technicallyComplete` zeigt sich nur an einem Umfang mit gesetztem
+  Flag und fehlendem Abschnitt, und den erzeugt der STT-Zweig nicht; ein Test müsste ihn am Normalisieren vorbei in
+  den Speicherschritt schieben. Die beiden Schreiber in `JobCoordinator` sind belegt
+  (`AppPipelineTest.aResultWithAMissingChunkIsStoredAsPartialByBothArtifactWriters`), die Gegenprobe dazu steht in
+  STATUS unter Runde 17. Aufgenommen in Runde 17.
+
+### 46. Zwei Grenzfälle der Umstellung auf die neu gebündelte Engine (niedrig)
+
+- **Stelle:** `EngineUpdateManager.ensureBundledLocked`, der Zweig für eine neu gebündelte Engine;
+  [ADR 0010](adr/0010-bundled-engine-after-app-update.md).
+- **(a) Eine schon geladene Version kommt gebündelt wieder.** Hatte jemand genau die Version, die ein App-Update
+  mitbringt, vorher als Update geladen und war danach zur alten gebündelten zurückgegangen, stellt das App-Update
+  trotzdem auf sie um, weil ihr Eintrag bis dahin nicht als gebündelt markiert war.
+- **(b) Eine dritte Engine verliert ihren Platz als vorherige.** Jemand aktiviert eine geladene Engine D und geht zur
+  gebündelten A zurück; D ist jetzt die vorherige. Bringt ein App-Update die gebündelte Engine C, wird C aktiv und A
+  die vorherige. D ist danach über „Zur vorherigen Engine“ nicht mehr zu erreichen. Sie steht weiter in der Liste
+  der Einstellungen, die aber nur anzeigt, und eine Aktualisierung bietet nur das neueste Release des Kanals an.
+  Beim Räumen kann sie weichen, weil nichts sie mehr schützt. Gemeldet vom Code-Reviewer der Runde 18, der es als
+  mittel einstufte.
+- **Warum niedrig und offen:** Jede Aktivierung von Hand verdrängt die vorherige Engine auf dieselbe Weise; der Weg
+  zurück reicht in diesem Modell genau einen Schritt, und das App-Update ist selbst eine ausdrückliche Handlung. Eine
+  beliebige installierte Engine gezielt zu aktivieren wäre eine neue Funktion mit derselben Bestätigung wie der
+  Rollback (S7), keine Korrektur der Umstellung, und ist deshalb eine Frage an den Nutzer. Für (b) fehlt ein Test;
+  `anAppUpdateMakesItsBundledEngineActiveOnceAndKeepsTheOldOneAsTheWayBack` setzt nie eine vorherige Engine.
+
+### 47. Eine aktivierte Engine wird nach einem App-Update nicht neu gegen die Laufzeit geprüft (niedrig, unbestätigt)
+
+- **Stelle:** `EngineUpdateManager.active`; `verifyRuntimeCompatibility` läuft nur in `stage`, `activate` und
+  `ensureBundledLocked`.
+- **Voraussetzung:** Eine selbst aktivierte heruntergeladene Engine und ein App-Update, das Python oder die
+  JavaScript-Laufzeit ändert.
+- **Unbestätigt:** Ob eine yt-dlp-Version mit einer neueren gebündelten Laufzeit tatsächlich scheitert, ist nicht
+  geprüft; yt-dlp unterstützt mehrere Python-Versionen. Scheitert sie, zeigen es die Extraktionsfehler, und
+  „Zur vorherigen Engine“ oder ein Update hilft. Zum Schließen: `active()` prüft nach einem Versionswechsel der App
+  einmal die Laufzeit, mit Test. Aufgenommen in Runde 17.
+
+### 48. `stage` fragt die Referenzen vor dem Download und beim Räumen getrennt (niedrig)
+
+- **Stelle:** `EngineUpdateManager.stage`: `ensureRoomLocked(update.sha256, remove = false)` vor dem Download,
+  `materializeSlot` mit `ensureRoomLocked(installation.id, remove = true)` danach. `JobCoordinator.retry` gibt einem
+  Versuch „Nur Fehlendes“ die Engine seines Vorgängers, ohne den Manager zu fragen.
+- **Voraussetzung:** Fünf belegte Slots, von denen genau eine Installation entbehrlich ist, und ein Auftrag mit
+  Teilergebnis, dessen letzter STT-Versuch an genau diese gebunden war.
+- **Ablauf:** Der Trockenlauf findet Platz. Während des gedrosselten Downloads, 64 KiB je Sekunde, entsteht für diesen
+  Auftrag ein Versuch „Nur Fehlendes“. Er ist unfertig und hält die Engine seines Vorgängers, das Räumen nach dem
+  Download findet keinen Platz mehr, `stage` endet mit `SLOTS_IN_USE`, der geprüfte Download ist verworfen, und
+  entfernt ist nichts.
+- **Warum es heute kaum eintritt:** Update und Wiederholung laufen beide über `MainViewModel.action`, dessen Sperre
+  eine Aktion zurzeit zulässt, und `stageAndActivate` hält sie über den ganzen Download. Die Sperre gehört aber zu
+  einem View-Model. `MainActivity` hat den Startmodus `standard` und nimmt geteilte Texte an; eine zweite Instanz
+  mit eigenem View-Model, etwa nach dem Teilen aus einer anderen App, ist deshalb nicht ausgeschlossen, am Gerät
+  geprüft ist sie nicht. Jeder andere neue Versuch einer YouTube-Quelle fragt den Manager nach der aktiven Engine und
+  wartet, bis `stage` ihn freigibt, oder übernimmt als Rückfall auf STT die Engine eines Untertitelversuchs, der sie
+  in diesem Moment noch hält.
+- **Warum es offen bleibt:** Der Ausgang ist sicher und hat einen eigenen Text; er kostet den Download. Die Referenzen
+  unter der Sperre des Managers festzuhalten hieße, dass Aufträge für ihre Schreibzugriffe in Room auf den Manager
+  warten. Gemeldet vom Code-Reviewer der Runde 18; [ADR 0009](adr/0009-engine-slot-cleanup.md) nennt den Fall.
+
+### 49. Eine Vorschau hält ihre Engine nicht (niedrig)
+
+- **Stelle:** `JobCoordinator.inspect` gibt `engines.file(engines.active())` an `extractor.resolve`, ohne einen Versuch
+  anzulegen; `EngineReferences.inUse` kennt nur Versuche.
+- **Was es bräuchte:** Während yt-dlp für die Vorschau läuft, müsste deren Engine weder aktiv noch vorherig werden und
+  dann beim Räumen weichen, also zwei Aktivierungen und ein Räumen während eines einzigen Aufrufs.
+- **Warum es heute kaum eintritt:** `inspect` und `prepareAgain` laufen unter derselben Sperre von
+  `MainViewModel.action` wie `stageAndActivate` und `rollback`, und nur diese beiden aktivieren, gehen zurück oder
+  räumen für ein Update. Umstellung und Räumen nach einem App-Update geschehen im ersten Aufruf des Managers im
+  Prozess, und `inspect` fragt `engines.active()`, bevor es die Datei nimmt. Eine zweite Instanz der Aktivität mit
+  eigenem View-Model hebt die Sperre auf wie in Punkt 48; die zwei Aktivierungen müssten dann dort während eines
+  einzigen Aufrufs von yt-dlp geschehen.
+- **Warum es trotzdem hier steht:** Die Sicherheit hängt an einer Sperre des View-Models, nicht am Manager. Ein
+  künftiger Aufrufer von `stage`, `activate` oder `rollback` außerhalb dieser Sperre, etwa ein Update im Hintergrund,
+  öffnet das Fenster. Gemeldet vom Code-Reviewer der Runde 18.
+
+### 50. Instrumentierungstests reihen Arbeit in den WorkManager der App ein (niedrig, heute folgenlos)
+
+- **Stelle:** `ensureWorkManager` in `AppPipelineTest`, `BatchCreationTest`, `EngineJobPinningTest`,
+  `ParallelJobsTest`, `ProcessRecoveryTest` und `ViewModelStateTest` unter `app/src/androidTest/java/app/sourcescribe/`;
+  `SourceScribeApplication` als `Configuration.Provider`.
+- **Was geschieht:** Die Tests laufen im Prozess der App. `WorkManager.getInstance` liefert dort die Instanz der App
+  mit ihrer Datenbank `androidx.work.workdb`, weil die Anwendung selbst die Konfiguration liefert; der Rückfall auf
+  `WorkManagerTestInitHelper` im `catch` wird deshalb nie erreicht. Jede Testumgebung baut einen eigenen
+  `JobCoordinator` mit eigener Room-Datenbank, reiht aber über denselben Code Arbeit unter `attempt:<id>` und
+  `exports:<id>` in diese Datenbank ein. Eine Kopie vom 14. September, 01:47, enthielt 235 abgeschlossene Einträge,
+  176 erfolgreich und 59 abgebrochen; wie viele davon aus Tests stammen, ist nicht gezählt.
+- **Warum heute folgenlos:** Die Ids sind zufällige UUIDs, und die Tests brechen beim Aufräumen nur Arbeit mit den
+  Tags ihrer eigenen Aufträge ab. Ein Worker, dessen Versuch in der Datenbank der App nicht existiert, findet ihn
+  nicht und endet ohne Wirkung mit `Result.success()` (`AcquisitionWorker.doWork`, `SourceScribeDao.claim`). Die
+  Eingabedaten tragen nur die Versuchs-Id. Stirbt ein Testlauf vor dem Aufräumen, kann solche Arbeit später im
+  Prozess der App laufen, ebenso ohne Wirkung; beobachtet ist das nicht.
+- **Warum es offen bleibt:** Getrennt wäre es mit einer eigenen WorkManager-Instanz für Tests, etwa über
+  `WorkManagerTestInitHelper` mit einer eigenen Test-Anwendung, und das ändert, wie diese Klassen ihre Worker
+  ausführen. Gefunden in Runde 18 beim Lesen der App-Daten auf `emulator-5556`; nachgelesen hat es ein Hilfsagent,
+  die tragenden Stellen sind nachgeprüft.
 
 ## Bewusste Entscheidungen, die wie Fehler aussehen
 
@@ -665,13 +897,31 @@ modelliert waren: dort gab es keinen denkbaren Erzeuger, und sie sind entfernt.
 ### Aufklappen schiebt, was darunter steht
 
 Der Invarianten-Reviewer hat in Runde 15 als Hinweis gemeldet, dass aufklappbare Elemente beim Öffnen und
-Schließen ihre Nachbarn verschieben: die Auftragskarte im Verlauf, die Einträge der Hilfe und die
-Herkunftsangaben in der Ergebnisansicht; in der Vorschau erscheinen Modell- und Schlüsselauswahl erst, wenn
-ein Anbieter gewählt ist. Das bleibt so, und die Abwägung steht hier, damit sie nicht jede Runde neu gemeldet
+Schließen ihre Nachbarn verschieben: die Auftragskarte im Verlauf, die Einträge der Hilfe, die
+Herkunftsangaben in der Ergebnisansicht und in den Auftragseinstellungen über „Quelle prüfen“ der Hinweis
+`no_provider_help`, der verschwindet, sobald ein Schlüssel gewählt ist. Bis Runde 16 stand hier als vierte
+Stelle, dass in der Vorschau Modell- und Schlüsselauswahl erst mit einem Anbieter erscheinen. Das ist eine
+andere Stelle als die genannte, und auch sie liegt in den Auftragseinstellungen, nicht in der Vorschau;
+gefunden vom Konsistenz-Reviewer der Runde 16. Vollständig ist keine dieser Aufzählungen: Die
+Expertenoptionen klappen auf dieselbe Weise auf, und weitere bedingt eingeblendete Blöcke sind nicht
+gezählt. Das bleibt so, und die Abwägung steht hier, damit sie nicht jede Runde neu gemeldet
 wird. Diese Datei liest die Regel, dass nichts springt, als Regel gegen Bewegung, die niemand ausgelöst hat:
 eine Zeile, die wächst, während jemand liest oder etwas anderes bedient. Hier ändert sich der Platz dort, wo
 gerade getippt wurde, und zeigt, worum gebeten wurde; Platz für eingeklappten Inhalt freizuhalten, hebt das
-Einklappen auf. Wer das anders entscheidet, ändert alle vier Stellen zugleich.
+Einklappen auf. Wer das anders entscheidet, zählt die Stellen zuerst vollständig und ändert sie zugleich.
+
+### Nach einem Prozesstod zeigen die Auftragsfelder den Entwurf, nicht den getippten Text
+
+Der Code-Reviewer der Runde 16 hat gemeldet, dass ein über `rememberSaveable` geretteter Text nach dem Tod des
+Prozesses sofort wieder verschwand. Seit den Epochen ist das gewollt. Der Entwurf lebt nur im View-Model und ist mit
+dem Prozess fort; das neue View-Model hat eine neue Sitzungskennung, und ein Feld zeigt dann, was der Entwurf hält,
+also die gespeicherten Vorgaben. Den geretteten Text zu zeigen hieße, einen Wert anzuzeigen, mit dem kein Auftrag
+starten würde, denn der Start liest den Entwurf und nicht das Feld.
+Am Gerät geprüft in Runde 18, auf dem Stand von `39a1cdc`: `0.5` ins Budgetfeld getippt, die App in den
+Hintergrund geschickt, ihr Prozess beendet (`am kill`, danach lief keiner mehr) und die App gestartet, wie es der
+Launcher tut. Danach war das Feld leer und zeigte nicht `0.5`.
+Wer getippte Werte über einen Prozesstod retten will, rettet den Entwurf, etwa über `SavedStateHandle`, nicht den
+Text eines Feldes.
 
 ## Wartungshinweise, die keine Defekte sind
 
@@ -741,6 +991,25 @@ ein zweites Mal, diesmal mit 523 MB frei, und der Prüflauf brach wie vorgesehen
 `adb shell pm trim-caches 4G` und das Deinstallieren von `app.sourcescribe.extractor.test` brachten `/data`
 von 609 MB auf 933 MB frei. Für die Wiederholung des `extractor`-Laufs am selben Abend kam das Testpaket
 zurück; danach waren 607 MB frei. Die zweite gescheiterte Installation hatte bei 523 MB stattgefunden.
+
+Seit dem 12. September, als der Play Store auf `emulator-5556` vorinstallierte Apps aktualisiert hat, reicht der Platz
+dort nicht mehr, um die Testpakete über ihre alten Fassungen zu installieren. Die Prüfskripte deinstallieren deshalb
+vor jeder Installation beide Testpakete, `app.sourcescribe.extractor.test` und `app.sourcescribe.debug.test`, nie
+die App selbst: Das löschte ihre Einstellungen und ihren Verlauf. In Runde 18 stieg der freie Platz damit von 565 MB
+auf 886 MB und lag nach den drei Installationen bei 560 MB.
+
+### Die Debug-App auf `emulator-5556` trägt Einstellungen aus Tests
+
+Bis Runde 18 haben Instrumentierungstests die Einstellungen von `app.sourcescribe.debug` geschrieben, zuletzt am
+14. September 2026 um 00:47. Die Datei `files/datastore/settings.preferences_pb` hält seitdem nur STT, Groq mit
+`whisper-large-v3`, den Fachbegriff `mutated-default`, zwei parallele Aufträge, das Systemdesign, 2 GiB
+Speichergrenze und keine Voreinstellung. Zurückgesetzt ist nichts, weil niemand weiß, was vorher darin stand, und die
+App zu deinstallieren löschte auch den Verlauf. Wer an diesem Gerät etwas prüft, das von Einstellungen abhängt, liest
+sie zuerst. Ob ein Lauf sie ändert, zeigt ihr SHA-256 davor und danach:
+
+```bash
+adb -s emulator-5556 exec-out run-as app.sourcescribe.debug cat files/datastore/settings.preferences_pb | sha256sum
+```
 
 ### Abhängigkeitsprüfung nach jedem Versionswechsel neu erzeugen
 

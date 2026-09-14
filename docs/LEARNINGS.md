@@ -1,6 +1,6 @@
 # Lernprotokoll für die Wiederaufnahme
 
-Stand: 8. September 2026. Fehlversuche und Korrekturen im
+Stand: 14. September 2026. Fehlversuche und Korrekturen im
 [Integrationsbericht](reports/2026-09-07-integration.md) und
 [Previewbericht](reports/2026-09-08-preview.md); hier wiederverwendbare Folgerungen.
 
@@ -53,3 +53,31 @@ Stand: 8. September 2026. Fehlversuche und Korrekturen im
 - **Nicht waehrend eines laufenden Builds im Repository editieren.** Eine Zeichenkette, die nach der
   R-Generierung eingefuegt wurde, liess `compileDebugKotlin` an einer `Unresolved reference` scheitern,
   die es zu diesem Zeitpunkt gar nicht mehr gab. Aenderungen sammeln und zwischen zwei Laeufen anwenden.
+- **„Internal error: Unexpected lint invalid arguments“ kann Speichermangel sein.** In Runde 16 endete ein Lintlauf
+  so; im Kernelprotokoll von WSL stand eine fehlgeschlagene Seitenanforderung beim Lesen eines Verzeichnisses über
+  9p. Ein zweiter Lauf, nachdem der Speicher wieder frei war, lief durch. Nicht den Code verdächtigen, sondern
+  `free -m` und `dmesg` lesen und die Gradle-Aufrufe teilen.
+- **Lint vor jedem Commit einer UI-Änderung.** `1b2dc45` ging mit einem Lintfehler (`ModifierParameter`) in den
+  Baum, weil Lint erst im Gate danach lief.
+- **K2 zieht Smart-Casts durch lokale Boolean-`val`s.** Stammt `existingHealthy` aus `existing?.healthy == true`,
+  gilt `existing` hinter `existingHealthy && …` als nicht null, und ein `existing?.bundled` dort ist die Warnung
+  „Unnecessary safe call“, mit `allWarningsAsErrors` ein Buildfehler. Die Bedingung so ordnen, dass der sichere
+  Aufruf vor der Prüfung steht.
+- **Keine Instrumentierung neben einem Gradle-Build.** In Runde 17 scheiterte ein Test der Gegenprobe an
+  `native_runtime:TIMED_OUT`, dem Selbsttest der Laufzeit mit 30 Sekunden, während daneben ein Build in WSL anlief;
+  mit derselben Test-APK ohne Build bestand er. Bewiesen ist die Ursache nicht, aber eine Gegenprobe, die an Last
+  scheitert, belegt nichts.
+- **`preferencesDataStore` bindet einmal je Prozess.** Der Delegat legt einen DataStore an, auf den Dateien des
+  Kontexts, mit dem er zuerst benutzt wird, und jeder spätere Kontext bekommt denselben. Wer einen Store je Kontext
+  braucht, baut ihn mit `PreferenceDataStoreFactory` und hält je Datei genau einen; DataStore verbietet zwei.
+- **Eine Kontextattrappe hält die Verträge des Originals.** `Context.getFilesDir` legt sein Verzeichnis an. Eine
+  Attrappe, die das nicht tat, ließ `File.usableSpace` 0 melden, und die Speicherprüfung sah eine volle Platte, in
+  sieben Tests zugleich.
+- **`Context.deleteDatabase` entfernt keine `.lck`-Datei.** Laut AOSP-Quelltext von
+  `SQLiteDatabase.deleteDatabase` löscht es die Datenbank, `-journal`, `-shm`, `-wal`, eine Prüfdatei des
+  Frameworks und `-mj`-Dateien, nicht aber die Sperrdatei `<name>.lck`, die neben den Datenbanken der
+  Migrationstests lag. In der Gegenprobe der Runde 18 blieben genau diese zwei Dateien zurück, als nur ihr eigenes
+  Löschen fehlte. Wer Testdatenbanken aufräumt, löscht sie selbst und prüft danach, dass nichts mit ihrem Namen
+  bleibt.
+- **Ein Prüfskript trägt sein Urteil im Exitcode.** `r16_typing.py` meldete in Runde 17 einen abweichenden Fall und
+  endete mit 0; wer nur den Exitcode liest, hätte den Lauf als bestanden gezählt.
