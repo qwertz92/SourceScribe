@@ -116,7 +116,8 @@ def _tracked_paths(root: Path) -> list[Path]:
         )
     except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
         return _filesystem_paths(root)
-    return [root / item for item in result.stdout.decode().split("\0") if item]
+    # During a merge git lists a conflicted path once per side, and each would be read and counted again.
+    return [root / item for item in dict.fromkeys(result.stdout.decode().split("\0")) if item]
 
 
 def _filesystem_paths(root: Path) -> list[Path]:
@@ -274,7 +275,9 @@ def _check_executable_scripts(root: Path, tally: Tally) -> list[Issue]:
     Git keeps one permission of a file, whether it may run, and a checkout on Linux or macOS restores it.
     `0f6db67` took it from this file, because the script that staged that commit wrote every file as
     100644, and nothing noticed: every documented call starts with `python3`. A shebang in a `src`
-    directory belongs to a resource such as the packed yt-dlp, which nothing runs from the tree.
+    directory belongs to a resource such as the packed yt-dlp, which nothing runs from the tree. A path in
+    the middle of a merge has an index entry per side and conflict markers in the tree, so neither the mode
+    nor the first line that will be committed is known yet; such a path is flagged once and not counted.
     """
     try:
         result = subprocess.run(
@@ -288,12 +291,18 @@ def _check_executable_scripts(root: Path, tally: Tally) -> list[Issue]:
         return []
     issues: list[Issue] = []
     scripts = 0
+    unmerged: set[str] = set()
     for entry in result.stdout.decode().split("\0"):
         if not entry:
             continue
         details, path = entry.split("\t", 1)
-        mode = details.split(" ", 1)[0]
+        mode, _, stage = details.split(" ")
         if mode not in ("100644", "100755") or "src" in Path(path).parts or _skipped(Path(path)):
+            continue
+        if stage != "0":
+            if path not in unmerged:
+                unmerged.add(path)
+                issues.append(Issue(path, None, "unmerged in the git index, so its mode cannot be checked"))
             continue
         try:
             with (root / path).open("rb") as handle:
@@ -396,7 +405,9 @@ def _self_test() -> None:
         # thing this counter exists to make visible.
         assert tally == Tally(scanned=11, binary=1), str(tally)
     # Modes live in the git index, so this part builds one: a script git may run, one it may not, a file without a
-    # shebang and a shebang under src/, of which only the second is flagged.
+    # shebang and a shebang under src/, of which only the second is flagged. Then two paths in the middle of a merge,
+    # with an index entry per side, one of them with its conflict in the shebang line: each is flagged once as
+    # unmerged, read once, and counted as no script.
     with tempfile.TemporaryDirectory(prefix="sourcescribe-modes-") as directory:
         root = Path(directory)
         (root / "tools").mkdir()
@@ -405,18 +416,35 @@ def _self_test() -> None:
         (root / "tools/stopped.py").write_bytes(b"#!/usr/bin/env python3\n")
         (root / "tools/notes.txt").write_bytes(b"no shebang\n")
         (root / "src/main/res/raw/packed").write_bytes(b"#!/usr/bin/env python3\n")
-        for arguments in (
-            ["init", "-q"],
-            ["add", "--", "."],
-            ["update-index", "--chmod=+x", "--", "tools/runs.sh"],
-            ["update-index", "--chmod=-x", "--", "tools/stopped.py", "src/main/res/raw/packed"],
-        ):
-            subprocess.run(["git", "-C", str(root), *arguments], check=True, capture_output=True, timeout=30)
+
+        def git(*arguments: str, stdin: bytes | None = None) -> bytes:
+            return subprocess.run(
+                ["git", "-C", str(root), *arguments], input=stdin, check=True, capture_output=True, timeout=30
+            ).stdout
+
+        git("init", "-q")
+        git("add", "--", ".")
+        git("update-index", "--chmod=+x", "--", "tools/runs.sh")
+        git("update-index", "--chmod=-x", "--", "tools/stopped.py", "src/main/res/raw/packed")
+        blob = git("hash-object", "-w", "--", "tools/runs.sh").decode().strip()
+        sides = "".join(
+            f"{mode} {blob} {stage}\t{path}\n"
+            for path in ("tools/conflicted.sh", "tools/marked.sh")
+            for mode, stage in (("100755", 1), ("100644", 2), ("100755", 3))
+        )
+        git("update-index", "--index-info", stdin=sides.encode())
+        (root / "tools/conflicted.sh").write_bytes(
+            b"#!/bin/sh\n<<<<<<< ours\necho one\n=======\necho two\n>>>>>>> theirs\n"
+        )
+        (root / "tools/marked.sh").write_bytes(b"<<<<<<< ours\n#!/bin/sh\n=======\n#!/bin/bash\n>>>>>>> theirs\n")
         tally = Tally()
         issues = check_repository(root, tally=tally)
         flagged = [issue.path for issue in issues if "git mode" in issue.reason]
         assert flagged == ["tools/stopped.py"], str(issues)
+        unmerged = [issue.path for issue in issues if "unmerged" in issue.reason]
+        assert unmerged == ["tools/conflicted.sh", "tools/marked.sh"], str(issues)
         assert tally.scripts == 2, str(tally)
+        assert (tally.scanned, tally.binary) == (6, 0), str(tally)
     print("PASS self-test")
 
 
