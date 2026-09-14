@@ -1,58 +1,51 @@
 # Third-party notices
 
-Stand: 7. September 2026. Dieses Dokument ist ein gezieltes Inventar der im
-aktuellen SourceScribe-Baum sichtbaren direkten Abhängigkeiten, der gebündelten
-Extractor-Artefakte und der nachgewiesenen WebP-Dateien. Es ist noch kein
-vollständiges, veröffentlichungsfertiges Lizenz- oder Corresponding-Source-
-Angebot.
+As of 14 September 2026. This is an inventory of the direct dependencies visible in the SourceScribe source tree, the
+bundled extractor artifacts and the WebP libraries built for the app. It is not yet a complete license and
+corresponding-source inventory; the open points are listed at the end.
 
-## Eigenes Projekt
+## This project
 
-Die eigenen SourceScribe-Anteile stehen nach ausdrücklicher Projektentscheidung
-unter GPL-3.0-only; der vollständige Text liegt in [`LICENSE`](LICENSE). Diese
-Projektwahl ist keine Rechtsbehauptung, dass jede UI-Zeile unabhängig von den
-konkreten Abhängigkeiten zwingend unter GPL stehen müsse. Die endgültige
-Vertriebs- und Kombinationsprüfung bleibt offen.
+SourceScribe's own code is licensed under GPL-3.0-only; the full text is in [`LICENSE`](LICENSE). That is not a legal
+claim that the bundled components force every line of the app under the GPL.
 
-## Gebündelte Extractor-Komponenten
+## Bundled extractor components
 
-| Komponente | Version/Nachweis | Lizenz-/Quellhinweis |
+| Component | Version and evidence | License and source |
 |---|---|---|
-| `youtubedl-android` AARs (`library`, `common`, `ffmpeg`) | 0.18.1; lokale AARs aus Gradle-Cache, FFmpeg-AAR SHA-256 `0a87ffa6cf912b0fe76c1a99b9107f543ee2f247935fae2c71f0822eb7bc5f49` | Die POMs nennen GPL-3.0; [Upstream-Repository](https://github.com/yausername/youtubedl-android), [POM-Lizenzreferenz](https://www.gnu.org/licenses/gpl-3.0.en.html) |
-| FFmpeg im FFmpeg-AAR | 7.1.1; Artefaktmetadaten und Buildflags `--enable-gpl --enable-version3` | [FFmpeg legal](https://ffmpeg.org/legal.html), [offizielles Release-Archiv](https://ffmpeg.org/releases/ffmpeg-7.1.1.tar.xz), erwartete Quelle SHA-256 `733984395e0dbbe5c046abda2dc49a5544e7e0e1e2366bba849222ae9e3a03b1`; bitidentische AAR-Provenienz ist nicht bewiesen |
-| x264, VMAF, SVT-AV1 und weitere FFmpeg-Codecs | Im FFmpeg-Buildpfad berührt; einzelne Corresponding-Source-/Lizenzzuordnung noch offen | x264-Quellhash ungelöst; VMAF-/SVT-Lizenzinventar unvollständig; keine Veröffentlichung daraus ableiten |
-| Python-Runtime | 3.12.11 laut untersuchtem AAR-Artefakt | [Python license](https://docs.python.org/3/license.html), PSF-2.0; gebündelte AAR-Noticeprüfung noch nicht vollständig |
-| QuickJS-Runtime | 2025-04-26 laut untersuchtem AAR-Artefakt | [QuickJS license/source](https://bellard.org/quickjs/); gebündelte Noticeprüfung noch nicht vollständig |
-| OpenSSL | Version im aktuellen AAR-Review nicht separat festgestellt | [OpenSSL license](https://www.openssl.org/source/license.html); keine Versions- oder Corresponding-Source-Zuordnung behauptet |
-| yt-dlp | Zipapp 2026.08.19, SHA-256 `1fa6733c37ea6fb51c99ad8fe785e7b7e5f3246c9b980230329d4fb72ed8d4d6` | [yt-dlp LICENSE](https://github.com/yt-dlp/yt-dlp/blob/master/LICENSE); Unlicense-Angabe aus Upstream muss mit dem konkreten Zipapp-Inhalt abgeglichen werden |
-| yt-dlp-ejs | EJS 0.8.0 im geprüften Zipapp | [EJS LICENSE](https://github.com/yt-dlp/ejs/blob/master/LICENSE); konkrete gebündelte Notice noch nicht separat archiviert |
-| Bouncy Castle | `bcpg` 1.86, `bcprov` 1.86, am 14. September 2026 von 1.85 und 1.85.2 nachgeführt | [Bouncy-Castle-Lizenz](https://www.bouncycastle.org/licence.html); JVM-Kryptobibliothek, keine native AAR-Komponente |
-| WebP | 1.6.0-rc1, zehn neu gebaute SOs für `arm64-v8a`/`x86_64`; Quellarchiv SHA-256 `a8822fbd36e43fa1e5a83a7104d86c5be8692cee1e323d57030b5562ef884a8a` | BSD 3-Clause in [`extractor/src/main/assets/webp/COPYING`](extractor/src/main/assets/webp/COPYING), ergänzend [`AUTHORS`](extractor/src/main/assets/webp/AUTHORS) und [`PATENTS`](extractor/src/main/assets/webp/PATENTS); [Upstream-Tag](https://github.com/webmproject/libwebp/tree/v1.6.0-rc1) |
+| `youtubedl-android` AARs (`library`, `common`, `ffmpeg`) | 0.18.1; local AARs from the Gradle cache, FFmpeg AAR SHA-256 `0a87ffa6cf912b0fe76c1a99b9107f543ee2f247935fae2c71f0822eb7bc5f49` | The POMs name GPL-3.0; [upstream repository at tag 0.18.1](https://github.com/yausername/youtubedl-android/tree/0.18.1), [license referenced by the POM](https://www.gnu.org/licenses/gpl-3.0.en.html) |
+| FFmpeg in the FFmpeg AAR | 7.1.1; artifact metadata and build flags `--enable-gpl --enable-version3` | [FFmpeg legal](https://ffmpeg.org/legal.html), [official release archive](https://ffmpeg.org/releases/ffmpeg-7.1.1.tar.xz), expected source SHA-256 `733984395e0dbbe5c046abda2dc49a5544e7e0e1e2366bba849222ae9e3a03b1`; that the AAR was built bit-identically from it is not proven |
+| x264, VMAF, SVT-AV1 and other FFmpeg codecs | Touched by the FFmpeg build; source and license mapping per component still open | x264 source hash unresolved; VMAF and SVT-AV1 license inventory incomplete |
+| Python runtime | 3.12.11 according to the inspected AAR artifact | [Python license](https://docs.python.org/3/license.html), PSF-2.0; review of the notices bundled in the AAR not complete |
+| QuickJS runtime | 2025-04-26 according to the inspected AAR artifact | [QuickJS license and source](https://bellard.org/quickjs/); review of the bundled notices not complete |
+| OpenSSL | Version not determined separately in the current AAR review | [OpenSSL license](https://www.openssl.org/source/license.html); no version or source mapping claimed |
+| yt-dlp | Zipapp 2026.08.19, SHA-256 `1fa6733c37ea6fb51c99ad8fe785e7b7e5f3246c9b980230329d4fb72ed8d4d6` | [yt-dlp LICENSE](https://github.com/yt-dlp/yt-dlp/blob/master/LICENSE); the upstream Unlicense statement is still to be matched against the zipapp's content |
+| yt-dlp-ejs | EJS 0.8.0 in the inspected zipapp | [EJS LICENSE](https://github.com/yt-dlp/ejs/blob/master/LICENSE); the bundled notice is not archived separately |
+| Bouncy Castle | `bcpg` 1.86, `bcprov` 1.86, updated on 14 September 2026 from 1.85 and 1.85.2 | [Bouncy Castle license](https://www.bouncycastle.org/licence.html); JVM cryptography library, not a native AAR component |
+| WebP | 1.6.0-rc1, ten newly built shared libraries for `arm64-v8a` and `x86_64`; source archive SHA-256 `a8822fbd36e43fa1e5a83a7104d86c5be8692cee1e323d57030b5562ef884a8a` | BSD 3-Clause in [`extractor/src/main/assets/webp/COPYING`](extractor/src/main/assets/webp/COPYING), plus [`AUTHORS`](extractor/src/main/assets/webp/AUTHORS) and [`PATENTS`](extractor/src/main/assets/webp/PATENTS); [upstream tag](https://github.com/webmproject/libwebp/tree/v1.6.0-rc1) |
 
-Der FFmpeg-AAR enthält keine Dateien mit `LICENSE`, `NOTICE`, `COPYING` oder
-`README`; dessen POM nennt lediglich GPL-3.0. Die WebP-Begleitdateien sind
-deshalb bewusst separat im Asset-Verzeichnis versioniert.
+The FFmpeg AAR contains no file named `LICENSE`, `NOTICE`, `COPYING` or `README`; its POM only names GPL-3.0. The
+WebP companion files are therefore versioned separately in the asset directory.
 
-## Direkte und transitive JVM-/Android-Abhängigkeiten
+## Direct and transitive JVM and Android dependencies
 
-Die Versionen stehen in [`gradle/libs.versions.toml`](gradle/libs.versions.toml)
-und wurden aus dem lokalen Gradle-Cache gegen die aufgelösten POMs betrachtet.
-Die AndroidX-, Kotlin-/kotlinx-, OkHttp-, Hilt-, Room-, WorkManager-
-und DataStore-Komponenten werden über ihre jeweiligen Apache-2.0-
-Upstreamhinweise geführt. Bouncy Castle (`bcpg` 1.86, `bcprov` 1.86) folgt der
-[Bouncy-Castle-Lizenz](https://www.bouncycastle.org/licence.html). JUnit 4.13.2
-ist test-only und folgt der [EPL 1.0](https://www.eclipse.org/legal/epl-v10.html).
+The versions are in [`gradle/libs.versions.toml`](gradle/libs.versions.toml) and were checked against the resolved POMs
+in the local Gradle cache. The AndroidX, Kotlin and kotlinx, OkHttp, Hilt, Room, WorkManager and DataStore components
+follow their upstream Apache-2.0 notices. Bouncy Castle (`bcpg` 1.86, `bcprov` 1.86) follows the
+[Bouncy Castle license](https://www.bouncycastle.org/licence.html). JUnit 4.13.2 is test-only and follows the
+[EPL 1.0](https://www.eclipse.org/legal/epl-v10.html).
 
-Die lokale Auflösung enthielt 73 paketierte transitive Artefakte und 8 von den
-Metadaten aus erreichbare externe Lizenz-/Quellverweise. Diese Zahlen sind ein
-Prüfumfang für den aktuellen Stand, keine Zusicherung, dass damit jedes
-enthaltene FFmpeg-Codec- oder Generatorartefakt vollständig erfasst ist.
+The local resolution contained 73 packaged transitive artifacts and 8 external license or source references reachable
+from the metadata. These numbers describe the scope of that check; they do not guarantee that every FFmpeg codec or
+generator artifact is covered.
 
-## Veröffentlichungsgrenze
+## Corresponding source
 
-Vor einer öffentlichen APK-Freigabe müssen Corresponding Source, Notices,
-Codec- und Lizenzzuordnung für den konkreten FFmpeg-AAR geschlossen werden.
-Insbesondere sind der x264-Quellhash sowie VMAF und SVT-AV1 noch nicht
-ausreichend belegt. Bis dahin dürfen die eigenen Source-Dateien und die
-geprüften WebP-Dateien öffentlich liegen; ein öffentliches APK-Release ist
-`BLOCKED`.
+Every GitHub release of SourceScribe carries the signed APK, and its source code is the release's tag in this
+repository. For the GPL-licensed binaries bundled from the youtubedl-android AAR:
+
+- FFmpeg 7.1.1 source: https://ffmpeg.org/releases/ffmpeg-7.1.1.tar.xz
+- Build scripts of the bundled FFmpeg, Python and QuickJS binaries: https://github.com/yausername/youtubedl-android/tree/0.18.1
+
+Still open: proof that these sources correspond exactly to the bundled binaries, the x264 source hash, and the VMAF and
+SVT-AV1 license inventory.
