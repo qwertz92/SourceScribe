@@ -86,6 +86,7 @@ class TranscriptWarningsTest {
             "MALFORMED_SEGMENTS" to WarningGroup.SEGMENT_TIMES,
             "MISSING_SEGMENT_TIMESTAMPS" to WarningGroup.SEGMENT_TIMES,
             "INCOMPLETE_SEGMENT_TIMESTAMPS" to WarningGroup.SEGMENT_TIMES,
+            "UNREADABLE_SEGMENTS" to WarningGroup.SEGMENT_TIMES,
             "MALFORMED_WORDS" to WarningGroup.WORD_TIMES,
             "MISSING_WORD_TIMESTAMPS" to WarningGroup.WORD_TIMES,
             "INCOMPLETE_WORD_TIMESTAMPS" to WarningGroup.WORD_TIMES,

@@ -394,7 +394,7 @@
     <string name="warning_section_lost_provider">Ein Abschnitt fehlt im Ergebnis, weil der Anbieter ihn nicht fertig geliefert hat.</string>
     <string name="warning_result_shortened">Es kamen mehr Daten an, als diese App verarbeitet. Der Rest fehlt im Ergebnis.</string>
     <string name="warning_missing_text">Einzelne Stellen waren unlesbar oder trugen keinen Text und fehlen im Ergebnis.</string>
-    <string name="warning_segment_times">Für einen Teil des Textes fehlen verlässliche Zeitmarken.</string>
+    <string name="warning_segment_times">Für den ganzen Text oder einen Teil davon fehlen verlässliche Zeitmarken.</string>
     <string name="warning_word_times">Für einen Teil des Textes fehlen verlässliche Zeiten je Wort.</string>
     <string name="warning_speakers">Die Sprecherzuordnung ist unvollständig.</string>
     <string name="warning_provider_language">Die Sprachangabe des Anbieters war unbrauchbar oder nicht eindeutig.</string>

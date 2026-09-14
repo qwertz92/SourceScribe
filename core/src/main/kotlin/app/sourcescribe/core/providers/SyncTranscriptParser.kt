@@ -219,7 +219,7 @@ object SyncTranscriptParser {
     ): ParsedParts {
         val rawSegments = root["segments"] as? JsonArray
         val rawWords = root["words"] as? JsonArray
-        val segments = rawSegments?.let { parseEntries(it, request, TimeEvidence.PROVIDER_SEGMENT, null, warnings) }
+        val segments = rawSegments?.let { parseSections(it, request, null, warnings) }
             .orEmpty()
         val words = rawWords?.let { parseEntries(it, request, TimeEvidence.PROVIDER_WORD, "word", warnings) }
             .orEmpty()
@@ -235,8 +235,35 @@ object SyncTranscriptParser {
         warnings: Warnings,
     ): List<Segment> {
         val rawSegments = element as? JsonArray ?: return emptyList()
-        return parseEntries(rawSegments, request, TimeEvidence.PROVIDER_SEGMENT, "speaker", warnings)
+        return parseSections(rawSegments, request, "speaker", warnings)
     }
+
+    /**
+     * The sections of a response. When not one of them can be read, [parse] falls back to the response's full text,
+     * so no passage is missing from the transcript, only its division into sections and their times. That is reported
+     * as one `UNREADABLE_SEGMENTS`, which groups with the missing timestamps. A warning per entry would group as missing
+     * text, and the reader would look for gaps that are not there (defect 18).
+     */
+    private fun parseSections(
+        entries: JsonArray,
+        request: TranscriptionRequest,
+        field: String?,
+        warnings: Warnings,
+    ): List<Segment> {
+        val readable = entries.take(MAX_SEGMENTS).any { entry ->
+            (entry as? JsonObject)?.let { entryText(it, field) } != null
+        }
+        if (entries.isNotEmpty() && !readable) {
+            warnings += "UNREADABLE_SEGMENTS"
+            return emptyList()
+        }
+        return parseEntries(entries, request, TimeEvidence.PROVIDER_SEGMENT, field, warnings)
+    }
+
+    /** The text an entry carries: its `text`, or in a word list its `word`. Null when it carries none. */
+    private fun entryText(entry: JsonObject, field: String?): String? =
+        string(entry["text"])?.takeIf { it.isNotBlank() }
+            ?: if (field == "word") string(entry["word"])?.takeIf { it.isNotBlank() } else null
 
     private fun parseEntries(
         entries: JsonArray,
@@ -260,12 +287,7 @@ object SyncTranscriptParser {
                 warnings += "MALFORMED_${if (evidence == TimeEvidence.PROVIDER_WORD) "WORD" else "SEGMENT"}_$index"
                 continue
             }
-            val text = string(objectEntry["text"])?.takeIf { it.isNotBlank() }
-                ?: if (field == "word") {
-                    string(objectEntry["word"])?.takeIf { it.isNotBlank() }
-                } else {
-                    null
-                }
+            val text = entryText(objectEntry, field)
             if (text == null) {
                 warnings += "MISSING_${if (evidence == TimeEvidence.PROVIDER_WORD) "WORD" else "SEGMENT"}_TEXT_$index"
                 continue

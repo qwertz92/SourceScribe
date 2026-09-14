@@ -12,7 +12,9 @@ import app.sourcescribe.core.ResponseSpool
 import app.sourcescribe.core.Segment
 import app.sourcescribe.core.SubmissionResult
 import app.sourcescribe.core.TimeEvidence
+import app.sourcescribe.core.TranscriptWarnings
 import app.sourcescribe.core.TranscriptionRequest
+import app.sourcescribe.core.WarningGroup
 import java.io.File
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
@@ -450,6 +452,35 @@ class SyncProviderTest {
         assertTrue(warnings.toString(), warnings.any { it.startsWith("MALFORMED_WORD_") })
         assertTrue(warnings.toString(), warnings.any { it.startsWith("MISSING_WORD_TEXT_") })
         assertFalse(result.transcript.technicallyComplete)
+    }
+
+    @Test
+    fun aResponseWhoseEverySectionIsUnreadableKeepsItsTextAndReportsOnlyTheLostSections() {
+        // Defect 18. With no readable section left, the transcript is the response's full text, so no passage
+        // is missing; the division into sections and their times are. A warning about missing text would send
+        // the reader looking for gaps that are not there. The same holds whether timestamps were asked for.
+        val raw = """
+            {
+              "text":"one two three",
+              "segments":[
+                "not an object",
+                {"start":0.5,"end":1.0,"text":""}
+              ]
+            }
+        """.trimIndent().toByteArray(StandardCharsets.UTF_8)
+        for (segmentTimestamps in listOf(false, true)) {
+            val transcript = (
+                GroqAdapter().parseSavedResponse(
+                    raw,
+                    request(Provider.GROQ, GroqAdapter.MODEL_TURBO, segmentTimestamps = segmentTimestamps, durationMs = 2_000),
+                ) as SubmissionResult.Direct
+                ).transcript
+            val groups = TranscriptWarnings.summarize(transcript.warnings).groups
+            val context = "segmentTimestamps=$segmentTimestamps ${transcript.warnings}"
+            assertEquals(context, listOf("one two three"), transcript.segments.map(Segment::text))
+            assertFalse(context, WarningGroup.MISSING_TEXT in groups)
+            assertTrue(context, WarningGroup.SEGMENT_TIMES in groups)
+        }
     }
 
     @Test

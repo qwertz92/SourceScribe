@@ -392,7 +392,7 @@
     <string name="warning_section_lost_provider">A section is missing from the result because the provider did not deliver it complete.</string>
     <string name="warning_result_shortened">More data arrived than this app processes. The rest is missing from the result.</string>
     <string name="warning_missing_text">Some places were unreadable or carried no text and are missing from the result.</string>
-    <string name="warning_segment_times">Reliable timestamps are missing for part of the text.</string>
+    <string name="warning_segment_times">Reliable timestamps are missing for all or part of the text.</string>
     <string name="warning_word_times">Reliable per-word times are missing for part of the text.</string>
     <string name="warning_speakers">The speaker labelling is incomplete.</string>
     <string name="warning_provider_language">The provider language information was unusable or not unambiguous.</string>

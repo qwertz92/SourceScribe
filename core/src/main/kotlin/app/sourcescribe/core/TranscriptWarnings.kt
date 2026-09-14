@@ -142,11 +142,13 @@ object TranscriptWarnings {
         WarningGroup.SECTION_ALIGNMENT to listOf("AUDIO_INTERVAL_GAP_OR_OVERLAP"),
 
         // Every family here keeps its text and loses only its place on the timeline. `INVALID_CHUNK_OFFSET`
-        // belongs with them: the entry is still written, its start and end are dropped.
+        // belongs with them: the entry is still written, its start and end are dropped. So does
+        // `UNREADABLE_SEGMENTS`: with no section readable, the full text of the response stands in for them.
         WarningGroup.SEGMENT_TIMES to listOf(
             "SEGMENT_TIMESTAMPS_MISSING", "MALFORMED_SEGMENTS", "INVALID_SEGMENT_TIMESTAMP",
             "OUT_OF_RANGE_SEGMENT_TIMESTAMP", "NON_MONOTONIC_SEGMENT_TIMESTAMP",
             "MISSING_SEGMENT_TIMESTAMPS", "INCOMPLETE_SEGMENT_TIMESTAMPS", "INVALID_CHUNK_OFFSET",
+            "UNREADABLE_SEGMENTS",
         ),
 
         // `MALFORMED_WORD` and `MISSING_WORD_TEXT` cost the word list an entry, and that list carries the
