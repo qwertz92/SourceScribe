@@ -26,7 +26,7 @@ Vertriebs- und Kombinationsprüfung bleibt offen.
 | OpenSSL | Version im aktuellen AAR-Review nicht separat festgestellt | [OpenSSL license](https://www.openssl.org/source/license.html); keine Versions- oder Corresponding-Source-Zuordnung behauptet |
 | yt-dlp | Zipapp 2026.08.19, SHA-256 `1fa6733c37ea6fb51c99ad8fe785e7b7e5f3246c9b980230329d4fb72ed8d4d6` | [yt-dlp LICENSE](https://github.com/yt-dlp/yt-dlp/blob/master/LICENSE); Unlicense-Angabe aus Upstream muss mit dem konkreten Zipapp-Inhalt abgeglichen werden |
 | yt-dlp-ejs | EJS 0.8.0 im geprüften Zipapp | [EJS LICENSE](https://github.com/yt-dlp/ejs/blob/master/LICENSE); konkrete gebündelte Notice noch nicht separat archiviert |
-| Bouncy Castle | `bcpg` 1.85, `bcprov` 1.85.2 | [Bouncy-Castle-Lizenz](https://www.bouncycastle.org/licence.html); JVM-Kryptobibliothek, keine native AAR-Komponente |
+| Bouncy Castle | `bcpg` 1.86, `bcprov` 1.86, am 14. September 2026 von 1.85 und 1.85.2 nachgeführt | [Bouncy-Castle-Lizenz](https://www.bouncycastle.org/licence.html); JVM-Kryptobibliothek, keine native AAR-Komponente |
 | WebP | 1.6.0-rc1, zehn neu gebaute SOs für `arm64-v8a`/`x86_64`; Quellarchiv SHA-256 `a8822fbd36e43fa1e5a83a7104d86c5be8692cee1e323d57030b5562ef884a8a` | BSD 3-Clause in [`extractor/src/main/assets/webp/COPYING`](extractor/src/main/assets/webp/COPYING), ergänzend [`AUTHORS`](extractor/src/main/assets/webp/AUTHORS) und [`PATENTS`](extractor/src/main/assets/webp/PATENTS); [Upstream-Tag](https://github.com/webmproject/libwebp/tree/v1.6.0-rc1) |
 
 Der FFmpeg-AAR enthält keine Dateien mit `LICENSE`, `NOTICE`, `COPYING` oder
@@ -39,7 +39,7 @@ Die Versionen stehen in [`gradle/libs.versions.toml`](gradle/libs.versions.toml)
 und wurden aus dem lokalen Gradle-Cache gegen die aufgelösten POMs betrachtet.
 Die AndroidX-, Kotlin-/kotlinx-, OkHttp-, Hilt-, Room-, WorkManager-, DataStore-
 und DocumentFile-Komponenten werden über ihre jeweiligen Apache-2.0-
-Upstreamhinweise geführt. Bouncy Castle (`bcpg` 1.85, `bcprov` 1.85.2) folgt der
+Upstreamhinweise geführt. Bouncy Castle (`bcpg` 1.86, `bcprov` 1.86) folgt der
 [Bouncy-Castle-Lizenz](https://www.bouncycastle.org/licence.html). JUnit 4.13.2
 ist test-only und folgt der [EPL 1.0](https://www.eclipse.org/legal/epl-v10.html).
 
