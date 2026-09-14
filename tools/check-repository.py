@@ -88,12 +88,15 @@ class Tally:
     unreadable: int = 0
     # None where no git index says which files may run, and then the closing line says that instead.
     scripts: int | None = None
+    # Paths the git index has and the tree cannot give, which the check of the scripts could not open.
+    unreadable_in_index: int = 0
 
     def __str__(self) -> str:
         modes = (
             "no git index to read file modes from"
             if self.scripts is None
-            else f"{self.scripts} scripts checked for their executable bit"
+            else f"{self.scripts} scripts checked for their executable bit, "
+            + f"{self.unreadable_in_index} paths of the git index unreadable"
         )
         return (
             f"{self.scanned} files read, {self.binary} skipped as binary, "
@@ -331,7 +334,8 @@ def _check_executable_scripts(root: Path, tally: Tally) -> list[Issue]:
     directory belongs to a resource such as the packed yt-dlp, which nothing runs from the tree. A path in
     the middle of a merge has an index entry per side and conflict markers in the tree, so neither the mode
     nor the first line that will be committed is known yet; such a path is flagged once and not counted. So is a
-    path the index has and the tree cannot give, deleted or kept out with skip-worktree, which may be a script too.
+    path the index has and the tree cannot give, deleted or kept out with skip-worktree, which may be a script too;
+    the closing line counts it as a path of the git index that could not be read.
     """
     try:
         result = subprocess.run(
@@ -363,6 +367,7 @@ def _check_executable_scripts(root: Path, tally: Tally) -> list[Issue]:
                 if handle.read(2) != b"#!":
                     continue
         except OSError:
+            tally.unreadable_in_index += 1
             issues.append(Issue(path, None, "is in the git index but cannot be read, so its mode cannot be checked"))
             continue
         scripts += 1
@@ -465,7 +470,7 @@ def _self_test() -> None:
     # shebang and a shebang under src/, of which only the second is flagged. Then two paths in the middle of a merge,
     # with an index entry per side, one of them with its conflict in the shebang line: each is flagged once as
     # unmerged, read once, and counted as no script. A script deleted from the tree after it was added cannot be read:
-    # it is flagged for that and counted as no script either.
+    # it is flagged for that, counted as no script either, and counted as a path of the git index that is unreadable.
     with tempfile.TemporaryDirectory(prefix="sourcescribe-modes-") as directory:
         root = Path(directory)
         (root / "tools").mkdir()
@@ -506,6 +511,8 @@ def _self_test() -> None:
         unreadable = [issue.path for issue in issues if "cannot be read" in issue.reason]
         assert unreadable == ["tools/gone.sh"], str(issues)
         assert tally.scripts == 2, str(tally)
+        assert tally.unreadable_in_index == 1, str(tally)
+        assert "1 paths of the git index unreadable" in str(tally), str(tally)
         assert (tally.scanned, tally.binary) == (6, 0), str(tally)
     # The notices have to name the catalogue's versions, in backticks or as a word of their own. A name the
     # catalogue does not know is left alone, and an entry outside its [versions] table is no version.
