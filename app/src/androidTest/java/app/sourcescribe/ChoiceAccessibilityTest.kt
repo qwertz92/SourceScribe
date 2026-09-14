@@ -34,7 +34,11 @@ class ChoiceAccessibilityTest {
             }
             assertTrue("Settings accessibility click failed", settings.performAction(AccessibilityNodeInfo.ACTION_CLICK))
 
-            val language = waitForNode(automation, "App language control") { node ->
+            val language = waitForNode(
+                automation,
+                "App language control",
+                nearMiss = { node -> node.isClickable && node.hasAnyLabel(APP_LANGUAGE_LABELS) },
+            ) { node ->
                 node.isClickable && node.isEnabled && node.hasAnyLabel(APP_LANGUAGE_LABELS) && node.hasAnyLabel(LANGUAGE_VALUES)
             }
             assertTrue("App language control is disabled", language.isEnabled)
@@ -56,6 +60,7 @@ class ChoiceAccessibilityTest {
     private fun waitForNode(
         automation: UiAutomation,
         description: String,
+        nearMiss: (AccessibilityNodeInfo) -> Boolean = { false },
         predicate: (AccessibilityNodeInfo) -> Boolean,
     ): AccessibilityNodeInfo {
         val deadline = SystemClock.uptimeMillis() + NODE_TIMEOUT_MS
@@ -63,7 +68,25 @@ class ChoiceAccessibilityTest {
             automation.rootInActiveWindow?.findFirst(predicate)?.let { return it }
             SystemClock.sleep(POLL_MS)
         }
-        throw AssertionError("Timed out waiting for $description")
+        // Only CI has timed out here, where nobody can look at the screen, so the message says what the window held.
+        throw AssertionError("Timed out waiting for $description; ${windowSummary(automation, nearMiss)}")
+    }
+
+    /** The nodes that nearly matched, with the state that kept them out, and the first texts of the active window. */
+    private fun windowSummary(automation: UiAutomation, nearMiss: (AccessibilityNodeInfo) -> Boolean): String {
+        val root = automation.rootInActiveWindow ?: return "no active window"
+        val misses = ArrayList<String>()
+        val queue = ArrayDeque<AccessibilityNodeInfo>().apply { add(root) }
+        var visited = 0
+        while (queue.isNotEmpty() && visited++ < MAX_NODES) {
+            val node = queue.removeFirst()
+            if (misses.size < MAX_NEAR_MISSES && nearMiss(node)) {
+                misses += "clickable=${node.isClickable} enabled=${node.isEnabled} visible=${node.isVisibleToUser} " +
+                    "texts=${node.nodeStrings().take(4)}"
+            }
+            for (index in 0 until node.childCount) node.getChild(index)?.let(queue::addLast)
+        }
+        return "near misses $misses, window ${root.packageName} shows ${root.nodeStrings().distinct().take(MAX_TEXTS)}"
     }
 
     private fun waitForLabels(automation: UiAutomation, labels: Set<String>, description: String) {
@@ -108,6 +131,8 @@ class ChoiceAccessibilityTest {
         private const val NODE_TIMEOUT_MS = 25_000L
         private const val POLL_MS = 50L
         private const val MAX_NODES = 512
+        private const val MAX_NEAR_MISSES = 5
+        private const val MAX_TEXTS = 24
         private const val GERMAN_LABEL = "Deutsch"
         private const val ENGLISH_LABEL = "English"
         private val SETTINGS_LABELS = setOf("Mehr", "More")
