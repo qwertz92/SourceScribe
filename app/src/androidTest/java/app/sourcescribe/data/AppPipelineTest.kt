@@ -1857,6 +1857,7 @@ class AppPipelineTest {
         }
 
         private fun installCaptionFixtureEngine(failure: CaptionFailure): String {
+            val version = "t05-fixture"
             val script = """
                 # SourceScribe T05 Android instrumentation fixture; never packaged in production.
                 import json
@@ -1864,6 +1865,11 @@ class AppPipelineTest {
                 import sys
 
                 video_id = "$SOURCE_VIDEO_ID"
+                # The runtime self-test an installed engine answers. The first start of an app build checks the active
+                # engine against the runtime (ADR 0012), and an engine that cannot say its version stops being healthy.
+                if "--version" in sys.argv:
+                    print("$version")
+                    sys.exit(0)
                 if "--dump-single-json" in sys.argv:
                     print(json.dumps({
                         "id": video_id,
@@ -1887,14 +1893,25 @@ class AppPipelineTest {
                     sys.exit(0)
                 sys.exit(64)
             """.trimIndent().toByteArray(Charsets.UTF_8)
-            val id = sha256(script)
+            // A zip application like the real engine, so that the runtime's EJS probe can import a version from it.
+            val engine = java.io.ByteArrayOutputStream().also { bytes ->
+                java.util.zip.ZipOutputStream(bytes).use { zip ->
+                    zip.putNextEntry(java.util.zip.ZipEntry("__main__.py"))
+                    zip.write(script)
+                    zip.closeEntry()
+                    zip.putNextEntry(java.util.zip.ZipEntry("yt_dlp_ejs/__init__.py"))
+                    zip.write("version = \"$version\"\n".toByteArray(Charsets.UTF_8))
+                    zip.closeEntry()
+                }
+            }.toByteArray()
+            val id = sha256(engine)
             val enginesDirectory = File(context.noBackupFilesDir, "engines").also { check(it.mkdirs()) }
             val slot = File(enginesDirectory, id).also { check(it.mkdirs()) }
-            File(slot, "yt-dlp").writeBytes(script)
+            File(slot, "yt-dlp").writeBytes(engine)
             val installation = JSONObject()
                 .put("id", id)
-                .put("version", "t05-fixture")
-                .put("ejsVersion", "t05-fixture")
+                .put("version", version)
+                .put("ejsVersion", version)
                 .put("channel", "STABLE")
                 .put("sha256", id)
                 .put("healthy", true)
