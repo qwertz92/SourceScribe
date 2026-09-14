@@ -1,7 +1,7 @@
 # ADR 0010 — Nach einem App-Update wird die neu gebündelte Engine aktiv
 
-Datum: 13. September 2026. Status: Implementiert in Runde 17. Welche Prüfungen gelaufen sind, steht in
-[STATUS.md](../STATUS.md).
+Datum: 13. September 2026. Status: Implementiert in Runde 17, Grenzfälle berichtigt in Runde 18. Welche Prüfungen
+gelaufen sind, steht in [STATUS.md](../STATUS.md).
 
 ## Kontext
 
@@ -26,13 +26,24 @@ Engine wie bisher (S7).
 
 ## Grenzfälle
 
-- Fehlt der gesunde Eintrag der neuen gebündelten Engine, weil die App im kurzen Fenster zwischen den zwei
-  Speicherungen in `ensureBundledLocked` abgestürzt ist oder ihr Slot die Prüfung nicht mehr besteht, wird beim
-  nächsten Start erneut umgestellt, auch wenn jemand vorher bewusst zur alten zurückgegangen war.
 - Hatte jemand genau diese Version schon als Update geladen und war danach zur alten gebündelten zurückgegangen,
   stellt das App-Update trotzdem auf sie um: Ihr Eintrag war bis dahin nicht als gebündelt markiert.
+- Stand als vorherige eine dritte Engine, von der jemand bewusst zur alten gebündelten zurückgegangen war, ist sie
+  danach nicht mehr über „Zur vorherigen Engine“ erreichbar, weil die alte gebündelte die vorherige wird. So endet
+  auch jede Aktivierung von Hand: Der Weg zurück reicht genau einen Schritt. Die Installation bleibt in der Liste,
+  bis sie beim Räumen weicht (ADR 0009).
+- Ein Absturz zwischen den zwei Speicherungen in `ensureBundledLocked` verschiebt die Umstellung nur auf den nächsten
+  Start. Dazwischen kann niemand zur alten Engine zurückgehen, weil jeder Aufruf des Managers zuerst
+  `ensureBundledLocked` durchläuft.
 
-Beides ist selten, und ein App-Update ist selbst eine ausdrückliche Handlung.
+Die ersten beiden Fälle sind selten, und ein App-Update ist selbst eine ausdrückliche Handlung.
+
+Bis Runde 18 stand hier als erster Grenzfall, nach einem solchen Absturz oder mit einem Slot, der die Prüfung nicht
+mehr besteht, werde erneut umgestellt, auch nach einem bewussten Zurückgehen. Beides stimmte nicht: Der Absturz
+lässt kein Zurückgehen dazwischen zu, und ein ungültiger Slot endete in `materializeSlot` mit `VERIFICATION`, ohne
+umzustellen, bei jedem Aufruf des Managers. Seit [ADR 0011](0011-damaged-bundled-engine-slot.md) wird er ersetzt;
+der gesunde Eintrag bleibt, und umgestellt wird nichts. Den zweiten Fall hat der Code-Reviewer der Runde 18
+gemeldet.
 
 ## Verworfene Alternativen
 

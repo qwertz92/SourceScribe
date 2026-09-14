@@ -387,7 +387,9 @@ class EngineUpdateManager internal constructor(
                 healthy = false,
                 bundled = true,
             )
-            materializeSlot(artifact, installation)
+            // Every call of this manager comes through here, so a damaged slot of this engine would stop all of them
+            // for good; the bytes just verified take its place (ADR 0011).
+            materializeSlot(artifact, installation, replaceInvalid = true)
             if (!validSlot(installation)) throw EngineUpdateException(EngineUpdateCode.VERIFICATION)
             val existing = state.installations[installation.id]
             val existingHealthy = existing?.healthy == true && state.healthyIds.contains(installation.id) &&
@@ -496,18 +498,28 @@ class EngineUpdateManager internal constructor(
         deleteHashSlot(root, id)
     }
 
-    private suspend fun materializeSlot(artifact: File, installation: EngineInstallation): Boolean {
+    /**
+     * Puts [artifact], already verified as [installation], into its hash slot and says whether it created the slot.
+     *
+     * A slot that exists but does not hold these bytes, a symbolic link in its place included, is refused with
+     * VERIFICATION, or with [replaceInvalid] replaced: the verified copy is complete before the damaged slot is
+     * removed, so the slot's path is missing only between that removal and the rename (ADR 0011).
+     */
+    private suspend fun materializeSlot(
+        artifact: File,
+        installation: EngineInstallation,
+        replaceInvalid: Boolean = false,
+    ): Boolean {
         val root = enginesDirectory()
         requireHashId(installation.id)
         val destination = File(root, installation.id)
-        if (isSymbolicLink(destination)) throw EngineUpdateException(EngineUpdateCode.VERIFICATION)
-        if (destination.exists()) {
-            if (!validSlot(installation)) {
-                throw EngineUpdateException(EngineUpdateCode.VERIFICATION)
-            }
-            return false
+        val present = isSymbolicLink(destination) || destination.exists()
+        if (present) {
+            if (validSlot(installation)) return false
+            if (!replaceInvalid) throw EngineUpdateException(EngineUpdateCode.VERIFICATION)
+        } else {
+            ensureRoomLocked(installation.id, remove = true)
         }
-        ensureRoomLocked(installation.id, remove = true)
         val temporary = File(root, ".slot-${UUID.randomUUID()}")
         if (!temporary.mkdirs()) throw EngineUpdateException(EngineUpdateCode.STORAGE)
         try {
@@ -519,6 +531,8 @@ class EngineUpdateManager internal constructor(
                 throw EngineUpdateException(EngineUpdateCode.VERIFICATION)
             }
             writeSlotMetadata(temporary, installation)
+            // deleteHashSlot removes a symbolic link itself, never what it points at.
+            if (present) deleteHashSlot(root, installation.id)
             val created = temporary.renameTo(destination)
             if (!created) {
                 if (!validSlot(installation)) {

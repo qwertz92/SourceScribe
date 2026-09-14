@@ -531,6 +531,35 @@ class EngineUpdateManagerTest {
         }
     }
 
+    @Test
+    fun aDamagedBundledSlotIsReplacedWithTheVerifiedEngineInsteadOfStoppingEveryCall() = runBlocking {
+        withIsolatedManager { harness ->
+            val bundled = harness.manager.bundled()
+            val file = File(harness.root, "engines/${bundled.id}/yt-dlp")
+
+            // Cut short while the manager that verified it is still in use, as a fault of the storage would leave it.
+            RandomAccessFile(file, "rw").use { it.setLength(it.length() / 2) }
+            assertEquals(bundled.id, harness.manager.active().id)
+            assertEquals(bundled.id, sha256(harness.manager.file(bundled)))
+
+            // A slot without its file, as an interrupted removal leaves one, found by the next start.
+            assertTrue(file.delete())
+            val restarted = newManager(harness)
+            assertEquals(bundled.id, restarted.bundled().id)
+            assertEquals(bundled.id, sha256(restarted.file(bundled)))
+
+            // A symbolic link in the file's place goes, and what it points at stays as it was.
+            val outside = File(harness.root, "outside-the-slot").also { it.writeText("not an engine") }
+            assertTrue(file.delete())
+            Files.createSymbolicLink(file.toPath(), outside.toPath())
+            assertEquals(bundled.id, newManager(harness).active().id)
+            assertEquals("not an engine", outside.readText())
+            assertTrue(file.isFile && !Files.isSymbolicLink(file.toPath()))
+            assertEquals(bundled.id, sha256(file))
+            assertNoUpdateTemporaryDirectories(harness)
+        }
+    }
+
     private suspend fun withIsolatedManager(block: suspend (Harness) -> Unit) {
         requireEnabled()
         NativeRuntime(context).initialize()
