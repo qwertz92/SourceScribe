@@ -3,10 +3,11 @@
 **Stand:** 14. September 2026. **Freigabe:** Persönliche Preview; vollständige v1 weiterhin blockiert.
 Der Preview-Abschluss vom 8. September steht unten; seither ist die Nutzerrückmeldung vom
 10. September eingearbeitet, siehe den nächsten Abschnitt. **Die Testzahlen weiter unten in diesem
-Abschnitt sind der Stand vom 8. September und nicht der heutige.** Heute, nach Runde 18, sind es 182
-JVM-Tests im Modul `core`, 207 Instrumentierungstests im Modul `app` und 48 im Modul `extractor`,
-zusammen 437, davon 431 ausgeführt; die Runde-11-Passage sagt, warum die Tests im Modul `extractor` zehn
-Runden lang in keiner Gate-Meldung vorkamen. Diese Zahlen standen bis Runde 14 unter dem Wort „Heute“ auf dem Stand der
+Abschnitt sind der Stand vom 8. September und nicht der heutige.** Heute, nach Runde 19, sind es 182
+JVM-Tests im Modul `core`, 207 Instrumentierungstests im Modul `app` und 49 im Modul `extractor`,
+zusammen 438, davon 432 ausgeführt, die Module `core` und `app` zuletzt im Gate der Runde 18; die
+Runde-11-Passage sagt, warum die Tests im Modul `extractor` zehn Runden lang in keiner Gate-Meldung vorkamen.
+Diese Zahlen standen bis Runde 14 unter dem Wort „Heute“ auf dem Stand der
 zwölften Runde — die Gate-Zahlen einer Runde stehen in ihrer eigenen Passage, und dieser Satz oben muss
 mitwandern. Eine Testzahl, die als heutige gelten soll, gehört nur hierher. App-Quellstand ist die Spitze
 von `main`, CI-Diagnose `f9d4f8b`, lokales `main` und öffentliches
@@ -1459,6 +1460,102 @@ zeigte sich erst beim Lesen der Stellen, die die ADRs nennen. Und eine Testisoli
 den Kontext fragt, den der Test ihm gibt, und eine Attrappe muss die Verträge des Originals halten: Der Delegat der
 Einstellungen kannte nur den ersten Kontext, und die Korrektur brach sieben Nachbartests, weil ihre Attrappe ein
 Verzeichnis nannte, das es nicht gab.
+
+### Runde 19
+
+Gelesen haben die vier Commits der Runde 18 ein Code- und ein Invarianten-Reviewer auf einem Export von
+`39a1cdc` und den Doku-Commit `51329fb` ein Konsistenz-Reviewer auf einem Export dieses Commits. Alle drei
+liefen als `claude-sonnet-5`, abgelesen an den Antworten in ihren Transkripten. Eine Unterbrechung der Sitzung
+durch ein Windows-Update traf die ersten beiden; beide liefen aus ihren Transkripten weiter.
+
+**ADR 0010 sagte zu viel über `ensureBundledLocked`.** Code-Reviewer, niedrig. ADR 0010 begründete, warum nach einem
+Absturz zwischen den zwei Speicherungen niemand zur alten Engine zurückgehen kann, damit, dass jeder Aufruf des
+Managers zuerst `ensureBundledLocked` durchlaufe. `check()` und `discardUnhealthyCandidate()` tun das nicht; beim
+Nachprüfen kam `file()` hinzu, und derselbe Satz stand in einem Kommentar in `ensureBundledLocked`. ADR 0011 zählte die
+sieben Aufrufe, die es durchlaufen, richtig auf, nannte sie aber „jeden Aufruf des Managers“. Die Folgerung hält,
+weil `rollback()` und `activate()` es durchlaufen. Berichtigt in beiden ADRs und im Kommentar (`3fc97aa`).
+
+**Das Ersetzen eines beschädigten Slots ließ den Pfad der Engine kurz fehlen.** Code-Reviewer, mittel. `validSlot`
+wertet jede Ausnahme als ungültig, auch einen Lesefehler beim Hashen einer intakten Datei, und seit `89eecad`
+ersetzt `ensureBundledLocked` einen ungültigen Slot, indem es ihn entfernt und die geprüfte Kopie an seine Stelle
+umbenennt. Ein Auftrag, der yt-dlp genau dazwischen über seinen Pfad startet, scheitert, und bis zu vier Aufträge
+dürfen gleichzeitig laufen. Jetzt nimmt die geprüfte Datei mit einer einzigen Umbenennung den Platz der alten im
+Verzeichnis des Slots ein, `Files.move` mit `ATOMIC_MOVE` und `REPLACE_EXISTING`, die Metadaten mit einer zweiten;
+wer den Pfad öffnet, findet die alte oder die neue Datei (`a1a5af1`,
+[ADR 0011](adr/0011-damaged-bundled-engine-slot.md)). Entfernt und neu angelegt wird der Slot nur noch, wo an seiner
+Stelle kein Verzeichnis steht, ein Teil seines Pfads eine symbolische Verknüpfung ist oder statt der Datei ein
+Verzeichnis darin liegt, und einen solchen Slot lehnt `file()` ab; außerdem, wenn die Umbenennung über eine intakte
+Datei scheitert. Den letzten Fall ließ die erste Fassung des ADR aus; aufgefallen ist das beim Schreiben dieser
+Passage, vor dem Commit. Der Test des beschädigten Slots legt jetzt eine Datei neben die Engine, die jede Reparatur
+überstehen muss, und ersetzt zuletzt den ganzen Slot durch eine symbolische Verknüpfung auf ein Verzeichnis mit einer
+falschen `yt-dlp`: Die Verknüpfung weicht, das Verzeichnis bleibt, wie es war.
+
+**`stage` lehnte einen beschädigten Slot ab, ohne dass ein Test es zeigte.** Invarianten-Reviewer, Testlücke.
+ADR 0011 sagte, für diesen Weg gebe es keinen deterministischen Test, weil eine gültige Signatur zu einem echten
+Release gehöre. Die gebündelte Engine ist selbst eines:
+`stageRefusesADamagedSlotOfTheEngineItDownloadedInsteadOfReplacingIt` liefert sie `stage` über eine Attrappe des
+Netzes, kürzt die Datei im Slot, sobald `stage` die Engine anfragt, und verlangt `VERIFICATION`, die drei Anfragen in
+ihrer Reihenfolge, den Slot weiter beschädigt und keine temporären Verzeichnisse; erst der nächste Aufruf, der die
+gebündelte Engine einrichtet, repariert ihn (`fbd83ce`).
+
+**STATUS stand drei Runden zurück.** Invarianten-Reviewer, mittel. ADR 0009 und ADR 0011 verweisen für ihre
+Prüfungen hierher, und dieses Dokument endete bei Runde 15. Geschlossen mit `51329fb`.
+
+**Nicht bestätigt hat sich, dass die Aufräumregel in `MigrationTest` einen Testfehler verdeckt.** Code-Reviewer, als
+mittel gemeldet. Er beschrieb `ExternalResource` mit `after()` in einem `finally`, dessen Ausnahme die des Tests
+ersetzt; so war es in JUnit 4.12. In 4.13.2, das das Projekt nutzt (`gradle/libs.versions.toml`), sammelt die Regel
+beide Ausnahmen und wirft sie zusammen als `MultipleFailureException`.
+
+**Offen und eingetragen:** [Punkt 51](DEFECTS.md), die Migrationstests legen ihre Datenbanken im Datenbankverzeichnis
+der App an (Invarianten-Reviewer, niedrig), und [Punkt 52](DEFECTS.md), `SettingsStore` sucht seinen DataStore im
+Konstruktor und hält je Datei einen für den ganzen Prozess (Code-Reviewer, zwei niedrige Funde). Ein Detail des
+zweiten stimmte nicht: Der ersetzte Delegat fragte `Context.getFilesDir()` nicht im Konstruktor, sondern erst, wenn
+DataStore die Datei zum ersten Mal brauchte. Ohne Test bleiben die drei Lücken, die der Code-Reviewer nannte: eine
+symbolische Verknüpfung auf eine Verknüpfung an der Stelle des Slots, ein Lesefehler beim Hashen einer intakten Datei
+und zwei gleichzeitige Aufrufer des Managers, die das Fenster treffen. Sie stehen in der Jagdliste.
+
+**Zeilenangaben in DEFECTS zeigten auf anderen Code.** Konsistenz-Reviewer, mittel und niedrig. Punkt 40 nannte für
+`file()` und `validSlot` zwei Zeilen, die in `rollback` und `ensureRoomLocked` lagen, Punkt 42 für `shareArtifact`
+und `shareDiagnostics` zwei, auf denen `retryExport` und `showLicenses` standen. Von den dreizehn Zeilenangaben der
+Datei zeigten beim Nachprüfen acht auf anderen Code, auch in Punkt 4 und Punkt 11. Die Punkte nennen jetzt Funktionen
+oder zitieren den Ausdruck (`1ef195d`), und `tools/check-repository.py` weist Zeilennummern in Markdown unter
+`docs/` ab, in den drei Formen, die DEFECTS benutzte (`0f6db67`). Sonst fand der Konsistenz-Reviewer nichts;
+nachgezählt hat er unter anderem die Testzuwächse jeder Runde je Modul, die Summen im Kopf und zwanzig zitierte
+Commits.
+
+**Gegenprobe der Runde 19.**
+Zurückgenommen, was die neuen Tests der Runde 19 festhalten, auf dem Stand von `0f6db67`: zwei Builds für das
+Modul `extractor`, danach der committete Stand neu gebaut und installiert; kein Build lief neben einem Gerätelauf.
+Jeder Lauf hatte dieselben neun Tests aus `EngineUpdateManagerTest` und `NativeRuntimeTest`, von denen nur die
+betroffenen fallen durften. So kam es in beiden Sätzen.
+
+- Satz 1, `stage` ersetzt einen beschädigten Slot der geladenen Engine, wie es `ensureBundledLocked` tut, und das
+  Entfernen einer symbolischen Verknüpfung löscht auch die Datei `yt-dlp` in ihrem Ziel: genau
+  `stageRefusesADamagedSlotOfTheEngineItDownloadedInsteadOfReplacingIt`, dem die erwartete `EngineUpdateException`
+  fehlte, und der Test des beschädigten Slots, der die falsche `yt-dlp` im Ziel der Verknüpfung nicht mehr fand.
+- Satz 2, ein beschädigter Slot wird immer entfernt und die Kopie an seine Stelle umbenannt, wie in Runde 18: genau
+  der Test des beschädigten Slots, dem die Datei neben der Engine fehlte.
+
+Die Regel gegen Zeilennummern weist in der Fassung von `docs/DEFECTS.md` vor `1ef195d` zwölf Zeilen ab, die
+zusammen dreizehn Zeilenangaben tragen, und sonst nichts. Ohne die Regel scheitert ihr Selbsttest, weil er in seiner
+Testdatei keine der drei Zeilen abweist. Vor und nach den Geräteläufen hatte die Einstellungsdatei der App denselben
+SHA-256.
+
+**Gates der Runde 19.**
+Runde 19 ändert das Modul `extractor`, seine Tests, `tools/check-repository.py` und die Doku. Gelaufen sind Build und
+beide Lintberichte des Moduls `extractor`, beide ohne Befund, `tools/check-repository.py` mit Selbsttest, auch nach
+der neuen Regel, und die ganze Suite des Moduls auf `emulator-5556`: **49 Tests**, 45 bestanden, 4 per Annahme
+übersprungen, dieselben vier wie nach Runde 18, 0 Fehler. Runde 19 hat im Modul `extractor` einen Test hinzugefügt.
+Die Suite lief auf dem Stand vor den Commits, nachgeprüft über einen Fingerabdruck des Diffs. Die letzte Änderung
+davor betraf nur einen Kommentar: Der Build danach übersetzte das Modul neu, fand die Klassen unverändert und baute
+die Test-APK nicht neu. Die Module `core` und `app` sind in Runde 19 unverändert und liefen zuletzt im Gate der
+Runde 18; `app` hängt vom Modul `extractor` ab. Vor und nach dem Lauf hatte die Einstellungsdatei der App denselben
+SHA-256.
+
+**Die Schleife ist nicht konvergiert.** Neunzehn Runden, keine davon leer. Runde 19 fügt zwei Dinge hinzu. Ein Fund
+über das Verhalten einer Bibliothek gilt nur für die Version, die er beschreibt: Der Reviewer beschrieb JUnit 4.12,
+das Projekt nutzt 4.13.2. Und eine Korrektur, die ein Fenster schließt, zählt auf, wo es offen bleibt; die erste
+Fassung des ADR für das Ersetzen im Slot ließ einen Fall aus.
 
 ## UI-Feedback umgesetzt
 

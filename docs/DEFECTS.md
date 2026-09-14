@@ -1,6 +1,6 @@
 # Bekannte Probleme und offene Punkte
 
-**Stand:** 14. September 2026, nach achtzehn Runden adversarischer Reviews. Diese Datei ist für den
+**Stand:** 14. September 2026, nach neunzehn Runden adversarischer Reviews. Diese Datei ist für den
 nächsten Agenten gedacht und listet, was **nicht** vollständig erledigt ist. Ein geschlossener Punkt
 behält seine Nummer und einen kurzen Vermerk, damit Verweise aus anderen Dokumenten gültig bleiben. Was hier nicht steht, ist entweder erledigt oder in
 [STATUS.md](STATUS.md) beschrieben.
@@ -838,6 +838,37 @@ Kostenzeile urteilen über die Konfiguration, die Start anlegt. Ein vor Runde 17
   `WorkManagerTestInitHelper` mit einer eigenen Test-Anwendung, und das ändert, wie diese Klassen ihre Worker
   ausführen. Gefunden in Runde 18 beim Lesen der App-Daten auf `emulator-5556`; nachgelesen hat es ein Hilfsagent,
   die tragenden Stellen sind nachgeprüft.
+
+### 51. Die Migrationstests legen ihre Datenbanken zwischen denen der App an (niedrig, heute folgenlos)
+
+- **Stelle:** `MigrationTest` unter `app/src/androidTest/java/app/sourcescribe/data/`:
+  `MigrationTestHelper(InstrumentationRegistry.getInstrumentation(), SourceScribeDatabase::class.java)` und die Namen
+  `migration-<UUID>.db`.
+- **Was geschieht:** Der Helfer legt die Testdatenbanken mit dem Kontext der App an, also in ihrem Verzeichnis
+  `databases/` neben ihrer eigenen Datenbank. Getrennt sind sie nur durch den zufälligen Namen. Seit `39a1cdc` löscht
+  eine äußere Regel nach jedem Test die Datenbank samt `-journal`, `-shm`, `-wal` und `.lck` und prüft, dass nichts
+  mit ihrem Namen bleibt.
+- **Warum heute folgenlos:** Die Namen treffen nicht den der App, und gelöscht wird nur, was die Tests selbst anlegen.
+  Stirbt der Prozess mitten in einem Test, bleiben die Dateien liegen wie vor `39a1cdc`.
+- **Warum es offen bleibt:** Ein eigenes Verzeichnis bräuchte absolute Pfade als Datenbanknamen oder einen Kontext mit
+  eigenem Datenbankverzeichnis; ob `MigrationTestHelper` und die Sperrdatei `.lck` damit arbeiten, ist nicht geprüft.
+  Gemeldet vom Invarianten-Reviewer der Runde 19; von derselben Art wie Punkt 50.
+
+### 52. `SettingsStore` sucht seinen DataStore im Konstruktor und hält ihn für den ganzen Prozess (niedrig)
+
+- **Stelle:** `settingsDataStore` und die Map `stores` in `app/src/main/java/app/sourcescribe/data/SettingsStore.kt`,
+  seit `8fe0dd5`, aufgerufen im Konstruktor von `SettingsStore`.
+- **Was geschieht:** Der Konstruktor ruft `preferencesDataStoreFile`, das `Context.getFilesDir()` fragt, und
+  `File.canonicalPath`, das den Pfad im Dateisystem auflöst und `IOException` werfen darf. Hilt erzeugt den
+  `@Singleton` beim ersten Bedarf, und unter den Empfängern ist `MainViewModel`, das auf dem Hauptthread entsteht.
+  Der ersetzte Delegat `preferencesDataStore` fragte nach der Datei erst, wenn DataStore sie zum ersten Mal las.
+  Außerdem legt jeder neue Pfad einen Eintrag in `stores` an, der bis zum Ende des Prozesses bleibt.
+- **Warum niedrig:** In der App gibt es einen Pfad und damit einen Eintrag, wie beim alten Delegaten, und DataStore
+  verbietet zwei Instanzen für dieselbe Datei. Weitere Einträge entstehen nur in Instrumentierungstests mit eigenen
+  Kontexten. Ob der Zugriff im Konstruktor spürbar dauert oder je wirft, ist nicht gemessen.
+- **Was zum Schließen fehlt:** den DataStore erst beim ersten Lesen oder Schreiben suchen, ohne dass zwei Stores für
+  dieselbe Datei entstehen können. Gemeldet vom Code-Reviewer der Runde 19; dass der alte Delegat die Datei ebenso
+  im Konstruktor fragte, wie er schrieb, trifft nicht zu.
 
 ## Bewusste Entscheidungen, die wie Fehler aussehen
 

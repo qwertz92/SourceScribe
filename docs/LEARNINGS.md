@@ -81,3 +81,15 @@ Stand: 14. September 2026. Fehlversuche und Korrekturen im
   bleibt.
 - **Ein Prüfskript trägt sein Urteil im Exitcode.** `r16_typing.py` meldete in Runde 17 einen abweichenden Fall und
   endete mit 0; wer nur den Exitcode liest, hätte den Lauf als bestanden gezählt.
+- **Ein Reviewerfund über das Verhalten einer Bibliothek nennt ihre Version.** `ExternalResource` rief in JUnit 4.12
+  `after()` in einem `finally`, dessen Ausnahme die des Tests ersetzte. In 4.13.2, das dieses Projekt nutzt, sammelt
+  die Regel beide und wirft sie zusammen als `MultipleFailureException`. In Runde 19 beschrieb ein Reviewer die alte
+  Fassung.
+- **Eine Datei, die andere über ihren Pfad öffnen, wird mit einer Umbenennung ersetzt, nicht mit Entfernen und
+  Umbenennen.** `Files.move` mit `ATOMIC_MOVE` und `REPLACE_EXISTING` ruft auf demselben Dateisystem `rename(2)`: Der
+  Eintrag nennt davor die alte und danach die neue Datei, nie keine, und eine symbolische Verknüpfung an seiner Stelle
+  wird selbst ersetzt, nicht ihr Ziel. Ein Verzeichnis an seiner Stelle lässt sich so nicht ersetzen.
+- **Eine Zeilennummer in einem Dokument veraltet mit der nächsten Änderung darüber.** In Runde 19 zeigten acht von
+  dreizehn Zeilenangaben in `docs/DEFECTS.md` auf anderen Code, eine davon auf `rollback` statt auf die Prüfung eines
+  Hashes. Eine Stelle nennt die Funktion oder zitiert den Ausdruck; `tools/check-repository.py` weist Zeilennummern
+  in `docs/` ab.

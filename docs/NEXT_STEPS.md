@@ -2,27 +2,26 @@
 
 ## Wiederaufnahme: hier weitermachen
 
-Geschrieben am 11. September 2026, zuletzt nach der achtzehnten Reviewrunde nachgeführt, damit die
+Geschrieben am 11. September 2026, zuletzt nach der neunzehnten Reviewrunde nachgeführt, damit die
 Arbeit ohne Wiedereinlesen der ganzen Sitzung weitergehen kann. Reihenfolge ist Absicht.
 
 **Wo der Stand steht:** Die Reviewrunden und was sie gefunden haben, stehen in
 [STATUS.md](STATUS.md); was offen ist, mit Stelle und fehlendem Nachweis, in
 [DEFECTS.md](DEFECTS.md). Die Punktnummern unten sind die Nummern dort.
 
-### 1. Neunzehnte Reviewrunde über die Korrekturen der achtzehnten
+### 1. Zwanzigste Reviewrunde über die Korrekturen der neunzehnten
 
-Runden 3 bis 16 haben ihren wichtigsten Fund jeweils in den Korrekturen der Vorrunde gehabt. Runde 17 fand ihren in
-einer Vorgabe aus S7 in [SECURITY_UPDATES.md](SECURITY_UPDATES.md), die seit dem ersten Commit nie umgesetzt war,
-Runde 18 ihren in der Begründung eines ADR der Runde 17. Commits der achtzehnten Runde sind `cb4afb9`,
-`89eecad`, `8fe0dd5` und `39a1cdc`, dazu der Doku-Commit direkt darüber, der auch die Passagen der
-Runden 16 und 17 schreibt; einzeln benennen, nicht als Bereich, weil `a..b` den Anfangscommit auslässt.
+Runden 3 bis 16 haben ihren wichtigsten Fund jeweils in den Korrekturen der Vorrunde gehabt, Runde 17 in einer nie
+umgesetzten Vorgabe aus S7 in [SECURITY_UPDATES.md](SECURITY_UPDATES.md), Runde 18 in der Begründung eines ADR und
+Runde 19 wieder in einer Korrektur der Vorrunde, dem Ersetzen eines beschädigten Slots. Commits der neunzehnten Runde
+sind `3fc97aa`, `fbd83ce`, `a1a5af1`, `1ef195d` und `0f6db67`, dazu der Doku-Commit direkt
+darüber; einzeln benennen, nicht als Bereich, weil `a..b` den Anfangscommit auslässt. Den Doku-Commit
+`51329fb` mit den Passagen der Runden 16 bis 18 hat Runde 19 gelesen.
 
-**Stand am 14. September 2026:** Code- und Invarianten-Reviewer der Runde 19 haben berichtet; der
-Konsistenz-Reviewer liest den Doku-Commit, der diese Zeile schreibt. Bestätigt sind eine zu weite Aussage über
-`ensureBundledLocked` in ADR 0010 und im Code, ein Fenster beim Ersetzen eines Slots der gebündelten Engine, eine
-Testlücke bei `stage` und zwei niedrige Punkte zu `SettingsStore` und `MigrationTest`. Nicht bestätigt hat sich,
-dass die Aufräumregel in `MigrationTest` einen Testfehler verdeckt: `ExternalResource` meldet in JUnit 4.13.2 beide
-Fehler. Korrekturen und die Passage der Runde 19 folgen.
+**Stand am 14. September 2026:** Der Code- und der Invarianten-Reviewer der zwanzigsten Runde lesen die fünf
+Commits auf einem Export von `0f6db67`, beide als `claude-sonnet-5`, abgelesen an den Antworten in ihren
+Transkripten; als diese Zeilen entstanden, hatten sie noch nichts gemeldet. Den Doku-Commit direkt über den fünf
+liest danach ein Konsistenz-Reviewer.
 
 Rein lesende Reviewer zuerst, gleichzeitig; ein verändernder danach allein. Diese Lehren gehören in den
 Auftrag:
@@ -84,17 +83,24 @@ Auftrag:
 - **Nach Tests auf dem Gerät die Daten der App lesen, nicht nur die Testberichte, und eine geänderte Testklasse vor
   dem Gate laufen lassen.** Runde 18: Einstellungen und 24 Datenbankdateien aus Tests lagen seit Tagen in der
   Debug-App, und die Korrektur der Einstellungen brach sieben Tests einer Nachbarklasse, die erst das Gate lief.
+- **Ein Fund über das Verhalten einer Bibliothek gilt für eine Version.** Runde 19: Der Code-Reviewer beschrieb
+  `ExternalResource` wie in JUnit 4.12; das Projekt nutzt 4.13.2, und dort tritt der gemeldete Fehler nicht auf. Die
+  Version aus dem Build lesen, bevor ein solcher Fund zählt.
+- **Eine Korrektur, die ein Fenster schließt, zählt auf, wo es offen bleibt.** Runde 19: Die erste Fassung von
+  ADR 0011 zum Ersetzen im Slot ließ aus, dass eine gescheiterte Umbenennung über eine intakte Datei den Slot weiter
+  entfernt und neu anlegt.
 
 Die Jagdliste:
 
-- **`SettingsStore` hält je Datei einen DataStore in einer Map des Prozesses** (`8fe0dd5`). `canonicalPath`
-  liest das Dateisystem; geschieht das auf dem Hauptthread, und kostet es? Kann derselbe Speicherort unter zwei
-  Pfaden zwei DataStores bekommen, die DataStore verbietet?
-- **`materializeSlot(replaceInvalid = true)`** ([ADR 0011](adr/0011-damaged-bundled-engine-slot.md)): `validSlot`
-  wertet jede Ausnahme als ungültig. Was sieht ein Auftrag, dessen Engine gerade ersetzt wird, und hält die Folge
-  Kopieren, Prüfen, Entfernen, Umbenennen einem Absturz an jeder Stelle stand?
-- **`MigrationTest`:** Räumt die äußere Regel auch, wenn ein Test oder der Helfer scheitert, und verdeckt ihre
-  Zusicherung dann den eigentlichen Fehler?
+- **`replaceInSlot`** (`a1a5af1`, [ADR 0011](adr/0011-damaged-bundled-engine-slot.md)): Erst die Engine, dann die
+  Metadaten, zwei Umbenennungen. Was hinterlässt ein Absturz zwischen beiden? `metadata.json` liest heute niemand;
+  stimmt das noch? Ist `Files.move` mit `ATOMIC_MOVE` auf Android an dieser Stelle für jede Art von Eintrag ein
+  einziges `rename(2)`?
+- **Die Testlücken des Code-Reviewers der Runde 19:** eine symbolische Verknüpfung auf eine Verknüpfung an der Stelle
+  des Slots, ein Lesefehler beim Hashen einer intakten Datei und zwei gleichzeitige Aufrufer des Managers, von denen
+  einer den Slot ersetzt, während der andere die Engine startet. Keine davon hat einen Test.
+- **[Punkt 52](DEFECTS.md):** Lässt sich der DataStore erst beim ersten Zugriff suchen, ohne zwei Stores für dieselbe
+  Datei zu erlauben?
 - **Die Sperre von `MainViewModel.action`** trägt die Punkte [48](DEFECTS.md) und [49](DEFECTS.md). Entsteht eine
   zweite Instanz der Aktivität mit eigenem View-Model tatsächlich, etwa nach dem Teilen aus einer anderen App, und
   gibt es einen Aufrufer von `stage`, `activate`, `rollback` oder `retry` außerhalb der Sperre?
