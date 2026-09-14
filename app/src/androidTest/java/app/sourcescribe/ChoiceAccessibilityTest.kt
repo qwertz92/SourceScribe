@@ -31,6 +31,9 @@ class ChoiceAccessibilityTest {
                 ),
             )
 
+            // This test is about the control, not about how fast the app starts. While MainViewModel does its start,
+            // busy disables the control, and on the CI emulator that outlasted NODE_TIMEOUT_MS (DEFECTS, item 54).
+            waitUntilIdle(automation)
             val settings = waitForNode(automation, "Settings navigation") { node ->
                 node.isClickable && node.hasAnyLabel(SETTINGS_LABELS)
             }
@@ -115,8 +118,30 @@ class ChoiceAccessibilityTest {
     }
 
     /**
-     * The nodes that nearly matched, with the state that kept them out, and the first texts of the active window, as
-     * [reportableTexts] gives them.
+     * Waits until the app shows its navigation and no progress bar. MainActivity draws the progress bar exactly while
+     * MainViewModel is busy, which is also what disables most controls.
+     */
+    private fun waitUntilIdle(automation: UiAutomation) {
+        val deadline = SystemClock.uptimeMillis() + STARTUP_TIMEOUT_MS
+        while (SystemClock.uptimeMillis() < deadline) {
+            val root = automation.rootInActiveWindow
+            if (root != null && root.findFirst { it.isClickable && it.hasAnyLabel(SETTINGS_LABELS) } != null &&
+                root.findFirst(::isProgressBar) == null
+            ) {
+                return
+            }
+            SystemClock.sleep(POLL_MS)
+        }
+        throw AssertionError(
+            "The app was still busy after ${STARTUP_TIMEOUT_MS / 1000} s; ${windowSummary(automation) { false }}",
+        )
+    }
+
+    private fun isProgressBar(node: AccessibilityNodeInfo): Boolean = node.className?.toString() == PROGRESS_BAR
+
+    /**
+     * The nodes that nearly matched, with the state that kept them out, whether a progress bar shows, and the first
+     * texts of the active window, as [reportableTexts] gives them.
      */
     private fun windowSummary(automation: UiAutomation, nearMiss: (AccessibilityNodeInfo) -> Boolean): String {
         val root = automation.rootInActiveWindow ?: return "no active window"
@@ -131,7 +156,8 @@ class ChoiceAccessibilityTest {
             }
             for (index in 0 until node.childCount) node.getChild(index)?.let(queue::addLast)
         }
-        return "near misses $misses, window ${root.packageName} shows ${root.reportableTexts(MAX_TEXTS)}"
+        val busy = root.findFirst(::isProgressBar) != null
+        return "near misses $misses, busy=$busy, window ${root.packageName} shows ${root.reportableTexts(MAX_TEXTS)}"
     }
 
     private fun waitForLabels(automation: UiAutomation, labels: Set<String>, description: String) {
@@ -193,8 +219,10 @@ class ChoiceAccessibilityTest {
         lineSequence().flatMap { it.split(',').asSequence() }.any { it.trim().equals(label, true) }
 
     companion object {
-        private const val TEST_TIMEOUT_MS = 60_000L
+        private const val TEST_TIMEOUT_MS = 240_000L
         private const val NODE_TIMEOUT_MS = 25_000L
+        private const val STARTUP_TIMEOUT_MS = 150_000L
+        private const val PROGRESS_BAR = "android.widget.ProgressBar"
         private const val POLL_MS = 50L
         private const val MAX_NODES = 512
         private const val MAX_NEAR_MISSES = 5
