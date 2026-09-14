@@ -717,12 +717,10 @@ class EngineUpdateManagerTest {
         .filter { it.isDirectory && it.name.matches(Regex("[0-9a-f]{64}")) }
         .mapTo(mutableSetOf(), File::getName)
 
+    /** The manager works in directories whose names start with a dot, `.staging-`, `.bundled-` and `.slot-`. */
     private fun assertNoUpdateTemporaryDirectories(harness: Harness) {
-        assertTrue(
-            File(harness.root, "engines").listFiles().orEmpty().none {
-                it.name.startsWith(".staging-") || it.name.startsWith(".slot-")
-            },
-        )
+        val left = File(harness.root, "engines").list().orEmpty().filter { it.startsWith(".") }
+        assertTrue("left behind: $left", left.isEmpty())
     }
 
     private suspend fun expectUpdateFailure(block: suspend () -> Unit): EngineUpdateException = try {
