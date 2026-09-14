@@ -298,6 +298,28 @@ def _check_notice_versions(root: Path) -> list[Issue]:
     return issues
 
 
+def _check_notice_copies(root: Path) -> list[Issue]:
+    """Flag the first line where the app's copy of the third-party notices differs from the notices.
+
+    `812c4dc` took DocumentFile out of the copy the app shows, together with the dependency, and the notices went
+    on naming it until round 21. Lines are compared, so a checkout that writes CRLF into one of them makes no
+    difference. When only one of the two exists, the missing one is flagged; a tree with neither has nothing to
+    compare.
+    """
+    present = [(root / name).is_file() for name in NOTICE_FILES]
+    if not any(present):
+        return []
+    if not all(present):
+        missing, existing = NOTICE_FILES[present.index(False)], NOTICE_FILES[present.index(True)]
+        return [Issue(missing, None, f"is missing while {existing} exists")]
+    original, copy = ((_read_text(root / name) or "").splitlines() for name in NOTICE_FILES)
+    if original == copy:
+        return []
+    differing = (number for number, (left, right) in enumerate(zip(original, copy), 1) if left != right)
+    line_number = next(differing, min(len(original), len(copy)) + 1)
+    return [Issue(NOTICE_FILES[1], line_number, f"differs from {NOTICE_FILES[0]}, which it copies for the app")]
+
+
 def _check_executable_scripts(root: Path, tally: Tally) -> list[Issue]:
     """Flag a tracked script that starts with a shebang but that git records as not executable.
 
@@ -356,6 +378,7 @@ def check_repository(root: Path, *, tracked_only: bool = True, tally: Tally | No
     issues.extend(_check_wrapper(root))
     issues.extend(_check_dependency_verification(root))
     issues.extend(_check_notice_versions(root))
+    issues.extend(_check_notice_copies(root))
     # Only a run over what git tracks has modes to check; the walk over a plain directory has none.
     if tracked_only:
         issues.extend(_check_executable_scripts(root, counter))
@@ -490,6 +513,21 @@ def _self_test() -> None:
         issues = _check_notice_versions(root)
         expected = [Issue("THIRD_PARTY_NOTICES.md", 1, "names bcpg 1.85, the version catalogue has 1.86")]
         assert issues == expected, str(issues)
+        # The app's copy has to equal these notices line by line. CRLF makes no difference; a changed line does, and
+        # so does a missing last line. A copy without the notices it copies is flagged as well.
+        notices = (root / "THIRD_PARTY_NOTICES.md").read_text(encoding="utf-8")
+        copy = root / NOTICE_FILES[1]
+        copy.parent.mkdir(parents=True)
+        copy.write_bytes(notices.replace("\n", "\r\n").encode("utf-8"))
+        assert _check_notice_copies(root) == [], str(_check_notice_copies(root))
+        differs = [Issue(NOTICE_FILES[1], 2, "differs from THIRD_PARTY_NOTICES.md, which it copies for the app")]
+        copy.write_bytes(notices.replace("1.86", "1.85").encode("utf-8"))
+        assert _check_notice_copies(root) == differs, str(_check_notice_copies(root))
+        copy.write_bytes(notices.split("\n", 1)[0].encode("utf-8") + b"\n")
+        assert _check_notice_copies(root) == differs, str(_check_notice_copies(root))
+        (root / "THIRD_PARTY_NOTICES.md").unlink()
+        missing = [Issue("THIRD_PARTY_NOTICES.md", None, f"is missing while {NOTICE_FILES[1]} exists")]
+        assert _check_notice_copies(root) == missing, str(_check_notice_copies(root))
     print("PASS self-test")
 
 
