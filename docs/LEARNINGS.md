@@ -1,147 +1,119 @@
-# Lernprotokoll für die Wiederaufnahme
+# Learnings for Resumption
 
-Stand: 14. September 2026. Fehlversuche und Korrekturen im
-[Integrationsbericht](reports/2026-09-07-integration.md) und
-[Previewbericht](reports/2026-09-08-preview.md); hier wiederverwendbare Folgerungen.
+**As of 2026-09-14.** Failed attempts and fixes are in the
+[2026-09-07 integration report](reports/2026-09-07-integration.md) and the
+[2026-09-08 preview report](reports/2026-09-08-preview.md); this file holds the reusable conclusions.
 
-- **Build ist kein Laufzeitnachweis.** Gerät, APK-Hash und tatsächlichen Pfad nennen.
-  Fixture, echte Quelle und Provideraufruf unterscheiden. 185 Runnerfälle mit fünf
-  Skips bedeuten 180 bestandene Tests.
-- **UI am Bild beurteilen.** Label-/Wertabstände, Buttonabstände, Proportionen,
-  stabile Dialoge und 200-%-Schrift betrachten. Zusammengehörige Korrekturen und
-  statischen Review bündeln, einmal bauen, betroffene Pfade prüfen. Scrollen
-  widerlegte einen vermeintlich abgeschnittenen Viewer; nicht jeden Verdacht umbauen.
-- **TalkBack ist hörbar.** Semantiktest und gebundener Dienst beweisen keine
-  vollständige Bedienung. ADB/UIAutomation kann die InputFilter-Kette umgehen.
-  Eingabeereignis ist kein nachgewiesener Fokuswechsel. Tests ankündigen und
-  Ausgangswerte anschließend exakt restaurieren.
-- **Asynchrone UI abwarten.** Trackwahl/Start erst nach beendeter Quellprüfung.
-  Der r75-Abbruch war verfrühte Testautomation, kein App-Bug.
-- **Prozessabbruch beweisen.** `am kill` beendete den gebundenen Prozess nicht.
-  Nur eigene identifizierte PID kontrolliert beenden und Verschwinden prüfen.
-  r78 wurde nach dem 100-Sekunden-Fenster erfolgreich wieder aufgenommen; früher
-  Timeout bleibt FAIL, späterer Beleg gilt nur für tatsächlich erfasste Daten.
-  Dozing ist nicht zwingend ein Fehler beim Display-Aus-Test.
-- **Offizielle SDK-Werkzeuge verwenden.** `aapt2` löst das Backup-Resource-Mapping
-  auf, `apksigner` prüft die Signatur. Nicht im PATH bedeutet nicht nicht vorhanden.
-  APK-Hash vor/nach Audit vergleichen. Native ZIP-Payloads und tatsächlich verwendete
-  Ersatzassets mitprüfen; ein großer selbstgeschriebener Parser ist kein alleiniger Gate.
-- **JSON nicht als andere Sprache einsetzen.** Androids `JSONObject.quote` lieferte
-  maskierte Slashes; direkt als Python-Literal eingesetzt entstanden falsche
-  Testpfade. Daten mit JSON lesen statt Sprachen verschachteln.
-- **CI-Pfade und Fehlerausgaben explizit halten.** AVD-Erzeugung und Emulator
-  brauchen dasselbe Verzeichnis. API-37-Emulator erhöhte 2 auf 4 GiB RAM; nun
-  ausdrücklich gesetzt. Nach erfolgreichem Boot JUnit/UTP lesen, nicht jede
-  nachfolgende Störung als Boot-Timeout behandeln.
-- **Last begrenzen.** WSL-OOM war belegt, 16-GiB-Swap ist inzwischen aktiv.
-  Ein Buildworker, 2-GiB-Heap, große Caches auf dem Projektlaufwerk. Mehr Swap
-  ersetzt keine Begrenzung paralleler Last.
-- **Reviews eng und unabhängig halten.** Luna fand echte Grenzfälle, aber auch
-  widerlegte Lock-/Cursor-/Layoutverdachte. Datei, Voraussetzung und reproduzierbare
-  Abweichung verlangen und verifizieren. Vage Audits produzierten zu große
-  Hilfswerkzeuge. Kleine Dinge direkt erledigen, Sol für klare größere Pakete,
-  Astra für UI/Integration.
-- **Handoff aktuell halten.** Keine widersprüchlichen Pausen aneinanderhängen;
-  Historie gehört in Git/Berichte. SDK, Rohlogs, private Keys und Appdaten reisen
-  nicht automatisch mit. Restabnahme ist kein rein kosmetischer Aufwand.
-- **Dexing-Fehler mit kleingeschriebenem Projektpfad ist veralteter Gradle-Zustand.**
-  `DexingNoClasspathTransform` meldete `The given file '/mnt/c/users/.../projects/sourcescribe/...'
-  is located outside the root directory '/mnt/c/Users/.../Projects/SourceScribe/...'`. Der Unterschied
-  ist ausschliesslich die Gross-/Kleinschreibung des Pfads, nicht die genannte Klasse: zwei Laeufe
-  nannten zwei verschiedene, teils unveraenderte Klassen. Behoben durch `rm -rf core/build` aus WSL
-  heraus und `--no-watch-fs`. Nicht nach der genannten Klasse suchen, sondern den Buildordner leeren.
-- **Nicht waehrend eines laufenden Builds im Repository editieren.** Eine Zeichenkette, die nach der
-  R-Generierung eingefuegt wurde, liess `compileDebugKotlin` an einer `Unresolved reference` scheitern,
-  die es zu diesem Zeitpunkt gar nicht mehr gab. Aenderungen sammeln und zwischen zwei Laeufen anwenden.
-- **„Internal error: Unexpected lint invalid arguments“ kann Speichermangel sein.** In Runde 16 endete ein Lintlauf
-  so; im Kernelprotokoll von WSL stand eine fehlgeschlagene Seitenanforderung beim Lesen eines Verzeichnisses über
-  9p. Ein zweiter Lauf, nachdem der Speicher wieder frei war, lief durch. Nicht den Code verdächtigen, sondern
-  `free -m` und `dmesg` lesen und die Gradle-Aufrufe teilen. In Runde 21 zeigte sich dieselbe Meldung von `dmesg`, eine
-  gescheiterte Seitenanforderung der Ordnung 4 in `p9pdu_readf`, als `Could not read directory path` in
-  `mergeDebugAndroidTestResources`; der nächste Build derselben Aufgabe lief durch.
-- **Lint vor jedem Commit einer UI-Änderung.** `1b2dc45` ging mit einem Lintfehler (`ModifierParameter`) in den
-  Baum, weil Lint erst im Gate danach lief.
-- **K2 zieht Smart-Casts durch lokale Boolean-`val`s.** Stammt `existingHealthy` aus `existing?.healthy == true`,
-  gilt `existing` hinter `existingHealthy && …` als nicht null, und ein `existing?.bundled` dort ist die Warnung
-  „Unnecessary safe call“, mit `allWarningsAsErrors` ein Buildfehler. Die Bedingung so ordnen, dass der sichere
-  Aufruf vor der Prüfung steht.
-- **Keine Instrumentierung neben einem Gradle-Build.** In Runde 17 scheiterte ein Test der Gegenprobe an
-  `native_runtime:TIMED_OUT`, dem Selbsttest der Laufzeit mit 30 Sekunden, während daneben ein Build in WSL anlief;
-  mit derselben Test-APK ohne Build bestand er. Bewiesen ist die Ursache nicht, aber eine Gegenprobe, die an Last
-  scheitert, belegt nichts.
-- **`preferencesDataStore` bindet einmal je Prozess.** Der Delegat legt einen DataStore an, auf den Dateien des
-  Kontexts, mit dem er zuerst benutzt wird, und jeder spätere Kontext bekommt denselben. Wer einen Store je Kontext
-  braucht, baut ihn mit `PreferenceDataStoreFactory` und hält je Datei genau einen; DataStore verbietet zwei.
-- **Eine Kontextattrappe hält die Verträge des Originals.** `Context.getFilesDir` legt sein Verzeichnis an. Eine
-  Attrappe, die das nicht tat, ließ `File.usableSpace` 0 melden, und die Speicherprüfung sah eine volle Platte, in
-  sieben Tests zugleich.
-- **`Context.deleteDatabase` entfernt keine `.lck`-Datei.** Laut AOSP-Quelltext von
-  `SQLiteDatabase.deleteDatabase` löscht es die Datenbank, `-journal`, `-shm`, `-wal`, eine Prüfdatei des
-  Frameworks und `-mj`-Dateien, nicht aber die Sperrdatei `<name>.lck`, die neben den Datenbanken der
-  Migrationstests lag. In der Gegenprobe der Runde 18 blieben genau diese zwei Dateien zurück, als nur ihr eigenes
-  Löschen fehlte. Wer Testdatenbanken aufräumt, löscht sie selbst und prüft danach, dass nichts mit ihrem Namen
-  bleibt.
-- **Ein Prüfskript trägt sein Urteil im Exitcode.** `r16_typing.py` meldete in Runde 17 einen abweichenden Fall und
-  endete mit 0; wer nur den Exitcode liest, hätte den Lauf als bestanden gezählt.
-- **Ein Reviewerfund über das Verhalten einer Bibliothek nennt ihre Version.** `ExternalResource` rief in JUnit 4.12
-  `after()` in einem `finally`, dessen Ausnahme die des Tests ersetzte. In 4.13.2, das dieses Projekt nutzt, sammelt
-  die Regel beide und wirft sie zusammen als `MultipleFailureException`. In Runde 19 beschrieb ein Reviewer die alte
-  Fassung.
-- **Eine Datei, die andere über ihren Pfad öffnen, wird mit einer Umbenennung ersetzt, nicht mit Entfernen und
-  Umbenennen.** `Files.move` mit `ATOMIC_MOVE` und `REPLACE_EXISTING` ruft auf demselben Dateisystem `rename(2)`: Der
-  Eintrag nennt davor die alte und danach die neue Datei, nie keine, und eine symbolische Verknüpfung an seiner Stelle
-  wird selbst ersetzt, nicht ihr Ziel. Ein Verzeichnis an seiner Stelle lässt sich so nicht ersetzen.
-- **Eine Zeilennummer in einem Dokument veraltet mit der nächsten Änderung darüber.** In Runde 19 zeigten acht von
-  dreizehn Zeilenangaben in `docs/DEFECTS.md` auf anderen Code, eine davon auf `rollback` statt auf die Prüfung eines
-  Hashes. Eine Stelle nennt die Funktion oder zitiert den Ausdruck; `tools/check-repository.py` weist Zeilennummern
-  in `docs/` ab.
-- **Wer einen Commit aus Textersetzungen baut, trägt auch den Dateimodus ein.** `git update-index --cacheinfo`
-  verlangt ihn, und das Stage-Skript der Runde 19 setzte fest 100644 ein. So verlor `tools/check-repository.py` sein
-  Ausführungsbit, ohne dass sich eine Zeile änderte; im Diff steht das nur als `old mode 100755` und
-  `new mode 100644`. Den Modus aus HEAD übernehmen; `tools/check-repository.py` prüft seit Runde 20 Skripte mit
-  Shebang.
-- **Eine Datei lässt sich nicht über ein Verzeichnis umbenennen.** `rename(2)` lehnt das ab, laut Handbuch mit
-  `EISDIR`, und `Files.move` mit `ATOMIC_MOVE` meldet eine `IOException`. Auf dem Emulator mit API 37 zeigt das
-  `aSlotRepairWhoseMetadataCannotFollowFailsWithStorageAndLeavesTheEngineRepaired`, der mit `STORAGE` endet. Ein Test
-  kann so die zweite von zwei Umbenennungen gezielt scheitern lassen: Er legt ein Verzeichnis an ihr Ziel.
-- **`grep -l` zählt Dateien, in denen eine Zeichenkette steht, keine Aufrufe.** `d994c23` nannte 55 Klassen von
-  `bcprov` 1.85.2, die `BigInteger.intValueExact` aufrufen, und der Release-Reviewer der Runde 21 bestätigte die Zahl
-  mit `grep -lr intValueExact`. Die Zeichenkette steht auch in Klassen, die gleichnamige Methoden von Bouncy Castle
-  selbst aufrufen, und keine Klasse ruft die von `BigInteger` auf. Aufrufe stehen als Methodenverweise im
-  Konstantenpool einer Klasse; wer sie zählt, liest diese, mit `javap -c` oder einem kleinen Leser, und prüft den
-  Leser an einem Verweis, der sicher vorkommt.
-- **Lint vergleicht Versionen mit einem Cache.** `NewerVersionAvailable` liest die neuesten Versionen aus
-  `maven-metadata.xml` unter `build/intermediates/lint-cache` jedes Moduls. Lokal stammten sie vom 7. und
-  8. September, und so scheiterte vom 11. bis 14. September nur die CI an Bouncy Castle 1.86. Vor einem lokalen
-  Lintlauf, der für die CI stehen soll, diesen Cache löschen.
-- **Ein Beleg nennt den Code, der lief, nicht nur den HEAD.** Die Gates der Runde 20 trugen `HEAD=b204a47` und liefen
-  mit Code, der erst danach als `dc9e6dd` committet wurde; an diesen Code band den Lauf nur der Fingerabdruck
-  daneben. Die Gates der Runde 21 prüfen, dass der Baum HEAD plus genau die benannten Korrekturen ist, und schreiben
-  das in ihre Ausgabe.
-- **Compose gibt vom Inhalt eines Passwortfelds nur Punkte an die Accessibility, in der Fassung, die die App
-  bündelt.** Auf `emulator-5556` mit API 37 und `compose-bom` 2026.09.00 erschien Text, den `adb shell input text` in
-  das Schlüsselfeld der Einstellungen tippte, im Dump von `uiautomator` als Punkte, mit `password=true`, und nirgends
-  im Klartext. `uiautomator` liest denselben Baum wie `UiAutomation.rootInActiveWindow`. Ein Reviewer der Runde 22
-  hatte aus dem Quelltext von Compose auf GitHub das Gegenteil geschlossen, ohne eine Fassung zu nennen. Ein Feld ohne
-  Maskierung gibt seinen Inhalt dagegen im Klartext weiter; das zeigt der Test aus Runde 22, bevor er die Meldung
-  prüft.
-- **ASCII-Armor endet für Bouncy Castle an seiner Fußzeile, und die Fußzeile an ihrem Zeilenumbruch.**
-  `PGPUtil.getDecoderStream` liest Armor über `ArmoredInputStream`, und in 1.86 liefert dieser Strom nach
-  `-----END PGP SIGNATURE-----` nichts mehr, auch wenn dahinter ein zweiter Block steht;
-  `PGPObjectFactory.nextObject()` gibt dann `null` zurück. Die Fußzeile selbst liest er bis zu ihrem Zeilenumbruch.
-  Fehlt dieser, verschwindet angehängter Text mit ihr, und auch hinter dem Parser bleibt nichts übrig. Wer genau eine
-  Signatur verlangt, prüft deshalb die rohen Bytes hinter der Fußzeile, nicht nur, was der Parser nicht gelesen hat.
-- **Ein grüner CI-Lauf beendet keinen zeitweisen Fehler.** `ChoiceAccessibilityTest` scheiterte in drei CI-Läufen,
-  bestand am Stand `7d9ce41`, ohne dass sich seine Bedingung oder der Code der App geändert hatte, und scheiterte am
-  Stand `17bc156` wieder. Einen Punkt in DEFECTS schließt erst die gefundene Ursache. Gezeigt hat sie eine Meldung,
-  die den Zustand des gesuchten Elements nennt: Es war da, aber gesperrt, weil die App noch startete.
-- **Leitet Git Bash die Ausgabe von `wsl.exe` in eine Datei, überschreibt stderr den Anfang von stdout.** Am
-  14. September auf HomeBase gezeigt: Nach `wsl.exe -e bash -lc '…' > datei 2>&1` stand in der Datei die Zeile von
-  stderr an der Stelle der ersten Zeile von stdout, und von dieser blieb nur ihr Rest. `wsl.exe` schreibt beide
-  Ströme von getrennten Positionen aus, die beim Start des Aufrufs am selben Punkt stehen; was vorher in der Datei
-  stand, bleibt. Mit `2>&1 | cat > datei` oder einer Umleitung innerhalb von WSL bleibt alles in der Reihenfolge,
-  in der es geschrieben wurde.
-- **Ein Test, der eine Bedienung prüft, wartet zuerst, bis die App sie freigibt.** `MainViewModel` führt beim Start
-  eine exklusive Aktion aus. Solange sie läuft, sperrt `state.busy` unter anderem die Sprachwahl, und `MainActivity`
-  zeigt einen Fortschrittsbalken; in der CI dauerte das länger als 25 Sekunden. In der Accessibility erscheint der
-  Balken als `android.widget.ProgressBar`: Auf `emulator-5556` fand ihn `ChoiceAccessibilityTest` noch nach 150 Sekunden, als die Aktion beim Start 600 Sekunden länger dauerte, und nicht mehr, sobald sie beendet war. Seit Runde 23 wartet der Test, bis keiner mehr zu sehen ist.
+- **Build is not runtime evidence.** Name the device, the APK hash, and the actual path taken; distinguish a
+  fixture, a real source, and a real provider call. 185 runner cases with five skips means 180 tests passed.
+- **Judge UI from the image.** Check label/value spacing, button spacing, proportions, stable dialogs, and
+  200% font size. Batch related fixes with a static review and build once. Scrolling disproved a viewer that
+  looked cut off — don't rebuild on every suspicion.
+- **TalkBack is audible.** A semantics test and a bound service don't prove full operability; ADB/UIAutomation
+  can bypass the InputFilter chain, and an input event is not a proven focus change. Announce audible tests
+  and restore starting values exactly afterward.
+- **Wait out async UI.** Track selection and start only after source validation has finished; a round-75
+  abort was premature test automation, not an app bug.
+- **Prove process death.** `am kill` did not end the bound process; only kill an identified PID and confirm it
+  is gone. A round-78 run resumed successfully after the 100-second window — an earlier timeout stays FAIL,
+  and a later result covers only what it actually captured. Dozing is not automatically a failure in the
+  display-off test.
+- **Use official SDK tools.** `aapt2` resolves backup resource mapping and `apksigner` checks the signature;
+  not being on PATH doesn't mean absent. Compare the APK hash before/after an audit, and check native ZIP
+  payloads and actually-used replacement assets — a large homegrown parser is not a sufficient gate by itself.
+- **Don't use JSON as another language.** Android's `JSONObject.quote` escaped slashes; used directly as a
+  Python literal, that produced wrong test paths. Read data with JSON instead of nesting languages.
+- **Keep CI paths and error output explicit.** AVD creation and the emulator need the same directory; the
+  API 37 emulator needed RAM raised from 2 to 4 GiB, now set explicitly. After a successful boot, read
+  JUnit/UTP output rather than treating every later hiccup as a boot timeout.
+- **Bound the load.** WSL ran out of memory before 16 GiB of swap was made active; one build worker, a 2 GiB
+  heap, large caches on the project drive. More swap does not replace a concurrency limit.
+- **Keep reviews narrow and independent.** Luna found real edge cases but also disproved lock/cursor/layout
+  suspicions; require and verify file, precondition, and reproducible deviation. Vague audits produced
+  oversized helper tools — handle small things directly, route clear larger packages to Sol and UI/integration
+  to Astra.
+- **Keep the handoff current.** Don't chain contradictory pauses; history belongs in git/reports. SDK, raw
+  logs, private keys, and app data don't travel automatically, and remaining acceptance work is not purely
+  cosmetic.
+- **A dexing error with a lowercased project path is stale Gradle state, not the class it names.**
+  `DexingNoClasspathTransform` complained about a path differing only in letter case; two runs named two
+  different, sometimes unchanged, classes. Fixed with `rm -rf core/build` from WSL and `--no-watch-fs` —
+  empty the build folder rather than chasing the named class.
+- **Don't edit the repository during a running build.** A string inserted after R generation made
+  `compileDebugKotlin` fail on an "unresolved reference" that no longer existed by the time the message
+  appeared. Batch changes and apply them between runs.
+- **"Internal error: Unexpected lint invalid arguments" can mean low memory.** In round 16 a lint run ended
+  this way; WSL's kernel log showed a failed page request reading a directory over 9p, and a second run
+  succeeded once memory was free. Read `free -m`/`dmesg` and split the Gradle calls rather than suspecting the
+  code. Round 21 showed the same root cause behind "Could not read directory path" in a resource-merge task;
+  the next build of the same task succeeded.
+- **Lint before every UI-affecting commit.** `1b2dc45` landed with a lint failure (`ModifierParameter`)
+  because lint only ran later, in the gate.
+- **K2 carries a smart-cast through a local Boolean `val`.** If `existingHealthy` comes from
+  `existing?.healthy == true`, `existing` is treated as non-null after `existingHealthy && …`, and a further
+  `existing?.bundled` there becomes an "unnecessary safe call" warning — a build failure under
+  `allWarningsAsErrors`. Order the condition so the safe call comes before the check.
+- **No instrumentation next to a Gradle build.** A counter-test failed on a runtime self-test's 30-second
+  timeout while a WSL build ran alongside; the same test APK passed without a concurrent build. Not proven as
+  the cause, but a counter-test that fails under load proves nothing either way.
+- **`preferencesDataStore` binds once per process.** The delegate creates a store on the files of whichever
+  context first uses it, and every later context gets that same one. A store per context needs
+  `PreferenceDataStoreFactory`, one instance held per file — DataStore forbids two for the same file.
+- **A fake context must keep the real one's contracts.** `Context.getFilesDir` creates its directory; a fake
+  that did not made `File.usableSpace` report 0, so the storage check saw a full disk in seven tests at once.
+- **`Context.deleteDatabase` does not remove a `.lck` file.** Per the AOSP source, it deletes the database,
+  `-journal`, `-shm`, `-wal`, a framework check file, and `-mj` files, but not the `<name>.lck` lock file that
+  sat next to migration-test databases. Whoever cleans up test databases deletes them and then confirms
+  nothing with that name remains.
+- **A check script carries its verdict in its exit code.** `r16_typing.py` reported a deviating case in
+  round 17 and still exited 0; reading only the exit code would have counted the run as passed.
+- **A reviewer's finding about a library's behavior names a version.** `ExternalResource` called `after()`
+  inside a `finally` in JUnit 4.12, replacing the test's own exception; in 4.13.2, which this project uses,
+  the rule collects both and throws a `MultipleFailureException`. A round-19 reviewer described the old
+  behavior.
+- **A file that others open by path is replaced by renaming over it, not by removing and renaming.**
+  `Files.move` with `ATOMIC_MOVE`/`REPLACE_EXISTING` calls `rename(2)` on the same filesystem: the entry names
+  the old file and then the new one, never neither, and a symlink in that place is itself replaced, not its
+  target. A directory in that place cannot be replaced this way.
+- **A line number in a document goes stale with the next change above it.** In round 19, eight of thirteen
+  line references in `docs/DEFECTS.md` pointed at different code, one at a rollback function instead of a
+  hash check. Name the function or quote the expression instead; `tools/check-repository.py` rejects line
+  numbers under `docs/`.
+- **Building a commit from text substitution also has to carry the file mode.** `git update-index
+  --cacheinfo` requires it, and round 19's staging script hardcoded 100644 — `tools/check-repository.py` lost
+  its executable bit without a single line changing. Carry the mode over from `HEAD`; the script now checks
+  scripts with a shebang.
+- **A file cannot be renamed over a directory.** `rename(2)` refuses with `EISDIR`, and `Files.move` with
+  `ATOMIC_MOVE` reports an `IOException`. On the API 37 emulator, a slot-repair test exercises exactly this by
+  placing a directory at the target.
+- **`grep -l` counts files containing a string, not calls.** A commit message cited 55 classes calling a
+  method older Android versions lack, and a round-21 reviewer confirmed the count with the same grep — but
+  the string also names an identically-named method of a different library, and no class actually calls the
+  one in question. Read method references from the constant pool (e.g. with `javap -c`) instead.
+- **Lint compares versions against a cache.** `NewerVersionAvailable` reads `maven-metadata.xml` under each
+  module's lint cache; a stale local cache meant only CI caught an outdated dependency. Clear that cache
+  before a local lint run meant to stand in for CI.
+- **Evidence names the code that ran, not just `HEAD`.** Round 20's gates were labeled with a `HEAD` that did
+  not yet contain the code that actually ran; only a diff fingerprint recorded alongside it tied the run to
+  the right code. Later gates assert the tree is `HEAD` plus exactly the named fixes and record that in their
+  own output.
+- **Compose passes only dots to accessibility for a password field's content, in the version this app
+  bundles.** Text typed into a masked settings field appeared as dots (with `password=true`) in a
+  `uiautomator` dump; a reviewer had concluded the opposite from reading Compose's source on GitHub without
+  naming a version. An unmasked field does pass its content through in plain text, confirmed by testing that
+  case first.
+- **ASCII armor ends, for Bouncy Castle, at its footer — and the footer at its own line break.** In 1.86,
+  `ArmoredInputStream` returns nothing after `-----END PGP SIGNATURE-----`, even with a second block behind
+  it; without a trailing line break, appended text is treated as part of the footer and disappears with it. A
+  check that requires exactly one signature has to inspect the raw bytes behind the footer, not just what the
+  parser left unread.
+- **A green CI run does not rule out a flaky failure.** `ChoiceAccessibilityTest` failed in three CI runs,
+  passed once with no change to its condition or the app's code, then failed again. Only a message naming the
+  state of the searched element revealed the cause: present, but disabled because the app was still starting.
+- **Redirecting `wsl.exe` output to a file from Git Bash lets stderr overwrite the start of stdout.**
+  `wsl.exe -e bash -lc '…' > file 2>&1` wrote the stderr line over the first line of stdout, because the two
+  streams write from separate positions that start out equal. Pipe through `cat`, or redirect inside WSL,
+  instead.
+- **A test that checks an interaction first waits for the app to allow it.** `MainViewModel` runs an
+  exclusive action at startup that locks the language picker (among other things) and shows a progress bar;
+  in CI this took over 25 seconds. Since round 23 the test waits until no progress bar is visible.

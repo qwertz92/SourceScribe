@@ -1,44 +1,42 @@
-# Implementierungs- und Nachweischeckliste
+# Implementation and Evidence Checklist
 
-Stand: 8. September 2026. **Persönlicher Preview-Abschluss, danach PAUSE.** Endzustände je Arbeitspaket: `complete`, `no_change`,
-`blocked`, `conflict`. Bis zum Nachweis bleibt ein Paket offen. Die Prüflabels
-IMPLEMENTED / TESTED_WITH_FIXTURES / LIVE_VERIFIED sind keine austauschbaren Begriffe.
+**As of 2026-09-08** (the 0.1.0 preview milestone), with later corrections noted per row. End states per work
+package: `complete`, `no_change`, `blocked`, `conflict`. A package stays open until it has evidence. The
+evidence labels IMPLEMENTED / TESTED_WITH_FIXTURES / LIVE_VERIFIED are not interchangeable. Current test
+counts and CI status are in [STATUS.md](STATUS.md); this table is not the place to look for today's numbers.
 
-| Paket | Abnahme/Evidenz | Integrationsverantwortung | Zustand |
+| Package | Acceptance / evidence | Owner | State |
 |---|---|---|---|
-| Wiki | Gemeinsamer Index statt Anforderungsduplikat; Claude-Brücke | Hauptagent | complete |
-| Umgebung/Git | Toolchain/Netz/ADB gemessen, Daten erhalten, öffentliches main/Commits | Hauptagent | complete |
-| P0 Runtime x86_64 | Echte Android-Python-/JS-/EJS-/FFmpeg-/TLS-/YouTube-Prüfung r48, 16 KB | Hauptagent | complete |
-| P0 ARM64 statisch | Beide ABIs gebaut; aktuelles APK einschließlich 528 innerer ELF-Dateien geprüft | Hauptagent | complete |
-| P0 ARM64 physisch | Keine angeschlossene physische ARM64-Hardware | Nutzergerät fehlt | blocked |
-| P0 Updates | Signiertes Nightly aktiviert und zurückgerollt; Schad-/Fehlerfixtures; r70 zwei laufende Fixturejobs gepinnt | Hauptagent | complete |
-| P1 | Echter Share → Caption → Herkunft → Room → MD/SAF → Viewer/Teilen | Hauptagent | complete |
-| P2 Implementierung/Fixtures | Groq, Import, Vorbereitung/Chunks, Credentials, Submissiongrenzen | Hauptagent | complete |
-| P3 Implementierung/Fixtures | AssemblyAI/OpenAI, vier Modi, Tracks/Optionen/Presets, Teilfehler | Hauptagent | complete |
-| P4 Implementierung/Fixtures | Queue/Limits, Recovery/Unsicherheit, Exportreparatur, Updategrenzen; Gesamtlauf r81 | Hauptagent | complete |
-| P5 UI-Feedback | Feld-/Buttonabstände, de/en, System/Hell/Dunkel, Startfreigabe ohne allgemeinen Uploadschalter, tatsächliche Screenshotkritik | Hauptagent/Astra | complete |
-| P5 Viewer/Export | 10.000 Segmente, Suche/Share/Kopierauswahl, keine erfundenen Zeitformate; SAF-Fehlerregressionen | Hauptagent | complete |
-| P5 TalkBack | Semantik und Dialogaktivierung geprüft; vollständige TalkBack-Traversierung mit verfügbarer Eingabeautomation nicht möglich | Toolinggrenze | blocked |
-| P5 Signing | Dauerhafter externer persönlicher Key; r81 signiert, apksigner/zipalign geprüft und installiert. Separate Key-Sicherung und künftiges App-Upgrade noch NOT_RUN | Hauptagent | complete |
-| P5 CI | Run 34252821287: Build/JVM/Lint und Emulatorstart PASS; connectedDebugAndroidTest FAIL, Einzelursache noch unbekannt. Diagnoseausgabe vorbereitet, neuer Lauf pausiert | Hauptagent | offen |
-| Letzte History-Anzeige r80 | r81 auf aktueller APK: 180 App-Tests, betrachteter Nachher-Screenshot und statischer Releaseaudit PASS | Hauptagent | complete |
-| P6 lokale Regression/Reviews | 103 JVM + 180 ausgeführte Android-App-Tests; unabhängige Reviews und dokumentierte Regressionen | Hauptagent + Reviewer | complete |
-| P6 vollständige Abnahme | Pflichtnachweise wegen untenstehender externer Grenzen unvollständig | Hauptagent | blocked |
-| Live-Provider | Kein freigegebener Testzugang/Inhalt/Kostenrahmen für AssemblyAI/OpenAI/Groq | Nutzerfreigabe fehlt | blocked |
-| Öffentliche APK | Vollständige FFmpeg-Lizenz-/Corresponding-Source-Zuordnung fehlt | Native-Provenienzgrenze | blocked |
+| Wiki | Shared index instead of a duplicated requirements doc; Claude bridge file | Lead agent | complete |
+| Environment/Git | Toolchain/network/ADB measured, data preserved, public `main`/commits | Lead agent | complete |
+| P0 runtime, x86_64 | Real Android Python/JS/EJS/FFmpeg/TLS/YouTube check (round 48), 16 KB pages | Lead agent | complete |
+| P0 ARM64, static | Both ABIs built; current APK incl. 528 inner ELF files checked | Lead agent | complete |
+| P0 ARM64, physical | Not run: every device test used an x86_64 emulator | Needs the owner's phone | blocked |
+| P0 updates | Signed nightly activated and rolled back; malformed/error fixtures; round 70 pins two running fixture jobs | Lead agent | complete |
+| P1 | Real share -> caption -> provenance -> Room -> MD/SAF -> viewer/share | Lead agent | complete |
+| P2 implementation/fixtures | Groq, import, prep/chunking, credentials, submission limits | Lead agent | complete |
+| P3 implementation/fixtures | AssemblyAI/OpenAI, four modes, tracks/options/presets, partial failures | Lead agent | complete |
+| P4 implementation/fixtures | Queue/limits, recovery/uncertainty, export repair, update limits; full run round 81 | Lead agent | complete |
+| P5 UI feedback | Field/button spacing, German/English, system/light/dark, start approval without a general upload switch, actual screenshot review | Lead agent / Astra | complete |
+| P5 viewer/export | 10,000 segments, search/share/copy selection, no invented timestamp formats; SAF error regressions | Lead agent | complete |
+| P5 TalkBack | Semantics and dialog activation checked; full TalkBack traversal not possible with available input automation | Tooling limit | blocked |
+| P5 signing | Durable external personal key; round 81 signed, apksigner/zipalign checked and installed. Separate key backup and a future app upgrade still `NOT_RUN` | Lead agent | complete |
+| P5 CI | Run 34252821287: build/JVM/lint and emulator boot passed; `connectedDebugAndroidTest` failed, root cause unknown at the time; a new run was paused. The device step later passed in CI run 34865638431 on commit `1fe2dad` — see [STATUS.md](STATUS.md). | Lead agent | complete |
+| Last history view, round 80 | Round 81 on the current APK: 180 app tests, an after-screenshot reviewed, static release audit passed | Lead agent | complete |
+| P6 local regression/reviews | 103 JVM + 180 executed Android app tests; independent reviews and documented regressions | Lead agent + reviewers | complete |
+| P6 full acceptance | Required evidence incomplete because of the external limits below | Lead agent | blocked |
+| Live providers | Not run for AssemblyAI, OpenAI or Groq: needs the owner's API keys, which agents may not enter | Needs the owner | blocked |
 
-`complete` bei einem Fixturepaket ist keine Live-Providerfreigabe. Die Phasen mit
-blockierten Pflichtteilen sind als Gesamtphase nicht vollständig abgenommen.
-Aktuelle Rohbelegnamen, APK-Hashes und Prüfebenen im
-[Preview-Prüfbericht](reports/2026-09-08-preview.md).
+`complete` on a fixture package is not a live-provider clearance. Phases with a blocked required part are not
+fully accepted as a whole phase. Current raw evidence names, APK hashes, and check levels are in the
+[0.1.0](reports/2026-09-08-preview.md) and [0.2.0](reports/2026-09-14-preview-0.2.md) preview reports.
 
-## Ausgangsmessung
+## Starting measurement
 
-- Nur Übergabedokumente, kein vorhandener App-Code; lokales Git auf `main` initialisiert.
-- GitHub-Zugang als qwertz92 verfügbar; `qwertz92/SourceScribe` anfangs nicht vorhanden.
-- ADB über vorhandene Windows-SDK-Installation: `emulator-5554`, Android 17/API 37,
-  `sdk_gphone16k_x86_64`, ABI-Liste `x86_64,arm64-v8a`, `PAGE_SIZE=16384`.
-  ARM64 in der Liste belegt keine native physische ARM64-Ausführung.
-- WSL: OpenJDK 17.0.20.1; Gradle 9.6.0 erfolgreich gestartet. Lokaler isolierter
-  SDK-/Gradle-Cache zunächst unter `/tmp`; nach dem belegten Speicherfehler
-  nach `.local-tools/` auf das Projektlaufwerk verlegt. Keine globalen Sicherheitseinstellungen geändert.
+- Handoff documents only at the start, no existing app code; local git initialized on `main`.
+- GitHub access available as qwertz92; `qwertz92/SourceScribe` did not exist yet.
+- ADB via the existing Windows SDK install: `emulator-5554`, Android 17/API 37, `sdk_gphone16k_x86_64`, ABI
+  list `x86_64,arm64-v8a`, `PAGE_SIZE=16384`. ARM64 in that list is not native physical ARM64 execution.
+- WSL: OpenJDK 17.0.20.1; Gradle 9.6.0 started successfully. An isolated local SDK/Gradle cache started under
+  `/tmp`; after an out-of-space error it moved to `.local-tools/` on the project drive. No global security
+  settings changed.
