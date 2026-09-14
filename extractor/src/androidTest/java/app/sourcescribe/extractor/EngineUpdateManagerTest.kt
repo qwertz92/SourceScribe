@@ -623,6 +623,30 @@ class EngineUpdateManagerTest {
         }
     }
 
+    @Test
+    fun aSlotRepairWhoseMetadataCannotFollowFailsWithStorageAndLeavesTheEngineRepaired() = runBlocking {
+        withIsolatedManager { harness ->
+            val bundled = harness.manager.bundled()
+            val file = File(harness.root, "engines/${bundled.id}/yt-dlp")
+            // No rename of a file takes a directory's place: the verified engine file moves into the damaged slot,
+            // and its metadata cannot follow (ADR 0011).
+            val metadata = File(file.parentFile, "metadata.json")
+            assertTrue(metadata.delete() && metadata.mkdir())
+            File(metadata, "occupied").writeText("a directory, not metadata")
+            RandomAccessFile(file, "rw").use { it.setLength(it.length() / 2) }
+
+            val failure = expectUpdateFailure { newManager(harness).bundled() }
+
+            assertEquals(EngineUpdateCode.STORAGE, failure.code)
+            assertEquals(bundled.id, sha256(file))
+            assertNoUpdateTemporaryDirectories(harness)
+            // The next call finds the slot valid and uses the engine the failed one put there.
+            val restarted = newManager(harness)
+            assertEquals(bundled.id, restarted.active().id)
+            assertEquals(bundled.id, sha256(restarted.file(bundled)))
+        }
+    }
+
     private suspend fun withIsolatedManager(block: suspend (Harness) -> Unit) {
         requireEnabled()
         NativeRuntime(context).initialize()

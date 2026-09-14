@@ -1,6 +1,7 @@
 # ADR 0011 — Ein beschädigter Slot der gebündelten Engine wird ersetzt
 
-Datum: 14. September 2026. Status: Implementiert in Runde 18, in Runde 19 auf ein Ersetzen im Slot umgestellt.
+Datum: 14. September 2026. Status: Implementiert in Runde 18, in Runde 19 auf ein Ersetzen im Slot umgestellt, in
+Runde 20 um den Ausgang ergänzt, wenn nur die zweite Umbenennung scheitert.
 Welche Prüfungen gelaufen sind, steht in [STATUS.md](../STATUS.md).
 
 ## Kontext
@@ -43,6 +44,11 @@ intakte Datei scheitert, etwa an einem Fehler des Speichers; dann fehlt der Pfad
 Ersetzen. yt-dlp läuft nur beim Auflösen einer Quelle und beim Herunterladen, also vor jeder Anfrage an einen
 Anbieter; eine kostenrelevante Anfrage wiederholt ein Fehler dort nicht.
 
+Scheitert nur die zweite Umbenennung, steht die geprüfte Datei schon im Slot, neben den alten Metadaten, und der
+Aufruf endet trotzdem mit `STORAGE`: Ein Fehler beim Schreiben in den Speicher wird dem Aufrufer nicht verschwiegen.
+Der nächste Aufruf findet den Slot gültig, weil `validSlot` nur die Datei prüft, und benutzt sie. Die alten Metadaten
+bleiben liegen; `metadata.json` wird nur geschrieben und verschoben, gelesen wird es nirgends.
+
 ## Verworfene Alternativen
 
 - **Auch in `stage` ersetzen:** Ein Update ist freiwillig, und die Ablehnung blockiert dort nur dieses Update. Der
@@ -53,6 +59,9 @@ Anbieter; eine kostenrelevante Anfrage wiederholt ein Fehler dort nicht.
 - **Den Slot immer entfernen und das temporäre Verzeichnis an seine Stelle umbenennen, wie in Runde 18:** Dazwischen
   fehlt der Pfad, und ein Auftrag, der die Engine genau dann startet, scheitert, auch wenn nur ein Lesefehler den Slot
   ungültig erscheinen ließ. Gemeldet vom Code-Reviewer der Runde 19.
+- **Den Aufruf gelingen lassen, sobald die Datei im Slot steht, auch wenn die Metadaten nicht folgen:** Die Engine
+  wäre einen Aufruf früher nutzbar, aber der Fehler des Speichers bliebe unbemerkt. Vorgeschlagen vom Code-Reviewer
+  der Runde 20.
 - **Beim Laden jeden ungültigen Slot löschen:** trifft auch Slots, an die Aufträge gebunden sind, und ersetzt nichts.
 - **Den Fehler hinnehmen:** Die einzige Abhilfe war, die App-Daten zu löschen.
 
@@ -67,3 +76,7 @@ der Stelle des ganzen Slots, während das Verzeichnis, auf das sie zeigt, bleibt
 `EngineUpdateManagerTest.stageRefusesADamagedSlotOfTheEngineItDownloadedInsteadOfReplacingIt` liefert `stage` die
 gebündelte Engine über eine Attrappe des Netzes, beschädigt ihren Slot während des Downloads und verlangt
 `VERIFICATION` und den Slot, wie er war; erst der nächste Aufruf, der die gebündelte Engine einrichtet, ersetzt ihn.
+
+`EngineUpdateManagerTest.aSlotRepairWhoseMetadataCannotFollowFailsWithStorageAndLeavesTheEngineRepaired` legt an die
+Stelle der Metadaten ein Verzeichnis, das keine Umbenennung einer Datei ersetzen kann, und kürzt die Engine. Der
+Aufruf endet mit `STORAGE`, im Slot liegen danach die geprüften Bytes, und der nächste Aufruf benutzt sie.

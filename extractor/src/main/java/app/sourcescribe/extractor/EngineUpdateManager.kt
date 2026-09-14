@@ -506,7 +506,9 @@ class EngineUpdateManager internal constructor(
      * VERIFICATION, or with [replaceInvalid] replaced once the verified copy is complete. In a slot directory the copy
      * takes the file's place with one rename, so a process that opens the engine by its path meanwhile finds the old
      * file or the new one and never none. Anything else in the slot's place, which [file] refuses, is removed, and the
-     * copy is renamed into its place whole; so is a slot directory whose file that rename cannot replace (ADR 0011).
+     * copy is renamed into its place whole; so is a slot directory whose file that rename cannot replace. Where the
+     * file took its place and the metadata cannot follow, the call fails with STORAGE and leaves the verified file in
+     * the slot beside the old metadata, which nothing reads (ADR 0011).
      */
     private suspend fun materializeSlot(
         artifact: File,
