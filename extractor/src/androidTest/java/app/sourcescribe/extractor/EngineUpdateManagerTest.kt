@@ -14,6 +14,7 @@ import java.io.File
 import java.io.IOException
 import java.io.RandomAccessFile
 import java.nio.file.Files
+import java.nio.file.LinkOption
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.zip.ZipEntry
@@ -536,17 +537,22 @@ class EngineUpdateManagerTest {
         withIsolatedManager { harness ->
             val bundled = harness.manager.bundled()
             val file = File(harness.root, "engines/${bundled.id}/yt-dlp")
+            // Lasts only as long as the slot directory: the verified copy takes the file's place inside it, so a job
+            // that opens the engine by its path meanwhile finds the old file or the new one, never none (ADR 0011).
+            val besideTheEngine = File(file.parentFile, "beside-the-engine").also { it.writeText("kept") }
 
             // Cut short while the manager that verified it is still in use, as a fault of the storage would leave it.
             RandomAccessFile(file, "rw").use { it.setLength(it.length() / 2) }
             assertEquals(bundled.id, harness.manager.active().id)
             assertEquals(bundled.id, sha256(harness.manager.file(bundled)))
+            assertEquals("kept", besideTheEngine.readText())
 
             // A slot without its file, as an interrupted removal leaves one, found by the next start.
             assertTrue(file.delete())
             val restarted = newManager(harness)
             assertEquals(bundled.id, restarted.bundled().id)
             assertEquals(bundled.id, sha256(restarted.file(bundled)))
+            assertEquals("kept", besideTheEngine.readText())
 
             // A symbolic link in the file's place goes, and what it points at stays as it was.
             val outside = File(harness.root, "outside-the-slot").also { it.writeText("not an engine") }
@@ -555,6 +561,18 @@ class EngineUpdateManagerTest {
             assertEquals(bundled.id, newManager(harness).active().id)
             assertEquals("not an engine", outside.readText())
             assertTrue(file.isFile && !Files.isSymbolicLink(file.toPath()))
+            assertEquals(bundled.id, sha256(file))
+            assertEquals("kept", besideTheEngine.readText())
+
+            // A symbolic link in place of the whole slot goes too, and the directory it points at stays as it was.
+            val slot = requireNotNull(file.parentFile)
+            val elsewhere = File(harness.root, "elsewhere").also { assertTrue(it.mkdirs()) }
+            val decoy = File(elsewhere, "yt-dlp").also { it.writeText("not an engine either") }
+            assertTrue(slot.deleteRecursively())
+            Files.createSymbolicLink(slot.toPath(), elsewhere.toPath())
+            assertEquals(bundled.id, newManager(harness).active().id)
+            assertEquals("not an engine either", decoy.readText())
+            assertTrue(Files.isDirectory(slot.toPath(), LinkOption.NOFOLLOW_LINKS))
             assertEquals(bundled.id, sha256(file))
             assertNoUpdateTemporaryDirectories(harness)
         }

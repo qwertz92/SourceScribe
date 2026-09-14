@@ -17,6 +17,7 @@ import java.net.URI
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.LinkOption
+import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 import java.util.Locale
 import java.util.UUID
@@ -502,8 +503,10 @@ class EngineUpdateManager internal constructor(
      * Puts [artifact], already verified as [installation], into its hash slot and says whether it created the slot.
      *
      * A slot that exists but does not hold these bytes, a symbolic link in its place included, is refused with
-     * VERIFICATION, or with [replaceInvalid] replaced: the verified copy is complete before the damaged slot is
-     * removed, so the slot's path is missing only between that removal and the rename (ADR 0011).
+     * VERIFICATION, or with [replaceInvalid] replaced once the verified copy is complete. In a slot directory the copy
+     * takes the file's place with one rename, so a process that opens the engine by its path meanwhile finds the old
+     * file or the new one and never none. Anything else in the slot's place, which [file] refuses, is removed, and the
+     * copy is renamed into its place whole; so is a slot directory whose file that rename cannot replace (ADR 0011).
      */
     private suspend fun materializeSlot(
         artifact: File,
@@ -531,6 +534,10 @@ class EngineUpdateManager internal constructor(
                 throw EngineUpdateException(EngineUpdateCode.VERIFICATION)
             }
             writeSlotMetadata(temporary, installation)
+            if (present && replaceInSlot(temporary, destination)) {
+                if (!validSlot(installation)) throw EngineUpdateException(EngineUpdateCode.VERIFICATION)
+                return false
+            }
             // deleteHashSlot removes a symbolic link itself, never what it points at.
             if (present) deleteHashSlot(root, installation.id)
             val created = temporary.renameTo(destination)
@@ -547,6 +554,36 @@ class EngineUpdateManager internal constructor(
         } finally {
             deleteOwnedTree(temporary)
         }
+    }
+
+    /**
+     * Moves the engine file of [temporary] and then its metadata into the slot directory [slot], each with a rename
+     * that takes the place of what is there. False, with nothing moved, where [slot] is not a plain directory or the
+     * engine file cannot be moved that way; STORAGE where the engine file moved and its metadata could not follow.
+     */
+    private fun replaceInSlot(temporary: File, slot: File): Boolean {
+        if (!Files.isDirectory(slot.toPath(), LinkOption.NOFOLLOW_LINKS) || hasSymlinkComponent(slot)) return false
+        try {
+            moveOver(File(temporary, YTDLP_FILE_NAME), File(slot, YTDLP_FILE_NAME))
+        } catch (_: Exception) {
+            return false
+        }
+        try {
+            moveOver(File(temporary, METADATA_FILE_NAME), File(slot, METADATA_FILE_NAME))
+        } catch (_: Exception) {
+            throw EngineUpdateException(EngineUpdateCode.STORAGE)
+        }
+        return true
+    }
+
+    /** One rename over whatever [destination] names; a symbolic link there is replaced itself, not its target. */
+    private fun moveOver(source: File, destination: File) {
+        Files.move(
+            source.toPath(),
+            destination.toPath(),
+            StandardCopyOption.ATOMIC_MOVE,
+            StandardCopyOption.REPLACE_EXISTING,
+        )
     }
 
     private fun healthySlot(state: ManagerState, id: String): EngineInstallation? =
