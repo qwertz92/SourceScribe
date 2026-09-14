@@ -269,6 +269,35 @@ def _check_dependency_verification(root: Path) -> list[Issue]:
     return []
 
 
+NOTICE_FILES = ("THIRD_PARTY_NOTICES.md", "app/src/main/assets/legal/THIRD_PARTY_NOTICES.txt")
+
+
+def _check_notice_versions(root: Path) -> list[Issue]:
+    """Flag a version in the third-party notices that the version catalogue does not have.
+
+    Both notices, one of them shown in the app, name some dependencies with their version. `d994c23` moved
+    Bouncy Castle to 1.86 in the catalogue, and both went on naming 1.85. A name counts when it is a key of the
+    catalogue's [versions] table, in backticks or as a word of its own, followed by a version with a dot.
+    """
+    catalogue = root / "gradle" / "libs.versions.toml"
+    text = _read_text(catalogue) if catalogue.is_file() else None
+    if text is None or "[versions]" not in text:
+        return []
+    table = text.split("[versions]", 1)[1].split("\n[", 1)[0]
+    versions = {key.lower(): value for key, value in re.findall(r'^([\w.-]+)\s*=\s*"([^"]+)"', table, re.M)}
+    issues: list[Issue] = []
+    for name in NOTICE_FILES:
+        path = root / name
+        notice = _read_text(path) if path.is_file() else None
+        for line_number, line in enumerate((notice or "").splitlines(), 1):
+            for key, found in re.findall(r"(?<![\w.-])`?([\w.-]+)`?\s+(\d+(?:\.\d+)+)(?![\w.-])", line):
+                expected = versions.get(key.lower())
+                if expected is not None and found != expected:
+                    reason = f"names {key} {found}, the version catalogue has {expected}"
+                    issues.append(Issue(name, line_number, reason))
+    return issues
+
+
 def _check_executable_scripts(root: Path, tally: Tally) -> list[Issue]:
     """Flag a tracked script that starts with a shebang but that git records as not executable.
 
@@ -326,6 +355,7 @@ def check_repository(root: Path, *, tracked_only: bool = True, tally: Tally | No
     issues.extend(_check_actions(root))
     issues.extend(_check_wrapper(root))
     issues.extend(_check_dependency_verification(root))
+    issues.extend(_check_notice_versions(root))
     # Only a run over what git tracks has modes to check; the walk over a plain directory has none.
     if tracked_only:
         issues.extend(_check_executable_scripts(root, counter))
@@ -445,6 +475,21 @@ def _self_test() -> None:
         assert unmerged == ["tools/conflicted.sh", "tools/marked.sh"], str(issues)
         assert tally.scripts == 2, str(tally)
         assert (tally.scanned, tally.binary) == (6, 0), str(tally)
+    # The notices have to name the catalogue's versions, in backticks or as a word of their own. A name the
+    # catalogue does not know is left alone, and an entry outside its [versions] table is no version.
+    with tempfile.TemporaryDirectory(prefix="sourcescribe-notices-") as directory:
+        root = Path(directory)
+        (root / "gradle").mkdir()
+        (root / "gradle/libs.versions.toml").write_text(
+            '[versions]\nbcpg = "1.86"\njunit = "4.13.2"\n\n[libraries]\nbcprov = "1.99"\n', encoding="utf-8"
+        )
+        (root / "THIRD_PARTY_NOTICES.md").write_text(
+            "| Bouncy Castle | `bcpg` 1.85, `bcprov` 1.85.2 |\n(`bcpg` 1.86) und JUnit 4.13.2, EJS 0.8.0\n",
+            encoding="utf-8",
+        )
+        issues = _check_notice_versions(root)
+        expected = [Issue("THIRD_PARTY_NOTICES.md", 1, "names bcpg 1.85, the version catalogue has 1.86")]
+        assert issues == expected, str(issues)
     print("PASS self-test")
 
 
