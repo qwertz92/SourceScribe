@@ -1,13 +1,10 @@
-# Build und persönliche Auslieferung
+# Build and personal release
 
-SourceScribe baut mit Java 17, dem eingecheckten Gradle Wrapper 9.7.1, AGP 9.4.0 sowie compile/target SDK 37. Die Android-Module sind `:app` und `:extractor`; `:core` ist ein JVM-Modul. CI installiert die Build Tools 37.0.0 und 36.0.0, damit beide für Android-/Native-Prüfungen vorhanden sind.
+SourceScribe builds with Java 17, the checked-in Gradle Wrapper 9.7.1, AGP 9.4.0, and compile/target SDK 37. The Android modules are `:app` and `:extractor`; `:core` is a JVM module. CI installs Build Tools 37.0.0 and 36.0.0 so both are available for Android and native checks.
 
-## Frischer Clone unter Linux oder WSL
+## Fresh clone under Linux or WSL
 
-Java 17, Python 3, Git, Bash, `timeout` (coreutils) und `flock` (util-linux)
-müssen vorhanden sein. Windows-Android-Studio und ein Linux-SDK sind getrennte
-Installationen. Zum erstmaligen Klonen in Linux/WSL im gewünschten Elternordner
-beginnen; bei vorhandenem Clone direkt in dessen Projektordner wechseln:
+Java 17, Python 3, Git, Bash, `timeout` (coreutils), and `flock` (util-linux) must be present. Windows Android Studio and a Linux SDK are separate installations. For a first clone, start in Linux/WSL from the desired parent folder; with an existing clone, switch straight to its project folder instead:
 
 ```bash
 timeout 120 git clone https://github.com/qwertz92/SourceScribe.git
@@ -17,10 +14,7 @@ export ANDROID_HOME="$PWD/.local-tools/sdk"
 mkdir -p "$ANDROID_HOME"
 ```
 
-Für einen frischen SDK-Ordner die Linux-Command-Line-Tools von der offiziellen
-[Android-Downloadseite](https://developer.android.com/studio#command-line-tools-only)
-entpacken, sodass `cmdline-tools/latest/bin/sdkmanager` unter `ANDROID_HOME` liegt.
-Danach Lizenzen interaktiv prüfen und Pakete installieren:
+For a fresh SDK folder, unpack the Linux command-line tools from the official [Android download page](https://developer.android.com/studio#command-line-tools-only) so that `cmdline-tools/latest/bin/sdkmanager` ends up under `ANDROID_HOME`. Then review the licenses interactively and install the packages:
 
 ```bash
 timeout 300 "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses
@@ -28,23 +22,13 @@ timeout 900 "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install \
   'platforms;android-37.0' 'build-tools;37.0.0' 'build-tools;36.0.0' 'platform-tools'
 ```
 
-Ein vorhandenes SDK kann stattdessen per absolutem `ANDROID_HOME` verwendet werden.
-Eine lokale `local.properties` mit `sdk.dir=…` darf alternativ darauf zeigen; diese
-Datei ist ignoriert und darf keinen fremden Rechnerpfad in Git festschreiben.
-Bei abweichenden SDK-Variablen diese konsistent setzen. JAVA_HOME muss ggf. auf
-JDK 17 zeigen. Der Download von SDK, Wrapper und Maven-Abhängigkeiten benötigt Netz.
-Gradles Dependency-Verifikation bleibt aktiv; neue fehlende Metadaten erst gegen
-Primärquellen prüfen, nicht die Verifikation abschalten.
+An existing SDK can be used instead by pointing `ANDROID_HOME` at it with an absolute path. A local `local.properties` with `sdk.dir=…` may point there instead; that file is ignored by Git and must never commit another machine's path. Keep any other SDK-related variables consistent with it. `JAVA_HOME` may need to point at JDK 17. Downloading the SDK, the wrapper, and Maven dependencies needs network access. Gradle's dependency verification stays on; check newly missing metadata against primary sources first, rather than turning verification off.
 
-Die [offizielle SDK-Dokumentation](https://developer.android.com/tools/sdkmanager)
-markiert `sdkmanager` seit ihrem Stand vom 2. September 2026 als veraltet zugunsten
-der Android CLI. Hier bleibt der im Projekt/CI verwendete SDK-Installationsweg
-dokumentiert; eine CLI-Migration ist nicht Bestandteil dieser Preview. Ein zusätzlicher
-Build in einem vollständig frischen Clone wurde noch nicht ausgeführt.
+As of its 2 September 2026 revision, the [official SDK documentation](https://developer.android.com/tools/sdkmanager) marks `sdkmanager` as deprecated in favor of the Android CLI. This document keeps describing the SDK installation path actually used by the project and CI; migrating to the CLI is not part of this preview. An additional build from a completely fresh clone has not been run yet.
 
-## Lokaler Build
+## Local build
 
-Voraussetzungen sind ein Android SDK mit `platforms;android-37.0`, Build Tools 37.0.0/36.0.0 sowie ein JDK 17. Der reproduzierbare lokale Einstieg verwendet einen einzelnen Build-Worker, einen repo-lokalen Gradle-Cache und einen Lock gegen parallele Builds:
+Prerequisites are an Android SDK with `platforms;android-37.0`, Build Tools 37.0.0/36.0.0, and a JDK 17. The reproducible local entry point uses a single build worker, a repo-local Gradle cache, and a lock against parallel builds:
 
 ```text
 timeout 1500 bash tools/build-local.sh :core:test :app:assembleDebug :app:assembleDebugAndroidTest :app:assembleRelease :app:lintDebug :app:lintRelease :extractor:assembleDebugAndroidTest :extractor:lintDebug :extractor:lintRelease
@@ -52,22 +36,18 @@ timeout 45 python3 tools/check-repository.py --self-test
 timeout 45 python3 tools/check-repository.py
 ```
 
-Das Skript legt seine Daten unter `.local-tools/` ab und schreibt keine globale Gradle-Konfiguration. Den Debug-Build erzeugt es mit der App-ID `app.sourcescribe.debug` und den Release-Build mit `app.sourcescribe`. Provider-Schlüssel, Live-Aufrufe, ADB-Installationen und Instrumentationstests sind in diesem Befehl nicht enthalten. Fixture- und Android-Integrationshilfen bleiben auf `androidTest` beschränkt.
+The script keeps its data under `.local-tools/` and writes no global Gradle configuration. It builds the debug variant with the app ID `app.sourcescribe.debug` and the release variant with `app.sourcescribe`. This command does not include provider keys, live calls, ADB installs, or instrumented tests. Fixture and Android integration helpers stay confined to `androidTest`.
 
-Für einzelne Aufgaben darf derselbe Wrapper-Aufruf verwendet werden, zum Beispiel `tools/build-local.sh :app:lintDebug`. Die konkreten lokalen Ergebnisse und nicht ausgeführten Geräte-/Providerprüfungen gehören in einen datierten Bericht unter `docs/reports/`; dieser Text behauptet keinen Live-Nachweis.
+The same wrapper call may be used for individual tasks, for example `tools/build-local.sh :app:lintDebug`. Concrete local results and any device/provider checks that were not run belong in a dated report under `docs/reports/`; this document itself makes no claim of live verification.
 
-## Geräteprüfung getrennt vom Build
+## Device verification, separate from the build
 
-Auch bei einem nur über `local.properties` konfigurierten Build muss für die
-folgenden Gerätebefehle `ANDROID_HOME` zusätzlich auf genau dieses SDK gesetzt
-sein. Alternativ `ADB` direkt auf dessen ausführbare ADB-Datei setzen.
-Ein gestartetes Testgerät oder einen Emulator verwenden. Die Geräte-ID aus der
-ersten Ausgabe übernehmen; kein beliebiges Gerät automatisch auswählen:
+Even when the build is configured only through `local.properties`, the following device commands additionally need `ANDROID_HOME` set to that same SDK — or `ADB` pointed directly at its `adb` executable. Use an already-running test device or emulator. Take the device id from the first command's output; never pick just any device automatically:
 
 ```bash
 export ADB="$ANDROID_HOME/platform-tools/adb"
 timeout 20 "$ADB" devices -l
-export SERIAL=emulator-5554 # durch die tatsächlich angezeigte Testgeräte-ID ersetzen
+export SERIAL=emulator-5556 # replace with the device id "adb devices" actually printed
 timeout 90 "$ADB" -s "$SERIAL" install -r app/build/outputs/apk/debug/app-debug.apk
 timeout 60 "$ADB" -s "$SERIAL" install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
 timeout 60 "$ADB" -s "$SERIAL" install -r extractor/build/outputs/apk/androidTest/debug/extractor-debug-androidTest.apk
@@ -78,91 +58,53 @@ timeout 600 "$ADB" -s "$SERIAL" shell am instrument -w -r \
   app.sourcescribe.extractor.test/androidx.test.runner.AndroidJUnitRunner
 ```
 
-Bei Windows-ADB aus WSL `ADB` auf den tatsächlichen `adb.exe`-Pfad setzen und
-jedes Installationsargument in einen Windows-Pfad übersetzen, z. B.
-`"$(wslpath -w "$PWD/app/build/outputs/apk/debug/app-debug.apk")"`.
-Shell-/Instrumentationargumente bleiben gleich. Nicht gleichzeitig einen zweiten
-ADB-/UI-Prüfstrom betreiben. Die großen UI-/Prozess-/Live-Extractor-Fixtures sind
-opt-in; ihre Argumente und separaten Stufen stehen im Integrationsbericht. Ein
-normaler Instrumentationlauf ist deshalb kein P0-Live- oder Provider-Nachweis.
+When using Windows ADB from WSL, point `ADB` at the actual `adb.exe` path and translate every install argument into a Windows path, e.g. `"$(wslpath -w "$PWD/app/build/outputs/apk/debug/app-debug.apk")"`. The shell and instrumentation arguments stay the same. Do not run a second ADB/UI verification stream at the same time. The large UI/process/live-extractor fixtures are opt-in; their arguments and separate stages are in the integration report. A normal instrumented run is therefore not P0 live or provider evidence.
 
 ## GitHub Actions
 
-`.github/workflows/android.yml` läuft ohne Secrets und ohne APK-Veröffentlichung. Die Actions sind auf unveränderliche, am 7. September 2026 gegen die offiziellen Release-Refs geprüfte Commits gepinnt:
+`.github/workflows/android.yml` runs without secrets and without publishing an APK. The actions are pinned to immutable commits, checked against the official release refs on 7 September 2026:
 
 - `actions/checkout` v7.0.1 — [`3d3c42e5aac5ba805825da76410c181273ba90b1`](https://github.com/actions/checkout/releases/tag/v7.0.1)
 - `actions/setup-java` v6.0.0 — [`dd06d9cba3e5552c54d9f8ea23572deb30010f7c`](https://github.com/actions/setup-java/releases/tag/v6.0.0)
 - `android-actions/setup-android` v4.0.1 — [`40fd30fb8d7440372e1316f5d1809ec01dcd3699`](https://github.com/android-actions/setup-android/releases/tag/v4.0.1)
 - `actions/cache` v6.1.0 — [`55cc8345863c7cc4c66a329aec7e433d2d1c52a9`](https://github.com/actions/cache/releases/tag/v6.1.0)
 
-Der CI-Cache umfasst nur den Wrapper-Download und Gradle-Abhängigkeitsdateien unter `.ci-gradle/`; Build-Ausgaben und ein globaler Benutzer-Cache werden nicht gespeichert. Der Workflow enthält JVM-Tests, Debug-/Release-APKs, beide Android-Test-APKs sowie vollständiges Debug-/Release-Lint beider Android-Module mit `--no-daemon --max-workers=1`.
+The CI cache covers only the wrapper download and Gradle dependency files under `.ci-gradle/`; build outputs and a global user cache are not stored. The workflow runs JVM tests, the debug and release APKs, both Android test APKs, and full debug/release lint for both Android modules, with `--no-daemon --max-workers=1`.
 
-AVD-Erzeugung und Emulator verwenden dasselbe explizite `ANDROID_AVD_HOME` unter `.ci-android/avd`. Das Verzeichnis wird vor dem SDK-Setup angelegt; nach `avdmanager create` werden die INI-Datei und der registrierte AVD-Name geprüft. Damit hängt der Start nicht von unterschiedlichen Standardpfaden der beiden Android-Werkzeuge ab. Bei einem Fehler bleibt der Exitcode erhalten und der Workflow gibt den Emulator-Logauszug sowie die ADB-Geräteliste aus. Zusätzlich werden Fehlerknoten aus den JUnit-XML-Berichten und das Ende der UTP-Testlogs ausgegeben, damit Installations- oder Runnerfehler diagnostizierbar bleiben.
+AVD creation and the emulator share the same explicit `ANDROID_AVD_HOME` under `.ci-android/avd`. The directory is created before the SDK setup step; after `avdmanager create`, the workflow checks the INI file and the registered AVD name. That way, startup does not depend on the two Android tools defaulting to different paths. On failure, the exit code is preserved and the workflow prints the emulator log excerpt and the ADB device list. It also prints error nodes from the JUnit XML reports and the tail of the UTP test logs, so install or runner failures stay diagnosable.
 
-Anschließend startet er einen zeitlich begrenzten Android-37-Emulator mit dem offiziellen Image `system-images;android-37.0;google_apis_ps16k;x86_64`, 4 GiB RAM und zwei CPU-Kernen. Vor `:app:connectedDebugAndroidTest :extractor:connectedDebugAndroidTest` wird die tatsächliche Seitengröße 16384 geprüft. Die Emulator-Konfiguration folgt den offiziellen [Startoptionen](https://developer.android.com/studio/run/emulator-commandline) und der [Hardware-/Grafikbeschleunigung](https://developer.android.com/studio/run/emulator-acceleration); Linux-GitHub-Runner unterstützen [Android-Hardwarebeschleunigung](https://docs.github.com/en/actions/reference/runners/github-hosted-runners). Eine nötige KVM-Zugriffsfreigabe gilt nur dem Benutzer dieses kurzlebigen CI-Runners.
+It then starts a time-limited Android 37 emulator using the official image `system-images;android-37.0;google_apis_ps16k;x86_64`, with 4 GiB RAM and two CPU cores. Before `:app:connectedDebugAndroidTest :extractor:connectedDebugAndroidTest`, it checks that the actual page size is 16384. The emulator configuration follows the official [startup options](https://developer.android.com/studio/run/emulator-commandline) and [hardware/graphics acceleration](https://developer.android.com/studio/run/emulator-acceleration) docs; Linux GitHub runners support [Android hardware acceleration](https://docs.github.com/en/actions/reference/runners/github-hosted-runners). Any KVM access grant needed applies only to this short-lived CI runner's own user.
 
-Die Tests nutzen synthetische Daten und lokale HTTPS-Server. Die Netzdiagnose darf öffentliche DNS-/TLS-Erreichbarkeit prüfen; reale STT-Anfragen bleiben ausgeschlossen. Update-Fixtures sind aktiviert, echte Update-Downloads, YouTube-Live-Quellen und die interaktiven UI-/Prozessneustart-Fixtures erfordern zusätzliche explizite Testargumente und laufen nicht automatisch. Dieser Workflow ist implementiert; tatsächlich erfolgreiche CI-Läufe werden erst mit ihrer Run-ID im Testbericht als Nachweis geführt.
+The tests use synthetic data and local HTTPS servers. Network diagnostics may check public DNS/TLS reachability; real STT requests stay excluded. Update fixtures are enabled; real update downloads, live YouTube sources, and the interactive UI/process-restart fixtures need additional explicit test arguments and do not run automatically. This workflow is implemented; a CI run counts as evidence in the test report only once it is recorded there with its run ID.
 
-## Persönlicher Release-Pfad
+## Personal release path
 
-Der Release-Build wird zuerst als unsigned APK gebaut. `tools/sign-release.sh` richtet genau diese Datei mit den offiziellen Android Build Tools 37.0.0 aus, signiert sie mit `apksigner` und prüft die Signatur. Das Keystore bleibt außerhalb des Repositorys; das Skript lehnt einen fehlenden, relativen oder im Repository liegenden `KEYSTORE_PATH` ab. Es erzeugt oder verteilt keinen privaten Schlüssel.
+The release build first produces an unsigned APK. `tools/sign-release.sh` aligns exactly that file with the official Android Build Tools 37.0.0, signs it with `apksigner`, and verifies the signature. The keystore stays outside the repository; the script refuses a keystore path that is missing, relative, or inside the repository. It neither creates nor distributes a private key.
 
-Keystore-Passwort und Schlüsselpasswort werden ausschließlich über Umgebungsvariablen gelesen. Die Variablennamen werden an `apksigner` als `env:`-Passwörter übergeben, damit kein Passwort als Argument oder Ausgabe erscheint:
+By default, the script needs no environment variables at all:
 
 ```text
-export ANDROID_HOME=/absolute/path/to/android-sdk
-export KEYSTORE_PATH=/absolute/path/outside/SourceScribe/sourcescribe-release.jks
-export KEY_ALIAS=sourcescribe
-export KEYSTORE_PASSWORD='(lokal setzen)'
-export KEY_PASSWORD='(lokal setzen)'
 tools/sign-release.sh app/build/outputs/apk/release/app-release-unsigned.apk /absolute/path/outside/SourceScribe/sourcescribe-release.apk
-unset KEYSTORE_PATH KEY_ALIAS KEYSTORE_PASSWORD KEY_PASSWORD
 ```
 
-Das Ziel muss neu sein; ein vorhandenes Ausgabefile wird vor jeder Verarbeitung abgewiesen. Der unsigned Input bleibt erhalten. Für persönliche Updates denselben extern verwahrten Release-Key und fortlaufende Versionscodes verwenden. Dieser Pfad veröffentlicht kein APK und installiert nichts auf einem Gerät.
+It signs with the keystore at `~/.local/share/sourcescribe/signing/sourcescribe-release.p12`, using the alias `sourcescribe` — the same key that signed release 0.1.0. A keystore is a password-protected file holding a private signing key together with its certificate; an alias is the name of one key's entry inside that keystore. `apksigner` reads the keystore password — the password that unlocks the keystore file, and by default the key inside it too — from `keystore-password` in the same directory, so the password never appears on a command line or in the environment.
 
-Für Preview 0.1.0-preview.1 ist ein dauerhafter persönlicher RSA-3072/PKCS12-Key
-eingerichtet und die Signatur geprüft. Private Sicherung bleibt separat vom
-Git-Clone; Details auf dem ursprünglichen Rechner in `.local-tools/PRIVATE-RELEASE.md`.
-APK-Hash und öffentlicher Zertifikatfingerprint stehen im [Previewbericht 0.1.0](reports/2026-09-08-preview.md).
-Eine APK-Veröffentlichung ist bis zur geschlossenen FFmpeg-Source-/Lizenzprüfung gesperrt.
+Overrides, if needed: `SOURCESCRIBE_SIGNING_DIR` (a different directory holding both files), `KEYSTORE_PATH` (a different keystore file, still absolute and outside the repository), `KEY_ALIAS` (a different alias), `KEYSTORE_PASSWORD_FILE` (a different password file), or `KEYSTORE_PASSWORD` and `KEY_PASSWORD` set directly in the environment — the script passes these to `apksigner` as `env:` references, so even then the password is never a plain argument.
 
-### Preview 0.2.0-preview.1 signieren
+The script refuses to produce an APK whose certificate SHA-256 is not `19d1da9a8fe704082a531faed8a24d966c485aae581a7076dd4b4f66c11d3881`: Android only installs an update over an existing app when the new APK carries the same signing certificate, so anything signed with a different key would simply fail to install as an update. The output path must be new — the script refuses to overwrite an existing file — and the unsigned input is left untouched. Use this same externally kept release key, with consecutive version codes, for every personal update.
 
-Auf dem ursprünglichen Rechner in einem WSL-Terminal (unter Windows `wsl` eingeben), mit demselben Schlüssel wie
-0.1.0. Pfad und Alias des Schlüssels stehen in `.local-tools/PRIVATE-RELEASE.md`. Zuerst in den Projektordner
-wechseln und die zwei Platzhalter durch diese Werte ersetzen:
+A persistent personal RSA-3072/PKCS12 key was set up for preview 0.1.0-preview.1 at the location above, and its signature was verified. Whether the keystore and its password file are backed up anywhere is not verified; without them no later version installs as an update over an installed one. The APK hash and the public certificate fingerprint are in the [0.1.0 preview report](reports/2026-09-08-preview.md).
+
+### Publishing a release
+
+In WSL on the build machine, from the project folder. `ANDROID_HOME` must point to the Android SDK; on the original machine that is `.local-tools/sdk` inside the project.
 
 ```bash
-cd /mnt/c/Users/thoma/mystuff/personal/Projects/SourceScribe
 export ANDROID_HOME="$PWD/.local-tools/sdk"
-export KEYSTORE_PATH='/absoluter/Pfad/aus/PRIVATE-RELEASE.md'
-export KEY_ALIAS='Alias aus PRIVATE-RELEASE.md'
+tools/sign-release.sh .local-tools/releases/SourceScribe-<version>-<commit>-unsigned.apk .local-tools/releases/SourceScribe-<version>.apk
+gh release upload v<version> .local-tools/releases/SourceScribe-<version>.apk
 ```
 
-Dann die beiden Passwörter abfragen. Jede Zeile einzeln einfügen und danach das Passwort tippen: `read -rs` zeigt es
-nicht an und schreibt es nicht in die Shell-History. Wer beide Zeilen auf einmal einfügt, gibt die zweite Zeile als
-erstes Passwort ein.
+`<version>` is the app version, for example `0.3.0`, and `<commit>` the short commit the release build ran at. Signing went correctly if the script ends with `signed APK:` and `certificate SHA-256: 19d1da9a8fe704082a531faed8a24d966c485aae581a7076dd4b4f66c11d3881`; otherwise it stops with an error and writes no APK. After the upload, compare the SHA-256 digest GitHub shows for the asset with `sha256sum` of the local file.
 
-```bash
-read -rs -p 'Keystore-Passwort: ' KEYSTORE_PASSWORD; echo; export KEYSTORE_PASSWORD
-```
-
-```bash
-read -rs -p 'Schlüsselpasswort: ' KEY_PASSWORD; echo; export KEY_PASSWORD
-```
-
-Signieren, die Variablen wieder entfernen und das Ergebnis prüfen:
-
-```bash
-tools/sign-release.sh .local-tools/releases/SourceScribe-0.2.0-preview.1-1fe2dad-unsigned.apk .local-tools/releases/SourceScribe-0.2.0-preview.1.apk
-unset KEYSTORE_PATH KEY_ALIAS KEYSTORE_PASSWORD KEY_PASSWORD
-"$ANDROID_HOME/build-tools/37.0.0/zipalign" -c -P 16 4 .local-tools/releases/SourceScribe-0.2.0-preview.1.apk && echo aligned
-"$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --print-certs .local-tools/releases/SourceScribe-0.2.0-preview.1.apk | grep 'SHA-256'
-```
-
-Richtig ist es, wenn `sign-release.sh` mit `signed APK:` endet, `aligned` erscheint und die Zeile mit `SHA-256` auf
-`19d1da9a8fe704082a531faed8a24d966c485aae581a7076dd4b4f66c11d3881` endet, das Zertifikat von 0.1.0. Ein anderer Wert
-heißt, es war ein anderer Schlüssel: Diese APK dann nicht installieren, denn Android nimmt sie nicht als Update von
-0.1.0 an. Dieselben Befehle, ohne die zwei Passwortabfragen, liefen am 14. September mit einem Wegwerfschlüssel statt
-des persönlichen durch, siehe [Prüfbericht 0.2.0](reports/2026-09-14-preview-0.2.md).
+Preview 0.2.0-preview.1 was signed this way on 14 September 2026, after its tag, and its APK attached to the release: 146,688,333 bytes, SHA-256 `ea8bf17fa1262c5d4869ad7a5db9f6183b54746714f82ac46c7c031c449f971b`. In the same check the script refused an APK signed with a throwaway key.

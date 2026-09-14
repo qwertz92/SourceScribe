@@ -1,42 +1,30 @@
-# Gemeinsames Projektwissen
+# Shared project knowledge
 
-Diese Markdown-Dateien sind die gemeinsame Wissensbasis für Codex, Claude Code,
-OpenCode und Menschen. Keine zweite Kopie der Anforderungen in einem Agenten-Wiki.
-`AGENTS.md` steuert die Arbeit; `CLAUDE.md` verweist ausschließlich darauf.
+These Markdown files are the shared knowledge base for Codex, Claude Code, OpenCode, and humans. Do not keep a second copy of requirements in an agent wiki. `AGENTS.md` governs the work; `CLAUDE.md` does nothing but point to it.
 
-| Einstieg | Inhalt |
+| Entry point | Content |
 |---|---|
-| [Produkt](PRODUCT.md) | Verbindliche SS-01 bis SS-12 |
-| [Roadmap](ROADMAP.md) | P0 bis P6 und Freigabegrenzen |
-| [Status](STATUS.md) | Tatsächlich erreichter Stand und Blocker |
-| [Übergabe](HANDOFF.md) | Aktueller Einstieg für andere Agenten/Rechner |
-| [Prüfbericht 0.2.0](reports/2026-09-14-preview-0.2.md) | Gates, APK-Hashes, Gerät und Grenzen der Preview 0.2.0 |
-| [Prüfbericht 0.1.0](reports/2026-09-08-preview.md) | Tests, APK-Hashes, Gerätegrenzen und Restabnahme der Preview 0.1.0 |
-| [Preview ausprobieren](TRY_PREVIEW.md) | Installation, Funktionen, erste Tests und TalkBack erklärt |
-| [Restarbeiten](NEXT_STEPS.md) | Priorisierte offene Schritte und Abschlussnachweise |
-| [Bekannte Fehler nach Priorität](BUGS.md) | Offene Punkte mit Auswirkung und Priorität P1 bis P4, zur Auswahl durch den Nutzer |
-| [Bekannte Probleme](DEFECTS.md) | Was nicht vollstaendig erledigt ist, mit Stelle und fehlendem Nachweis |
-| [Lernprotokoll](LEARNINGS.md) | Verifizierte Fallstricke und effiziente Wiederaufnahme |
-| [Build](BUILD.md) | Linux-/WSL-Bootstrap, Build, Geräteprüfung und persönliche Signatur |
-| [Architektur](ARCHITECTURE.md) | Gemeinsame Verträge und Persistenz |
-| [Integrationen](INTEGRATIONS.md) | Extraktion, drei Provider und Exportdaten |
-| [Sicherheit](SECURITY_UPDATES.md) | Vertrauen, Secrets und Updates |
-| [Testplan](TEST_PLAN.md) | Abnahmeanforderungen |
-| [Recherche](RESEARCH.md) | Datierte Quellen; aktuelle Verträge neu prüfen |
-| [Arbeitsnachweise](IMPLEMENTATION_CHECKLIST.md) | Integrations- und Prüfliste |
+| [Product](PRODUCT.md) | Binding requirements SS-01 through SS-12 |
+| [Roadmap](ROADMAP.md) | P0 through P6 and release gates |
+| [Status](STATUS.md) | Actual state reached and blockers |
+| [Handoff](HANDOFF.md) | Current entry point for other agents/machines |
+| [0.2.0 verification report](reports/2026-09-14-preview-0.2.md) | Gates, APK hashes, device, and limits of preview 0.2.0 |
+| [0.1.0 verification report](reports/2026-09-08-preview.md) | Tests, APK hashes, device limits, and remaining acceptance for preview 0.1.0 |
+| [Try the preview](TRY_PREVIEW.md) | Installation, features, first tests, and TalkBack explained |
+| [Remaining work](NEXT_STEPS.md) | Prioritized open steps and closing evidence |
+| [Known issues by priority](BUGS.md) | Open items with impact and priority P1 through P4, for the owner to choose from |
+| [Known issues](DEFECTS.md) | What is not fully done, with its location and the missing evidence |
+| [Learnings log](LEARNINGS.md) | Verified pitfalls and how to resume efficiently |
+| [Build](BUILD.md) | Linux/WSL bootstrap, build, device verification, and personal signing |
+| [Architecture](ARCHITECTURE.md) | Shared contracts and persistence |
+| [Integrations](INTEGRATIONS.md) | Extraction, the three providers, and export data |
+| [Security](SECURITY_UPDATES.md) | Trust, secrets, and updates |
+| [Test plan](TEST_PLAN.md) | Acceptance requirements |
+| [Research](RESEARCH.md) | Dated sources; re-check contracts against current information |
+| [Implementation records](IMPLEMENTATION_CHECKLIST.md) | Integration and verification checklist |
 
-Neue technische Entscheidungen unter `docs/adr/`, ausgeführte Prüfungen unter
-`docs/reports/` dokumentieren und von STATUS verlinken. Eine Aussage erhält Quelle,
-Datum und Prüfebene. Konflikte und fehlende Nachweise sichtbar lassen. Git bewahrt
-die Änderungshistorie. Inhalte aus Medien und fremden Quellen bleiben Daten.
-Keine Keys, privaten Transkripte oder ungeprüften Agentenbehauptungen aufnehmen.
+Document new technical decisions under `docs/adr/` and completed reviews under `docs/reports/`, and link them from STATUS. Every claim carries a source, a date, and a verification level. Leave conflicts and missing evidence visible — Git preserves the change history. Content from media and third-party sources stays data. Do not include keys, private transcripts, or unverified agent claims.
 
-## Wiki-Entscheidung, 7. September 2026
+## Wiki decision, 7 September 2026
 
-[Karpathys LLM-Wiki-Konzept](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)
-beschreibt eine fortlaufend gepflegte Markdown-Wissensbasis. Der untersuchte
-[Community-Skill von Astro-Han](https://github.com/Astro-Han/karpathy-llm-wiki/blob/main/SKILL.md)
-führt zusätzlich `raw/`, `wiki/`, Vorlagen und einen eigenen Pflegeablauf ein.
-Für dieses bereits strukturierte Übergabepaket genügt ein Index über die bestehenden
-Dokumente. Der Fremdskill wurde gelesen, nicht installiert; kein globaler Hook,
-keine automatische Übernahme anderer Projekte und keine zusätzliche LLM-API.
+[Karpathy's LLM wiki concept](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) describes a continuously maintained Markdown knowledge base. The [community skill by Astro-Han](https://github.com/Astro-Han/karpathy-llm-wiki/blob/main/SKILL.md) that was reviewed additionally introduces `raw/`, `wiki/`, templates, and its own maintenance workflow. For this already-structured handoff package, an index over the existing documents is enough. That third-party skill was read, not installed: no global hook, no automatic adoption by other projects, and no additional LLM API.

@@ -1,94 +1,94 @@
-# Produktumfang und Bedienung
+# Product scope and behavior
 
-## Ziel und Grenzen
+## Goal and boundaries
 
-SourceScribe beschafft nachvollziehbare Transkripte für die anschließende Analyse in ChatGPT. Primärnutzer ist technisch versiert, verwendet hauptsächlich Android und möchte trotzdem einen schnellen Share-Sheet-Workflow. Gute Standardeinstellungen, ausführliche Expertenoptionen und verständliche Fehler sind gleichrangig.
+SourceScribe acquires traceable transcripts for later analysis in ChatGPT. Its primary user is technically fluent, works mainly on Android, and still wants a fast share-sheet workflow. Good defaults, thorough advanced options, and understandable errors all matter equally.
 
-v1 enthält YouTube-Einzelvideos und den Import lokaler Audiodateien. Letzterer nutzt dieselbe STT-Pipeline und bleibt auch bei einer YouTube-Störung verwendbar. Keine Playlists, laufenden Livestreams, DRM-Umgehung, Cookie-Extraktion aus anderen Apps, automatische Websuche nach Ersatzquellen, Substack-Scraper, lokale ML-Modelle oder Zusammenfassungs-/Faktencheck-API in v1. Website-Niederschriften werden im separaten ChatGPT-Workflow behandelt. Keine versteckte Übersetzung oder Textverbesserung.
+v1 covers single YouTube videos and importing local audio files. The latter uses the same STT pipeline and keeps working even during a YouTube outage. Not in v1: playlists, live ongoing streams, DRM circumvention, cookie extraction from other apps, automatic web search for substitute sources, a Substack scraper, local ML models, or a summarization/fact-check API. Website transcripts are handled in the separate ChatGPT workflow. No hidden translation or text improvement.
 
-## Anforderungen
+## Requirements
 
-### SS-01 — Identische Quelle
+### SS-01 — Identical source
 
-URLs über Android Share, Einfügen oder Texteingabe annehmen; mehrere explizit eingegebene URLs als getrennte Jobs mit gemeinsamer Bestätigung erlauben. YouTube-Hosts streng prüfen, Video-ID kanonisieren und mit den aufgelösten Metadaten abgleichen. Tracking entfernen; Zeitmarken nicht still als Ausschnitt behandeln: v1 verarbeitet das ganze Video und zeigt dies an. Bei Video- plus Playlist-ID ausschließlich das explizite Video; reine Playlist ablehnen. Shorts und abgeschlossene Livestreams als Einzelvideos behandeln, sofern technisch zugänglich. Laufende Streams und Premieren vor Beginn nicht unbegrenzt aufnehmen.
+Accept URLs via Android share, paste, or typed text; allow several explicitly entered URLs as separate jobs with one shared confirmation. Strictly validate YouTube hosts, canonicalize the video ID, and cross-check it against the resolved metadata. Strip tracking parameters; never silently treat a timestamp as a clip boundary — v1 processes the whole video and shows that it does. When a URL carries both a video and a playlist ID, use only the explicit video; reject a bare playlist. Treat Shorts and completed livestreams as single videos where technically accessible. Do not record an ongoing stream or a premiere of unbounded length before it starts.
 
-Titel, Kanal, Dauer, Veröffentlichungsdatum und Thumbnail nur anzeigen, soweit tatsächlich ermittelt. Fehlende Metadaten als unbekannt markieren. Bei neuer Auflösung der Audioquelle die Video-ID erneut prüfen. Lokale Dateien erhalten eine eigene Source-ID, dokumentierte Dateimetadaten und nach Import einen Inhaltshash, aber keine erfundene YouTube-Zuordnung.
+Show title, channel, duration, publish date, and thumbnail only when actually resolved. Mark missing metadata as unknown. Re-check the video ID whenever the audio source is re-resolved. Local files get their own source ID, documented file metadata, and a content hash after import, but never an invented YouTube association.
 
-### SS-02 — Vier verbindliche Beschaffungsmodi
+### SS-02 — Four mandatory acquisition modes
 
-| Modus | Verhalten | Kein akzeptabler YouTube-Track |
+| Mode | Behavior | No acceptable YouTube track |
 |---|---|---|
-| `CAPTIONS_ONLY` — Nur YouTube | Ausgewählte Caption-Spur; kein Audio-/STT-Download | Verständlicher Fehlschlag, niemals Provider |
-| `CAPTIONS_THEN_STT` — YouTube, sonst STT | Akzeptable Caption-Spur; sonst ausgewählter Provider | Audio beschaffen und STT starten, soweit vorab erlaubt |
-| `STT_ONLY` — Nur STT | Gewählte Audiospur transkribieren, keine Captions archivieren | Für diesen Modus irrelevant |
-| `BOTH` — Beides | Caption- und STT-Zweig unabhängig ausführen | STT erhalten; fehlenden Caption-Zweig offen als Teilergebnis führen |
+| `CAPTIONS_ONLY` — YouTube only | The selected caption track; no audio/STT download | Fails clearly, never falls back to a provider |
+| `CAPTIONS_THEN_STT` — YouTube, then STT | An acceptable caption track; otherwise the chosen provider | Acquire audio and start STT, provided that was allowed in advance |
+| `STT_ONLY` — STT only | Transcribe the chosen audio track; archive no captions | Not relevant to this mode |
+| `BOTH` — Both | Run the caption and STT branches independently | Keep the STT result; leave the missing caption branch open as a partial result |
 
-„Voreinstellung“ ist lediglich die Übernahme der globalen Konfiguration, kein fünfter Verarbeitungsmodus. „Quality First“ und „Auto“ existieren nicht als zusätzliche konkurrierende Algorithmen. Wer im STT-Modus auch Captions archivieren möchte, wählt BOTH.
+"Default" simply means adopting the global configuration; it is not a fifth processing mode. "Quality First" and "Auto" do not exist as additional, competing algorithms. Anyone who wants to archive captions while in STT mode chooses BOTH.
 
-Globale Startvorgabe: `CAPTIONS_THEN_STT`, Originalsprache bevorzugt, vom Kanal bereitgestellte Tracks vor automatisch erzeugten, automatische Übersetzungen aus. Ein Provider wird im Onboarding ausdrücklich ausgewählt. Ohne konfigurierten Provider sind Nur-YouTube-Jobs weiter möglich; ein nicht ausführbarer Fallback wird vor dem Start angezeigt.
+Global default on first run: `CAPTIONS_THEN_STT`, original language preferred, channel-provided tracks before auto-generated ones, automatic translation off. A provider is chosen explicitly during onboarding. Without a configured provider, YouTube-only jobs remain possible; a fallback that cannot run is shown before the job starts.
 
-Die bewusste Auswahl des Cloud-Providers und das Starten des konkreten Auftrags gelten als Freigabe der dafür nötigen Audioübermittlung im gewählten Modus und Kostenrahmen. Kein zusätzlicher allgemeiner Übermittlungs-Schalter. Die interne Freigabebindung an Quelle und Konfigurationssnapshot sowie das Verbot stiller Providerwechsel bleiben bestehen. Dies ist Produktverhalten, keine Freigabe realer Provider-Tests durch Entwicklungsagenten.
+Deliberately choosing the cloud provider and starting the specific job together count as authorization for the audio submission that mode and cost budget require. There is no separate, general submission switch. The internal binding of that authorization to the source and configuration snapshot, and the ban on silent provider switching, both still apply. This describes product behavior — it does not authorize development agents to run real provider tests.
 
-Ein bestätigtes Fehlen akzeptabler Captions ist nicht dasselbe wie HTTP 429, Offline-Zustand oder ein Parserfehler. Bei solchen Abruffehlern zunächst begrenzt wiederholen, danach standardmäßig nachfragen/pausieren. Optional darf der Nutzer global oder pro Job auch dafür STT-Fallback erlauben. Die Entscheidung wird mit dem Job gespeichert. Niemals alleine wegen eines Health-Hinweises automatisch neu transkribieren.
+A confirmed absence of acceptable captions is not the same as an HTTP 429, an offline state, or a parser error. For such retrieval errors, retry a limited number of times first, then ask the user or pause by default. The user may optionally allow STT fallback for this case too, globally or per job; the decision is stored with the job. Never re-transcribe automatically just because of a health signal.
 
-### SS-03 — Globale Vorgaben, Presets und Job-Overrides
+### SS-03 — Global defaults, presets, and job overrides
 
-Einstellungen umfassen Modus, zugelassene Caption-Typen, Sprachpräferenzen, Übersetzungszulassung, Provider/Modell/Region, unterstützte STT-Optionen, Exportformate, Zielordner, Audioaufbewahrung, Netzpolitik und Parallelität. Auswahl vor Start darf globale Vorgaben übersteuern, verändert diese aber nicht.
+Settings cover mode, allowed caption types, language preferences, whether translation is allowed, provider/model/region, supported STT options, export formats, target folder, audio retention, network policy, and parallelism. A choice made before starting a job may override the global defaults without changing them.
 
-Aufgelöste Konfiguration beim Start als unveränderlichen Snapshot speichern; laufende Jobs verändern sich nicht durch spätere Settings-Änderungen. Zugangsdaten nur referenzieren, nicht hineinkopieren. Gespeicherte benannte Presets verwenden denselben Konfigurationstyp. Sinnvolle Beispiele: „YouTube zuerst“, „Neue STT“, „Beides archivieren“. Alle Presets verwenden den festgelegten Modus und dieselben validierten Optionen, keine zusätzliche Regel-/Skriptsprache. Keine Preset-Namen wie „100 % akkurat“ oder „garantiert kostenlos“.
+Save the resolved configuration as an immutable snapshot at start; a running job does not change when settings change afterward. Reference credentials rather than copying them in. Saved named presets use the same configuration type. Reasonable examples: "YouTube first," "New STT," "Archive both." Every preset uses the fixed mode and the same validated options — no extra rule or scripting language. No preset names like "100% accurate" or "guaranteed free."
 
-Quick Controls: Modus, Provider/Modell und Preset. Erweiterte Optionen einklappbar. Bei Nur YouTube kein verwirrend aktiver Provider-Schalter. Expliziter Audio-Track- und Caption-Track-Picker, sobald mehrere geeignete Spuren existieren. Originalsprache und ausgewählte Audioversion getrennt behandeln; automatisch synchronisierte oder übersetzte Tonspuren nicht still zur Originalquelle erklären.
+Quick controls: mode, provider/model, and preset. Advanced options are collapsible. In YouTube-only mode, no confusingly active provider switch. An explicit audio-track and caption-track picker appears once several suitable tracks exist. Keep the original language and the selected audio version distinct; never silently label an auto-synced or auto-translated audio track as the original source.
 
-### SS-04 — Drei STT-Anbieter
+### SS-04 — Three STT providers
 
-AssemblyAI, OpenAI und Groq vollständig integrieren, aber Optionen nach tatsächlichen Modellfähigkeiten darstellen. Deutsch/Englisch und automatische Sprachwahl sind Kernanwendungen. Sprechertrennung, Wort-/Segmentzeiten und Kontextbegriffe nur anbieten, soweit unterstützt. Inkompatible Kombinationen vor dem Upload erklären. Nutzer konfiguriert den eigenen Account; die App enthält keine gemeinsamen API-Schlüssel.
+Fully integrate AssemblyAI, OpenAI, and Groq, but present options according to what each model actually supports. German/English and automatic language detection are core use cases. Offer speaker diarization, word/segment timestamps, and context terms only where supported. Explain incompatible combinations before uploading. The user configures their own account; the app ships no shared API keys.
 
-AssemblyAI-Guthaben kann genutzt werden; Groq ist eine wählbare günstige Alternative. Keine feste universelle Genauigkeitsrangfolge. Keine automatische Flucht zu einem anderen Provider: Audioübermittlung und mögliche Kosten brauchen eine zuvor ausdrücklich gewählte Richtlinie. Modell-/Accountzugriff muss verifiziert werden; ein erfolgreicher Modelllistenabruf allein beweist keine erfolgreiche Transkription.
+Existing AssemblyAI credit can be used; Groq is a selectable low-cost alternative. There is no fixed, universal accuracy ranking. No automatic fallback to a different provider: submitting audio and incurring possible cost both require a policy chosen explicitly in advance. Model/account access must be verified; successfully listing available models alone does not prove that transcription will succeed.
 
-### SS-05 — Verlauf und mehrere Jobs
+### SS-05 — History and multiple jobs
 
-Dauerhafter Verlauf mit Suche, Quelle, Datum, Provider/Modell, Phase, Ergebnis-/Exportstatus und verständlicher Fehleransicht. Wiederholen, nur fehlenden Zweig wiederholen, abbrechen, mit anderem Provider neu ausführen und löschen. Neue Ausführung als neue Attempt erhalten; abgeschlossene Ergebnisse nicht überschreiben.
+A persistent history with search, source, date, provider/model, phase, result/export status, and an understandable error view. Retry, retry only the missing branch, cancel, re-run with a different provider, and delete. Keep a re-run as a new attempt; never overwrite a completed result.
 
-Konfigurierbar 1–4 gleichzeitig aktive Jobs, Standard 2. CPU-intensive Audioaufbereitung standardmäßig einmal gleichzeitig. Providerlimits separat berücksichtigen. Doppeltes Teilen desselben Links darf nicht unbemerkt einen weiteren kostenpflichtigen Auftrag auslösen: vorhandenen Job zeigen, neue Ausführung explizit anbieten. Verschiedene Konfigurationen und bewusst gewünschte Vergleiche bleiben möglich.
+1-4 simultaneously active jobs, configurable, default 2. CPU-intensive audio preparation defaults to one at a time. Respect provider limits separately. Sharing the same link twice must never silently trigger another billable job: show the existing job and offer a new run explicitly. Different configurations and deliberately wanted comparisons both remain possible.
 
-### SS-06 — Hintergrundausführung und ehrliche Zustände
+### SS-06 — Background execution and honest state
 
-Navigation, Display-Aus und normale Prozessneuerstellung dürfen den Verlauf nicht verlieren. Arbeit wird soweit vom OS zugelassen fortgesetzt oder aus sicheren Checkpoints wieder aufgenommen. Nach einem Benutzer-Force-Stop keine geheime Selbstreaktivierung versprechen. Beim nächsten Öffnen Zustand abgleichen und verständlich fortsetzen.
+Navigation, the screen turning off, and a normal process restart must never lose history. Work continues as far as the OS allows, or resumes from safe checkpoints. After the user force-stops the app, never promise silent self-reactivation. On the next open, reconcile state and continue in an understandable way.
 
-Phase und reale Byte-/Chunk-Fortschritte zeigen. Ohne Provider-Prozentwert „Provider verarbeitet“ mit Laufzeit, nicht einen erfundenen Prozentbalken. Wartezustände für Netz, Nutzerentscheidung, Kontingent, Geräteentsperrung und Exportberechtigung unterscheiden. In BOTH erfolgreiche Artefakte sofort öffnen können, während der andere Zweig noch läuft.
+Show phase and real byte/chunk progress. Without a percentage from the provider, show "provider processing" with elapsed time, not an invented progress bar. Distinguish waiting states for network, user decision, quota, device unlock, and export permission. In BOTH, a successful artifact can be opened immediately while the other branch is still running.
 
-### SS-07 — Provenienz und Ergebnisqualität
+### SS-07 — Provenance and result quality
 
-YouTube-Auto-Captions, vom Kanal bereitgestellte Captions, automatische Übersetzung, externes STT und lokale Datei als getrennte Herkunftsinformationen dokumentieren. Uploader-bereitgestellt heißt nicht nachgewiesen manuell erstellt. Unklare Informationen als unbekannt lassen. Provider und Modell nicht in dasselbe Feld wie Caption-Herkunft zwingen.
+Document YouTube auto-captions, channel-provided captions, automatic translation, external STT, and local files as distinct provenance types. Uploader-provided does not mean proven to be manually created. Leave unclear information as unknown. Never force provider and model into the same field as caption provenance.
 
-Originaldaten auf Wunsch speichern; abgeleitete bereinigte Texte getrennt halten. Keine LLM-Korrektur, keine scheinbar beste Wortauswahl aus zwei Transkripten. Weder Lesbarkeit noch Textübereinstimmung beweisen Genauigkeit. Strukturwarnungen dürfen Schleifen, fehlende Chunks, kaputte Zeiten oder leeres Ergebnis anzeigen, aber keine falsche WER-/Accuracy-Bewertung liefern. Echte Sprechwiederholungen dürfen nicht global gelöscht werden.
+Store the original data on request; keep derived, cleaned-up text separate. No LLM correction, no apparently-best word choice merged from two transcripts. Neither readability nor text agreement proves accuracy. Structural warnings may flag loops, missing chunks, broken timestamps, or an empty result, but must never produce a fabricated WER/accuracy score. Genuine speech repetitions must never be deleted globally.
 
-### SS-08 — Speicherung und Exporte
+### SS-08 — Storage and exports
 
-Intern eine kanonische, dauerhaft gespeicherte Fassung behalten. Externe Zielordner über Android Storage Access Framework auswählen, nicht als ungeprüften Dateisystempfad behandeln. Markdown ist Standard; TXT, strukturiertes JSON sowie SRT/VTT bei vorhandenen geeigneten Zeitdaten. Ein Teilergebnis bleibt auch dort erkennbar, weil ein Player nur Cues zeigt: ein Hinweis-Cue am Anfang und eigene Cues über nicht transkribierte Abschnitte. Rohe Captions sind eine zusätzliche Ausgabe. Tatsächliches Rohformat erhalten; Konvertierungen kennzeichnen.
+Keep one canonical, permanently stored version internally. Choose external target folders through the Android Storage Access Framework, never treat one as an unchecked filesystem path. Markdown is the default; TXT, structured JSON, and SRT/VTT when suitable timing data exists. A partial result stays recognizable there too, since a player only shows cues: a notice cue at the start, and separate cues over untranscribed sections. Raw captions are an additional output. Preserve the actual raw format; label any conversion.
 
-Bei Verlust der Ordnerberechtigung bleibt das Transkript intern verfügbar und erhält `EXPORT_PENDING/FAILED`, keine erneute STT-Anfrage. Export wiederholbar, Kollisionen vermeiden. Dateinamen enthalten Video-/Source-ID, Quelle/Modell und Sprachangabe; Titel allein ist nicht eindeutig. Exportmetadaten bleiben auch nach Umbenennung aussagekräftig.
+If folder permission is lost, the transcript stays available internally and gets `EXPORT_PENDING`/`FAILED` — never a new STT request. Export is repeatable and avoids collisions. Filenames include the video/source ID, source/model, and language, since the title alone is not unique. Export metadata stays meaningful even after renaming.
 
-Audioaufbewahrung: nur technisch notwendige temporäre Dateien, bis erfolgreicher Transkriptpersistierung (Standard), oder dauerhaft ausdrücklich behalten. Speicherobergrenze und sichere Bereinigung; aktive Dateien und erfolgreiche Transkripte niemals als Cache löschen. „Nie behalten“ bedeutet nicht „niemals während der Verarbeitung auf Datenträger schreiben“.
+Audio retention: only technically necessary temporary files, kept until the transcript is durably persisted (the default), or kept permanently if explicitly chosen. A storage ceiling and safe cleanup apply; never delete active files or successful transcripts as cache. "Never retain" does not mean "never write to disk during processing."
 
-### SS-09 — Viewer und Weitergabe
+### SS-09 — Viewer and sharing
 
-Lange Transkripte ohne UI-Blockierung anzeigen, durchsuchen, kopieren und über Android Share als Datei teilen. Herkunft, Quelle, Sprache, Zeit-/Sprecherangaben und Warnungen sichtbar. BOTH zeigt getrennte Artefakte, keine automatische Verschmelzung. Zunächst umschaltbare Ansicht; auf großen Displays optional nebeneinander. Ein vollständiger algorithmischer Diff ist nachgeordnet.
+Display long transcripts without blocking the UI; search, copy, and share as a file through Android Share. Provenance, source, language, timing/speaker data, and warnings all stay visible. BOTH shows separate artifacts, with no automatic merging. A switchable view comes first; side-by-side is optional on large displays. A full algorithmic diff is a lower priority.
 
-Kein Versprechen, dass Android eine Datei automatisch im ChatGPT-Projekt „Summarize“ ablegt. Standard-Share-Sheet und gespeicherte Datei sind die zuverlässige Schnittstelle. Kein eigener OpenAI-LLM-Schlüssel nur für Zusammenfassungen erforderlich.
+No promise that Android will automatically file a document into a "Summarize" ChatGPT project. The standard share sheet and a saved file are the reliable interface. No separate OpenAI LLM key is needed just for summarization.
 
-### SS-10 — Sicherheit und Komponentenupdates
+### SS-10 — Security and component updates
 
-API-Schlüssel geschützt speichern; Diagnoseexport redigieren; keine Telemetrie oder Drittanbieteranalyse. Herkunft von Update-Code prüfen, kompatible yt-dlp-/EJS-Pakete unabhängig vom APK aktualisieren und zurückrollen, soweit technisch nachgewiesen. Native Runtimes und unverträgliche Änderungen benötigen gegebenenfalls weiterhin ein APK-Update. Genaue Freigabe- und Fehlerregeln stehen in SECURITY_UPDATES.
+Store API keys securely; redact diagnostic exports; no telemetry or third-party analytics. Verify the provenance of update code; update and roll back compatible yt-dlp/EJS packages independently of the APK, to the extent this is technically demonstrated. Native runtimes and incompatible changes may still require an APK update. Exact release and failure rules are in `docs/SECURITY_UPDATES.md`.
 
-### SS-11 — Kosten, Limits und Transparenz
+### SS-11 — Cost, limits, and transparency
 
-Vor kostenrelevanten Jobs geschätzte Audiodauer und verfügbare Preisinformation mit Datums-/Tarifangabe zeigen. Bei unbekanntem Preis „unbekannt“, nicht null. Persönliche lokale Budgets begrenzen neue Submissions konservativ, ersetzen keine Providerabrechnung. Overlap, Retries und Anbieter-Rundung können Zusatzverbrauch verursachen. Ein entfernter Job kann nach lokalem Abbruch weiterlaufen und berechnet werden.
+Before a cost-relevant job, show the estimated audio duration and the available pricing information with its date and rate. Show "unknown" for an unknown price, never zero. Personal local budgets conservatively cap new submissions; they do not replace provider billing. Overlap, retries, and provider rounding can cause extra usage. A remote job can keep running and being billed after a local cancellation.
 
-Lokale Usage-Zählung ist nur eine Teilansicht dieses Geräts, keine verbindliche organisationsweite Kontingentanzeige. Warteschlange bei Rate-Limit statt Endlosschleife; `Retry-After` berücksichtigen. Keine Paid-Upgrades oder Budgetänderungen automatisch vornehmen.
+Local usage counting is only a partial view from this device, not a binding organization-wide quota display. Queue on a rate limit instead of looping forever; honor `Retry-After`. Never make a paid upgrade or a budget change automatically.
 
-### SS-12 — Bedienqualität und Nachweise
+### SS-12 — Usability and evidence
 
-Deutsch und Englisch als ausdrücklich wählbare App-Sprache (`de`/`en`) mit systematischer Ressourcenlokalisierung, unabhängig von der Transkriptionssprache. System/hell/dunkel, lesbare Typografie, ausreichende Touch-Flächen, TalkBack-Semantik, Schriftvergrößerung und klare Leer-/Fehlerzustände. Untere Schaltflächen brauchen sichtbare Abstände; Auswahlfelder für Beschaffung, Anbieter und Modell sollen kompakt bleiben, ohne abgeschnittene Inhalte oder Layoutsprünge bei Schriftvergrößerung. Aufwendige Grafiken dürfen Funktion und Performance nicht verdrängen. Clipboard nur nach Nutzeraktion lesen, nicht dauernd überwachen. Laufende Jobs über passende Notifications anzeigen; verweigerte Berechtigungen verständlich behandeln.
+German and English as explicitly selectable app languages (`de`/`en`) with systematic resource localization, independent of the transcription language. System/light/dark theming, readable typography, large enough touch targets, TalkBack semantics, font scaling, and clear empty/error states. Bottom buttons need visible spacing; the acquisition, provider, and model selection fields should stay compact, without truncated content or layout shifts at larger font sizes. Elaborate graphics must never crowd out function or performance. Read the clipboard only after a user action, never monitor it continuously. Show running jobs through appropriate notifications; handle denied permissions in an understandable way.
 
-Vollständiges Repository, nachvollziehbare Build-Anleitung, CI, Testberichte, debug APK und ein für persönliche Updates reproduzierbar signierbarer Release-Pfad. Die vollständige v1-Abnahme folgt TEST_PLAN, nicht dem bloßen Vorhandensein von Screenshots.
+A complete repository, a traceable build guide, CI, test reports, a debug APK, and a release path that can be signed reproducibly for personal updates. Full v1 acceptance follows `docs/TEST_PLAN.md`, not the mere existence of screenshots.

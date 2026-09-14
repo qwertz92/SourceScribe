@@ -1,68 +1,39 @@
 # SourceScribe
 
-**Stand:** 14. September 2026 · Persönliche Preview 0.2.0-preview.1; Reviewschleife angehalten, bekannte Fehler in [BUGS](docs/BUGS.md) · **Status:** Persönliche Preview; vollständige v1-Abnahme blockiert
+**As of:** 14 September 2026 · Personal preview 0.2.0-preview.1 with its signed APK; work towards 0.3.0 in progress; known issues in [BUGS](docs/BUGS.md) · **Status:** Personal preview; full v1 acceptance not reached
 
-SourceScribe ist eine persönlich genutzte Android-App für nachvollziehbare
-Transkripte. Eine ausdrücklich eingegebene YouTube-Quelle lässt sich teilen oder
-einfügen; vorhandene Untertitel werden gesichert und Audio kann über den gewählten
-Provider transkribiert werden. Ergebnisse bleiben zunächst intern und können als
-Datei über das Android-Share-Sheet weitergegeben werden. Deutsche Zusammenfassung
-und Faktencheck bleiben außerhalb der App.
+SourceScribe is a personal-use Android app for traceable transcripts. An explicitly entered YouTube source can be shared or pasted in; existing captions are archived, and audio can be transcribed through the chosen provider. Results stay internal at first and can be shared as a file through the Android share sheet. Summarization and fact-checking in German happen outside the app.
 
-## Aktueller Stand
+## Current state
 
-Das öffentliche Repository ist [qwertz92/SourceScribe](https://github.com/qwertz92/SourceScribe).
-Für die Preview 0.2.0-preview.1 sind am Stand `1fe2dad` Debug-App, beide Test-APKs und die unsignierte
-Release-APK gebaut; signiert wird sie vom Nutzer mit dem Schlüssel von 0.1.0.
-[Einstieg zum Testen](docs/TRY_PREVIEW.md) · [Preview-Quellstand](https://github.com/qwertz92/SourceScribe/releases/tag/v0.2.0-preview.1) · [Prüfbericht](docs/reports/2026-09-14-preview-0.2.md).
-An diesem Stand bestanden 187 JVM-Tests, im Modul `app` 202 von 208 Instrumentierungstests und im Modul
-`extractor` 46 von 50, auf dem API-37-/x86_64-/16-KB-Emulator `emulator-5556`. Die übrigen zehn sind opt-in: Vier
-Prozessstufen liefen einzeln und bestanden; sechs Tests brauchen eine echte Quelle oder einen echten Engine-Download
-oder legen nur Testdaten an und liefen nicht. Derselbe Stand ist in der CI grün, die Gerätetests beider Module
-eingeschlossen. Echte Android-Caption-/Audioextraktion und der Caption-App-Pfad bis SAF-Export wurden für 0.1.0
-nachgewiesen und für 0.2.0 nicht wiederholt. Deutsch/Englisch, System/Hell/Dunkel, überarbeitete Auswahlfelder und
-die Freigabe durch bewussten Auftragsstart sind integriert. [STATUS](docs/STATUS.md) trennt Implementierung,
-Fixtures und reale Nachweise.
+The public repository is [qwertz92/SourceScribe](https://github.com/qwertz92/SourceScribe); its [releases page](https://github.com/qwertz92/SourceScribe/releases) is where signed, installable APKs are published.
 
-Echte Transkriptionen mit AssemblyAI, OpenAI und Groq bleiben mangels freigegebener
-Zugangsdaten, Testinhalte und Kostenrahmen blockiert. Ein physisches ARM64-Gerät
-fehlt; vollständige TalkBack-Bedienung ist mit der verfügbaren Eingabeautomation
-nicht nachgewiesen. Die GitHub-Preview enthält nur den Quellstand. Öffentliche APK-Verteilung
-bleibt wegen fehlender vollständiger FFmpeg-Lizenz-/Quellbelege gesperrt.
+For preview 0.2.0-preview.1, commit `1fe2dad` built the debug app, both test APKs, and the unsigned release APK; `tools/sign-release.sh` signed the release APK with the key of 0.1.0, and it is attached to the release.
+[Try it](docs/TRY_PREVIEW.md) · [preview release](https://github.com/qwertz92/SourceScribe/releases/tag/v0.2.0-preview.1) · [verification report](docs/reports/2026-09-14-preview-0.2.md).
+At this commit, 187 JVM tests passed, along with 202 of 208 instrumented tests in the `app` module and 46 of 50 in the `extractor` module, on the API 37/x86_64 emulator with 16 KB pages, `emulator-5556`. The other ten are opt-in: four process-recovery stages ran individually and passed; six tests need a real source, a real engine download, or only set up test data, and did not run. The same commit is green in CI, including the device tests of both modules. Real Android caption/audio extraction and the caption-to-SAF-export path were verified for 0.1.0 and not repeated for 0.2.0. German/English, system/light/dark, redesigned selection fields, and gating a release on a deliberate job start are all in place. [STATUS](docs/STATUS.md) separates implementation, fixture testing, and real-world verification.
 
-Die CI baut, testet und lintet und führt die Gerätetests beider Module auf einem Emulator aus. Ihr Geräteschritt
-scheiterte in vier Läufen vom 10. und 14. September an `ChoiceAccessibilityTest`. Der letzte davon zeigte den Grund:
-Die Sprachwahl blieb gesperrt, weil die App noch startete, länger als die 25 Sekunden, die der Test wartete. Seit
-`1fe2dad` wartet er zuerst auf das Ende des Starts, und der Lauf am Stand `1fe2dad` ist grün
-([DEFECTS](docs/DEFECTS.md), Punkt 54).
+Real transcription with AssemblyAI, OpenAI, and Groq has not run yet: it needs the owner's API keys, which agents may not enter. The app has not run on a physical ARM64 phone yet, and full TalkBack operation is not verified with the available input automation.
 
-Die maßgeblichen Nachweise werden fortgeschrieben:
+CI builds, tests, and lints, and runs the device tests of both modules on an emulator. Its device step failed in four runs on 10 and 14 September on `ChoiceAccessibilityTest`. The last of those showed the cause: the language selector stayed locked because the app was still starting, for longer than the 25 seconds the test waited. Since `1fe2dad`, the test first waits for startup to finish, and the run at `1fe2dad` is green ([DEFECTS](docs/DEFECTS.md), item 54).
 
-- [Tatsächlicher Projektstatus](docs/STATUS.md)
-- [Restarbeiten und nächste Prüfziele](docs/NEXT_STEPS.md)
-- [Bekannte Fehler nach Priorität](docs/BUGS.md)
-- [Bekannte Probleme im Detail](docs/DEFECTS.md)
-- [Lernprotokoll für andere Agenten](docs/LEARNINGS.md)
-- [Build und persönliche Auslieferung](docs/BUILD.md)
-- [Prüfbericht der Preview 0.2.0](docs/reports/2026-09-14-preview-0.2.md)
-- [Build-/P0-Prüfbericht](docs/reports/2026-09-07-build-and-p0.md)
-- [Lizenz- und Provenienzprüfung](docs/reports/2026-09-07-licenses.md)
+The authoritative evidence is kept up to date here:
 
-## Einstieg
+- [Actual project status](docs/STATUS.md)
+- [Remaining work and next verification targets](docs/NEXT_STEPS.md)
+- [Known issues by priority](docs/BUGS.md)
+- [Known issues in detail](docs/DEFECTS.md)
+- [Learnings log for other agents](docs/LEARNINGS.md)
+- [Build and personal release](docs/BUILD.md)
+- [0.2.0 preview verification report](docs/reports/2026-09-14-preview-0.2.md)
+- [Build/P0 verification report](docs/reports/2026-09-07-build-and-p0.md)
+- [License and provenance review](docs/reports/2026-09-07-licenses.md)
 
-Der [Dokumentationsindex](docs/INDEX.md) führt zu Produktumfang, Architektur,
-Sicherheitsgrenzen, Integrationsverträgen, Roadmap und Testplan. Vor Änderungen
-bitte [AGENTS.md](AGENTS.md) lesen.
+## Getting started
 
-Der lokale Build-Einstieg steht in [docs/BUILD.md](docs/BUILD.md). Er erzeugt
-keine Provideraufrufe und installiert nichts auf einem Gerät. ADB-, Provider- und
-weitere Live-Nachweise werden in den Berichten mit ihrer tatsächlichen Ebene als
-`PASS`, `BLOCKED` oder `NOT_RUN` geführt.
+The [documentation index](docs/INDEX.md) leads to product scope, architecture, security boundaries, integration contracts, roadmap, and test plan. Read [AGENTS.md](AGENTS.md) before making changes.
 
-## Technische Leitlinien
+The local build entry point is [docs/BUILD.md](docs/BUILD.md). It makes no provider calls and installs nothing on a device. ADB, provider, and other live verification are tracked in the reports at their actual level, as `PASS`, `BLOCKED`, or `NOT_RUN`.
 
-SourceScribe ist eine native Kotlin-/Jetpack-Compose-App ohne eigenen Server und
-ohne zusätzliche LLM-API für Zusammenfassungen. Quellen, Konfigurationen,
-Verarbeitungszustände und Exporte haben getrennte Verträge. API-Schlüssel,
-temporäre Audiodaten und vollständige Transkripte gehören weder in Git noch in
-Logs, Diagnoseexporte oder Testberichte.
+## Technical guidelines
+
+SourceScribe is a native Kotlin/Jetpack Compose app with no server of its own and no separate LLM API for summarization. Sources, configuration, processing state, and exports each have a separate contract. API keys, temporary audio data, and full transcripts belong in none of: Git, logs, diagnostic exports, or test reports.

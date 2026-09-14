@@ -1,45 +1,45 @@
-# Arbeitsregeln für SourceScribe
+# Working rules for SourceScribe
 
-## Orientierung und Verantwortung
+## Orientation and responsibility
 
-Dies ist ein persönliches Android-Projekt, kein SaaS. `docs/PRODUCT.md` definiert den Umfang; `docs/ROADMAP.md` die Reihenfolge. Architektur, Integrationsverträge und Sicherheit stehen in den gleichnamigen Dokumenten. Lies sie gezielt, bevor du ihren Bereich veränderst. Arbeitsberichte und Dokumentation auf Deutsch; Codebezeichner und stabile Zustandswerte auf Englisch.
+This is a personal Android project, not a SaaS product. `docs/PRODUCT.md` defines the scope; `docs/ROADMAP.md` sets the order of work. Architecture, integration contracts, and security live in the documents of the same name — read the relevant one before changing its area. Documentation, code identifiers, comments, commit messages, and release notes are in English; agents talk to the owner in the owner's language.
 
-`docs/INDEX.md` ist der gemeinsame Wissenseinstieg. Anforderungen nicht in ein zweites Wiki kopieren; Entscheidungen, Quellen und echte Tests in den verlinkten Dokumenten pflegen. `CLAUDE.md` bleibt ausschließlich die Brücke `@AGENTS.md`.
+`docs/INDEX.md` is the shared entry point to project knowledge. Do not copy requirements into a second wiki; keep decisions, sources, and real test results in the linked documents. `CLAUDE.md` remains nothing but the bridge `@AGENTS.md`.
 
-Bestehende Nutzerdateien und uncommittete Änderungen erhalten. Keine eigenmächtigen Remote-Pushes, Veröffentlichungen, Änderungen an Abrechnungen, Absenkungen des Sicherheitsniveaus oder Löschungen fremder Daten. Ein echter Blocker rechtfertigt einen klaren Zwischenstand, keine erfundene Fertigstellung.
+Preserve existing user files and uncommitted changes. Commit and push verified work to `main`; no release, billing change, lowering of the security level, or deletion of other people's data without the owner's approval. A genuine blocker warrants a clear interim status, not a fabricated claim of completion.
 
-## Unverhandelbare Invarianten
+## Non-negotiable invariants
 
-- Genau die angegebene Quelle verarbeiten. Keine Ersatzvideos, Suchtreffer oder erfundenen Transkripte.
-- Der gewählte Beschaffungsmodus und Kostenrahmen gelten auch bei Fehlern. Keine stillen Providerwechsel, Uploads oder kostenpflichtigen Wiederholungen.
-- Ungewisser Ausgang eines kostenrelevanten Requests ist nicht gleichbedeutend mit „nicht ausgeführt“.
-- Erst intern dauerhaft sichern, dann exportieren. Ein Exportfehler löst keine erneute STT-Anfrage aus.
-- Herkunft, Sprache, tatsächliche Modellangaben und Unsicherheiten offenlegen. Keine erfundenen Zeitstempel, Sprecheridentitäten, Prozentfortschritte oder Genauigkeitswerte.
-- Ein Teilergebnis darf nicht als vollständiger Erfolg erscheinen. Erfolgreiche Geschwisterartefakte bleiben erhalten.
-- API-Schlüssel, temporäre Audioquellen und vollständige Transkripte nicht in Logs, Git, WorkManager-Input-Daten oder Diagnoseexporte schreiben.
-- Kein ungeprüfter Update-Code, keine Shell-Interpolation untrusted Eingaben, keine frei konfigurierbaren yt-dlp-Plugins oder `--exec`-Hooks.
-- Ein eigener Prozess mit derselben Android-UID ist keine Sicherheitsisolation gegenüber App-Daten.
+- Process exactly the specified source. No substitute videos, search results, or invented transcripts.
+- The chosen acquisition mode and cost budget hold even when something fails. No silent provider switches, uploads, or paid retries.
+- An uncertain outcome for a cost-relevant request is not the same as "did not happen."
+- Persist internally first, then export. An export failure must not trigger another STT request.
+- Disclose provenance, language, the actual model used, and known uncertainty. Never invent timestamps, speaker identities, progress percentages, or accuracy figures.
+- A partial result must never appear as a full success. Successful sibling artifacts must be preserved.
+- Never write API keys, temporary audio sources, or full transcripts to logs, Git, WorkManager input data, or diagnostic exports.
+- No unreviewed update code, no shell interpolation of untrusted input, no freely configurable yt-dlp plugins or `--exec` hooks.
+- A separate process under the same Android UID is not a security boundary against the app's own data.
 
-## Implementierungsstil
+## Implementation style
 
-Kotlin, Compose, Coroutines/Flow; UI frei von Netzwerk-/Dateiverarbeitungslogik. Domainlogik möglichst JVM-testbar. Kleine Änderungen mit klaren Verträgen, typisierten Fehlern, Cancellation und nachvollziehbaren Zuständen. Keine Framework-Abstraktionen ohne konkreten Nutzen. Bibliotheks-/Toolversionen im Versionskatalog und Build festhalten, keine dynamischen `+`-Versionen.
+Kotlin, Compose, Coroutines/Flow; keep the UI free of networking or file-processing logic. Keep domain logic JVM-testable wherever possible. Make small changes with clear contracts, typed errors, cancellation support, and traceable state. No framework abstractions without a concrete benefit. Pin library and tool versions in the version catalogue and the build; no dynamic `+` versions.
 
-Vor Änderungen an Datenmodell, Job-Semantik, Update-Vertrauen oder Netzwerkgrenzen einen kurzen Architekturentscheid dokumentieren. Die technischen Aussagen in RESEARCH sind datierte Recherche, keine ewigen Versionsvorgaben. Prüfe integrationskritische Details gegen aktuelle Primärquellen und den tatsächlich ausgeführten Code.
+Document a short architecture decision before changing the data model, job semantics, update trust, or network boundaries. The technical statements in `docs/RESEARCH.md` are dated research, not permanent version mandates. Check integration-critical details against current primary sources and the code that actually runs.
 
-## Subagenten und Review
+## Subagents and review
 
-Delegiere sinnvoll, sofern die Umgebung echte Subagenten unterstützt. Geeignete unabhängige Bereiche sind Provideradapter samt Contract-Tests, Caption-Parser/Exporter, UI und gezielte Sicherheits-/Lebenszyklusreviews. Gemeinsame Interfaces, DB-Migrationen und Scheduler haben einen verantwortlichen Integrator. Scope, erlaubte Dateien, erwartete Tests und Ergebnisformat je Auftrag festlegen; isolierte Worktrees bei parallelen Codeänderungen bevorzugen.
+Delegate sensibly wherever the environment supports real subagents. Good independent units are provider adapters with their contract tests, the caption parser/exporter, the UI, and targeted security or lifecycle reviews. Shared interfaces, database migrations, and the scheduler each need one responsible integrator. Define scope, allowed files, expected tests, and result format per task; parallel code changes only in disjoint files and never with overlapping builds — worktrees or branches only with the owner's consent.
 
-Ein Reviewer soll nicht nur seinen eigenen Code abnehmen. Findings brauchen Datei/Stelle, Voraussetzung, reproduzierbaren Ablauf, erwartetes/tatsächliches Verhalten und Schweregrad. Der Hauptagent prüft die Evidenz. Bei fehlender Delegationsfunktion getrennte Review-Rollen sequenziell ausführen; keine fiktiven Agenten behaupten.
+A reviewer should not simply approve their own code. Findings need a file/location, preconditions, a reproducible sequence, expected versus actual behavior, and a severity. The lead agent checks the evidence. Where delegation is unavailable, run separate review roles sequentially; never claim a fictitious agent.
 
-## Nachweise und Fertigstellung
+## Evidence and completion
 
-Reale Befehle und Ergebnisse aufzeichnen. Tests dürfen nicht abgeschwächt, gelöscht oder übersprungen werden, nur um grün zu werden. Netzwerk-/Providerfehler durch kontrollierte Fixtures reproduzieren; Live-Tests separat dokumentieren. Fehlende Credentials oder Geräte als `BLOCKED/NOT_RUN`, nicht als `PASS` führen.
+Record real commands and their results. Tests must never be weakened, deleted, or skipped just to turn green. Reproduce network or provider failures with controlled fixtures; document live tests separately. Report missing credentials or devices as `BLOCKED`/`NOT_RUN`, never as `PASS`.
 
-Nach einem Reviewfund einen passenden Regressionstest ergänzen. Vor Freigabe alle betroffenen Tests erneut ausführen und einen abschließenden unabhängigen Review-Pass durchführen. Keine offenen kritischen/hohen Defekte; keine offenen Abnahmeverletzungen. Niedrige verbleibende Risiken sichtbar dokumentieren. Keine endlose „bis garantiert fehlerfrei“-Schleife; eine nicht geschlossene Abnahmeanforderung verhindert die Freigabe, nicht die ehrliche Übergabe des erreichten Stands.
+Add a matching regression test after every review finding. Before release, rerun all affected tests and run one final, independent review pass. P1 findings are always fixed; findings that take minutes are fixed on the spot; everything else goes into `docs/BUGS.md` with a priority and is reported to the owner. Only open P1 or P2 findings, or unmet acceptance criteria, block a release.
 
-## Repositoryhygiene
+## Repository hygiene
 
-Versioniere Quellcode, Tests, freigegebene kleine Fixtures, Lock-/Versionsdateien, Room-Schemas und Dokumentation. Ignoriere Schlüssel, lokale SDK-Pfade, Signing-Dateien, private Testdaten, Audio-Downloads und Laufzeitlogs. CI ohne echte Provider-Schlüssel betreiben. Testhilfen, Klartext-HTTP für lokale Fixtures und Demo-Provider dürfen nicht im persönlichen Release-Build verfügbar sein. Keine persistenten Test-Hintertüren.
+Version source code, tests, small approved fixtures, lock/version files, Room schemas, and documentation. Ignore keys, local SDK paths, signing files, private test data, audio downloads, and runtime logs. Run CI without real provider keys. Test helpers, cleartext HTTP for local fixtures, and demo providers must not be reachable in the personal release build. No persistent test backdoors.
 
-Halte `docs/STATUS.md` aktuell. Der Abschlussbericht unterscheidet implementiert, fixture-getestet, live-verifiziert und blockiert. Der letzte Satz dieses Abschnitts sagte bis zum 11. September, das Übergabepaket enthalte noch keinen App-Code und keinen App-Testnachweis; das galt am Gründungstag und ist seit dem ersten Modul falsch. Was tatsächlich fehlt, steht in `docs/STATUS.md` und in der Blockadetabelle von `docs/NEXT_STEPS.md` — dort und nirgends sonst.
+Keep `docs/STATUS.md` up to date. The final report distinguishes implemented, fixture-tested, live-verified, and blocked. What is actually missing is listed in `docs/STATUS.md` and `docs/BUGS.md` — there and nowhere else.

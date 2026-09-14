@@ -18,6 +18,9 @@ progress.
 In parallel the owner tests `0.2.0-preview.1` on a phone: the update over 0.1.0, scrolling in the result view
 (BUGS item 1) and, with the owner's own API key, a short real transcription.
 
+Open license points about the bundled FFmpeg binaries are listed at the end of
+[THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md).
+
 ## Running the test gates correctly
 
 Two instrumentation suites, `app` and `extractor`, must both run — commands are in [BUILD.md](BUILD.md). For
