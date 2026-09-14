@@ -119,6 +119,7 @@ jobs:
           from pathlib import Path
           import os
           import xml.etree.ElementTree as ET
+          ASSUMPTIONS = ("org.junit.AssumptionViolatedException", "org.junit.internal.AssumptionViolatedException")
           lines = []
           for module in ("app", "extractor"):
               counts = {"tests": 0, "failures": 0, "errors": 0, "skipped": 0}
@@ -132,14 +133,29 @@ jobs:
                   for suite in ([root] if root.tag == "testsuite" else list(root.iter("testsuite"))):
                       suites += 1
                       cases = list(suite.iter("testcase"))
-                      fallback = {
-                          "tests": len(cases),
-                          "failures": sum(1 for case in cases if case.find("failure") is not None),
-                          "errors": sum(1 for case in cases if case.find("error") is not None),
-                          "skipped": sum(1 for case in cases if case.find("skipped") is not None),
-                      }
-                      for key in counts:
-                          counts[key] += int(suite.get(key, fallback[key]))
+                      if not cases:
+                          for key in counts:
+                              counts[key] += int(suite.get(key, 0))
+                          continue
+                      # Counted per test case rather than from the suite's attributes. The Android Gradle plugin
+                      # writes a failed assumption, which is how an opt-in test skips itself, as a <failure> and
+                      # counts it among the suite's failures, although the task does not fail for it.
+                      counts["tests"] += len(cases)
+                      for case in cases:
+                          problem = case.find("failure")
+                          if problem is None:
+                              problem = case.find("error")
+                          described = [] if problem is None else [
+                              problem.get("type", ""), problem.get("message", ""), problem.text or "",
+                          ]
+                          if case.find("skipped") is not None or any(
+                              value.lstrip().startswith(ASSUMPTIONS) for value in described
+                          ):
+                              counts["skipped"] += 1
+                          elif case.find("failure") is not None:
+                              counts["failures"] += 1
+                          elif problem is not None:
+                              counts["errors"] += 1
               if suites == 0:
                   lines.append(f"{module}: no test report found")
                   continue
