@@ -12,6 +12,7 @@ import java.security.MessageDigest
 import java.util.Locale
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
+import org.bouncycastle.bcpg.ArmoredInputStream
 import org.bouncycastle.bcpg.HashAlgorithmTags
 import org.bouncycastle.bcpg.PublicKeyAlgorithmTags
 import org.bouncycastle.jce.provider.BouncyCastleProvider
@@ -76,6 +77,7 @@ object EngineVerifier {
     private val checksumLine = Regex("^([0-9A-Fa-f]{64})[ \\t]{2,}([^\\r\\n]+)$")
     private val assignmentValue = Regex("[A-Za-z0-9][A-Za-z0-9._+~-]{0,63}")
     private val gitHeadValue = Regex("[0-9A-Fa-f]{40}")
+    private val armorFooter = Regex("-----END [A-Z0-9 ,]+-----")
 
     /** Verifies the fixed-key signature, signed hash manifest, archive, and metadata. */
     fun verify(artifact: File, checksums: ByteArray, signature: ByteArray): VerifiedEngine {
@@ -213,9 +215,12 @@ object EngineVerifier {
             factory.setThrowForUnknownCriticalPackets(true)
             val first = factory.nextObject()
             // ASCII armor ends at its footer line, and the factory reads nothing behind it, so a second armored block
-            // or any other text there would pass unseen. Only whitespace may follow what the factory has read.
+            // or any other text there would pass unseen. Only whitespace may follow what the factory has read, and for
+            // armor also what follows the footer in the raw bytes, since Bouncy Castle takes text glued to the footer
+            // for the rest of the footer's line.
             if (first !is PGPSignatureList || first.size() != 1 || factory.nextObject() != null ||
-                !onlyWhitespaceRemains(encoded)
+                !onlyWhitespaceRemains(encoded) ||
+                decoder is ArmoredInputStream && !onlyWhitespaceFollowsTheFooter(encodedSignature)
             ) {
                 fail(EngineVerificationCode.SIGNATURE, "signature must contain exactly one detached signature")
             }
@@ -252,6 +257,13 @@ object EngineVerifier {
         val rest = ByteArray(input.available())
         val read = input.read(rest, 0, rest.size).coerceAtLeast(0)
         return (0 until read).all { index -> rest[index].toInt().toChar() in " \t\r\n" }
+    }
+
+    /** Armor without a footer is incomplete; after the first footer only whitespace may follow, in the raw bytes. */
+    private fun onlyWhitespaceFollowsTheFooter(encodedSignature: ByteArray): Boolean {
+        val text = String(encodedSignature, StandardCharsets.ISO_8859_1)
+        val footer = armorFooter.find(text) ?: return false
+        return text.substring(footer.range.last + 1).all { it in " \t\r\n" }
     }
 
     private fun trustedPublicKey(provider: BouncyCastleProvider): PGPPublicKey {

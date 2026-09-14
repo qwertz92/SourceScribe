@@ -55,6 +55,26 @@ class EngineVerifierTest {
     }
 
     @Test
+    fun nothingMayBeGluedToTheArmorFooter() {
+        // Bouncy Castle reads the footer line of ASCII armor up to its line break. Without one it took text glued to the
+        // footer for the rest of that line, nothing was left behind the factory, and until a reviewer of round 23 tried
+        // it, the file verified like the signature alone. A footer without a line break is still a footer.
+        val armored = armor(resource("SHA2-256SUMS.sig"))
+        val end = armored.indexOfLast { it != '\n'.code.toByte() && it != '\r'.code.toByte() } + 1
+        val unterminated = armored.copyOf(end)
+        assertTrue(String(unterminated, Charsets.US_ASCII).endsWith("-----END PGP SIGNATURE-----"))
+        for (glued in listOf("SNEAKY", "-----BEGIN PGP SIGNATURE-----")) {
+            val signature = unterminated + glued.toByteArray(Charsets.US_ASCII)
+            val failure = assertThrows(EngineVerificationException::class.java) {
+                EngineVerifier.verify(File("missing-engine"), resource("SHA2-256SUMS"), signature)
+            }
+            assertEquals(glued, EngineVerificationCode.SIGNATURE, failure.code)
+        }
+
+        assertEquals(verifyCopyOfFixture(armored), verifyCopyOfFixture(unterminated))
+    }
+
+    @Test
     fun modifiedSignedManifestFailsBeforeHashUse() {
         val checksums = resource("SHA2-256SUMS").also { it[0] = (it[0].toInt() xor 1).toByte() }
         val failure = assertThrows(EngineVerificationException::class.java) {
