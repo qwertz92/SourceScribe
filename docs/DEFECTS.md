@@ -7,7 +7,9 @@ behält seine Nummer und einen kurzen Vermerk, damit Verweise aus anderen Dokume
 
 Jeder Eintrag nennt Datei und Stelle, die Voraussetzung, das erwartete gegenüber dem tatsächlichen
 Verhalten und was zum Schließen fehlt. Einträge ohne reproduzierbaren Ablauf sind als **unbestätigt**
-markiert; sie sind Verdachtsfälle, keine belegten Defekte.
+markiert; sie sind Verdachtsfälle, keine belegten Defekte. Eine Stelle nennt Datei und Funktion oder zitiert den
+Ausdruck, nie eine Zeilennummer: Zeilennummern wandern mit jeder Änderung darüber, und `tools/check-repository.py`
+weist sie in `docs/` ab.
 
 ## Rückmeldungen aus dem Test vom 10. September 2026
 

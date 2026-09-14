@@ -58,6 +58,15 @@ MAIN_FORBIDDEN = (
     ("test-provider", re.compile(r"(?i)(?:androidx\.test|MockWebServer|FixtureProvider|test\.documents)")),
 )
 
+# A line number is right for one version of a file and points at other code after the next change above it. By round
+# 19, eight of the thirteen in docs/DEFECTS.md did, one of them sending a reader who looked for a hash check into
+# `rollback`. The documents name the function or quote the expression instead.
+DOCS_FORBIDDEN = (
+    ("line-number", re.compile(r"\.(?:kts?|java|py|xml|toml|ya?ml|sh|md|json|properties|pro|gradle):\d+")),
+    ("line-number", re.compile(r"`:\d+`")),
+    ("line-number", re.compile(r"\b(?:[Zz]eilen?|[Ll]ines?) \d+")),
+)
+
 
 @dataclass(frozen=True)
 class Issue:
@@ -187,6 +196,10 @@ def _scan_text(path: Path, root: Path, tally: Tally) -> list[Issue]:
             for label, pattern in MAIN_FORBIDDEN:
                 if pattern.search(line):
                     issues.append(Issue(_issue_path(path, root), line_number, f"forbidden in main: {label}"))
+        if _issue_path(path, root).startswith("docs/") and path.suffix == ".md":
+            for label, pattern in DOCS_FORBIDDEN:
+                if pattern.search(line):
+                    issues.append(Issue(_issue_path(path, root), line_number, f"forbidden in docs: {label}"))
     return issues
 
 
@@ -291,6 +304,14 @@ def _self_test() -> None:
         (root / "src/main/utf32be.kt").write_bytes(
             codecs.BOM_UTF32_BE + ('val key = "gsk_' + "G" * 24 + '"\n').encode("utf-32-be")
         )
+        # The three forms of line number docs/DEFECTS.md used until round 19, one per line, then words that only
+        # look like one, and a line number outside docs/, which this rule leaves alone.
+        (root / "docs").mkdir()
+        (root / "docs/Defects.md").write_text("`Manager.kt:314`\nund `:271`\ngeprüft in Zeile 24\n", encoding="utf-8")
+        (root / "docs/Fine.md").write_text(
+            "Die Kostenzeile ist zweizeilig, und Zeilennummern wandern; `file()` prüft `validSlot`.\n", encoding="utf-8"
+        )
+        (root / "src/androidTest/Notes.md").write_text("`Manager.kt:314`\n", encoding="utf-8")
         tally = Tally()
         issues = check_repository(root, tracked_only=False, tally=tally)
         reasons = {issue.reason for issue in issues}
@@ -305,9 +326,15 @@ def _self_test() -> None:
         assert any(issue.path == "src/main/utf16.kt" for issue in issues), "UTF-16 file went unread"
         assert any(issue.path == "src/main/utf32.kt" for issue in issues), "UTF-32 file went unread"
         assert any(issue.path == "src/main/utf32be.kt" for issue in issues), "UTF-32BE file went unread"
+        flagged = {
+            issue.line for issue in issues
+            if issue.path == "docs/Defects.md" and issue.reason == "forbidden in docs: line-number"
+        }
+        assert flagged == {1, 2, 3}, f"line numbers in docs flagged on lines {sorted(flagged)}"
+        assert not any(issue.path in ("docs/Fine.md", "src/androidTest/Notes.md") for issue in issues)
         # Exactly, not at least. A lower bound is satisfied by a file going unread, which is the one
         # thing this counter exists to make visible.
-        assert tally == Tally(scanned=8, binary=1), str(tally)
+        assert tally == Tally(scanned=11, binary=1), str(tally)
     print("PASS self-test")
 
 
