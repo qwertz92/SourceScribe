@@ -153,6 +153,25 @@ class EngineVerifierTest {
     }
 
     @Test
+    fun aFailedInspectionRemovesItsTemporaryView() {
+        // inspectArchive reads a zipapp through a temporary view beside it and removes the view in a finally block.
+        // Only successful verifications showed that it goes; this inspection fails after the view exists.
+        val directory = Files.createTempDirectory("sourcescribe-inspection-").toFile()
+        try {
+            val made = zipFile(VERSION_PATH to versionSource())
+            val archive = made.copyTo(File(directory, "engine.zip"))
+            assertTrue(made.delete())
+            val failure = assertThrows(EngineVerificationException::class.java) {
+                EngineVerifier.inspectArchive(archive)
+            }
+            assertEquals(EngineVerificationCode.REQUIRES_APP_UPDATE, failure.code)
+            assertEquals(listOf("engine.zip"), directory.list()?.toList())
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
     fun unsupportedChannelAndUnsafePathAreRejected() {
         val badChannel = zipFile(
             VERSION_PATH to String(versionSource(), Charsets.UTF_8).replace("'stable'", "'master'").toByteArray(),
