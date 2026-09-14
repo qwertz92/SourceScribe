@@ -1,9 +1,12 @@
 package app.sourcescribe.data
 
 import android.content.Context
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
-import androidx.datastore.preferences.preferencesDataStore
+import androidx.datastore.preferences.preferencesDataStoreFile
 import app.sourcescribe.core.AppSettings
 import app.sourcescribe.core.JobConfig
 import app.sourcescribe.core.JobLimits
@@ -14,12 +17,24 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.json.Json
 
-private val Context.settingsDataStore by preferencesDataStore(name = "settings")
+/**
+ * One DataStore per settings file in this process, which DataStore requires. The `preferencesDataStore` delegate this
+ * replaces kept a single one for the whole process, on the files of whichever context used it first, so a store made
+ * for a context with files of its own read and wrote those instead: instrumentation tests changed the app's settings.
+ */
+private val stores = HashMap<String, DataStore<Preferences>>()
+
+private fun settingsDataStore(context: Context): DataStore<Preferences> {
+    val file = context.applicationContext.preferencesDataStoreFile("settings")
+    return synchronized(stores) {
+        stores.getOrPut(file.canonicalPath) { PreferenceDataStoreFactory.create(produceFile = { file }) }
+    }
+}
 
 /** Settings contain credential references only; corruption is surfaced instead of silently resetting policy. */
 @Singleton
 class SettingsStore @Inject constructor(@ApplicationContext context: Context) {
-    private val store = context.settingsDataStore
+    private val store = settingsDataStore(context)
     private val key = stringPreferencesKey("settings_v1")
     private val json = Json { encodeDefaults = true }
     val settings: Flow<AppSettings> = store.data.map { preferences ->

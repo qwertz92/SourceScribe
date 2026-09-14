@@ -187,12 +187,9 @@ class AudioImportTest {
         assertTrue(imports.listFiles().orEmpty().none { it.name.endsWith(".part") || it.name.endsWith(".audio") })
     }
 
-    private fun importer() = AudioImport(
-        IsolatedStorageContext(context, testRoot),
-        NativeRuntime(context),
-        SettingsStore(context),
-        database.records(),
-    )
+    private fun importer() = IsolatedStorageContext(context, testRoot).let { isolated ->
+        AudioImport(isolated, NativeRuntime(context), SettingsStore(isolated), database.records())
+    }
 
     private suspend fun expectCode(code: AudioImportCode, operation: suspend () -> Unit) {
         try {
@@ -205,6 +202,10 @@ class AudioImportTest {
 
     private class IsolatedStorageContext(base: Context, private val root: File) : ContextWrapper(base) {
         override fun getApplicationContext(): Context = this
+
+        // Created on use, as Context.getFilesDir does: the storage budget measures the free space of this directory,
+        // and one that does not exist reads as a full disk.
+        override fun getFilesDir(): File = File(root, "files").apply { mkdirs() }
 
         override fun getNoBackupFilesDir(): File = root
     }
