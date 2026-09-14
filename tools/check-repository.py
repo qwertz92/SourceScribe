@@ -277,7 +277,9 @@ def _check_notice_versions(root: Path) -> list[Issue]:
 
     Both notices, one of them shown in the app, name some dependencies with their version. `d994c23` moved
     Bouncy Castle to 1.86 in the catalogue, and both went on naming 1.85. A name counts when it is a key of the
-    catalogue's [versions] table, in backticks or as a word of its own, followed by a version with a dot.
+    catalogue's [versions] table, in backticks or as a word of its own, followed by a version with a dot, with or
+    without a v in front. A version in a table cell of its own, or a name the catalogue spells otherwise, is not
+    recognised.
     """
     catalogue = root / "gradle" / "libs.versions.toml"
     text = _read_text(catalogue) if catalogue.is_file() else None
@@ -290,7 +292,7 @@ def _check_notice_versions(root: Path) -> list[Issue]:
         path = root / name
         notice = _read_text(path) if path.is_file() else None
         for line_number, line in enumerate((notice or "").splitlines(), 1):
-            for key, found in re.findall(r"(?<![\w.-])`?([\w.-]+)`?\s+(\d+(?:\.\d+)+)(?![\w.-])", line):
+            for key, found in re.findall(r"(?<![\w.-])`?([\w.-]+)`?\s+v?(\d+(?:\.\d+)+)(?![\w.-])", line):
                 expected = versions.get(key.lower())
                 if expected is not None and found != expected:
                     reason = f"names {key} {found}, the version catalogue has {expected}"
@@ -514,11 +516,14 @@ def _self_test() -> None:
             '[versions]\nbcpg = "1.86"\njunit = "4.13.2"\n\n[libraries]\nbcprov = "1.99"\n', encoding="utf-8"
         )
         (root / "THIRD_PARTY_NOTICES.md").write_text(
-            "| Bouncy Castle | `bcpg` 1.85, `bcprov` 1.85.2 |\n(`bcpg` 1.86) und JUnit 4.13.2, EJS 0.8.0\n",
+            "| Bouncy Castle | `bcpg` 1.85, `bcprov` 1.85.2 |\n(`bcpg` 1.86) und JUnit 4.13.2, EJS 0.8.0\n`bcpg` v1.84\n",
             encoding="utf-8",
         )
         issues = _check_notice_versions(root)
-        expected = [Issue("THIRD_PARTY_NOTICES.md", 1, "names bcpg 1.85, the version catalogue has 1.86")]
+        expected = [
+            Issue("THIRD_PARTY_NOTICES.md", 1, "names bcpg 1.85, the version catalogue has 1.86"),
+            Issue("THIRD_PARTY_NOTICES.md", 3, "names bcpg 1.84, the version catalogue has 1.86"),
+        ]
         assert issues == expected, str(issues)
         # The app's copy has to equal these notices line by line. CRLF makes no difference; a changed line does, and
         # so does a missing last line. A copy without the notices it copies is flagged as well.
