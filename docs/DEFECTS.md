@@ -74,7 +74,7 @@ belegt. Diese drei sind offen oder nur teilweise geschlossen:
   die dieser Satz schlicht falsch wäre. Ein gemeinsamer Satz für den ganzen Zweig würde damit genau den
   Fehler machen, den diese Reviewschleife sonst jagt: eine Ursache behaupten, die nicht die eingetretene ist.
 - **Zwei Codes standen in dieser Aufzählung zu Unrecht, gefunden in Runde 9.** `RESPONSE_NOT_READY`
-  (`SttStep.kt:985`) entsteht aus `state != RESPONSE_SAVED` **oder** aus einem Fehlschlag von
+  (`SttStep.normalize`) entsteht aus `state != RESPONSE_SAVED` **oder** aus einem Fehlschlag von
   `bindingMatches` — der zweite Fall ist wörtlich eine Bindungsprüfung, dieser Code gehört also in beide
   Lager und braucht einen Satz, der beide trägt. Bei `SOURCE_NOT_FOUND` ist offen, ob er im Normalbetrieb
   überhaupt erreichbar ist: Beide beteiligten Fremdschlüssel stehen auf `RESTRICT`, und `JobCoordinator`
@@ -165,8 +165,9 @@ wie ein Code aussieht, wird unverändert durchgereicht.
 
 ### 11. Eine Änderung an der Warnungserzeugung sperrt die Wiederverwendung bezahlter Abschnitte (niedrig)
 
-- **Stelle:** `app/src/main/java/app/sourcescribe/data/SttStep.kt`, `prepareMissingRetry()`,
-  Zeile 236 (`artifact.warningCount != partial.warnings.size`) und Zeile 336-338
+- **Stelle:** `app/src/main/java/app/sourcescribe/data/SttStep.kt`, `prepareMissingRetry()`: der Vergleich
+  `artifact.warningCount != partial.warnings.size` und der Vergleich der Warnungen behaltener Abschnitte mit
+  `providerWarnings.distinct()`
 - **Voraussetzung:** Ein Auftrag steht auf `PARTIAL_SUCCESS`. Für einen bereits bezahlten Abschnitt
   hatte die Antwort mehr als 64 verschiedene Warnungen. Danach wird die App auf einen Stand mit der
   Warndeckelung aktualisiert.
@@ -190,7 +191,7 @@ wie ein Code aussieht, wird unverändert durchgereicht.
   weil sie eine Meldepflicht erfüllt, und sie zeigt, dass dieser Punkt keine Einzelfallfrage ist: jede
   künftige Korrektur an der Warnungserzeugung trifft ihn wieder, solange `normalizationVersion` nicht
   entschieden ist.
-- **Was fehlt:** `TranscriptDocument.normalizationVersion` (`core/.../Domain.kt:163`) steht fest auf
+- **Was fehlt:** `TranscriptDocument.normalizationVersion` in `core/.../Domain.kt` steht fest auf
   `"1"`, wird nirgends erhöht und nirgends geprüft — nur im Export angezeigt. Es ist offenbar genau
   für diesen Fall gedacht. Zum Schließen: einen kurzen Architekturentscheid schreiben, was ein
   Versionsunterschied bedeuten soll (Vergleich überspringen? Teilstand neu normalisieren?), dann
@@ -667,8 +668,8 @@ Kostenzeile urteilen über die Konfiguration, die Start anlegt. Ein vor Runde 17
 
 ### 39. Die Wartezeit im Verlauf reserviert Platz für höchstens dreistellige Stunden (niedrig)
 
-- **Stelle:** `LONGEST_ELAPSED = "000:00:00"` in `app/src/main/java/app/sourcescribe/ui/HistoryScreen.kt:210`
-  gegen `duration` in `app/src/main/java/app/sourcescribe/ui/Labels.kt:124`.
+- **Stelle:** `LONGEST_ELAPSED = "000:00:00"` in `app/src/main/java/app/sourcescribe/ui/HistoryScreen.kt`
+  gegen `duration` in `app/src/main/java/app/sourcescribe/ui/Labels.kt`.
 - **Voraussetzung:** Ein Auftrag steht 1000 Stunden oder länger, also gut 41 Tage, auf `WAITING_REMOTE`.
 - **Erwartet gegen tatsächlich:** `duration` begrenzt die Stunden nicht, ab 1000 Stunden steht dort
   `1000:00:00`, ein Zeichen breiter als der Platzhalter. `ReservedText` schneidet nichts ab und misst den
@@ -682,8 +683,8 @@ Kostenzeile urteilen über die Konfiguration, die Start anlegt. Ein vor Runde 17
 ### 40. Zwischen Prüfsumme und Start einer Engine liegt ein kurzes Fenster (niedrig, Restrisiko aus S1)
 
 - **Stelle:** `EngineUpdateManager.file` in
-  `extractor/src/main/java/app/sourcescribe/extractor/EngineUpdateManager.kt:314` prüft bei jedem Aufruf über
-  `validSlot` (Zeile 468) den SHA-256 des Slots. Gestartet wird die Datei danach in `NativeRuntime`.
+  `extractor/src/main/java/app/sourcescribe/extractor/EngineUpdateManager.kt` prüft bei jedem Aufruf über
+  `validSlot` den SHA-256 des Slots. Gestartet wird die Datei danach in `NativeRuntime`.
 - **Voraussetzung:** Ein Prozess, der mit der UID der App schreiben darf, ersetzt die Datei genau zwischen
   Prüfung und Start.
 - **Warum es offen bleibt:** Wer mit derselben UID schreibt, braucht dieses Fenster nicht, er kann App-Daten
@@ -694,19 +695,19 @@ Kostenzeile urteilen über die Konfiguration, die Start anlegt. Ein vor Runde 17
 
 ### 41. `youtube-nocookie.com` wird nicht als YouTube-Quelle erkannt (niedrig, sichere Richtung)
 
-- **Stelle:** `youtubeHosts` in `core/src/main/kotlin/app/sourcescribe/core/SourceResolver.kt:11`, geprüft in
-  Zeile 24.
+- **Stelle:** `youtubeHosts` in `core/src/main/kotlin/app/sourcescribe/core/SourceResolver.kt`, geprüft in
+  `SourceResolver.youtube`.
 - **Voraussetzung:** Ein Link der Form `https://www.youtube-nocookie.com/embed/<id>`.
 - **Erwartet gegen tatsächlich:** Die Einbettungsadresse wird mit `INVALID_HOST` abgelehnt, während
-  `youtube.com/embed/<id>` angenommen wird (Zeile 38). Nichts wird falsch verarbeitet, der Link wird nur nicht
+  `youtube.com/embed/<id>` angenommen wird. Nichts wird falsch verarbeitet, der Link wird nur nicht
   angenommen.
 - **Warum es offen bleibt:** Nicht verlangt und nicht ohne einen Test für genau diese Form aufzunehmen, der
   auch zeigt, dass die kanonische Adresse dieselbe bleibt. Gefunden vom Invarianten-Reviewer der Runde 16.
 
 ### 42. Geteilte Exporte bleiben im Cache liegen (niedrig, Hygiene)
 
-- **Stelle:** `shareArtifact` und `shareDiagnostics` in `app/src/main/java/app/sourcescribe/MainViewModel.kt:251`
-  und `:271` schreiben nach `cacheDir/shares/`.
+- **Stelle:** `shareArtifact` und `shareDiagnostics` in `app/src/main/java/app/sourcescribe/MainViewModel.kt`
+  schreiben nach `cacheDir/shares/`.
 - **Erwartet gegen tatsächlich:** Die Datei bleibt nach dem Teilen liegen, bis Android den Cache räumt, auch
   ein vollständiges Transkript. Der Ordner liegt im app-privaten Cache; ein neuer Abflussweg entsteht dadurch
   nicht.
