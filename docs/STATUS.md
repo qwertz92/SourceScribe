@@ -1,12 +1,13 @@
 # Tatsächlicher Projektstatus
 
-**Stand:** 14. September 2026. **Freigabe:** Persönliche Preview; vollständige v1 weiterhin blockiert.
-Der Preview-Abschluss vom 8. September steht unten; seither ist die Nutzerrückmeldung vom
-10. September eingearbeitet, siehe den nächsten Abschnitt. **Die Testzahlen weiter unten in diesem
-Abschnitt sind der Stand vom 8. September und nicht der heutige.** Heute, nach Runde 21, sind es 184
-JVM-Tests im Modul `core`, 207 Instrumentierungstests im Modul `app` und 50 im Modul `extractor`,
-zusammen 441, davon 435 ausgeführt, `core` im Gate der Runde 21, `app` vollständig zuletzt im Gate der Runde 18; die
-Runde-11-Passage sagt, warum die Tests im Modul `extractor` zehn Runden lang in keiner Gate-Meldung vorkamen.
+**Stand:** 14. September 2026. **Freigabe:** Persönliche Preview 0.2.0-preview.1; vollständige v1 weiterhin
+blockiert. Der Preview-Abschluss vom 8. September steht unten; seither ist die Nutzerrückmeldung vom
+10. September eingearbeitet, siehe den nächsten Abschnitt, und die Preview 0.2.0 gebaut, siehe „Artefakte und
+Grenzen“. **Die Testzahlen weiter unten in diesem Abschnitt sind der Stand vom 8. September und nicht der
+heutige.** Heute, am gebauten Stand `1fe2dad` der Preview 0.2.0, sind es 187 JVM-Tests im Modul `core`,
+208 Instrumentierungstests im Modul `app` und 50 im Modul `extractor`, zusammen 445, davon 439 ausgeführt,
+alle drei Module zuletzt im Release-Gate der Preview 0.2.0; die Runde-11-Passage sagt, warum die Tests im Modul
+`extractor` zehn Runden lang in keiner Gate-Meldung vorkamen.
 Diese Zahlen standen bis Runde 14 unter dem Wort „Heute“ auf dem Stand der
 zwölften Runde — die Gate-Zahlen einer Runde stehen in ihrer eigenen Passage, und dieser Satz oben muss
 mitwandern. Eine Testzahl, die als heutige gelten soll, gehört nur hierher. App-Quellstand ist die Spitze
@@ -1949,6 +1950,29 @@ Providerwahl plus Auftragsstart erzeugen die intern an Quelle/Konfiguration
 gebundene Freigabe. Dies erlaubt keine Live-Tests durch Entwicklungsagenten.
 
 ## Artefakte und Grenzen
+
+### Preview 0.2.0-preview.1
+
+Gebaut am 14. September 2026 am Stand `1fe2dad`, dem letzten Commit, der Code ändert, mit den Korrekturen der
+Runde 23. Ein erster Build am Stand `17bc156` bestand die lokalen Gates, sein CI-Lauf nicht. Version 0.2.0 / Code 2,
+Tag `v0.2.0-preview.1`. Gates, Gerät, APK-Hashes, statische Releaseprüfung und Grenzen stehen im
+[Prüfbericht](reports/2026-09-14-preview-0.2.md), Installation und Neuerungen im [Testleitfaden](TRY_PREVIEW.md).
+
+- Unsignierte Release-APK `.local-tools/releases/SourceScribe-0.2.0-preview.1-1fe2dad-unsigned.apk`,
+  146.638.298 Bytes, SHA-256 `339e326e5abce460018f370443237f8f6d5e98fb1b7658c902fdc1148b7e60b4`. Signiert wird sie
+  vom Nutzer mit dem Schlüssel von 0.1.0; Signatur und Installation der signierten APK sind NOT_RUN, bis der Nutzer
+  sie meldet. Die Befehle dafür liefen vorher mit einem Wegwerfschlüssel durch.
+- Die Gerätetests liefen mit der Debug-APK desselben Stands, kopiert nach
+  `.local-tools/releases/SourceScribe-0.2.0-preview.1-1fe2dad-debug.apk`, 157.997.263 Bytes, SHA-256
+  `3762b0cc0cfb5b0f8b47b76dcf8c441dcc7dfcdf49c2c57e3dd130719ae2ddb3`.
+- Auf `emulator-5556`: App-Suite 202 PASS bei sechs opt-in-Skips, die vier Prozessstufen einzeln PASS,
+  Extractor-Suite 46 PASS bei vier opt-in-Skips, 0 Fehler. JVM 187 PASS, vier Lintberichte ohne Befund. Der CI-Lauf
+  [34865638431](https://github.com/qwertz92/SourceScribe/actions/runs/34865638431) am selben Stand ist grün, die
+  Gerätetests beider Module eingeschlossen.
+- Öffentliche APK-Verteilung bleibt wegen fehlender vollständiger FFmpeg-Corresponding-Source-/Lizenzzuordnung
+  gesperrt; die GitHub-Preview enthält nur den Quellstand.
+
+### Preview 0.1.0-preview.1, Stand 8. September 2026
 
 r81 installiert und erneut gerätegeprüft: Debug-APK r80: `app/build/outputs/apk/debug/app-debug.apk` (159.065.550 Bytes).
 SHA-256: `ad94d85da0b1fc3cf3bbc885b3f3fa2857806448d4e20524a3c5971e3a887b32`.

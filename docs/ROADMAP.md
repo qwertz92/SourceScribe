@@ -40,10 +40,10 @@ Priorität nach v1: aussagekräftiger Transcript-Diff, zusätzliche Anzeige-/Fil
 
 Ein Integrator verantwortet Produktverträge, Datenmodell und Scheduler. Unabhängige Pakete für Caption-Parser/Exporter, einzelne Provideradapter und UI können nach stabilen Interfaces parallel entstehen. Read-only-Reviews für Sicherheit und Lebenszyklus unabhängig vom Autor einplanen. Bei gemeinsamem Emulator Geräte-/Testslots serialisieren: mehrere Agenten dürfen sich nicht gegenseitig die App stoppen, Dateien löschen oder denselben API-Budgettopf unkoordiniert verbrauchen.
 
-## Restarbeit nach Preview 0.1.0-preview.1
+## Restarbeit nach Preview 0.2.0-preview.1
 
-Die konkrete priorisierte Liste mit Einstieg und Abschlussnachweis steht in
-[NEXT_STEPS](NEXT_STEPS.md). Persönlicher Signing-Key und r80/r81-Regression sind
-erledigt. Live-Provider, physisches ARM64, TalkBack, CI-Gerätefehler und öffentliche
-APK-Quell-/Lizenzbelege bleiben ausdrücklich offen. Keine neue Implementierungs-
-oder Vollreview-Schleife ohne nächsten Nutzerauftrag.
+Die bekannten Fehler stehen nach Priorität in [BUGS](BUGS.md), Einzelheiten in [DEFECTS](DEFECTS.md), Einstieg und
+Abschlussnachweise in [NEXT_STEPS](NEXT_STEPS.md). Persönlicher Signing-Key und die Rückmeldungen vom 10. September
+bis auf drei Punkte sind erledigt. Live-Provider, physisches ARM64, TalkBack und öffentliche APK-Quell-/Lizenzbelege
+bleiben ausdrücklich offen. Die Reviewschleife ist nach Runde 23 angehalten; was als Nächstes behoben wird, wählt der
+Nutzer nach dem eigenen Test aus BUGS.

@@ -10,7 +10,8 @@ OpenCode und Menschen. Keine zweite Kopie der Anforderungen in einem Agenten-Wik
 | [Roadmap](ROADMAP.md) | P0 bis P6 und Freigabegrenzen |
 | [Status](STATUS.md) | Tatsächlich erreichter Stand und Blocker |
 | [Übergabe](HANDOFF.md) | Aktueller Einstieg für andere Agenten/Rechner |
-| [Preview-Prüfbericht](reports/2026-09-08-preview.md) | Aktuelle Tests, APK-Hashes, Gerätegrenzen und Restabnahme |
+| [Prüfbericht 0.2.0](reports/2026-09-14-preview-0.2.md) | Gates, APK-Hashes, Gerät und Grenzen der Preview 0.2.0 |
+| [Prüfbericht 0.1.0](reports/2026-09-08-preview.md) | Tests, APK-Hashes, Gerätegrenzen und Restabnahme der Preview 0.1.0 |
 | [Preview ausprobieren](TRY_PREVIEW.md) | Installation, Funktionen, erste Tests und TalkBack erklärt |
 | [Restarbeiten](NEXT_STEPS.md) | Priorisierte offene Schritte und Abschlussnachweise |
 | [Bekannte Fehler nach Priorität](BUGS.md) | Offene Punkte mit Auswirkung und Priorität P1 bis P4, zur Auswahl durch den Nutzer |

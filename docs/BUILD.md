@@ -124,5 +124,45 @@ Das Ziel muss neu sein; ein vorhandenes Ausgabefile wird vor jeder Verarbeitung 
 Für Preview 0.1.0-preview.1 ist ein dauerhafter persönlicher RSA-3072/PKCS12-Key
 eingerichtet und die Signatur geprüft. Private Sicherung bleibt separat vom
 Git-Clone; Details auf dem ursprünglichen Rechner in `.local-tools/PRIVATE-RELEASE.md`.
-APK-Hash und öffentlicher Zertifikatfingerprint stehen im Previewbericht. Eine
-APK-Veröffentlichung ist bis zur geschlossenen FFmpeg-Source-/Lizenzprüfung gesperrt.
+APK-Hash und öffentlicher Zertifikatfingerprint stehen im [Previewbericht 0.1.0](reports/2026-09-08-preview.md).
+Eine APK-Veröffentlichung ist bis zur geschlossenen FFmpeg-Source-/Lizenzprüfung gesperrt.
+
+### Preview 0.2.0-preview.1 signieren
+
+Auf dem ursprünglichen Rechner in einem WSL-Terminal (unter Windows `wsl` eingeben), mit demselben Schlüssel wie
+0.1.0. Pfad und Alias des Schlüssels stehen in `.local-tools/PRIVATE-RELEASE.md`. Zuerst in den Projektordner
+wechseln und die zwei Platzhalter durch diese Werte ersetzen:
+
+```bash
+cd /mnt/c/Users/thoma/mystuff/personal/Projects/SourceScribe
+export ANDROID_HOME="$PWD/.local-tools/sdk"
+export KEYSTORE_PATH='/absoluter/Pfad/aus/PRIVATE-RELEASE.md'
+export KEY_ALIAS='Alias aus PRIVATE-RELEASE.md'
+```
+
+Dann die beiden Passwörter abfragen. Jede Zeile einzeln einfügen und danach das Passwort tippen: `read -rs` zeigt es
+nicht an und schreibt es nicht in die Shell-History. Wer beide Zeilen auf einmal einfügt, gibt die zweite Zeile als
+erstes Passwort ein.
+
+```bash
+read -rs -p 'Keystore-Passwort: ' KEYSTORE_PASSWORD; echo; export KEYSTORE_PASSWORD
+```
+
+```bash
+read -rs -p 'Schlüsselpasswort: ' KEY_PASSWORD; echo; export KEY_PASSWORD
+```
+
+Signieren, die Variablen wieder entfernen und das Ergebnis prüfen:
+
+```bash
+tools/sign-release.sh .local-tools/releases/SourceScribe-0.2.0-preview.1-1fe2dad-unsigned.apk .local-tools/releases/SourceScribe-0.2.0-preview.1.apk
+unset KEYSTORE_PATH KEY_ALIAS KEYSTORE_PASSWORD KEY_PASSWORD
+"$ANDROID_HOME/build-tools/37.0.0/zipalign" -c -P 16 4 .local-tools/releases/SourceScribe-0.2.0-preview.1.apk && echo aligned
+"$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --print-certs .local-tools/releases/SourceScribe-0.2.0-preview.1.apk | grep 'SHA-256'
+```
+
+Richtig ist es, wenn `sign-release.sh` mit `signed APK:` endet, `aligned` erscheint und die Zeile mit `SHA-256` auf
+`19d1da9a8fe704082a531faed8a24d966c485aae581a7076dd4b4f66c11d3881` endet, das Zertifikat von 0.1.0. Ein anderer Wert
+heißt, es war ein anderer Schlüssel: Diese APK dann nicht installieren, denn Android nimmt sie nicht als Update von
+0.1.0 an. Dieselben Befehle, ohne die zwei Passwortabfragen, liefen am 14. September mit einem Wegwerfschlüssel statt
+des persönlichen durch, siehe [Prüfbericht 0.2.0](reports/2026-09-14-preview-0.2.md).
