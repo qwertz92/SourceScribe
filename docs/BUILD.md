@@ -93,7 +93,7 @@ Overrides, if needed: `SOURCESCRIBE_SIGNING_DIR` (a different directory holding 
 
 The script refuses to produce an APK whose certificate SHA-256 is not `19d1da9a8fe704082a531faed8a24d966c485aae581a7076dd4b4f66c11d3881`: Android only installs an update over an existing app when the new APK carries the same signing certificate, so anything signed with a different key would simply fail to install as an update. The output path must be new — the script refuses to overwrite an existing file — and the unsigned input is left untouched. Use this same externally kept release key, with consecutive version codes, for every personal update.
 
-A persistent personal RSA-3072/PKCS12 key was set up for preview 0.1.0-preview.1 at the location above, and its signature was verified. Whether the keystore and its password file are backed up anywhere is not verified; without them no later version installs as an update over an installed one. The APK hash and the public certificate fingerprint are in the [0.1.0 preview report](reports/2026-09-08-preview.md).
+A persistent personal RSA-3072/PKCS12 key was set up for preview 0.1.0-preview.1 at the location above, and its signature was verified. The owner confirmed on 14 September 2026 that the keystore and its password file are backed up; without them no later version installs as an update over an installed one. The APK hash and the public certificate fingerprint are in the [0.1.0 preview report](reports/2026-09-08-preview.md).
 
 ### Publishing a release
 

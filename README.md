@@ -23,6 +23,7 @@ The authoritative evidence is kept up to date here:
 - [Known issues by priority](docs/BUGS.md)
 - [Known issues in detail](docs/DEFECTS.md)
 - [Learnings log for other agents](docs/LEARNINGS.md)
+- [Work history, including every review round](docs/HISTORY.md)
 - [Build and personal release](docs/BUILD.md)
 - [0.2.0 preview verification report](docs/reports/2026-09-14-preview-0.2.md)
 - [Build/P0 verification report](docs/reports/2026-09-07-build-and-p0.md)

@@ -795,7 +795,8 @@ How long startup locks the UI is tracked as item 57.
 - **Location:** `bcpg` and `bcprov` in `gradle/libs.versions.toml`, used by `EngineVerifier` on every engine-update
   check. `minSdk` is 29.
 - **Missing:** a run of the signature check on API 29 through 36. Only an API-37 system image exists locally, and CI
-  also uses API 37.
+  also uses API 37. On 14 September 2026 the owner decided that tests on Android 17 are enough, so no older image
+  is planned.
 - **What suggests it holds:** per the release notes, 1.86's build checks every module's base classes with
   AnimalSniffer against API level 26. None of 1.86's three files reference any of `java.math.BigInteger`'s
   `…ValueExact` methods, which the same notes say made 1.85 fail on older Android versions (STATUS, round 21).

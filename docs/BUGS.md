@@ -17,7 +17,7 @@ start.
 | Level | Meaning | Handling |
 |---|---|---|
 | P1 | The app or a core function is unusable: fetching subtitles, transcribing audio, saving or exporting a result. Also data loss, unapproved cost, or an exploitable security hole. | Fix immediately. |
-| P2 | A normal flow gives a wrong or misleading result, or is clearly disruptive; a workaround exists. | Fix when the fix is small and clear; otherwise record the effort and let the owner decide. |
+| P2 | A normal flow gives a wrong or misleading result, or is clearly disruptive; a workaround exists. | Fix it; only when the fix needs a design decision or costs far more than the defect is worth, record the effort and let the owner decide. |
 | P3 | Minor annoyance: imprecise text, display, diagnostics, cleanup, or a bug that only occurs under rare conditions in normal use. | Fix on the spot if it takes minutes; otherwise record it here and report it. |
 | P4 | Not noticeable: tests, check scripts, code that works correctly today but could easily become wrong, or a case only a contrived flow reaches. | Same as P3. |
 
@@ -25,7 +25,7 @@ start.
 case; where a worse case would rate higher, that is noted. For the security-adjacent items 37, 40, and 42, no
 exploitable hole is demonstrated, so none of them carries a CVSS score.
 
-50 items are open: 2 P2, 19 P3, 28 P4, and item 55, which is listed under "Not verified."
+50 items are open: 2 P2, 19 P3, 28 P4, and item 55, which stays untested by the owner's decision (see "Not verified").
 
 ## P1
 
@@ -39,14 +39,15 @@ These gaps are not known bugs. If any of them fails, it is a P1.
   simulated provider responses.
 - **An ARM64 device, like almost every current phone.** All device tests ran on x86_64 emulators with Android 17
   (API 37). The ARM64 build of the app never ran in any of these tests.
-- **Item 55, Android before version 17.** The app checks the signature of its bundled engine on every start with
-  Bouncy Castle 1.86. The app installs from Android 10 (API 29) onward, but this check has only run on API 37. If it
-  fails on an older version, the engine is unusable there, and without it the app cannot process YouTube links.
-  Bouncy Castle's release notes suggest it holds up.
 - **Updating an installed preview 0.1.0.** Preview 0.2.0 migrates the database from schema 3 to schema 4. This is
   only verified against test databases in `MigrationTest`.
 
 Full operation with TalkBack is also not verified.
+
+**Untested by decision: item 55, Android before version 17.** The app installs from Android 10 (API 29) onward and
+checks the signature of its bundled engine with Bouncy Castle 1.86, but every device test runs on Android 17 (API 37).
+If that check failed on an older version, the app could not process YouTube links there; Bouncy Castle's release
+notes suggest it holds up. On 14 September 2026 the owner decided that tests on Android 17 are enough.
 
 ## P2
 

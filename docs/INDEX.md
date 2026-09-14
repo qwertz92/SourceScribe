@@ -15,6 +15,7 @@ These Markdown files are the shared knowledge base for Codex, Claude Code, OpenC
 | [Known issues by priority](BUGS.md) | Open items with impact and priority P1 through P4, for the owner to choose from |
 | [Known issues](DEFECTS.md) | What is not fully done, with its location and the missing evidence |
 | [Learnings log](LEARNINGS.md) | Verified pitfalls and how to resume efficiently |
+| [Work history](HISTORY.md) | Dated log of releases, review rounds, and the mistakes they found |
 | [Build](BUILD.md) | Linux/WSL bootstrap, build, device verification, and personal signing |
 | [Architecture](ARCHITECTURE.md) | Shared contracts and persistence |
 | [Integrations](INTEGRATIONS.md) | Extraction, the three providers, and export data |

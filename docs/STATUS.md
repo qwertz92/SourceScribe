@@ -4,8 +4,8 @@
 yet. App source is the tip of `main`, public repo
 [qwertz92/SourceScribe](https://github.com/qwertz92/SourceScribe). Between the two previews, 23 rounds of
 independent adversarial review (Sonnet-5 agents, each reviewing the previous round's fixes) ran over code and
-docs. The round-by-round findings are not repeated here — see `git log -p -- docs/STATUS.md` for that
-history, and [LEARNINGS.md](LEARNINGS.md) for the lessons it produced.
+docs. What each round found, and every other step so far, is logged briefly in [HISTORY.md](HISTORY.md); the
+lessons it produced are in [LEARNINGS.md](LEARNINGS.md).
 
 ## What it does today
 

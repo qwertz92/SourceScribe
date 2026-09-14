@@ -36,10 +36,10 @@ A reviewer should not simply approve their own code. Findings need a file/locati
 
 Record real commands and their results. Tests must never be weakened, deleted, or skipped just to turn green. Reproduce network or provider failures with controlled fixtures; document live tests separately. Report missing credentials or devices as `BLOCKED`/`NOT_RUN`, never as `PASS`.
 
-Add a matching regression test after every review finding. Before release, rerun all affected tests and run one final, independent review pass. P1 findings are always fixed; findings that take minutes are fixed on the spot; everything else goes into `docs/BUGS.md` with a priority and is reported to the owner. Only open P1 or P2 findings, or unmet acceptance criteria, block a release.
+Add a matching regression test after every review finding. Before release, rerun all affected tests and run one final, independent review pass. P1 and P2 findings are fixed; only a P2 whose fix needs a design decision or costs far more than the defect is worth is recorded and put to the owner instead. P3 and P4 findings that take minutes are fixed on the spot; everything else goes into `docs/BUGS.md` with a priority and is reported to the owner. Only open P1 or P2 findings, or unmet acceptance criteria, block a release.
 
 ## Repository hygiene
 
 Version source code, tests, small approved fixtures, lock/version files, Room schemas, and documentation. Ignore keys, local SDK paths, signing files, private test data, audio downloads, and runtime logs. Run CI without real provider keys. Test helpers, cleartext HTTP for local fixtures, and demo providers must not be reachable in the personal release build. No persistent test backdoors.
 
-Keep `docs/STATUS.md` up to date. The final report distinguishes implemented, fixture-tested, live-verified, and blocked. What is actually missing is listed in `docs/STATUS.md` and `docs/BUGS.md` — there and nowhere else.
+Keep `docs/STATUS.md` up to date; it describes the current state only. `docs/HISTORY.md` is the compact work log: one dated entry per release, review round, or notable mistake, one to three lines each, naming what went wrong and the `docs/LEARNINGS.md` entry it produced, so that a later agent does not repeat it. Keep it under 12 KB by condensing the oldest period into a short summary; the full text stays in Git. The final report distinguishes implemented, fixture-tested, live-verified, and blocked. What is actually missing is listed in `docs/STATUS.md` and `docs/BUGS.md` — there and nowhere else.

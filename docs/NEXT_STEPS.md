@@ -31,6 +31,8 @@ running more than one stage per invocation fails the others. The tests that need
 (`EngineJobPinningTest`, `EngineUpdateManagerTest`'s real-release round trip, `ExtractionChainTest` and
 `NativeRuntimeTest`'s public-source probe) take `engineProbeSource` or `publicSourceUrl` and run before every
 release. `emulator-5556` is the agent device; `emulator-5554` belongs to the owner and agents do not touch it.
+Device tests run on Android 17 (API 37); on 14 September 2026 the owner decided that older Android versions get
+no separate run.
 
 ## Blockers
 
@@ -39,5 +41,4 @@ release. `emulator-5556` is the agent device; `emulator-5554` belongs to the own
 | Physical ARM64 device | All device coverage (Python/TLS, JS/EJS, FFmpeg, caption/audio, update/rollback) ran on x86_64 emulators only. | The owner installs the release APK on the owner's phone and repeats the main flows. |
 | Live transcription (AssemblyAI, OpenAI, Groq) | Needs the owner's API keys and costs money; agents may not enter API keys. Only fixture responses have been exercised. | The owner runs a short real recording through each provider. |
 | Full TalkBack operation | Semantics and dialog activation are tested, but full focus navigation has no suitable real-input automation; ADB/UIAutomation can bypass the input-filter chain TalkBack relies on. | A human tester, or suitable real-input automation, walking all main screens (track dialog, viewer, export, error views) with TalkBack on. |
-| Engine signature check on Android versions before 17 (BUGS item 55) | Every device test ran on API 37, and no older emulator image is installed. | An API 29 emulator image, whose download needs the owner's approval, or a phone with an older Android version. |
 | Fresh-clone build | Never run on a second machine or a clean Linux/WSL system without existing project caches. | Run BUILD.md's fresh-clone steps on such a system; confirm wrapper/dependency verification, build, and tests succeed. |
