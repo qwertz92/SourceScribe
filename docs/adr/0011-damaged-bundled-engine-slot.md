@@ -8,10 +8,11 @@ Datum: 14. September 2026. Status: Implementiert in Runde 18. Welche Prüfungen 
 `EngineUpdateManager.materializeSlot` lehnt seit `06b996a` einen Slot ab, dessen Verzeichnis existiert, dessen
 Datei aber nicht die Bytes enthält, deren SHA-256 der Name des Slots ist, auch eine symbolische Verknüpfung an
 ihrer Stelle: `VERIFICATION`, ohne etwas zu ändern. Für ein Update ist das richtig. Für die gebündelte Engine war
-es eine Sackgasse. Jeder Aufruf des Managers, `bundled()`, `active()`, `installations()`, `rollbackTarget()`,
-`rollback()`, `stage()` und `activate()`, geht zuerst durch `ensureBundledLocked`. Also endete jeder mit
-`VERIFICATION`, bei jedem Start: Keine YouTube-Quelle ließ sich mehr prüfen und kein Auftrag mehr starten, der eine
-Engine braucht, bis jemand die App-Daten löschte und damit den Verlauf.
+es eine Sackgasse. `bundled()`, `active()`, `installations()`, `rollbackTarget()`, `rollback()`, `stage()` und
+`activate()` gehen zuerst durch `ensureBundledLocked`, alle Aufrufe des Managers außer `check()`,
+`discardUnhealthyCandidate()` und `file()`. Also endete jeder davon mit `VERIFICATION`, nach jedem Start der App:
+Keine YouTube-Quelle ließ sich mehr prüfen und kein Auftrag mehr starten, der eine Engine braucht, bis jemand die
+App-Daten löschte und damit den Verlauf.
 
 Wie ein Slot so werden kann: ein Fehler des Speichers; eine Entfernung, die zwischen dem Löschen der Datei und dem
 des Verzeichnisses abbrach, während `state.json` nicht lesbar war, sodass die nächste Ladung nichts aufräumt; ein

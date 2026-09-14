@@ -387,8 +387,8 @@ class EngineUpdateManager internal constructor(
                 healthy = false,
                 bundled = true,
             )
-            // Every call of this manager comes through here, so a damaged slot of this engine would stop all of them
-            // for good; the bytes just verified take its place (ADR 0011).
+            // Every call of this manager but check, discardUnhealthyCandidate and file comes through here, so a damaged
+            // slot of this engine would stop all of them for good; the bytes just verified take its place (ADR 0011).
             materializeSlot(artifact, installation, replaceInvalid = true)
             if (!validSlot(installation)) throw EngineUpdateException(EngineUpdateCode.VERIFICATION)
             val existing = state.installations[installation.id]

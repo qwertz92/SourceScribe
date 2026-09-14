@@ -1,7 +1,7 @@
 # ADR 0010 — Nach einem App-Update wird die neu gebündelte Engine aktiv
 
-Datum: 13. September 2026. Status: Implementiert in Runde 17, Grenzfälle berichtigt in Runde 18. Welche Prüfungen
-gelaufen sind, steht in [STATUS.md](../STATUS.md).
+Datum: 13. September 2026. Status: Implementiert in Runde 17, Grenzfälle berichtigt in Runde 18, eine Begründung in
+Runde 19. Welche Prüfungen gelaufen sind, steht in [STATUS.md](../STATUS.md).
 
 ## Kontext
 
@@ -33,17 +33,19 @@ Engine wie bisher (S7).
   auch jede Aktivierung von Hand: Der Weg zurück reicht genau einen Schritt. Die Installation bleibt in der Liste,
   bis sie beim Räumen weicht (ADR 0009).
 - Ein Absturz zwischen den zwei Speicherungen in `ensureBundledLocked` verschiebt die Umstellung nur auf den nächsten
-  Start. Dazwischen kann niemand zur alten Engine zurückgehen, weil jeder Aufruf des Managers zuerst
-  `ensureBundledLocked` durchläuft.
+  Start. Dazwischen kann niemand zur alten Engine zurückgehen, weil `rollback()` und `activate()` zuerst
+  `ensureBundledLocked` durchlaufen und die Umstellung damit nachholen.
 
 Die ersten beiden Fälle sind selten, und ein App-Update ist selbst eine ausdrückliche Handlung.
 
 Bis Runde 18 stand hier als erster Grenzfall, nach einem solchen Absturz oder mit einem Slot, der die Prüfung nicht
 mehr besteht, werde erneut umgestellt, auch nach einem bewussten Zurückgehen. Beides stimmte nicht: Der Absturz
 lässt kein Zurückgehen dazwischen zu, und ein ungültiger Slot endete in `materializeSlot` mit `VERIFICATION`, ohne
-umzustellen, bei jedem Aufruf des Managers. Seit [ADR 0011](0011-damaged-bundled-engine-slot.md) wird er ersetzt;
-der gesunde Eintrag bleibt, und umgestellt wird nichts. Den zweiten Fall hat der Code-Reviewer der Runde 18
-gemeldet.
+umzustellen, bei jedem Aufruf des Managers, der zuerst `ensureBundledLocked` durchläuft. Seit
+[ADR 0011](0011-damaged-bundled-engine-slot.md) wird er ersetzt; der gesunde Eintrag bleibt, und umgestellt wird
+nichts. Den zweiten Fall hat der Code-Reviewer der Runde 18 gemeldet. Dass die Begründung des dritten zu weit griff,
+hat der Code-Reviewer der Runde 19 gezeigt: `check()`, `discardUnhealthyCandidate()` und `file()` gehen nicht durch
+`ensureBundledLocked`, stellen aber auch nichts um.
 
 ## Verworfene Alternativen
 
