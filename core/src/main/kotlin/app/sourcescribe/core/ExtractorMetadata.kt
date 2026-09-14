@@ -95,11 +95,13 @@ object ExtractorMetadata {
             val approximate = number("filesize_approx")?.takeIf { it > 0 && it <= MAX_TRACK_BYTES }?.toLong()
             val sampleRate = number("asr")?.takeIf { it in 1.0..768_000.0 }?.toInt()
             val channelCount = number("audio_channels")?.takeIf { it in 1.0..64.0 }?.toInt()
-            // `abr` wins over `tbr` as soon as it holds a number at all, even where that number is then
-            // rejected as implausible. That selection is left exactly as it was: which field supplies a
-            // bitrate is a data change and does not belong inside a fix to the provenance line.
-            val rateKey = if (number("abr") != null) "abr" else if (number("tbr") != null) "tbr" else null
-            val rate = (number("abr") ?: number("tbr"))?.takeIf { it in 1.0..10_000.0 }?.toInt()
+            // `abr` wins over `tbr`, but only with a plausible value (defect 12): an implausible `abr` backs
+            // nothing, and a plausible `tbr` then supplies the rate. Only audio-only formats get here, so
+            // their total bitrate is their audio bitrate.
+            val abr = number("abr")?.takeIf { it in 1.0..10_000.0 }
+            val tbr = number("tbr")?.takeIf { it in 1.0..10_000.0 }
+            val rateKey = if (abr != null) "abr" else if (tbr != null) "tbr" else null
+            val rate = (abr ?: tbr)?.toInt()
             // A DRC rendition is only ever marked by the extractor id suffix or its note; never inferred from bitrate.
             val compressed = id.endsWith("-drc", ignoreCase = true) || statedNote?.contains("drc", ignoreCase = true) == true
             // yt-dlp encodes the track role numerically: 10 original, 5 default, -10 audio description.

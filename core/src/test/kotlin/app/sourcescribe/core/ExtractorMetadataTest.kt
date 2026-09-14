@@ -142,16 +142,26 @@ class ExtractorMetadataTest {
         // feeds then refuses, because zero channels, a rate of 40 Mbit/s or a size of zero are not facts
         // about audio. Such a key backed nothing either and must not appear in the provenance line.
         val raw = """{"id":"BaW_jenozKc","formats":[{"format_id":"140","vcodec":"none","acodec":"mp4a.40.2",
-            "ext":"m4a","audio_channels":0,"asr":0,"filesize":0,"filesize_approx":0,"abr":40000,"tbr":128}]}"""
+            "ext":"m4a","audio_channels":0,"asr":0,"filesize":0,"filesize_approx":0,"abr":40000,"tbr":0}]}"""
         val track = ExtractorMetadata.parse(raw, source).audio.single()
         assertNull(track.channels)
         assertNull(track.sampleRateHz)
         assertNull(track.bytes)
-        // `abr` holds a number, so it still wins the selection over `tbr` and the rejected value leaves no
-        // bitrate at all. That selection is deliberately unchanged; the provenance line must not pretend
-        // either key contributed.
+        // Neither rate is plausible, so no bitrate is recorded and the provenance line must not pretend either
+        // key contributed. A plausible `tbr` beside an implausible `abr` does supply the rate; the test below
+        // covers that case.
         assertNull(track.bitrateKbps)
         assertEquals("yt-dlp:formats.acodec,vcodec,ext", track.evidence)
+    }
+
+    @Test fun anImplausibleAbrLeavesTheBitrateToAPlausibleTbr() {
+        // Only audio-only formats become tracks, so `tbr` is the rate of the audio as well. An `abr` that fails the
+        // range check backs nothing, and it must not keep `tbr` from supplying the rate the size estimate needs.
+        val raw = """{"id":"BaW_jenozKc","formats":[{"format_id":"140","vcodec":"none","acodec":"mp4a.40.2",
+            "ext":"m4a","abr":40000,"tbr":128}]}"""
+        val track = ExtractorMetadata.parse(raw, source).audio.single()
+        assertEquals(128, track.bitrateKbps)
+        assertEquals("yt-dlp:formats.acodec,vcodec,ext,tbr", track.evidence)
     }
 
     @Test fun whereTwoKeysCanSupplyOneFactOnlyTheOneThatSuppliedItIsNamed() {
