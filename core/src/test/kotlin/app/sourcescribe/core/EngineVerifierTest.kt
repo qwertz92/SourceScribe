@@ -2,6 +2,7 @@ package app.sourcescribe.core
 
 import java.io.File
 import java.io.FileOutputStream
+import java.nio.file.Files
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import org.junit.Assert.assertEquals
@@ -12,14 +13,23 @@ import org.junit.Assert.assertThrows
 class EngineVerifierTest {
     @Test
     fun verifiesOfficialFixtureAndMetadata() {
-        val artifact = File(requireNotNull(System.getProperty("sourcescribe.engineFixture")))
-        val verified = EngineVerifier.verify(artifact, resource("SHA2-256SUMS"), resource("SHA2-256SUMS.sig"))
+        // The verifier writes a temporary view of a zipapp beside it, and the fixture lives in res/raw of the
+        // extractor. A copy in a directory of its own keeps that view out of the source tree and shows it is gone.
+        val directory = Files.createTempDirectory("sourcescribe-fixture-").toFile()
+        try {
+            val fixture = File(requireNotNull(System.getProperty("sourcescribe.engineFixture")))
+            val artifact = fixture.copyTo(File(directory, fixture.name))
+            val verified = EngineVerifier.verify(artifact, resource("SHA2-256SUMS"), resource("SHA2-256SUMS.sig"))
 
-        assertEquals("1fa6733c37ea6fb51c99ad8fe785e7b7e5f3246c9b980230329d4fb72ed8d4d6", verified.sha256)
-        assertEquals("2026.08.19", verified.version)
-        assertEquals("0.8.0", verified.ejsVersion)
-        assertEquals("stable", verified.channel)
-        assertEquals("594bd50c2c78ac432f81600d309fdc4e0a92d82c", verified.gitHead)
+            assertEquals("1fa6733c37ea6fb51c99ad8fe785e7b7e5f3246c9b980230329d4fb72ed8d4d6", verified.sha256)
+            assertEquals("2026.08.19", verified.version)
+            assertEquals("0.8.0", verified.ejsVersion)
+            assertEquals("stable", verified.channel)
+            assertEquals("594bd50c2c78ac432f81600d309fdc4e0a92d82c", verified.gitHead)
+            assertEquals(listOf(fixture.name), directory.list()?.toList())
+        } finally {
+            directory.deleteRecursively()
+        }
     }
 
     @Test
