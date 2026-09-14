@@ -127,7 +127,7 @@ class MessageTextTest {
             // Export rows: the errors ExportStore and JobCoordinator record beside the export state.
             addAll(
                 listOf(
-                    "PERMISSION_REQUIRED", "EXTERNAL_DOCUMENT_MISSING", "EXPORT_INTERRUPTED",
+                    "PERMISSION_REQUIRED", "EXTERNAL_DOCUMENT_MISSING", "EXTERNAL_DOCUMENT_UNCHECKED", "EXPORT_INTERRUPTED",
                     "EXPORT_SCHEDULING_FAILED", "CANCELLED", "RAW_NOT_RETAINED", "TOO_LARGE", "MISMATCH", "IO_FAILURE",
                     "INVALID_EXPORT",
                 ),

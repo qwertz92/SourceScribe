@@ -195,6 +195,23 @@ class ExportStoreTest {
     }
 
     @Test
+    fun reconcileDoesNotCallADocumentGoneWhenNoProviderCouldBeAsked() = runBlocking {
+        withHarness(ExportFixtureProvider.Mode.SUCCESS) { harness ->
+            val exported = harness.store.export(harness.artifactId, ExportFormat.TEXT, harness.treeUri)
+            // No provider is installed for this authority, which is what an uninstalled documents app leaves behind.
+            // Nobody answered whether the document exists, so it is neither reported gone nor forgotten (defect 13).
+            val unasked = "content://app.sourcescribe.test.absent.documents/document/${UUID.randomUUID()}"
+            harness.dao.updateExport(exported.copy(documentUri = unasked))
+
+            val reconciled = harness.store.reconcile(exported.id)
+            assertEquals(ExportState.FAILED, reconciled.state)
+            assertEquals("EXTERNAL_DOCUMENT_UNCHECKED", reconciled.error)
+            assertEquals(unasked, reconciled.documentUri)
+            assertEquals(reconciled, harness.dao.export(exported.id))
+        }
+    }
+
+    @Test
     fun aRawSiblingCountsAsATakenNameBecauseTheRowDoesNotRecordItsExtension() = runBlocking {
         withHarness(ExportFixtureProvider.Mode.NAME_COLLISION, retainRaw = true) { harness ->
             assertEquals(1, harness.dao.renameArtifact(harness.artifactId, "Folge 12 Interview"))

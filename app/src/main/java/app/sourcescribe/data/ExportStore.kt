@@ -2,6 +2,7 @@ package app.sourcescribe.data
 
 import android.content.Context
 import android.net.Uri
+import android.os.RemoteException
 import android.provider.DocumentsContract
 import androidx.core.net.toUri
 import app.sourcescribe.core.ArtifactFiles
@@ -71,21 +72,25 @@ class ExportStore @Inject constructor(
                     updateAfterFailure(row, ExportState.FAILED, ERROR_EXTERNAL_DOCUMENT_MISSING, null)
                 } else {
                     try {
-                        if (documentExists(documentUri.toUri())) {
-                            row
-                        } else {
+                        when (documentState(documentUri.toUri())) {
+                            DocumentState.PRESENT -> row
                             // The provider answered, and it answered that this document is gone. A URI kept
                             // here would go on naming a file that no longer exists, and `write` reads exactly
                             // that field to decide whether a chosen export name is still taken. Dropping it
                             // follows the convention `cleanup` already uses: null means no document out there.
-                            updateAfterFailure(row, ExportState.FAILED, ERROR_EXTERNAL_DOCUMENT_MISSING, null)
+                            DocumentState.GONE ->
+                                updateAfterFailure(row, ExportState.FAILED, ERROR_EXTERNAL_DOCUMENT_MISSING, null)
+                            // Nobody answered (defect 13). Nothing was established about the file behind the URI,
+                            // so it is not reported gone, keeps its URI and goes on counting as a name that is taken.
+                            DocumentState.UNCHECKED ->
+                                updateAfterFailure(row, ExportState.FAILED, ERROR_EXTERNAL_DOCUMENT_UNCHECKED, documentUri)
                         }
                     } catch (_: SecurityException) {
                         updateAfterFailure(row, ExportState.PERMISSION_REQUIRED, ERROR_PERMISSION_REQUIRED, documentUri)
                     } catch (_: IllegalArgumentException) {
                         // The stored URI could not be asked at all, so nothing was established about the file
                         // behind it. It keeps its URI and goes on counting as a name that is taken.
-                        updateAfterFailure(row, ExportState.FAILED, ERROR_EXTERNAL_DOCUMENT_MISSING, documentUri)
+                        updateAfterFailure(row, ExportState.FAILED, ERROR_EXTERNAL_DOCUMENT_UNCHECKED, documentUri)
                     }
                 }
             }
@@ -94,13 +99,26 @@ class ExportStore @Inject constructor(
         }
     }
 
-    private fun documentExists(uri: Uri): Boolean = resolver.query(
-        uri,
-        arrayOf(android.provider.DocumentsContract.Document.COLUMN_DOCUMENT_ID),
-        null,
-        null,
-        null,
-    )?.use { cursor -> cursor.moveToFirst() } ?: false
+    private enum class DocumentState { PRESENT, GONE, UNCHECKED }
+
+    /**
+     * Asks the document's provider whether the document is still there. A provider that answers with no row, or with
+     * no cursor at all, says it is gone: `DocumentsProvider.query` answers null for a document it no longer has. No
+     * installed provider for the URI's authority, or a provider process that dies while it is asked, establishes
+     * nothing (defect 13); `ContentResolver.query` answers null in those two cases too, which is why it is not used.
+     */
+    private fun documentState(uri: Uri): DocumentState {
+        val client = resolver.acquireUnstableContentProviderClient(uri) ?: return DocumentState.UNCHECKED
+        return try {
+            client.query(uri, arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID), null, null, null)
+                ?.use { cursor -> if (cursor.moveToFirst()) DocumentState.PRESENT else DocumentState.GONE }
+                ?: DocumentState.GONE
+        } catch (_: RemoteException) {
+            DocumentState.UNCHECKED
+        } finally {
+            client.close()
+        }
+    }
 
     private suspend fun write(row: ExportRow, document: TranscriptDocument): ExportRow {
         var documentUri: String? = null
@@ -285,6 +303,7 @@ class ExportStore @Inject constructor(
         private const val ERROR_CANCELLED = "CANCELLED"
         private const val ERROR_PERMISSION_REQUIRED = "PERMISSION_REQUIRED"
         private const val ERROR_EXTERNAL_DOCUMENT_MISSING = "EXTERNAL_DOCUMENT_MISSING"
+        private const val ERROR_EXTERNAL_DOCUMENT_UNCHECKED = "EXTERNAL_DOCUMENT_UNCHECKED"
         private const val ERROR_EXPORT_INTERRUPTED = "EXPORT_INTERRUPTED"
         private const val ERROR_RAW_NOT_RETAINED = "RAW_NOT_RETAINED"
         private const val ERROR_TOO_LARGE = "TOO_LARGE"

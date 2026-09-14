@@ -308,6 +308,7 @@ internal fun messageSpec(code: String): MessageSpec? = when (code) {
     "SUBMISSION_UNCERTAIN" -> MessageSpec.Joined(R.string.state_submission_uncertain, R.string.remote_may_continue)
     "EXPORT_PENDING", "EXPORT_WRITING" -> MessageSpec.Text(R.string.export_pending)
     "EXTERNAL_DOCUMENT_MISSING" -> MessageSpec.Text(R.string.external_document_missing)
+    "EXTERNAL_DOCUMENT_UNCHECKED" -> MessageSpec.Text(R.string.external_document_unchecked)
     "EXPORT_INTERRUPTED" -> MessageSpec.Text(R.string.export_interrupted)
     "EXPORT_FAILED" -> MessageSpec.Text(R.string.export_failed)
     "EXPORT_SCHEDULING_FAILED" -> MessageSpec.Text(R.string.export_scheduling_failed)

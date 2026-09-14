@@ -187,6 +187,7 @@
     <string name="check_exports">Exportdateien prüfen</string>
     <string name="retry_export_folder">Export erneut speichern · Ordner wählen</string>
     <string name="external_document_missing">Die externe Datei fehlt. Das interne Ergebnis ist weiter verfügbar.</string>
+    <string name="external_document_unchecked">Ob die exportierte Datei noch vorhanden ist, ließ sich nicht prüfen. Das interne Ergebnis ist weiter verfügbar.</string>
     <string name="export_interrupted">Der Export wurde unterbrochen. Eine eventuell vorhandene Teil-Datei bleibt im Zielordner; erneutes Speichern erzeugt eine neue Datei.</string>
     <string name="region_eu">EU (Europa)</string>
     <string name="region_us">USA</string>

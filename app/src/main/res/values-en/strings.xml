@@ -185,6 +185,7 @@
     <string name="check_exports">Check exported files</string>
     <string name="retry_export_folder">Save export again · select folder</string>
     <string name="external_document_missing">The external file is missing. The internal result remains available.</string>
+    <string name="external_document_unchecked">Whether the exported file still exists could not be checked. The internal result remains available.</string>
     <string name="export_interrupted">The export was interrupted. Any partial file remains in the destination folder; saving again creates a new file.</string>
     <string name="region_eu">EU (Europe)</string>
     <string name="region_us">USA</string>
