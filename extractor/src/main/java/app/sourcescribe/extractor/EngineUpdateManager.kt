@@ -89,13 +89,12 @@ data class EngineInstallation(
 /**
  * What work in the app still points at, asked for only when a new installation needs a slot and none is free.
  *
- * [inUse] are the installations an unfinished attempt is pinned to; they are never removed. [retainedForRetry] are
- * those a partial result would be continued with, since a missing-chunk retry runs on the engine of the attempt it
- * continues; they are removed only once nothing else makes room. ADR 0009 has the whole rule.
+ * [inUse] are the installations an unfinished attempt is pinned to; they are never removed. A finished attempt pins
+ * none, one with a partial result included: asking for its missing chunks again sends audio that is already prepared
+ * and never runs the engine. ADR 0009 has the whole rule.
  */
 data class EngineReferences(
     val inUse: Set<String> = emptySet(),
-    val retainedForRetry: Set<String> = emptySet(),
 )
 
 /**
@@ -197,7 +196,7 @@ class EngineUpdateManager internal constructor(
         val engines = enginesDirectory()
         // Only asks whether a slot can be freed: nothing is removed for a download that may still fail. The room is
         // made once the verified artifact is ready to take its slot (ADR 0009).
-        ensureRoomLocked(update.sha256, retainedMayGo = false, remove = false)
+        ensureRoomLocked(update.sha256, remove = false)
         val staging = File(engines, ".staging-${UUID.randomUUID()}")
         if (!staging.mkdirs()) throw EngineUpdateException(EngineUpdateCode.STORAGE)
         var candidate: EngineInstallation? = null
@@ -229,7 +228,7 @@ class EngineUpdateManager internal constructor(
                 bundled = false,
             )
             candidate = installation
-            createdSlot = materializeSlot(artifact, installation, retainedMayGo = false)
+            createdSlot = materializeSlot(artifact, installation)
             if (loaded.installations[installation.id] == null) {
                 loaded.installations[installation.id] = installation
                 recordAdded = true
@@ -388,9 +387,7 @@ class EngineUpdateManager internal constructor(
                 healthy = false,
                 bundled = true,
             )
-            // Only here may an installation a partial result would be continued with make room, and only as the last
-            // resort: without this engine no job can start at all, which a voluntary update does not risk (ADR 0009).
-            materializeSlot(artifact, installation, retainedMayGo = true)
+            materializeSlot(artifact, installation)
             if (!validSlot(installation)) throw EngineUpdateException(EngineUpdateCode.VERIFICATION)
             val existing = state.installations[installation.id]
             val existingHealthy = existing?.healthy == true && state.healthyIds.contains(installation.id) &&
@@ -442,10 +439,9 @@ class EngineUpdateManager internal constructor(
      *
      * Never removed: the active and the previous installation, the engine this app version bundles, [incoming]
      * itself, and every installation an unfinished attempt is pinned to. Removed first are slot directories no record
-     * names, then the oldest recorded installations nothing refers to. One a partial result would be continued with
-     * goes only where [retainedMayGo], and only after all of those.
+     * names, then the oldest recorded installations nothing refers to.
      */
-    private suspend fun ensureRoomLocked(incoming: String?, retainedMayGo: Boolean, remove: Boolean) {
+    private suspend fun ensureRoomLocked(incoming: String?, remove: Boolean) {
         val root = enginesDirectory()
         val slots = slotDirectories(root).map(File::getName)
         if (incoming != null && incoming in slots) return
@@ -464,9 +460,7 @@ class EngineUpdateManager internal constructor(
         }
         // The state keeps its records in the order they were first written, so the oldest come first.
         val recorded = state.installations.keys.filter { it in slots && it !in kept }
-        val removable = slots.filter { it !in kept && it !in state.installations }.sorted() +
-            recorded.filter { it !in needs.retainedForRetry } +
-            (if (retainedMayGo) recorded.filter { it in needs.retainedForRetry } else emptyList())
+        val removable = slots.filter { it !in kept && it !in state.installations }.sorted() + recorded
         if (removable.size < needed) throw EngineUpdateException(EngineUpdateCode.SLOTS_IN_USE)
         if (!remove) return
         for (id in removable) {
@@ -502,7 +496,7 @@ class EngineUpdateManager internal constructor(
         deleteHashSlot(root, id)
     }
 
-    private suspend fun materializeSlot(artifact: File, installation: EngineInstallation, retainedMayGo: Boolean): Boolean {
+    private suspend fun materializeSlot(artifact: File, installation: EngineInstallation): Boolean {
         val root = enginesDirectory()
         requireHashId(installation.id)
         val destination = File(root, installation.id)
@@ -513,7 +507,7 @@ class EngineUpdateManager internal constructor(
             }
             return false
         }
-        ensureRoomLocked(installation.id, retainedMayGo, remove = true)
+        ensureRoomLocked(installation.id, remove = true)
         val temporary = File(root, ".slot-${UUID.randomUUID()}")
         if (!temporary.mkdirs()) throw EngineUpdateException(EngineUpdateCode.STORAGE)
         try {

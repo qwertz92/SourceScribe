@@ -14,7 +14,7 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class EngineReferencesTest {
     @Test
-    fun unfinishedAttemptsAndContinuablePartialResultsKeepTheirEngines() = runBlocking {
+    fun unfinishedAttemptsKeepTheirEnginesAndAPartialResultKeepsNone() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val database = Room.inMemoryDatabaseBuilder(context, SourceScribeDatabase::class.java).build()
         try {
@@ -26,32 +26,24 @@ class EngineReferencesTest {
 
             val waiting = attempt("a", Branch.CAPTIONS, 1, ExecutionState.WAITING_USER, "E1")
             val running = attempt("b", Branch.STT, 1, ExecutionState.RUNNING, "E2")
-            val partial = attempt("c", Branch.STT, 1, ExecutionState.FINISHED, "E3", Outcome.PARTIAL_SUCCESS)
-            val retriedPartial = attempt("d", Branch.STT, 1, ExecutionState.FINISHED, "E4", Outcome.PARTIAL_SUCCESS)
-            val completedRetry = attempt("d", Branch.STT, 2, ExecutionState.FINISHED, "E4", Outcome.SUCCESS)
+            val uncertain = attempt("c", Branch.STT, 1, ExecutionState.SUBMISSION_UNCERTAIN, "E3")
+            val partial = attempt("d", Branch.STT, 1, ExecutionState.FINISHED, "E4", Outcome.PARTIAL_SUCCESS)
             val done = attempt("e", Branch.STT, 1, ExecutionState.FINISHED, "E5", Outcome.SUCCESS)
             val cancelled = attempt("f", Branch.CAPTIONS, 1, ExecutionState.CANCELLED, "E6", Outcome.CANCELLED)
-            val captionsPartial = attempt("g", Branch.CAPTIONS, 1, ExecutionState.FINISHED, "E7", Outcome.PARTIAL_SUCCESS)
-            val localAudio = attempt("h", Branch.STT, 1, ExecutionState.QUEUED, null)
-            val partialBehindCancelledRetry = attempt("i", Branch.STT, 1, ExecutionState.FINISHED, "E8", Outcome.PARTIAL_SUCCESS)
-            val cancelledRetry = attempt("i", Branch.STT, 2, ExecutionState.CANCELLED, "E8", Outcome.CANCELLED)
+            val localAudio = attempt("g", Branch.STT, 1, ExecutionState.QUEUED, null)
 
             val source = SourceRow("fixture-source", "{}", "Fixture source")
-            val attempts = listOf(waiting, running, partial, retriedPartial, completedRetry, done, cancelled, captionsPartial,
-                localAudio, partialBehindCancelledRetry, cancelledRetry)
+            val attempts = listOf(waiting, running, uncertain, partial, done, cancelled, localAudio)
             for ((job, rows) in attempts.groupBy { it.jobId }) dao.createJob(source, JobRow(job, source.id, "{}", 1), rows)
-            listOf(artifact(partial, false), artifact(retriedPartial, false), artifact(completedRetry, true), artifact(done, true),
-                artifact(captionsPartial, false), artifact(partialBehindCancelledRetry, false)).forEach { dao.insertArtifact(it) }
+            listOf(artifact(partial, false), artifact(done, true)).forEach { dao.insertArtifact(it) }
 
-            // Read back through the same call the app's manager is wired to, not from the lists above.
+            // Read back through the same call the app's manager is wired to, not from the list above.
             val references = engineReferences(dao)
 
-            // Waiting for the reader counts as unfinished just as running does; a local file pins no engine at all.
-            assertEquals(setOf("E1", "E2"), references.inUse)
-            // Only the latest speech-to-text attempt of a job counts, and only while its own result is partial. Job d
-            // was completed by its retry; job i's latest attempt has no result, so asking for the missing part again
-            // would start over on the active engine; and a caption result is never continued chunk by chunk.
-            assertEquals(setOf("E3"), references.retainedForRetry)
+            // Waiting for the reader or on a submission whose fate is unknown counts as unfinished just as running
+            // does, and a local file pins no engine at all. The partial result keeps none: asking for its missing
+            // chunks again never runs an engine (SttMissingRetryTest).
+            assertEquals(setOf("E1", "E2", "E3"), references.inUse)
         } finally {
             database.close()
         }

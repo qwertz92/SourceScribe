@@ -424,7 +424,7 @@
     <string name="reason_engine_probe_uncertain">The self-test gave no clear result. The previous component stays active.</string>
     <string name="reason_engine_no_previous">There is no earlier component to go back to.</string>
     <string name="reason_engine_rollback_target_changed">The component to go back to has changed in the meantime. Nothing was switched.</string>
-    <string name="reason_engine_slots_in_use">All five component slots hold versions that are still needed: the active, the previous or the bundled one, or one that an unfinished job or a resumable partial result is bound to. Nothing was removed. A slot frees up once one of those jobs is complete or deleted.</string>
+    <string name="reason_engine_slots_in_use">All five component slots hold versions that are still needed: the active, the previous or the bundled one, or one that an unfinished job is bound to. Nothing was removed. One of the other versions can go once the jobs bound to it are finished, cancelled or deleted.</string>
     <string name="engine_not_available">The extraction component this job is bound to is no longer installed or failed its check. A new attempt uses the active component.</string>
     <string name="key_invalid_input">The key you entered does not have the expected shape. Copy it again from your provider account.</string>
     <string name="reason_import_invalid">This file is not an audio file the app can process.</string>

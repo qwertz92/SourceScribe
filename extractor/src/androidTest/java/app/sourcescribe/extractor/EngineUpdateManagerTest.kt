@@ -389,9 +389,9 @@ class EngineUpdateManagerTest {
             val bundled = harness.manager.bundled()
             val slots = List(5) { createScriptedCandidate(harness, "slot $it") }
             removeBundledSlot(harness, bundled)
-            // slots[0] is the oldest, but a partial result would be continued with it.
+            // slots[0] is the oldest, but an unfinished attempt is pinned to it.
             rewriteState(harness, slots, active = slots[4], previous = slots[3])
-            val manager = newManager(harness, EngineReferences(retainedForRetry = setOf(slots[0].id)))
+            val manager = newManager(harness, EngineReferences(inUse = setOf(slots[0].id)))
 
             assertEquals(slots[4].id, manager.active().id)
 
@@ -406,21 +406,18 @@ class EngineUpdateManagerTest {
     }
 
     @Test
-    fun onlyAnEngineAPartialResultNeedsMakesRoomAsTheLastResortAndNeverTheActivePreviousOrAPinnedOne() = runBlocking {
+    fun neitherThePreviousNorAPinnedInstallationMakesRoomWhenTheyAreTheOldest() = runBlocking {
         withIsolatedManager { harness ->
             val bundled = harness.manager.bundled()
             val slots = List(5) { createScriptedCandidate(harness, "slot $it") }
             removeBundledSlot(harness, bundled)
             // The previous and the pinned installation are the two oldest, so age alone would pick one of them.
             rewriteState(harness, slots, active = slots[4], previous = slots[0])
-            val manager = newManager(harness, EngineReferences(
-                inUse = setOf(slots[1].id),
-                retainedForRetry = setOf(slots[2].id, slots[3].id),
-            ))
+            val manager = newManager(harness, EngineReferences(inUse = setOf(slots[1].id)))
 
             assertEquals(slots[4].id, manager.active().id)
 
-            // Nothing else could go, so the older of the two installations kept for a retry did.
+            // The oldest installation that is neither of them made room.
             assertEquals((slots.map { it.id } - slots[2].id + bundled.id).toSet(), hashSlotNames(harness))
             assertEquals(slots[0].id, manager.rollbackTarget()?.id)
         }
@@ -492,10 +489,10 @@ class EngineUpdateManagerTest {
                 throw IOException("offline fixture")
             }
 
-            // An update is voluntary, so an installation a partial result would be continued with does not make
-            // room for it, and the refusal comes before anything is downloaded.
+            // Every installation but the active one is pinned to an unfinished attempt, so none can make room, and
+            // the refusal comes before anything is downloaded.
             val refused = expectUpdateFailure {
-                newManager(harness, calls, EngineReferences(retainedForRetry = candidates.map { it.id }.toSet())).stage(update)
+                newManager(harness, calls, EngineReferences(inUse = candidates.map { it.id }.toSet())).stage(update)
             }
             assertEquals(EngineUpdateCode.SLOTS_IN_USE, refused.code)
             assertEquals(0, requests.get())

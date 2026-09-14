@@ -138,7 +138,6 @@ abstract class SourceScribeDao {
     @Query("SELECT * FROM jobs WHERE id = :id") abstract suspend fun job(id: String): JobRow?
     @Query("SELECT * FROM jobs") abstract suspend fun allJobs(): List<JobRow>
     @Query("SELECT * FROM attempts") abstract suspend fun allAttempts(): List<AttemptRow>
-    @Query("SELECT * FROM artifacts") abstract suspend fun allArtifacts(): List<ArtifactRow>
     @Query("SELECT * FROM sources WHERE NOT EXISTS (SELECT 1 FROM jobs WHERE jobs.sourceId = sources.id)") abstract suspend fun unreferencedSources(): List<SourceRow>
     @Query("DELETE FROM resource_leases") abstract suspend fun clearResourceLeases()
 

@@ -1,7 +1,7 @@
 # ADR 0009 — Alte Engine-Slots räumen, wenn eine neue Engine keinen Platz findet
 
-Datum: 13. September 2026. Status: Implementiert in Runde 17. Welche Prüfungen gelaufen sind, steht in
-[STATUS.md](../STATUS.md).
+Datum: 13. September 2026. Status: Implementiert in Runde 17, berichtigt in Runde 18 (letzter Abschnitt). Welche
+Prüfungen gelaufen sind, steht in [STATUS.md](../STATUS.md).
 
 ## Kontext
 
@@ -28,10 +28,8 @@ erhalten; alte Versionen erst ohne aktive Referenzen bereinigen.“
   ankommende Installation selbst und jede Installation, an die ein nicht abgeschlossener Versuch gebunden ist,
   gleich ob er läuft oder auf Netz, Anbieter oder den Nutzer wartet.
 - **Reihenfolge:** zuerst Slot-Verzeichnisse, die kein Eintrag nennt, dann die ältesten Installationen, auf die
-  nichts verweist. `state.json` hält die Einträge in der Reihenfolge ihrer ersten Aufnahme. Zuletzt kommt eine
-  Installation, mit der ein Teilergebnis über „Nur Fehlendes“ fortgesetzt würde, weil dieser Versuch die Engine
-  seines Vorgängers übernimmt (ADR 0006). Sie darf nur für die gebündelte Engine weichen, ohne die kein Auftrag
-  mehr startet, nicht für ein freiwilliges Update.
+  nichts verweist. `state.json` hält die Einträge in der Reihenfolge ihrer ersten Aufnahme. Ein abgeschlossener
+  Versuch verweist auf keine Engine, auch nicht mit einem Teilergebnis (Berichtigung in Runde 18).
 - **Woher der Manager weiß, was Aufträge brauchen:** Das Modul `extractor` kennt keine Aufträge. Die App
   übergibt im Konstruktor eine Funktion `references` (`AppModule`), die `engineReferences` über Room beantwortet.
   Gefragt wird nur, wenn tatsächlich etwas weg muss. Scheitert die Abfrage, geht ihr Fehler unverändert weiter,
@@ -51,8 +49,8 @@ erhalten; alte Versionen erst ohne aktive Referenzen bereinigen.“
 
 - **Nur geladene Updates entfernen, gebündelte Engines nie:** Alte gebündelte Engines sammeln sich über
   App-Updates hinweg an; das eigentliche Problem bliebe.
-- **Eine Schaltfläche „Engines löschen“:** Der Nutzer sieht nicht, welche Engine ein Teilergebnis noch braucht,
-  und `ensureBundledLocked` läuft auch im Hintergrund ohne jemanden, der tippen könnte.
+- **Eine Schaltfläche „Engines löschen“:** Der Nutzer sieht nicht, welche Engine ein unfertiger Auftrag noch
+  braucht, und `ensureBundledLocked` läuft auch im Hintergrund ohne jemanden, der tippen könnte.
 - **Einen Fehler von `ensureBundledLocked` hinnehmen, solange die aktive Engine gesund ist:** Das ändert die
   Zusage an sechs Aufrufstellen, dass die gebündelte Engine als Rückfall immer bereitsteht.
 - **Referenzen zusätzlich in `state.json` führen:** eine zweite Wahrheit neben Room, die bei Abbruch und Löschung
@@ -60,11 +58,15 @@ erhalten; alte Versionen erst ohne aktive Referenzen bereinigen.“
 
 ## Folgen und Restrisiken
 
-- Musste die Engine eines Teilergebnisses als letzter Ausweg für die gebündelte weichen, kann „Nur Fehlendes“
-  dieses Ergebnis nicht mehr fortsetzen. Der neue Versuch übernimmt die entfernte Engine und wartet mit
-  `ENGINE_NOT_AVAILABLE`; erst ein weiterer neuer Versuch läuft vollständig mit der aktiven Engine.
-- Zwischen der Abfrage der Referenzen und dem Entfernen kann genau ein solcher „Nur Fehlendes“-Versuch
-  entstehen; er wartet ebenso. Andere neue Versuche binden sich an die aktive Engine, und die bleibt immer.
+- Ein unfertiger Versuch hält seine Engine auch in Phasen, in denen er sie nicht mehr ausführt, etwa ein Versuch
+  „Nur Fehlendes“. Das schützt mehr als nötig, nie weniger.
+- `stage` fragt die Referenzen vor dem Download und beim Räumen danach getrennt. Entstünde dazwischen ein Versuch
+  „Nur Fehlendes“, der die Engine seines Vorgängers übernimmt, ohne den Manager zu fragen, und war genau diese zum
+  Räumen vorgesehen, endete das Update nach dem Download mit `SLOTS_IN_USE`, und entfernt wäre nichts. Heute
+  verhindert das nur die Sperre von `MainViewModel.action`, über die Update und Wiederholung beide laufen, und sie
+  gilt je View-Model. Jeder andere neue Versuch einer YouTube-Quelle fragt den Manager nach der aktiven Engine und
+  wartet, bis `stage` ihn freigibt, oder übernimmt als Rückfall auf STT die Engine eines Untertitelversuchs, der sie
+  in diesem Moment noch hält.
 - Scheitert `stage` nach dem Räumen, etwa am Selbsttest, bleibt die entfernte Installation entfernt.
 - Ist `state.json` nicht lesbar, nennt der Zustand keinen Slot, und alle vorhandenen Verzeichnisse gelten als
   zuerst entfernbar, soweit kein Auftrag an sie gebunden ist. Das nimmt vorweg, was ohnehin geschieht:
@@ -72,8 +74,20 @@ erhalten; alte Versionen erst ohne aktive Referenzen bereinigen.“
 
 ## Tests
 
-`EngineUpdateManagerTest` prüft Reihenfolge, Schutz, den letzten Ausweg, die Ablehnung ohne Entfernen, den
-Fehler der Abfrage und das Laden eines Updates, das vor dem Download abgelehnt wird oder am Download scheitert.
-`EngineReferencesTest` prüft die Room-Abfrage, `AppPipelineTest.aCaptionAttemptWhoseEngineIsGoneWaitsWithThatReason`
-den Untertitelzweig. Den Weg bis zum erfolgreich geladenen Update prüft nur der getrennte Live-Test, weil eine
+`EngineUpdateManagerTest` prüft Reihenfolge, Schutz, die Ablehnung ohne Entfernen, den Fehler der Abfrage und das
+Laden eines Updates, das vor dem Download abgelehnt wird oder am Download scheitert. `EngineReferencesTest` prüft die
+Room-Abfrage, `AppPipelineTest.aCaptionAttemptWhoseEngineIsGoneWaitsWithThatReason` den Untertitelzweig und
+`SttMissingRetryTest.aMissingChunkRetryOfAVideoCompletesWithoutTheEngineItIsBoundTo`, dass „Nur Fehlendes“ ohne
+seine Engine auskommt. Den Weg bis zum erfolgreich geladenen Update prüft nur der getrennte Live-Test, weil eine
 gültige Signatur zu einem echten Release gehört.
+
+## Berichtigung in Runde 18
+
+Bis Runde 18 hielt der Manager zusätzlich die Engine des jüngsten STT-Versuchs eines Auftrags, dessen Ergebnis nicht
+bestätigt vollständig war, und ließ sie nur als letzten Ausweg für die gebündelte Engine weichen, nie für ein Update.
+Die Begründung, „Nur Fehlendes“ laufe mit dieser Engine weiter, stimmte nicht: `SttStep.prepareMissingRetry` legt den
+neuen Versuch in `Phase.SUBMIT` an, mit den Audioabschnitten, die sein Vorgänger vorbereitet hat, und nur `resolve`
+und `download` fragen die gebundene Engine. Der neue Versuch trägt ihre Id weiter, als Angabe, woher das Audio
+stammt (ADR 0006), nicht als Datei, die er ausführt. Der Schutz ließ dagegen ein freiwilliges Update mit
+`SLOTS_IN_USE` scheitern, und dessen Text verlangte, das Teilergebnis abzuschließen oder zu löschen. Gefunden hat das
+der Invarianten-Reviewer der Runde 18. Seitdem hält nur ein unfertiger Versuch seine Engine.

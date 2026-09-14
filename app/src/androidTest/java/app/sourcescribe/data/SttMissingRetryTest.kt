@@ -70,8 +70,10 @@ class SttMissingRetryTest {
         cancelled: Boolean,
         firstResponse: String = response("zero"),
         expectedOutcome: Outcome = Outcome.SUCCESS,
+        youtube: Boolean = false,
+        engineId: String? = null,
     ) = withFixture {
-        var seeded = seed(firstResponse = firstResponse)
+        var seeded = seed(firstResponse = firstResponse, youtube = youtube, engineId = engineId)
         if (cancelled) {
             val previous = seeded.previous.copy(state = ExecutionState.CANCELLED, outcome = Outcome.CANCELLED)
             dao.updateAttempt(previous)
@@ -121,6 +123,7 @@ class SttMissingRetryTest {
 
         assertEquals(ExecutionState.FINISHED, row.state)
         assertEquals(expectedOutcome, row.outcome)
+        assertEquals(seeded.previous.engineId, row.engineId)
         assertEquals(1, server.requestCount)
         val targetCheckpoint = json.decodeFromString<FixtureCheckpoint>(row.checkpoint)
         val document = artifacts.read(targetCheckpoint.artifactId)
@@ -140,6 +143,18 @@ class SttMissingRetryTest {
         cancelled = false,
         firstResponse = """{"text":"zero","language":"en"}""",
         expectedOutcome = Outcome.PARTIAL_SUCCESS,
+    )
+
+    /**
+     * The engine a partial result is bound to may have made room for a newer one (ADR 0009). Asking for the missing
+     * chunk again must not need it: the new attempt starts at SUBMIT with the audio already prepared, and no step from
+     * there on runs an engine. No installation has this id.
+     */
+    @Test
+    fun aMissingChunkRetryOfAVideoCompletesWithoutTheEngineItIsBoundTo() = completeMissingRetry(
+        cancelled = false,
+        youtube = true,
+        engineId = "e".repeat(64),
     )
 
     @Test
@@ -391,6 +406,7 @@ class SttMissingRetryTest {
             audioSourceVideoId: String = VIDEO_ID,
             sourceAudioPresent: Boolean = youtube,
             insertArtifact: Boolean = true,
+            engineId: String? = null,
         ): Seeded {
             val credentialId = credentials.save(Provider.GROQ, Region.US, "fixture-${UUID.randomUUID()}")
             val config = JobConfig(
@@ -543,6 +559,7 @@ class SttMissingRetryTest {
                 phase = Phase.PERSIST,
                 outcome = Outcome.PARTIAL_SUCCESS,
                 checkpoint = json.encodeToString(previousCheckpoint),
+                engineId = engineId,
             )
             val target = AttemptRow(
                 id = targetId,
@@ -557,6 +574,7 @@ class SttMissingRetryTest {
                         source = source,
                     ),
                 ),
+                engineId = engineId,
             )
             dao.createJob(
                 SourceRow(source.id, json.encodeToString(source), "Fixture"),
