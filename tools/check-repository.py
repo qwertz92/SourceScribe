@@ -328,7 +328,8 @@ def _check_executable_scripts(root: Path, tally: Tally) -> list[Issue]:
     100644, and nothing noticed: every documented call starts with `python3`. A shebang in a `src`
     directory belongs to a resource such as the packed yt-dlp, which nothing runs from the tree. A path in
     the middle of a merge has an index entry per side and conflict markers in the tree, so neither the mode
-    nor the first line that will be committed is known yet; such a path is flagged once and not counted.
+    nor the first line that will be committed is known yet; such a path is flagged once and not counted. So is a
+    path the index has and the tree cannot give, deleted or kept out with skip-worktree, which may be a script too.
     """
     try:
         result = subprocess.run(
@@ -360,6 +361,7 @@ def _check_executable_scripts(root: Path, tally: Tally) -> list[Issue]:
                 if handle.read(2) != b"#!":
                     continue
         except OSError:
+            issues.append(Issue(path, None, "is in the git index but cannot be read, so its mode cannot be checked"))
             continue
         scripts += 1
         if mode != "100755":
@@ -460,7 +462,8 @@ def _self_test() -> None:
     # Modes live in the git index, so this part builds one: a script git may run, one it may not, a file without a
     # shebang and a shebang under src/, of which only the second is flagged. Then two paths in the middle of a merge,
     # with an index entry per side, one of them with its conflict in the shebang line: each is flagged once as
-    # unmerged, read once, and counted as no script.
+    # unmerged, read once, and counted as no script. A script deleted from the tree after it was added cannot be read:
+    # it is flagged for that and counted as no script either.
     with tempfile.TemporaryDirectory(prefix="sourcescribe-modes-") as directory:
         root = Path(directory)
         (root / "tools").mkdir()
@@ -468,6 +471,7 @@ def _self_test() -> None:
         (root / "tools/runs.sh").write_bytes(b"#!/bin/sh\n")
         (root / "tools/stopped.py").write_bytes(b"#!/usr/bin/env python3\n")
         (root / "tools/notes.txt").write_bytes(b"no shebang\n")
+        (root / "tools/gone.sh").write_bytes(b"#!/bin/sh\n")
         (root / "src/main/res/raw/packed").write_bytes(b"#!/usr/bin/env python3\n")
 
         def git(*arguments: str, stdin: bytes | None = None) -> bytes:
@@ -490,12 +494,15 @@ def _self_test() -> None:
             b"#!/bin/sh\n<<<<<<< ours\necho one\n=======\necho two\n>>>>>>> theirs\n"
         )
         (root / "tools/marked.sh").write_bytes(b"<<<<<<< ours\n#!/bin/sh\n=======\n#!/bin/bash\n>>>>>>> theirs\n")
+        (root / "tools/gone.sh").unlink()
         tally = Tally()
         issues = check_repository(root, tally=tally)
         flagged = [issue.path for issue in issues if "git mode" in issue.reason]
         assert flagged == ["tools/stopped.py"], str(issues)
         unmerged = [issue.path for issue in issues if "unmerged" in issue.reason]
         assert unmerged == ["tools/conflicted.sh", "tools/marked.sh"], str(issues)
+        unreadable = [issue.path for issue in issues if "cannot be read" in issue.reason]
+        assert unreadable == ["tools/gone.sh"], str(issues)
         assert tally.scripts == 2, str(tally)
         assert (tally.scanned, tally.binary) == (6, 0), str(tally)
     # The notices have to name the catalogue's versions, in backticks or as a word of their own. A name the
