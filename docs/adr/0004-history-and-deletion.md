@@ -1,33 +1,35 @@
-# ADR 0004: Wiederaufnahme, neue Versuche und Löschung
+# ADR 0004: Resumption, New Attempts, and Deletion
 
-7. September 2026. Eine sichere Wiederaufnahme verwendet denselben Versuch und
-seine Submission-Belege. Eine ausdrücklich bestätigte neue Ausführung erhält
-eine neue Attempt-ID und ein neues Artefakt; alte Ergebnisse bleiben erhalten.
-Beim gezielten Wiederholen werden nur Zweige ohne vollständiges Ergebnis neu
-angelegt. Ein anderer Provider wird vor dem Start als neuer Konfigurationssnapshot
-in der Quellenvorschau bestätigt. Ungewisse oder entfernte Aufträge können weiter
-Kosten verursachen; Wiederholung ist deshalb keine automatische Fehlerbehandlung.
+September 7, 2026. A safe resumption reuses the same attempt and its
+submission records. An explicitly confirmed new run gets a new attempt ID and
+a new artifact; old results are preserved. A targeted retry creates new
+attempts only for branches without a complete result. Switching providers is
+confirmed, before starting, as a new configuration snapshot in the source
+preview. Uncertain or abandoned jobs can keep incurring cost; retrying is
+therefore never automatic error handling.
 
-Löschen wird zuerst dauerhaft als Absicht in Room gespeichert. Neue Claims sind
-dann gesperrt. Erst nach Ende lokaler Worker werden ausschließlich Dateien dieses
-Jobs entfernt und seine DB-Bezüge gelöscht. Ein Absturz setzt beim nächsten Start
-diese bestätigte Löschung fort. Externe Exporte werden nicht gelöscht. Von anderen
-Jobs verwendete Importdateien bleiben erhalten. Schema 2 ergänzt die Löschabsicht
-mit einer nichtdestruktiven Migration von Schema 1.
+A deletion is first persisted durably as an intent in Room. New claims are
+then blocked. Only after local workers finish are this job's files removed
+and its DB references deleted — and only those. A crash resumes this
+confirmed deletion at the next start. External exports are never deleted.
+Import files used by other jobs are preserved. Schema 2 adds the deletion
+intent via a non-destructive migration from schema 1.
 
-Globale Parallelität ist die gemeinsame Scheduler-Kapazität (1–4); Provider,
-Kostenrahmen, Quellenwahl und alle Beschaffungsoptionen bleiben im Job-Snapshot.
+Global concurrency is the shared scheduler capacity (1–4); provider, cost
+ceiling, source choice, and every acquisition option stay in the job
+snapshot.
 
-Ein automatischer Rückfall verwendet eine deterministische UUID aus der ID seines
-Caption-Versuchs. So entsteht pro Versuch höchstens ein STT-Zweig; zurückgestellte
-Systemuhren oder gleiche Millisekunden unterdrücken keinen neuen ausdrücklichen
-Versuch. Die DB-Transaktion prüft zusätzlich Besitzer und Ablauf der Arbeitslease.
+An automatic fallback derives a deterministic UUID from its caption attempt's
+ID. This produces at most one STT branch per attempt; a system clock set
+back, or identical millisecond timestamps, never suppresses a new, explicit
+attempt. The DB transaction additionally checks the work lease's owner and
+expiry.
 
-Reviewergänzung vom 8. September: Die Recovery prüft auch die Gegenrichtung
-„Room-Artefakt ohne finalisierte Datei“. Der betroffene Versuch erhält einen
-sichtbaren Integritätsfehler; Metadaten und andere Ergebnisse bleiben erhalten.
-Ungültige gespeicherte Job-Konfigurationen sperren nur den betroffenen Auftrag.
-Es wird kein Ersatzsnapshot mit Standardwerten erzeugt. Verlauf und Einstellungen
-zeigen diesen Zustand, ohne die defekte Konfiguration erneut als gültig zu laden.
-Caption-Provenienz wird bei normaler Persistierung und Recovery zusätzlich an
-die im Versuch gepinnte, unveränderliche Engine-Installation gebunden.
+Review addition from September 8: recovery also checks the reverse direction,
+"a Room artifact without a finalized file." The affected attempt gets a
+visible integrity error; metadata and other results are preserved. An
+invalid stored job configuration only blocks the affected job. No replacement
+snapshot with default values is generated. History and settings show this
+state without ever reloading the broken configuration as valid. Caption
+provenance, during both normal persistence and recovery, is additionally
+bound to the immutable engine installation pinned to that attempt.

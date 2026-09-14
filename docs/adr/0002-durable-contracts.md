@@ -1,19 +1,22 @@
-# ADR 0002: Gemeinsame unveränderliche Verträge
+# ADR 0002: Shared Immutable Contracts
 
-Datum: 7. September 2026. Umsetzung beginnt im JVM-Modul `core`.
+Date: September 7, 2026. Implementation starts in the JVM module `core`.
 
-Source, JobConfig, Provenance und TranscriptDocument sind serialisierbare Werte.
-YouTube-Identität ist die validierte Video-ID; lokale Imports erhalten eine eigene
-ID und einen separat ermittelten SHA-256-Inhaltshash. Metadaten bleiben nullable.
-UTC-Zeitpunkte werden als Unix-Millisekunden gespeichert. Generation, Übersetzung,
-Provider, angefordertes und gemeldetes Modell sind orthogonale Felder.
+`Source`, `JobConfig`, `Provenance`, and `TranscriptDocument` are serializable
+values. YouTube identity is the validated video ID; local imports get their
+own ID and a separately computed SHA-256 content hash. Metadata stays
+nullable. UTC timestamps are stored as Unix milliseconds. Generation,
+translation, provider, requested model, and reported model are orthogonal
+fields.
 
-Der Planner entscheidet ausschließlich anhand des gespeicherten JobConfig und
-beobachteter Caption-Verfügbarkeit. Abruffehler unterscheiden sich von nachgewiesenem
-Fehlen. Eine geplante STT-Aktion ersetzt weder Uploadfreigabe noch Capability-/Budgetprüfung.
-CAPTIONS_THEN_STT fordert ein erfülltes alternatives Ergebnis, BOTH beide Ergebnisse.
+The planner decides solely from the stored `JobConfig` and observed caption
+availability. A retrieval error is distinct from proven absence. A planned
+STT action never substitutes for upload authorization or a capability/budget
+check. `CAPTIONS_THEN_STT` requires one alternative result to be satisfied;
+`BOTH` requires both.
 
-Room speichert Sources, Jobs, Attempts, Artefaktverweise, Submission- und Exportrecords
-getrennt; Snapshot und Artefaktinhalt bleiben unveränderlich. Jede Antwort wird vor
-Parser/Export intern gesichert. Kostenrelevante Absichten werden vor Übermittlung
-gesichert; unklarer Ausgang sperrt automatisches Wiederholen. Keine Exactly-once-Zusage.
+Room stores sources, jobs, attempts, artifact references, submission records,
+and export records separately; the snapshot and artifact content stay
+immutable. Every response is persisted internally before parsing/export.
+Billable intents are persisted before submission; an unclear outcome blocks
+automatic retry. No exactly-once guarantee.

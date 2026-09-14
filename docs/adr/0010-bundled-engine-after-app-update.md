@@ -1,61 +1,62 @@
-# ADR 0010 — Nach einem App-Update wird die neu gebündelte Engine aktiv
+# ADR 0010 — After an App Update, the Newly Bundled Engine Becomes Active
 
-Datum: 13. September 2026. Status: Implementiert in Runde 17, Grenzfälle berichtigt in Runde 18, eine Begründung in
-Runde 19. Welche Prüfungen gelaufen sind, steht in [STATUS.md](../STATUS.md).
+Date: September 13, 2026. Status: implemented in round 17, edge cases corrected in round 18, one
+justification corrected in round 19. Which checks have actually run is recorded in [STATUS.md](../STATUS.md).
 
-## Kontext
+## Context
 
-`EngineUpdateManager.ensureBundledLocked` setzte die aktive Installation nur, wenn noch keine gesetzt war. Wer nie
-selbst ein Engine-Update aktiviert hatte, behielt nach einem App-Update mit einer anderen gebündelten
-yt-dlp-Version die gebündelte Engine der **alten** App-Version als aktive: `active()` gibt die aktive zurück,
-solange sie gesund ist. Das App-Update kam bei der Extraktion also nie an. Die neue Engine lag nur als
-Rückfallziel da, und „Zur vorherigen Engine“ bot sie mit dem Hinweis an, eine ältere Version könne Lücken
-enthalten. Gefunden in Runde 17 beim Lesen des Codes für ADR 0009; kein Reviewerfund.
+`EngineUpdateManager.ensureBundledLocked` set the active installation only when none was set yet. Anyone
+who had never activated an engine update themselves kept the **old** app version's bundled engine active
+after an app update that shipped a different bundled yt-dlp version: `active()` returns the active
+installation as long as it's healthy. So the app update never actually reached extraction. The new engine
+just sat there as a rollback target, and "Switch to previous engine" offered it with a note that an older
+version might have gaps. Found in round 17 while reading the code for ADR 0009; not a reviewer finding.
 
-## Entscheidung
+## Decision
 
-Beim ersten Start, an dem die Engine dieser App-Version noch keinen gesunden Eintrag mit `bundled = true` hat,
-wird sie aktiv, **wenn die bisher aktive Installation selbst eine gebündelte ist**, also die einer früheren
-App-Version. Die bisherige wird die vorherige und bleibt damit der Weg zurück. Hat der Nutzer eine
-heruntergeladene Engine aktiviert (`bundled = false`), bleibt sie aktiv; das war eine Wahl, das Beibehalten der
-alten gebündelten nicht.
+At the first start where this app version's engine has no healthy entry with `bundled = true` yet, it
+becomes active **if the currently active installation is itself a bundled one** — that is, one belonging
+to an earlier app version. The previously active installation becomes the previous one, staying available
+as the way back. If the user had activated a downloaded engine (`bundled = false`), it stays active; that
+was a deliberate choice, whereas keeping the old bundled one was not.
 
-Danach geschieht das nicht wieder: Geht jemand später bewusst zur alten gebündelten Engine zurück, bleibt sie
-aktiv, weil die neue dann einen gesunden gebündelten Eintrag hat. Laufende und wartende Aufträge behalten ihre
-Engine wie bisher (S7).
+After that, it never happens again: if someone later deliberately switches back to the old bundled
+engine, it stays active, because the new one by then has a healthy bundled entry. Running and waiting
+jobs keep their engine as before (S7).
 
-## Grenzfälle
+## Edge Cases
 
-- Hatte jemand genau diese Version schon als Update geladen und war danach zur alten gebündelten zurückgegangen,
-  stellt das App-Update trotzdem auf sie um: Ihr Eintrag war bis dahin nicht als gebündelt markiert.
-- Stand als vorherige eine dritte Engine, von der jemand bewusst zur alten gebündelten zurückgegangen war, ist sie
-  danach nicht mehr über „Zur vorherigen Engine“ erreichbar, weil die alte gebündelte die vorherige wird. So endet
-  auch jede Aktivierung von Hand: Der Weg zurück reicht genau einen Schritt. Die Installation bleibt in der Liste,
-  bis sie beim Räumen weicht (ADR 0009).
-- Ein Absturz zwischen den zwei Speicherungen in `ensureBundledLocked` verschiebt die Umstellung nur auf den nächsten
-  Start. Dazwischen kann niemand zur alten Engine zurückgehen, weil `rollback()` und `activate()` zuerst
-  `ensureBundledLocked` durchlaufen und die Umstellung damit nachholen.
+- If someone had already loaded exactly this version as an update and then gone back to the old bundled
+  engine, the app update switches to it anyway: until then, its entry wasn't marked as bundled.
+- If a third engine had been the previous one, having deliberately switched back to the old bundled
+  engine from it, that third engine is no longer reachable via "Switch to previous engine" afterward,
+  because the old bundled engine becomes the previous one instead. That's how every manual activation
+  ends: the way back reaches exactly one step. The installation stays in the list until it yields during
+  clearing (ADR 0009).
+- A crash between the two writes inside `ensureBundledLocked` only postpones the switch to the next
+  start. In between, nobody can switch back to the old engine, because `rollback()` and `activate()` both
+  run `ensureBundledLocked` first, which catches up on the switch itself.
 
-Die ersten beiden Fälle sind selten, und ein App-Update ist selbst eine ausdrückliche Handlung.
+The first two cases are rare, and an app update is itself an explicit action.
 
-Bis Runde 18 stand hier als erster Grenzfall, nach einem solchen Absturz oder mit einem Slot, der die Prüfung nicht
-mehr besteht, werde erneut umgestellt, auch nach einem bewussten Zurückgehen. Beides stimmte nicht: Der Absturz
-lässt kein Zurückgehen dazwischen zu, und ein ungültiger Slot endete in `materializeSlot` mit `VERIFICATION`, ohne
-umzustellen, bei jedem Aufruf des Managers, der zuerst `ensureBundledLocked` durchläuft. Seit
-[ADR 0011](0011-damaged-bundled-engine-slot.md) wird er ersetzt; der gesunde Eintrag bleibt, und umgestellt wird
-nichts. Den zweiten Fall hat der Code-Reviewer der Runde 18 gemeldet. Dass die Begründung des dritten zu weit griff,
-hat der Code-Reviewer der Runde 19 gezeigt: `check()`, `discardUnhealthyCandidate()` und `file()` gehen nicht durch
-`ensureBundledLocked`, stellen aber auch nichts um.
+Through round 18, the first edge case listed here claimed that, after such a crash, or with a slot that no
+longer passes verification, the switch would happen again, even after a deliberate switch-back. Both were
+wrong: the crash allows no switch-back in between, and an invalid slot ended in `materializeSlot` with
+`VERIFICATION`, without switching anything, on every manager call that runs `ensureBundledLocked` first.
+Since [ADR 0011](0011-damaged-bundled-engine-slot.md), it gets replaced instead; the healthy entry stays,
+and nothing gets switched. The round 18 code reviewer reported the second case. The round 19 code
+reviewer showed that the third case's reasoning overreached: `check()`, `discardUnhealthyCandidate()`,
+and `file()` don't go through `ensureBundledLocked` at all, but they don't switch anything either.
 
-## Verworfene Alternativen
+## Alternatives Rejected
 
-- **Nie umstellen:** Das App-Update wirkt dann bei der Extraktion nicht, und die Runtime der neuen App muss mit
-  einer yt-dlp-Version arbeiten, die nie mit ihr geprüft wurde.
-- **Immer auf die neueste Version umstellen:** Versionsangaben sind über Stable- und Nightly-Kanal hinweg nicht
-  verlässlich vergleichbar, und eine bewusst aktivierte Engine würde überschrieben.
-- **Beim Start fragen:** ein Dialog vor jeder Nutzung, den Hintergrundaufträge nicht beantworten können.
+- **Never switch:** the app update would then never take effect for extraction, and the new app's runtime
+  would have to work with a yt-dlp version that was never verified against it.
+- **Always switch to the newest version:** version numbers aren't reliably comparable across the Stable
+  and Nightly channels, and a deliberately activated engine would get overwritten.
+- **Ask at start:** a dialog before every use, one that background jobs can't answer.
 
 ## Tests
 
-`EngineUpdateManagerTest` prüft das Umstellen beim ersten Start, das Beibehalten beim zweiten und nach einem
-bewussten Zurückgehen und dass eine aktivierte heruntergeladene Engine aktiv bleibt.
+`EngineUpdateManagerTest` verifies the switch at the first start, that it's kept on the second start and
+after a deliberate switch-back, and that an activated downloaded engine stays active.

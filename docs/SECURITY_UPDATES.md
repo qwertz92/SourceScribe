@@ -1,73 +1,73 @@
-# Sicherheit, Updates und persönliche Auslieferung
+# Security, Updates, and Personal Distribution
 
-## S1 — Bedrohungsmodell und Vertrauensgrenzen
+## S1 — Threat Model and Trust Boundaries
 
-Zu schützen sind API-Schlüssel, Audio-/Transkriptinhalte, persönliche Quellenhistorie, lokale Dateien, Providerbudgets und die Integrität des ausführbaren Codes. Untrusted sind eingefügte Links, Share-Inhalte, Titel/Untertitel, Medien, API-Antworten und heruntergeladene Updateartefakte. HTTPS alleine macht fremden Code nicht vertrauenswürdig.
+What needs protecting: API keys, audio/transcript content, personal source history, local files, provider budgets, and the integrity of the executable code. Untrusted: pasted links, shared content, titles/subtitles, media, API responses, and downloaded update artifacts. HTTPS alone does not make third-party code trustworthy.
 
-Die App führt Drittanbietercode für Extraktion und Audioverarbeitung aus. Ein Prozess mit eigener PID, aber derselben Android-UID bleibt im selben App-Vertrauensbereich. Keine falsche Aussage, ein separat gestartetes Python oder verschlüsselte API-Schlüssel verhinderten den Zugriff eines kompromittierten Extractors auf App-Daten. Android weist ausdrücklich darauf hin, dass nachgeladener Code mit App-Berechtigungen läuft. [R20–R21]
+The app runs third-party code for extraction and audio processing. A process with its own PID but the same Android UID stays within the same app trust boundary. Do not claim that a separately started Python process or encrypted API keys would stop a compromised extractor from reaching app data. Android explicitly states that dynamically loaded code runs with the app's own permissions. [R20–R21]
 
-Für die persönliche v1 wird dieses verbleibende Risiko transparent akzeptierbar gemacht durch eingeschränkte Bezugsquellen, verifizierte Pakete, minimale Optionen, aktuelle geprüfte Runtimes und getrennte Datenflüsse. Keystore schützt gespeicherte Schlüssel, nicht jeden späteren Klartextgebrauch in einer kompromittierten App. Echte Isolation mit eigener UID/isolated service und kontrolliertem I/O wäre ein gesonderter, praktisch zu validierender Entwurf, kein kostenloser Effekt eines zusätzlichen Prozesses.
+For the personal v1, this residual risk is made transparently acceptable through restricted sources, verified packages, minimal options, current vetted runtimes, and separated data flows. The keystore protects stored keys, not every later plaintext use inside an already-compromised app. Genuine isolation with its own UID/isolated service and controlled I/O would be a separate design that still needs practical validation — not a free side effect of running an extra process.
 
-## S2 — Geheimnisse und Daten
+## S2 — Secrets and Data
 
-API-Schlüssel mit einem nicht exportierbaren Android-Keystore-Schlüssel verschlüsseln, z. B. AES-GCM mit frischem Nonce je Verschlüsselung. Nur Ciphertext und Metadaten in privatem App-Speicher; kein Klartext in Room, DataStore, BuildConfig, Ressourcen, WorkManager Data oder Prozessargumenten. Credential-ID und Providerregion als zusätzliche Bindung berücksichtigen. Aktuell gepflegte Android-/Kryptobibliotheken verwenden; keine selbst entworfene Kryptografie. [R22]
+Encrypt API keys with a non-exportable Android Keystore key, e.g., AES-GCM with a fresh nonce per encryption. Only ciphertext and metadata live in private app storage; no plaintext in Room, DataStore, BuildConfig, resources, WorkManager data, or process arguments. Bind the credential ID and provider region in as well. Use currently maintained Android/crypto libraries; no home-grown cryptography. [R22]
 
-Für unbeaufsichtigte Jobs muss klar sein, ob ein Key ohne erneute biometrische Freigabe verfügbar sein darf. Default darf nach normaler Geräteentsperrung Hintergrundjobs ermöglichen. Keystore-Invalidierung, Gerätewechsel/Restore und fehlende Entsperrung verständlich behandeln. Schlüssel niemals bei gescheiterter Entschlüsselung auf Klartextspeicherung zurückfallen lassen.
+For unattended jobs, it must be clear whether a key may be available without a fresh biometric prompt. The default may allow background jobs after a normal device unlock. Handle keystore invalidation, device transfer/restore, and a missing unlock understandably. Never fall back to plaintext storage when decryption fails.
 
-Key-Eingabe maskiert, sensible Screenshots/Task-Previews soweit sinnvoll begrenzen. Kein Secret in Testberichten oder ADB-Befehlszeilen. Debug- und Release-Logging redigieren Authorization-Header, signierte Medien-/Upload-URLs, Kontextbegriffe und vollständige Providerantworten. Diagnoseexport enthält standardmäßig Fehlerkategorien, Versionen und pseudonymisierte IDs, nicht Audio, Transkript, URL-Tokens oder Schlüssel. Export vor Freigabe anzeigen lassen.
+Mask key entry, and limit sensitive screenshots/task previews where reasonable. No secrets in test reports or ADB command lines. Debug and release logging redact authorization headers, signed media/upload URLs, context terms, and full provider responses. Diagnostic exports contain error categories, versions, and pseudonymized IDs by default — not audio, transcript, URL tokens, or keys. Show the export to the user before it is shared.
 
-Automatisches Cloudbackup für Secrets und sensible App-Daten standardmäßig deaktivieren oder explizit ausschließen; die tatsächlichen Regeln für Backup/Device-Transfer prüfen. Ein Restore eines alten verschlüsselten Blobs ohne seinen gerätegebundenen Key ist kein funktionierendes Credential-Backup. Presetexport ohne Secrets, komplette Daten-/Schlüsselbackups nicht in v1.
+Disable automatic cloud backup for secrets and sensitive app data by default, or exclude them explicitly; verify the actual backup/device-transfer rules. Restoring an old encrypted blob without its device-bound key is not a working credential backup. Preset export without secrets, yes; full data/key backups are not in v1.
 
-Intern gespeicherte Transkripte sind app-privat, aber ohne zusätzlich implementierten Tresor nicht als separat anwendungsverschlüsselt bezeichnen. Externe TXT-/MD-/JSON-Exporte sind lesbare Dokumente; bei gewähltem Cloud-DocumentsProvider können sie dessen Synchronisierung unterliegen. Keine pauschale Aussage „alle Daten bleiben offline“: STT übermittelt Audio an den gewählten Provider.
+Internally stored transcripts are app-private, but without a separately implemented vault, do not call them application-encrypted. External TXT/MD/JSON exports are plain readable documents; when the chosen `DocumentsProvider` is cloud-backed, they can be subject to its sync. Never state a blanket "all data stays offline": STT sends audio to the chosen provider.
 
-## S3 — Netz, Eingaben und Rechte
+## S3 — Network, Input, and Permissions
 
-Nur Internet und funktional nötige Android-Berechtigungen. Kein `MANAGE_EXTERNAL_STORAGE`, keine Accessibility-Service-Berechtigung, kein Mikrofonzugriff ohne neue Aufnahmefunktion. SAF statt Vollzugriff. Notifications zur passenden Zeit anfordern; Ablehnung darf nicht zu geheimem oder defektem Verhalten führen. Die App arbeitet nicht als generischer Proxy für beliebige URLs.
+Only internet access and the Android permissions functionally needed. No `MANAGE_EXTERNAL_STORAGE`, no accessibility-service permission, no microphone access without an actual new recording feature. SAF instead of broad storage access. Request notification permission at the right moment; a denial must never cause silent or broken behavior. The app is not a generic proxy for arbitrary URLs.
 
-Strenge YouTube-Host-/URL-Prüfung, einschließlich Userinfo, Unicode-Lookalikes, verschachtelten Redirectparametern und Mehrfach-URLs. Keine shellfähigen freiformigen Parameter. Downloader nur mit kontrolliertem Konfigurationssatz; Dateinamen/-archive gegen Pfadtraversal und unerlaubte absolute Pfade prüfen. Provider-API-Hosts aus geprüften Profilen, keine frei eingegebenen OpenAI-kompatiblen Endpoints in v1.
+Strict YouTube host/URL validation, covering userinfo, Unicode lookalikes, nested redirect parameters, and multiple URLs. No shell-capable free-form parameters. The downloader gets only a controlled configuration set; check file names/archives against path traversal and disallowed absolute paths. Provider API hosts come from vetted profiles — no freely entered OpenAI-compatible endpoints in v1.
 
-Secrets nie bei Redirects an fremde Hosts weiterreichen. API-, Medien- und Update-HTTP-Clients getrennt konfigurieren. HTTPS und normale Zertifikatsprüfung verwenden; keine globalen Trust-all-Zertifikate. Test-HTTP-Ausnahmen ausschließlich in klar getrennten Testvarianten. Parsergrößen, Dekompression, Ausgabevolumen und Prozesslaufzeiten begrenzen. Medien-/Metadatendateien niemals als Anweisungen ausführen.
+Never carry secrets across a redirect to a different host. Configure API, media, and update HTTP clients separately. Use HTTPS with normal certificate validation; no global trust-all certificates. Test-only HTTP exceptions belong exclusively in clearly separated test build variants. Bound parser sizes, decompression, output volume, and process runtimes. Never execute media/metadata file content as instructions.
 
-## S4 — Zwei verschiedene Updateklassen
+## S4 — Two Different Update Classes
 
-**Komponentenupdate:** austauschbares yt-dlp-/EJS-Paket innerhalb einer nachgewiesen kompatiblen eingebetteten Runtime. Kann ohne APK-Neuinstallation erfolgen.
+**Component update:** a swappable yt-dlp/EJS package within a proven-compatible embedded runtime. Can happen without reinstalling the APK.
 
-**App-/Runtimeupdate:** Änderungen an Kotlin-Code, nativen Python-/JS-/FFmpeg-Binaries, ABI, SDK oder inkompatiblen Schnittstellen. Dafür einen signierten APK-Updatepfad verwenden. Kein Versprechen, alle zukünftigen Änderungen mit dem yt-dlp-Button beheben zu können.
+**App/runtime update:** changes to Kotlin code, native Python/JS/FFmpeg binaries, ABI, SDK, or incompatible interfaces. Use a signed APK update path for these. No promise that every future change can be fixed with the yt-dlp update button.
 
-Initial eine tatsächlich geprüfte Kombination mit der App ausliefern. Die App darf nicht nur auf einen ersten Internetdownload angewiesen sein. Versionen und Herkunft aller Komponenten in Einstellungen und Diagnosen anzeigen. Ein Runtimebedarf ist `REQUIRES_APP_UPDATE`, nicht „Update erfolgreich“.
+Ship an actually verified combination with the app initially. The app must not depend on an initial internet download to function at all. Show the versions and origin of every component in settings and diagnostics. A runtime requirement is `REQUIRES_APP_UPDATE`, not "update successful."
 
-## S5 — Updatepolitik für die persönliche Sideload-App
+## S5 — Update Policy for the Personal Sideload App
 
-Kanäle: Stable und Nightly. Nightly darf voreingestellt sein, wenn die ausgelieferte Kombination aus diesem Kanal geprüft wurde; Kanalwahl bedeutet nicht automatische Installation. Default: manuelle Installation, optional höchstens tägliche Metadatenprüfung und Benachrichtigung. Bei plausibler Extractor-Störung „Update prüfen / Update und erneut versuchen“ anbieten. Kein Main-/Master-Checkout und keine beliebigen Repository-URLs in v1.
+Channels: Stable and Nightly. Nightly may be the default when the shipped combination was verified from that channel; choosing a channel does not mean automatic installation. Default: manual installation, with an optional metadata check and notification at most once a day. Offer "Check for update / Update and retry" on a plausible extractor failure. No checking out `main`/`master` and no arbitrary repository URLs in v1.
 
-Optional „nach passendem Extraktionsfehler einmal aktualisieren“ nur nach ausdrücklichem Opt-in. Nie bei Offlinezustand, HTTP 429, privatem Video oder gesperrter Quelle reflexartig updaten. Vor einem Retry Video-ID und bisherige kostenrelevante Steps beachten. Eine Release-Notiz beweist nicht, dass genau der beobachtete Fehler behoben ist; UI formuliert „neue Version verfügbar“, nicht „garantierte Reparatur“.
+An optional "update once after a matching extraction error" requires explicit opt-in. Never update reflexively on offline state, HTTP 429, a private video, or a locked source. Before any retry, take the video ID and prior billable steps into account. A release note does not prove that the exact observed bug was fixed; the UI says "new version available," not "guaranteed fix."
 
-Updatechecks sind OS-gesteuert, nicht sekundengenaue Benachrichtigungen. Prüfanfragen cachen, ETag/Backoff soweit verfügbar nutzen und Notifications deduplizieren. Nach einmal gescheitertem Update/Retry keine Endlosschleife.
+Update checks are OS-scheduled, not second-accurate notifications. Cache check requests, use ETag/backoff where available, and deduplicate notifications. No infinite loop after one failed update/retry.
 
-## S6 — Integrität und Authentizität
+## S6 — Integrity and Authenticity
 
-Ein SHA-256-Hash, der ungesichert aus derselben kompromittierten Quelle stammt wie die Datei, belegt nur Übereinstimmung, keine unabhängige Herausgeberauthentizität. Die Mindestanforderung ist eine **authentifizierte Zuordnung** von vertrauenswürdigem Herausgeber, Paketinhalt, Version und Kompatibilität.
+A SHA-256 hash fetched, unauthenticated, from the same compromised source as the file only proves the two match — it proves nothing about independent publisher authenticity. The minimum requirement is an **authenticated binding** between a trusted publisher, package contents, version, and compatibility.
 
-Bevorzugt offizielle, signierte Release-/Checksum-Metadaten mit bereits vertrauenswürdig gebundenem öffentlichen Schlüssel prüfen. Signaturalgorithmus, tatsächlich veröffentlichte Artefakte und Key-Verifikation im P0-Test nachweisen. Einen öffentlichen Schlüssel nicht bei jedem Update unkontrolliert neben der Signatur neu laden. Schlüsselwechsel braucht einen nachvollziehbaren Vertrauenspfad oder ein App-Update.
+Preferably verify official, signed release/checksum metadata against a public key whose trust is already established. Prove the signature algorithm, the artifacts actually published, and key verification in the P0 test. Do not reload a public key alongside the signature, uncontrolled, on every update. A key change needs a traceable trust path or an app update.
 
-Falls ein Android-Wrapper eigene umgepackte/lazy Artefakte benötigt: deren Beziehung zu Upstream, Buildpfad und Herausgebervertrauen ausdrücklich prüfen. Alternativ in kontrollierter Projekt-CI ein Paket aus fixierten Upstream-Releases bauen und mit einem eigenen Release-Schlüssel signieren. Dann liegt Vertrauen zusätzlich beim eigenen Build-/Signierprozess; dies muss dokumentiert werden. Kein erfundener „offizieller“ Status für Forks. Private Signierschlüssel nicht ins Repository oder auf das Telefon legen.
+If an Android wrapper needs its own repackaged/lazily fetched artifacts, explicitly check their relationship to upstream, the build path, and publisher trust. Alternatively, build a package from pinned upstream releases in controlled project CI and sign it with a project release key — trust then additionally rests on the project's own build/signing process, and that must be documented. No inventing "official" status for forks. Never put private signing keys in the repository or on the phone.
 
-Eine kryptografische Prüfung ist Pflicht, nicht ein optionales kosmetisches Feature. Fehlt ein belastbarer Vertrauensweg für das gewählte Hot-Update-Artefakt, keine unsichere Implementierung erzwingen. Komponentenupdate als blockiert melden, geprüfte gebündelte Version verwenden und signierte APK-Updates ermöglichen. Das erfüllt dann noch nicht die vollständige Hot-Update-Abnahme.
+Cryptographic verification is mandatory, not an optional cosmetic feature. If no solid trust path exists for the chosen hot-update artifact, do not force an insecure implementation. Report the component update as blocked, use the verified bundled version, and keep signed APK updates working. That alone still does not satisfy full hot-update acceptance.
 
-## S7 — Kompatibilitätspaket und Aktivierung
+## S7 — Compatibility Package and Activation
 
-Ein installierbares Engine-Paket enthält oder referenziert verifizierbar: Paketformatversion, Herausgeber, Kanal, Release-/Commit-ID, yt-dlp- und EJS-Versionen, unterstützte App-/Python-/JS-Versionen, Artefakthashes/-größen und erforderliche Signatur. Die tatsächliche Upstream-Kopplung von EJS und yt-dlp beachten; nicht jedes Teil isoliert auf „latest“ setzen. [R12]
+An installable engine package verifiably contains or references: package format version, publisher, channel, release/commit ID, yt-dlp and EJS versions, supported app/Python/JS versions, artifact hashes/sizes, and the required signature. Respect the actual upstream coupling between EJS and yt-dlp; do not pin each piece to "latest" in isolation. [R12]
 
-Updateablauf: Metadaten verifizieren → Kompatibilität prüfen → begrenzt in privaten Stagingbereich laden → Signatur/Hashes prüfen → Archive sicher entpacken → lokale Initialisierung prüfen → kontrollierten Funktionstest ausführen → Kandidat aktivieren. Keine unlimitierte Dekompression, Zip-Slip-Pfade oder ausführbaren Dateien auf öffentlich beschreibbarem Speicher.
+Update flow: verify metadata → check compatibility → download, bounded, into a private staging area → verify signature/hashes → unpack archives safely → verify local initialization → run a controlled functional test → activate the candidate. No unbounded decompression, zip-slip paths, or executable files on publicly writable storage.
 
-Aktuelle Jobs pinnen ihre tatsächlich genutzte Engine-Version. Keine Dateien unter einem laufenden Prozess austauschen. Neue Jobs verwenden erst freigegebene Versionen. Aktivierung und Rollback über kleine atomar wechselnde Metadaten/Verzeichnisslots mit Crash-Recovery. Bei In-process-Python beachten, dass geladene Module nicht durch Dateiaustausch sauber neu geladen werden; Prozessneustart oder bewiesene Reloadstrategie ist Pflicht.
+Running jobs pin the engine version they actually use. Never swap files out from under a running process. New jobs use only released versions. Activation and rollback go through small, atomically switched metadata/directory slots with crash recovery. For in-process Python, keep in mind that loaded modules do not reload cleanly just because the underlying file changed; a process restart or a proven reload strategy is mandatory.
 
-Lokale Initialisierungsfehler führen zum Rollback. Ein fehlgeschlagener Live-Smoke-Test wegen Offline/YouTube-Ausfall ist dagegen zunächst unklar, kein sicherer Beweis für eine kaputte neue Version. Vor Aktivierung muss der definierte Nachweis erfüllt sein; unklare Kandidaten bleiben gestaged. Aktive, vorherige gesunde und gebündelte Version erhalten; alte Versionen erst ohne aktive Referenzen bereinigen. Rollback auf bekannte Sicherheitslücken warnend kennzeichnen und ggf. sperren. Kein „previous = sicher“, nur weil es älter ist.
+A local initialization failure triggers a rollback. A failed live smoke test due to being offline or a YouTube outage is, by contrast, inconclusive at first — not solid proof of a broken new version. The defined evidence must be satisfied before activation; inconclusive candidates stay staged. Keep the active, the previous healthy, and the bundled version; clean up older versions only once nothing active still references them. Flag a rollback to a known vulnerability with a warning and block it where appropriate. No "previous = safe" just because it is older.
 
-## S8 — APK-Auslieferung ohne ständige Handarbeit
+## S8 — APK Delivery Without Constant Manual Work
 
-APK-Builds für Debug und persönliche Release-Nutzung klar trennen. Für aufeinanderfolgende persönliche Updates denselben kontrollierten Release-Signing-Key verwenden und Versionscodes erhöhen. Den Key sicher außerhalb von Git sichern; CI-Signing nur bei bewusst bereitgestelltem Secret. Erstinstallation/Update nutzt den normalen Android-Installationsdialog, keine stille Installation behaupten.
+Clearly separate debug builds from personal release builds. Use the same controlled release signing key across successive personal updates, incrementing version codes. Store the key securely outside Git; CI signing only when the secret has been deliberately provisioned. First install/update goes through the normal Android install dialog — never claim silent installation.
 
-CI kann APK-Artefakte erzeugen. Eine spätere Release-Veröffentlichung beziehungsweise automatische Updatequelle braucht einen ausdrücklichen Auftrag; Codex soll nicht unbemerkt ein öffentliches Repository oder Release erzeugen. Optional APK-Updatehinweise in der App, aber keine zweite komplexe Appstore-Plattform bauen. Dieser Pfad bleibt auch dann nötig, wenn Komponentenupdates funktionieren.
+CI can produce APK artifacts. Actually publishing a release, or wiring up an automatic update source, needs an explicit instruction; Codex must not create a public repository or release unnoticed. Optional in-app APK update notices are fine, but do not build a second, complex app-store platform. This path stays necessary even once component updates work.
 
-Vor Veröffentlichung Abhängigkeitslizenzen, konkrete FFmpeg-Konfiguration, Notice-/Quellcodepflichten und App-Lizenz prüfen. Nicht das gesamte Projekt reflexartig MIT lizenzieren, wenn eingebundene Komponenten andere Bedingungen mitbringen. Die persönliche Sideload-Architektur ist nicht automatisch eine geprüfte Google-Play-Architektur. [R09, R19–R21]
+Before publishing, check dependency licenses, the concrete FFmpeg configuration, notice/source-disclosure obligations, and the app's own license. Do not reflexively license the whole project MIT when bundled components carry other terms. The personal sideload architecture is not automatically a Google-Play-vetted one. [R09, R19–R21]

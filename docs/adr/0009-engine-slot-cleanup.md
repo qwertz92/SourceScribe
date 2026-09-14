@@ -1,93 +1,96 @@
-# ADR 0009 — Alte Engine-Slots räumen, wenn eine neue Engine keinen Platz findet
+# ADR 0009 — Clear Old Engine Slots When a New Engine Finds No Room
 
-Datum: 13. September 2026. Status: Implementiert in Runde 17, berichtigt in Runde 18 (letzter Abschnitt). Welche
-Prüfungen gelaufen sind, steht in [STATUS.md](../STATUS.md).
+Date: September 13, 2026. Status: implemented in round 17, corrected in round 18 (last section). Which
+checks have actually run is recorded in [STATUS.md](../STATUS.md).
 
-## Kontext
+## Context
 
-`EngineUpdateManager` hält höchstens fünf Engine-Slots (`MAX_INSTALLATIONS`). Entfernt wurde bis Runde 17 nie
-eine gesunde Installation: `discardUnhealthyCandidate` löscht nur ungesunde Kandidaten, `cleanupCrashOrphans`
-nur Slots, die kein Eintrag in `state.json` nennt. Waren alle fünf Slots belegt, etwa durch die gebündelte
-Engine und vier geladene Updates, endete jedes weitere `stage` mit `STORAGE`. Schwerer wog ein App-Update mit
-einer anderen gebündelten yt-dlp-Version: `ensureBundledLocked` fand keinen Slot und warf ebenfalls `STORAGE`.
-Weil `active()`, `installations()`, `rollbackTarget()`, `stage()` und `activate()` diese Funktion zuerst
-aufrufen, konnte die App danach keine YouTube-Quelle mehr prüfen und keinen Auftrag mehr starten oder
-fortsetzen, dauerhaft und ohne eine Handlung, die das behob. Gemeldet hat das der Invarianten-Reviewer der
-Runde 17.
+`EngineUpdateManager` holds at most five engine slots (`MAX_INSTALLATIONS`). Through round 17, it never
+removed a healthy installation: `discardUnhealthyCandidate` only deletes unhealthy candidates, and
+`cleanupCrashOrphans` only removes slots that no entry in `state.json` names. Once all five slots were
+occupied — say, by the bundled engine plus four loaded updates — every further `stage` call ended in
+`STORAGE`. Worse, an app update carrying a different bundled yt-dlp version hit the same wall:
+`ensureBundledLocked` found no free slot and also threw `STORAGE`. Because `active()`, `installations()`,
+`rollbackTarget()`, `stage()`, and `activate()` all call that function first, the app could then no longer
+check any YouTube source, nor start or resume any job — permanently, and with no action that fixed it.
+The round 17 invariant reviewer reported this.
 
-Vorgabe aus `docs/SECURITY_UPDATES.md`, Abschnitt S7: „Aktive, vorherige gesunde und gebündelte Version
-erhalten; alte Versionen erst ohne aktive Referenzen bereinigen.“
+Requirement from `docs/SECURITY_UPDATES.md`, section S7: "Keep the active, the previous healthy, and the
+bundled version; clean up older versions only once nothing active still references them."
 
-## Entscheidung
+## Decision
 
-- **Wann geräumt wird:** nur wenn ein neuer Slot entstehen soll und keiner frei ist, in `materializeSlot`. Beim
-  Laden eines Updates ist das der Moment nach Download und Signaturprüfung. `stage` fragt vor dem Download nur,
-  ob sich Platz schaffen ließe, und entfernt dabei nichts: Für einen Download, der noch scheitern kann, geht
-  keine Installation verloren.
-- **Nie entfernt:** die aktive und die vorherige Installation, die Engine, die diese App-Version bündelt, die
-  ankommende Installation selbst und jede Installation, an die ein nicht abgeschlossener Versuch gebunden ist,
-  gleich ob er läuft oder auf Netz, Anbieter oder den Nutzer wartet.
-- **Reihenfolge:** zuerst Slot-Verzeichnisse, die kein Eintrag nennt, dann die ältesten Installationen, auf die
-  nichts verweist. `state.json` hält die Einträge in der Reihenfolge ihrer ersten Aufnahme. Ein abgeschlossener
-  Versuch verweist auf keine Engine, auch nicht mit einem Teilergebnis (Berichtigung in Runde 18).
-- **Woher der Manager weiß, was Aufträge brauchen:** Das Modul `extractor` kennt keine Aufträge. Die App
-  übergibt im Konstruktor eine Funktion `references` (`AppModule`), die `engineReferences` über Room beantwortet.
-  Gefragt wird nur, wenn tatsächlich etwas weg muss. Scheitert die Abfrage, geht ihr Fehler unverändert weiter,
-  und nichts wird entfernt: Ohne dieses Wissen ist kein Slot sicher zu löschen, und ein Grund, den niemand
-  geprüft hat, wird nicht behauptet.
-- **Wie entfernt wird:** erst der Eintrag in `state.json` (über `AtomicFile`), dann das Verzeichnis. Ein Absturz
-  dazwischen hinterlässt einen Slot ohne Eintrag, den die nächste Ladung eines lesbaren Zustands entfernt.
-  Scheitert das Schreiben, behält auch der Zustand im Speicher den Eintrag.
-- **Eigener Code:** Reicht das Entfernbare nicht, endet der Aufruf mit `SLOTS_IN_USE`, bevor irgendetwas entfernt
-  ist. `STORAGE` bleibt für Fälle, in denen das Dateisystem versagt, auch für ein Verzeichnis, das sich nicht
-  löschen ließ. Beide Codes haben in der App eigene Texte.
-- **Nebenbei vereinheitlicht:** Der Untertitelzweig in `JobCoordinator.captions` sucht die gebundene Engine jetzt
-  wie `SttStep.pinnedEngine` und wartet mit `ENGINE_NOT_AVAILABLE`, statt über `single` eine namenlose Ausnahme
-  zu werfen. `ENGINE_NOT_AVAILABLE` hat einen eigenen Text.
+- **When clearing happens:** only when a new slot needs to be created and none is free, inside
+  `materializeSlot`. For loading an update, that is the moment right after download and signature
+  verification. Before the download, `stage` only asks whether room *could* be made, and removes nothing
+  at that point: no installation is lost for a download that might still fail.
+- **Never removed:** the active and the previous installation, the engine bundled with this app version,
+  the incoming installation itself, and any installation an unfinished attempt is bound to — whether it's
+  running or waiting on the network, a provider, or the user.
+- **Order:** first, slot directories that no entry names; then the oldest installations that nothing
+  references. `state.json` keeps entries in the order they were first recorded. A finished attempt
+  references no engine, not even one with a partial result (corrected in round 18).
+- **How the manager knows what jobs need:** the `extractor` module knows nothing about jobs. The app
+  passes a `references` function into the constructor (`AppModule`), which answers `engineReferences`
+  through Room. It's only asked when something actually has to go. If that query fails, its error
+  propagates unchanged, and nothing is removed: without this knowledge, no slot can be safely deleted,
+  and no reason nobody actually checked gets asserted.
+- **How removal happens:** first the entry in `state.json` (via `AtomicFile`), then the directory. A crash
+  in between leaves a slot with no entry, which the next load of a readable state removes. If the write
+  fails, the in-memory state keeps the entry too.
+- **Dedicated codes:** if what's removable still isn't enough, the call ends with `SLOTS_IN_USE` before
+  anything is removed. `STORAGE` remains for cases where the file system itself fails, including a
+  directory that couldn't be deleted. Both codes have their own text in the app.
+- **Unified along the way:** the caption branch in `JobCoordinator.captions` now looks up the bound engine
+  the same way `SttStep.pinnedEngine` does, and waits with `ENGINE_NOT_AVAILABLE` instead of throwing a
+  nameless exception via `single`. `ENGINE_NOT_AVAILABLE` has its own text.
 
-## Verworfene Alternativen
+## Alternatives Rejected
 
-- **Nur geladene Updates entfernen, gebündelte Engines nie:** Alte gebündelte Engines sammeln sich über
-  App-Updates hinweg an; das eigentliche Problem bliebe.
-- **Eine Schaltfläche „Engines löschen“:** Der Nutzer sieht nicht, welche Engine ein unfertiger Auftrag noch
-  braucht, und `ensureBundledLocked` läuft auch im Hintergrund ohne jemanden, der tippen könnte.
-- **Einen Fehler von `ensureBundledLocked` hinnehmen, solange die aktive Engine gesund ist:** Das ändert die
-  Zusage an sechs Aufrufstellen, dass die gebündelte Engine als Rückfall immer bereitsteht.
-- **Referenzen zusätzlich in `state.json` führen:** eine zweite Wahrheit neben Room, die bei Abbruch und Löschung
-  auseinanderlaufen kann.
+- **Remove only loaded updates, never bundled engines:** old bundled engines would keep accumulating
+  across app updates; the actual problem would remain.
+- **A "delete engines" button:** the user can't see which engine an unfinished job still needs, and
+  `ensureBundledLocked` also runs in the background, with nobody there to tap anything.
+- **Accept a failure from `ensureBundledLocked` as long as the active engine is healthy:** that would
+  break the guarantee, relied on at six call sites, that the bundled engine is always available as a
+  fallback.
+- **Also keep references in `state.json`:** a second source of truth alongside Room, one that can drift
+  out of sync with it on abort and deletion.
 
-## Folgen und Restrisiken
+## Consequences and Residual Risks
 
-- Ein unfertiger Versuch hält seine Engine auch in Phasen, in denen er sie nicht mehr ausführt, etwa ein Versuch
-  „Nur Fehlendes“. Das schützt mehr als nötig, nie weniger.
-- `stage` fragt die Referenzen vor dem Download und beim Räumen danach getrennt. Entstünde dazwischen ein Versuch
-  „Nur Fehlendes“, der die Engine seines Vorgängers übernimmt, ohne den Manager zu fragen, und war genau diese zum
-  Räumen vorgesehen, endete das Update nach dem Download mit `SLOTS_IN_USE`, und entfernt wäre nichts. Heute
-  verhindert das nur die Sperre von `MainViewModel.action`, über die Update und Wiederholung beide laufen, und sie
-  gilt je View-Model. Jeder andere neue Versuch einer YouTube-Quelle fragt den Manager nach der aktiven Engine und
-  wartet, bis `stage` ihn freigibt, oder übernimmt als Rückfall auf STT die Engine eines Untertitelversuchs, der sie
-  in diesem Moment noch hält.
-- Scheitert `stage` nach dem Räumen, etwa am Selbsttest, bleibt die entfernte Installation entfernt.
-- Ist `state.json` nicht lesbar, nennt der Zustand keinen Slot, und alle vorhandenen Verzeichnisse gelten als
-  zuerst entfernbar, soweit kein Auftrag an sie gebunden ist. Das nimmt vorweg, was ohnehin geschieht:
-  `ensureBundledLocked` schreibt den Zustand dabei neu, und die nächste Ladung räumt Slots ohne Eintrag.
+- An unfinished attempt holds on to its engine even during phases where it no longer runs it — a
+  "missing only" attempt, for instance. This protects more than strictly necessary, never less.
+- `stage` queries references separately before the download and again, for clearing, afterward. If a
+  "missing only" attempt appeared in between and took over its predecessor's engine without asking the
+  manager — and that engine was exactly the one slated for clearing — the update would end with
+  `SLOTS_IN_USE` after the download, and nothing would be removed. Today, only the lock on
+  `MainViewModel.action` prevents that; both the update and the retry go through it, and it applies per
+  view model. Every other new attempt on a YouTube source asks the manager for the active engine and
+  waits until `stage` releases it, or falls back to the engine of a caption attempt that still holds it
+  at that moment, as its STT fallback.
+- If `stage` fails after clearing — at the self-test, say — the removed installation stays removed.
+- If `state.json` isn't readable, the state names no slot, and every existing directory counts as
+  removable first, as long as no job is bound to it. This just anticipates what happens anyway:
+  `ensureBundledLocked` rewrites the state in the process, and the next load clears slots with no entry.
 
 ## Tests
 
-`EngineUpdateManagerTest` prüft Reihenfolge, Schutz, die Ablehnung ohne Entfernen, den Fehler der Abfrage und das
-Laden eines Updates, das vor dem Download abgelehnt wird oder am Download scheitert. `EngineReferencesTest` prüft die
-Room-Abfrage, `AppPipelineTest.aCaptionAttemptWhoseEngineIsGoneWaitsWithThatReason` den Untertitelzweig und
-`SttMissingRetryTest.aMissingChunkRetryOfAVideoCompletesWithoutTheEngineItIsBoundTo`, dass „Nur Fehlendes“ ohne
-seine Engine auskommt. Den Weg bis zum erfolgreich geladenen Update prüft nur der getrennte Live-Test, weil eine
-gültige Signatur zu einem echten Release gehört.
+`EngineUpdateManagerTest` verifies ordering, protection, refusal without removal, a failing query, and
+loading an update that's either rejected before the download or fails during it. `EngineReferencesTest`
+verifies the Room query, `AppPipelineTest.aCaptionAttemptWhoseEngineIsGoneWaitsWithThatReason` the caption
+branch, and `SttMissingRetryTest.aMissingChunkRetryOfAVideoCompletesWithoutTheEngineItIsBoundTo` that
+"missing only" manages without its engine. Only the separate live test verifies the path all the way to a
+successfully loaded update, because a valid signature belongs to a real release.
 
-## Berichtigung in Runde 18
+## Correction in Round 18
 
-Bis Runde 18 hielt der Manager zusätzlich die Engine des jüngsten STT-Versuchs eines Auftrags, dessen Ergebnis nicht
-bestätigt vollständig war, und ließ sie nur als letzten Ausweg für die gebündelte Engine weichen, nie für ein Update.
-Die Begründung, „Nur Fehlendes“ laufe mit dieser Engine weiter, stimmte nicht: `SttStep.prepareMissingRetry` legt den
-neuen Versuch in `Phase.SUBMIT` an, mit den Audioabschnitten, die sein Vorgänger vorbereitet hat, und nur `resolve`
-und `download` fragen die gebundene Engine. Der neue Versuch trägt ihre Id weiter, als Angabe, woher das Audio
-stammt (ADR 0006), nicht als Datei, die er ausführt. Der Schutz ließ dagegen ein freiwilliges Update mit
-`SLOTS_IN_USE` scheitern, und dessen Text verlangte, das Teilergebnis abzuschließen oder zu löschen. Gefunden hat das
-der Invarianten-Reviewer der Runde 18. Seitdem hält nur ein unfertiger Versuch seine Engine.
+Through round 18, the manager additionally held on to the engine of a job's most recent STT attempt
+whenever that job's result wasn't confirmed complete, and let it yield only as a last resort for the
+bundled engine, never for an update. The reasoning — that "missing only" keeps running on that engine —
+was wrong: `SttStep.prepareMissingRetry` creates the new attempt in `Phase.SUBMIT`, using the audio
+segments its predecessor already prepared, and only `resolve` and `download` query the bound engine. The
+new attempt carries its ID forward as a record of where the audio came from (ADR 0006), not as a file it
+executes. The protection, meanwhile, made a voluntary update fail with `SLOTS_IN_USE`, whose message
+demanded finishing or deleting the partial result. The round 18 invariant reviewer found this. Since
+then, only an unfinished attempt holds on to its engine.

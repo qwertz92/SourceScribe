@@ -1,83 +1,83 @@
-# Extraktion, Provider und Transkriptdaten
+# Extraction, Providers, and Transcript Data
 
-## I1 — Android-Extractor: erst beweisen, dann festlegen
+## I1 — Android Extractor: Prove It, Then Commit
 
-`yt-dlp` bleibt die bevorzugte Extraktionsengine. Ein Android-Wrapper kann verwendet werden, aber erst nach Prüfung des tatsächlichen AAR-/Native-Inhalts, nicht nur eines README. `yausername/youtubedl-android` dokumentiert In-App-Updates, nennt zugleich eine ältere Python-Version im README. Das belegt eine Prüffrage, nicht automatisch die Version jedes aktuell veröffentlichten Binärartefakts. [R09]
+`yt-dlp` remains the preferred extraction engine. An Android wrapper may be used, but only after inspecting the actual AAR/native contents, not just a README. `yausername/youtubedl-android` documents in-app updates while its README still names an older Python version. That is a question to verify, not proof of the version in whatever binary artifact is currently published. [R09]
 
-Die upstream README nennt unterstützte Python-Versionen; aktuelle Release-Hinweise unterscheiden davon die empfohlene Mindestversion. Diese beiden Begriffe nicht verwechseln. Eine neue yt-dlp-Datei repariert keine inkompatible eingebettete Python-Runtime. [R10–R11]
+The upstream README lists supported Python versions; current release notes distinguish a separate recommended minimum version. Do not conflate the two. A new yt-dlp file does not fix an incompatible embedded Python runtime. [R10–R11]
 
-YouTube-Unterstützung umfasst heute neben yt-dlp auch passende `yt-dlp-ejs`-Skripte und eine unterstützte JavaScript-Runtime. EJS und yt-dlp müssen zueinander passen. Ein kleiner Android-tauglicher JS-Interpreter wie QuickJS/QuickJS-NG ist ein zu prüfender Kandidat, keine bereits bewiesene Auswahl. Deno-Empfehlungen für Desktop nicht ungeprüft auf Android übertragen. [R12]
+YouTube support today requires matching `yt-dlp-ejs` scripts and a supported JavaScript runtime alongside yt-dlp itself. EJS and yt-dlp must match each other. A small Android-capable JS interpreter such as QuickJS/QuickJS-NG is a candidate to evaluate, not an already-proven choice. Do not carry Deno recommendations for desktop over to Android unchecked. [R12]
 
-P0 muss Metadaten, Caption-Liste, echte Caption-Datei, Audio, Abbruch und Update/Rollback auf Android demonstrieren. Ermittelte Python-, yt-dlp-, EJS-, JS-, FFmpeg-, OpenSSL-/TLS- und ABI-Versionen dokumentieren. Ressourcenverbrauch und APK-/Installationsgröße messen. Native Komponenten auf der geplanten ARM64-Auslieferung und der Emulator-ABI prüfen. Keinen Desktop-Erfolg als Android-Erfolg ausgeben.
+P0 must demonstrate metadata, the caption list, a real caption file, audio, cancellation, and update/rollback on Android. Document the determined Python, yt-dlp, EJS, JS, FFmpeg, OpenSSL/TLS, and ABI versions. Measure resource use and APK/install size. Check native components on both the planned ARM64 target and the emulator ABI. Never pass off a desktop success as an Android success.
 
-Verschiedene YouTube-Clientpfade können Einschränkungen haben; ein aktueller Extractor garantiert keinen Zugriff. Erreichbarkeits-, Rate-Limit-, Authentifizierungs-, Token-/Challenge- und Formatprobleme auseinanderhalten. Keine Anti-Bot-Umgehung über undurchsichtige Drittserver, keine Credentials/Cookies aus anderen Apps extrahieren. Autorisierte, öffentlich erreichbare Inhalte unterstützen; nicht zugängliche Videos klar melden. [R13]
+Different YouTube client paths can carry different restrictions; an up-to-date extractor guarantees no access. Distinguish reachability, rate-limit, authentication, token/challenge, and format problems from one another. No anti-bot circumvention through opaque third-party servers, and no extracting credentials/cookies from other apps. Support authorized, publicly reachable content; report inaccessible videos clearly. [R13]
 
-Keine uneingeschränkten yt-dlp-Optionen aus der UI. Typsichere, geprüfte Auswahl für Sprachen, Formate und zulässige Diagnoseoptionen. Fremde Konfigurationsdateien, Plugins, `--exec` und beliebige Downloader-/Postprocessor-Kommandos deaktivieren. Argumente als Liste übergeben, URL nicht in eine Shellzeichenkette interpolieren. Medienpfade bleiben in kontrollierten App-Verzeichnissen.
+No unrestricted yt-dlp options from the UI. A type-safe, vetted selection for languages, formats, and allowed diagnostic options. Disable external config files, plugins, `--exec`, and arbitrary downloader/postprocessor commands. Pass arguments as a list; never interpolate the URL into a shell string. Media paths stay inside controlled app directories.
 
-## I2 — Caption- und Audioidentität
+## I2 — Caption and Audio Identity
 
-Für jede Spur festhalten: beobachtete Source-ID, Track-ID, Format, Sprache, Name, beobachtete maschinelle Erzeugung, Übersetzungsstatus und Quelle der Information. Metadaten können fehlen oder heuristisch sein. Verwende `true/false/unknown` und ein Evidenzfeld statt überall einen sicheren Boolean zu erfinden.
+Record, for every track: the observed source ID, track ID, format, language, name, observed machine generation, translation status, and where that information came from. Metadata can be missing or heuristic. Use `true`/`false`/`unknown` plus an evidence field instead of inventing a confident boolean everywhere.
 
-Provenienz orthogonal modellieren: `origin` (YouTube/Provider/Import), `generation` (uploader_provided/automatic/unknown), `translation` (none/automatic/unknown), `provider`, `requestedModel`, `reportedModel`, `sourceAudioTrack`, `languageEvidence`. „Vom Kanal bereitgestellt“ heißt nicht beweisbar von einem Menschen geschrieben. Eine übersetzte Spur kann wiederum aus automatischen Captions stammen; eine einzige flache Enum würde Information verlieren.
+Model provenance as orthogonal fields: `origin` (YouTube/Provider/Import), `generation` (uploader_provided/automatic/unknown), `translation` (none/automatic/unknown), `provider`, `requestedModel`, `reportedModel`, `sourceAudioTrack`, `languageEvidence`. "Provided by the channel" does not mean provably human-written. A translated track can in turn originate from automatic captions; a single flat enum would lose that information.
 
-Originalton, dub/synchronisierte Spur, UI-Sprache und Transkriptsprache sind unterschiedliche Eigenschaften. Priorisiere belegten Originalton. Ist die Sprachauswahl mehrdeutig, Track-Picker oder klarer Hinweis statt stiller Wahl der ersten Spur. Provider können nur die erste Spur einer Multitrack-Datei berücksichtigen; kontrollierte Audiospurauswahl vor Upload durchführen. [R14]
+Original audio, a dubbed/synced track, UI language, and transcript language are all different properties. Prioritize documented original audio. When language choice is ambiguous, show a track picker or a clear notice instead of silently picking the first track. Providers may only look at the first track of a multi-track file; perform controlled audio-track selection before upload. [R14]
 
-Nur den explizit gewählten bzw. nach dokumentierter Sprachregel gewählten Caption-Track laden, nicht versehentlich hunderte automatisch übersetzte Varianten. Bei Trackwechseln zwischen Metadaten und Download neu auflösen und Modusgrenzen weiter einhalten.
+Download only the explicitly chosen caption track, or the one selected by a documented language rule — never accidentally hundreds of auto-translated variants. On a track change between metadata and download, re-resolve and keep respecting mode boundaries.
 
-## I3 — Verlustarme Normalisierung
+## I3 — Low-Loss Normalization
 
-Rohdatei mit Hash und Erfassungszeit unverändert erhalten, wenn ausgewählt. Normalisierte Form als Ableitung mit Parser-/Normalisiererversion speichern. VTT/SRT/gegebenenfalls JSON-Captions robust parsen; Encoding, Entities, mehrzeilige Cues und Roll-up-Captions berücksichtigen. Keine naive Entfernung aller wiederholten Wörter oder Sätze.
+Keep the raw file unchanged, with hash and capture time, when that option is selected. Store the normalized form as a derivative tagged with the parser/normalizer version. Parse VTT/SRT/JSON captions robustly, accounting for encoding, entities, multi-line cues, and roll-up captions. No naive stripping of every repeated word or sentence.
 
-Sprechwiederholungen, Stottern, Verneinungen, Zahlen und Fachbegriffe erhalten. Nur nachweislich renderbedingte Überlappungen lokal reduzieren; unbearbeitete Fassung bleibt nachvollziehbar. Keine LLM-„Reparatur“. Parserwarnungen, ungeklärte Stellen und Umfang offenlegen.
+Preserve speech repetitions, stutters, negations, numbers, and technical terms. Reduce only overlaps demonstrably caused by rendering, and only locally; the unedited version stays traceable. No LLM "repair." Disclose parser warnings, unresolved spots, and scope.
 
-Modell-/Caption-Zeitdaten in Millisekunden normalisieren; Quelle und Genauigkeitsklasse festhalten. Ein fehlender Zeitstempel bleibt null. Importierte Chunk-Startzeiten sind Chunkgrenzen, keine echten Wort-/Segmentzeiten. SRT/VTT nur mit geeigneten Zeitdaten aktivieren, ansonsten TXT/MD/JSON anbieten.
+Normalize model/caption timing data to milliseconds; record the source and accuracy class. A missing timestamp stays null. Imported chunk start times are chunk boundaries, not real word/segment times. Enable SRT/VTT only with suitable timing data; offer TXT/MD/JSON otherwise.
 
-## I4 — Providervertrag
+## I4 — Provider Contract
 
-Keinen universellen asynchronen Jobdienst erfinden. Ein Adapter gibt entweder ein direktes Ergebnis oder ein langlebiges Remote-Handle zurück. Fähigkeiten definieren Pollbarkeit, Wiederaufnahme, unterstützten Abbruch, Größen-/Dauerlimits, Sprachen, Zeitdaten, Diarisierung, Kontext, Regionen und beobachtbare Limits. Nicht jede Funktion muss bei jedem Modell existieren.
+Do not invent a universal asynchronous job service. An adapter returns either a direct result or a long-lived remote handle. Capabilities define pollability, resumability, supported cancellation, size/duration limits, languages, timing data, diarization, context, regions, and observable limits. Not every feature has to exist on every model.
 
-Gemeinsame Typen: `TranscriptionRequest`, `ProviderCapabilities`, `SubmissionResult.Direct`, `SubmissionResult.Remote`, `TranscriptDocument`, `ProviderError`. Capability-Werte stammen aus einem versionierten Katalog plus tatsächlich bestätigten API-Eigenschaften. Online-Modelllisten beweisen weder alle Optionen noch Accountberechtigungen. Neue Modelle erst in kompatible, getestete Adapterprofile einordnen; kein beliebiges dynamisches Plugin-System.
+Shared types: `TranscriptionRequest`, `ProviderCapabilities`, `SubmissionResult.Direct`, `SubmissionResult.Remote`, `TranscriptDocument`, `ProviderError`. Capability values come from a versioned catalog plus actually confirmed API properties. Online model lists prove neither every option nor account entitlements. Slot new models into compatible, tested adapter profiles first — no arbitrary dynamic plugin system.
 
-Fehler unterscheiden: permanente Eingabe/Authentifizierung, Kontingent, temporäres Netz/Server, nicht unterstützte Option, ungewisse Submission und ungültige Antwort. Wiederholungsregeln zentral auf Kosten-/Idempotenzrisiko prüfen. Automatische HTTP-Retries bei nicht idempotenten, kostenrelevanten POSTs ausdrücklich kontrollieren.
+Distinguish error kinds: permanent input/authentication, quota, transient network/server, unsupported option, uncertain submission, and invalid response. Vet retry rules centrally against cost/idempotency risk. Explicitly control automatic HTTP retries on non-idempotent, billable POSTs.
 
 ## I5 — AssemblyAI
 
-Pre-recorded Async-API integrieren: lokale Audiodatei hochladen, Transkriptauftrag erzeugen, Remote-ID speichern, begrenzt Status abrufen, Ergebnis sichern. Explizite Region verwenden und Upload/Submission/Polling derselben Region zuordnen. Kein öffentlicher Callbackserver für v1 nötig. Unter „Batch“ ist hier Dateitranskription gemeint, nicht pauschal ein spezieller vergünstigter Batchdienst. [R15]
+Integrate the pre-recorded async API: upload the local audio file, create a transcript job, store the remote ID, poll status with bounds, save the result. Use an explicit region and route upload/submission/polling to that same region. No public callback server needed for v1. "Batch" here means file transcription, not necessarily a discounted bulk-processing tier. [R15]
 
-Aktuelle Modellbezeichner aus Referenz und Live-Vertrag verifizieren. Die Recherche enthält unterschiedliche Aktualitätsstände in Beispielcode und Modellseiten; keine Aliasnamen aus Marketingnamen zusammenraten. Angeforderte `speech_models` und zurückgeliefertes `speech_model_used` getrennt protokollieren. Fallback auf ein anderes Modell nur im ausdrücklich gewählten Providerprofil. Anbieterinterne Übersetzung/Zusammenfassung/Sentimentanalyse deaktiviert lassen, sofern nicht Produktanforderung.
+Verify current model identifiers against reference docs and the live contract. The research turned up example code and model pages at different levels of freshness; do not guess alias names from marketing copy. Log the requested `speech_models` and the returned `speech_model_used` separately. Fall back to a different model only within an explicitly chosen provider profile. Leave the provider's built-in translation/summarization/sentiment analysis off unless the product actually requires it.
 
-Diarisierung, Sprache, Fachbegriffe und Zeitdaten gemäß tatsächlicher Unterstützung anbieten. Löschen eines Remote-Transkripts und Abbrechen laufender Berechnung sind nicht ohne Nachweis dieselbe Operation. Remote-Datenlöschung als eigenständige, beobachtbare Aktion vorsehen, sofern verfügbar; lokale Löschung nicht als bestätigte Cloudlöschung darstellen.
+Offer diarization, language, technical-term hints, and timing data according to actual support. Deleting a remote transcript and cancelling a running computation are not the same operation without proof otherwise. Provide remote data deletion as its own, observable action where available; never present a local deletion as confirmed cloud deletion.
 
 ## I6 — OpenAI
 
-Datei-Transcriptions-Endpoint verwenden. Aktuell dokumentiertes allgemeines Modell: `gpt-transcribe`; getrennte Sprecherzuordnung über das entsprechend dokumentierte Modell, derzeit `gpt-4o-transcribe-diarize`. Modelle müssen im gewählten Account nutzbar sein. Optionale ältere Modelle nur als ausdrücklich gepflegte Profile anbieten, nicht als pauschal identische Whisper-API. [R16–R17]
+Use the file transcription endpoint. Currently documented general model: `gpt-transcribe`; separate speaker attribution through the correspondingly documented model, currently `gpt-4o-transcribe-diarize`. Models must actually be usable on the chosen account. Offer optional older models only as explicitly maintained profiles, never as a blanket stand-in for the Whisper API. [R16–R17]
 
-Insbesondere `languages` gegenüber singular `language`, Kontext-/Keywords und Ausgabeformate je Modell prüfen. `timestamp_granularities[]` nicht universell senden: Die geöffnete Anleitung dokumentiert diese Option für `whisper-1`. Sprechersegmente sind kein Beleg für Wortzeitstempel. Fehlende Zeiten nicht durch zusätzliches kostenpflichtiges STT ohne Zustimmung „nachrüsten“.
+Check, in particular, `languages` versus the singular `language`, context/keywords, and output formats per model. Do not send `timestamp_granularities[]` universally: the guide consulted documents that option for `whisper-1`. Speaker segments are not evidence of word-level timestamps. Never "backfill" missing times with additional billable STT without consent.
 
-Uploadlimit gegen aktuellen API-Vertrag prüfen; die geöffnete Anleitung nennt 25 MB für Dateiuploads. JSON- und ggf. Streaming-Ergebnisse korrekt zusammensetzen; ein Streaming-Abbruch ist kein vollständiger Erfolg. ChatGPT-Abonnement und API-Nutzung nicht gleichsetzen. Kein Video-Link als angebliche Audiodatei an den Transcriptions-Endpoint schicken. [R16]
+Verify the upload limit against the current API contract; the guide consulted states 25 MB for file uploads. Assemble JSON and, where used, streaming results correctly; a cancelled stream is not a complete success. Do not equate a ChatGPT subscription with API usage. Never send a video link to the transcriptions endpoint disguised as an audio file. [R16]
 
 ## I7 — Groq
 
-`whisper-large-v3` und `whisper-large-v3-turbo` über den dokumentierten Audio-Transcriptions-Endpoint unterstützen. Transkribieren, nicht den Übersetzungsendpoint wählen. Gemeinsamkeiten der OpenAI-kompatiblen Syntax sind keine Garantie für identische Antwort-/Modellfähigkeiten. Word-/Segment-Zeiten und Metadaten nur auf Basis der echten Antwort speichern. [R14]
+Support `whisper-large-v3` and `whisper-large-v3-turbo` through the documented audio transcriptions endpoint. Use transcription, not the translation endpoint. Sharing OpenAI-compatible syntax is no guarantee of identical response/model capabilities. Store word/segment timing and metadata only based on the actual response. [R14]
 
-Free- und Developer-Plan sowie direkten Upload und URL-Verarbeitung getrennt behandeln. Die geöffnete Dokumentation unterscheidet diese Grenzen. Für v1 lokale Uploads mit konservativer geprüfter Grenze und Chunking verwenden; keine Audiofreigabe auf einem öffentlichen Filehost nur zur Umgehung einer Uploadgrenze.
+Treat the Free and Developer plans, as well as direct upload and URL-based processing, as distinct — the documentation consulted separates these limits. For v1, use local uploads with a conservative, verified limit and chunking; never share audio on a public file host just to work around an upload limit.
 
-Offizielle Preis-/Limitwerte sind datierte Richtwerte, keine fest codierten Garantien. Rate Limits können organisationsweit gelten und auch durch andere Programme verbraucht werden. Acht Stunden als dokumentiertes tägliches Audiolimit sind kein garantierter, unabhängiger Achtstundenbonus pro Gerät oder Modell. Nur tatsächlich gelieferte Header anzeigen. [R18]
+Official price/limit figures are dated reference points, not hardcoded guarantees. Rate limits can apply organization-wide and be consumed by other programs too. The documented eight-hour daily audio limit is not a guaranteed, independent eight-hour allowance per device or model. Display only headers actually returned by the API. [R18]
 
-## I8 — Audioaufbereitung und Chunking
+## I8 — Audio Preparation and Chunking
 
-Audiodaten möglichst direkt verwenden. Nur bei inkompatiblem Format, Größenlimit oder expliziter Option konvertieren. Beste praktische Sprachqualität statt unnötig höchster Bitrate; keine Full-Video-Downloads. Eine kontrollierte Audio-Spur wählen. Lossless-Umverpackung vor verlustbehaftetem Re-Encoding prüfen.
+Use audio data as directly as possible. Convert only for an incompatible format, a size limit, or an explicit option. Best practical speech quality rather than needlessly maximal bitrate; no full-video downloads. Select one controlled audio track. Prefer lossless remuxing over lossy re-encoding where it applies.
 
-FFmpeg/ffprobe kapseln und die tatsächlich benötigten Codecs/Formate testen. Nicht blind eine alte FFmpegKit-Maven-Koordinate übernehmen: Der ursprüngliche FFmpegKit-Strang ist eingestellt; die aktuelle Upstream-README verweist auf eine source-only Fortführung. Distribution, Vertrauenswürdigkeit, Build, Lizenz und 16-KB-/ABI-Unterstützung konkret prüfen. [R19]
+Wrap FFmpeg/ffprobe and test the codecs/formats actually needed. Do not blindly pull in an old FFmpegKit Maven coordinate: the original FFmpegKit line has been discontinued, and the current upstream README points to a source-only continuation. Concretely verify distribution, trustworthiness, build, license, and 16 KB/ABI support. [R19]
 
-Chunks nach Audiozeit und realer Dateigröße begrenzen, nicht nur anhand eines geschätzten Minutenwertes. Exakte Offsets, Hashes, Status und Provider-Requests pro Chunk festhalten. Pausen-/Satzgrenzen bevorzugen; kleine dokumentierte Überlappung nur bei sinnvoller Zusammenführung. Beim Zusammenführen zeitliche Grenzen/Tokenabgleich verwenden, Unsicherheit erhalten. Keine globale Deduplizierung und keine erfundenen Ergänzungen.
+Bound chunks by audio duration and real file size, not just an estimated minute count. Record exact offsets, hashes, status, and provider requests per chunk. Prefer pause/sentence boundaries; use a small, documented overlap only where it enables a sensible merge. When merging, use time-boundary/token matching and preserve uncertainty. No global deduplication and no invented filler.
 
-Externe Aufteilung kann Diarisierung und Kontext verschlechtern. „Speaker A“ in zwei separaten Requests ist nicht automatisch dieselbe Person. Sprecher-IDs auf Chunk/Request scopen, sofern keine dokumentiert verifizierte Zuordnung vorliegt. Bei ungeeignetem Modell/Output ungeschnittene geeignete Verarbeitung anbieten oder Einschränkung erklären, nicht unbemerkt Identitäten verbinden.
+External splitting can degrade diarization and context. "Speaker A" in two separate requests is not automatically the same person. Scope speaker IDs to the chunk/request unless a documented, verified mapping exists. When the model/output does not fit, offer unsplit processing where suitable or explain the limitation — never merge identities silently.
 
-Fehlender Chunk ergibt ein sichtbar unvollständiges Artefakt und gezielte Wiederholung. Vor jedem Schritt verfügbaren Speicher prüfen; atomare Zwischendateien und Obergrenzen nutzen. Keine gesamte mehrstündige Datei in RAM lesen. Aufbereitung parallel begrenzen und nach Abbruch eigene Prozesse/Dateihandles schließen.
+A missing chunk produces a visibly incomplete artifact and a targeted retry. Check available storage before every step; use atomic intermediate files and upper bounds. Never read an entire multi-hour file into RAM. Bound preparation parallelism, and close the app's own processes/file handles after cancellation.
 
-## I9 — Strukturiertes Exportdokument
+## I9 — Structured Export Document
 
-Schema mit `schemaVersion`, `artifactId`, `source`, `acquisition`, `provenance`, `language`, `scope`, `segments`, `warnings`, `createdAt` und Prüfsummen. `scope` unterscheidet gewünschte Mediendauer, tatsächlich verarbeitete Intervalle, fehlende Chunks und unbekannte Vollständigkeit. Keine Textabdeckung als prozentuale inhaltliche Vollständigkeit behaupten.
+A schema with `schemaVersion`, `artifactId`, `source`, `acquisition`, `provenance`, `language`, `scope`, `segments`, `warnings`, `createdAt`, and checksums. `scope` distinguishes the desired media duration, the intervals actually processed, missing chunks, and unknown completeness. Never present text coverage as a percentage of content completeness.
 
-Markdown/TXT beginnen mit Titel, kanonischer Quellenreferenz, Video-/Source-ID, beobachteter Sprache, Provenienz, angefordertem/gemeldetem Modell und Einschränkungen. Zeitdaten/Sprecher nur wenn vorhanden. Untrusted Titel/Metadaten für Markdown/Dateinamen escapen. Erfasster Inhalt bleibt Daten, niemals eine Anweisung an die App oder nachgelagerte Agenten.
+Markdown/TXT open with title, canonical source reference, video/source ID, observed language, provenance, requested/reported model, and limitations. Timing/speaker data only where present. Escape untrusted titles/metadata for Markdown/file names. Captured content stays data — never an instruction to the app or to downstream agents.

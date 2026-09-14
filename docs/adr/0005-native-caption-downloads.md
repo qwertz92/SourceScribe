@@ -1,44 +1,46 @@
-# ADR 0005: Untertitel über den verifizierten Extractor beschaffen
+# ADR 0005: Fetch Subtitles Through the Verified Extractor
 
-7. September 2026. Der echte Android-Metadatenlauf für `jNQXAC9IVRw`
-lieferte sowohl direkte `api/timedtext`-URLs als auch HLS-Untertitel über
-`manifest.googlevideo.com/api/manifest/hls_timedtext_playlist/`. Der bisherige
-Parser wies deshalb selbst die Audio-Auflösung ab.
+September 7, 2026. A real Android metadata run for `jNQXAC9IVRw`
+returned both direct `api/timedtext` URLs and HLS subtitles via
+`manifest.googlevideo.com/api/manifest/hls_timedtext_playlist/`. As a
+result, the previous parser rejected even the audio resolution.
 
-Der vorhandene yt-dlp-Downloader übernimmt direkte und segmentierte Untertitel.
-SourceScribe benötigt dadurch keinen zweiten HLS-Parser. Feste Argumente sperren
-Audio-Downloads, Plugins, Remote-Komponenten, automatische Updates und Shell-Hooks.
-Quelle, ausgewählte Sprache, Generation und Format werden gebunden; private
-Ausgabepfade, Dateianzahl, Bytes und Laufzeit bleiben begrenzt. Der zurückgemeldete
-Video-Identifier muss vor Verarbeitung der Untertitel zur bestätigten Quelle passen.
-Bei der minimalen Downloadrezeptur bestätigt dieser Marker die ausgeführte Rezeptur,
-nicht unabhängig die Identität des Serverinhalts. Die Zuordnung stammt aus den
-zuvor über HTTPS aufgelösten Metadaten; opaque HLS-IDs bieten keine zusätzliche
-Video-ID-Prüfung.
+The existing yt-dlp downloader handles both direct and segmented subtitles,
+so SourceScribe needs no second HLS parser. Fixed arguments lock out audio
+downloads, plugins, remote components, automatic updates, and shell hooks.
+Source, selected language, generation, and format are all bound; private
+output paths, file count, bytes, and runtime stay bounded. The video
+identifier reported back must match the confirmed source before the
+subtitles are processed. Under this minimal download recipe, that marker
+confirms the recipe that ran, not independently the identity of the server
+content. The mapping comes from the metadata resolved earlier over HTTPS;
+opaque HLS IDs provide no additional video-ID check.
 
-Nur der konkrete YouTube-HLS-Untertitelendpunkt erweitert die Metadaten-Allowlist.
-Uploader- und Auto-Spuren werden durch getrennte Download-Flags gewählt. Ein
-nicht mehr vorhandener Track darf nicht durch eine andere Sprache oder Generation
-ersetzt werden. HLS-Zusammenfügung wird in der Herkunft ausdrücklich vermerkt.
-Als optionale rohe Ausgabe gilt das erhaltene Extractorformat vor dem Parser und
-der SourceScribe-Normalisierung; bei HLS ist dies die vom Extractor zusammengesetzte
-VTT-Datei, keine Behauptung unveränderter einzelner Netzwerkfragmente.
+Only the specific YouTube HLS subtitle endpoint extends the metadata
+allowlist. Uploader and auto tracks are chosen through separate download
+flags. A track that's no longer available must never be replaced by a
+different language or generation. HLS assembly is explicitly noted in the
+provenance. The optional raw output is the extractor's output format before
+the parser and SourceScribe normalization; for HLS, that's the VTT file the
+extractor assembled — not a claim of unmodified individual network fragments.
 
-Die Umsetzung und ihre Android-/Fixture-Nachweise werden im Testbericht festgehalten.
+The implementation and its Android/fixture evidence are recorded in the test
+report.
 
-## Bindung ohne erneute Quellenauflösung
+## Binding Without Re-Resolving the Source
 
-Der Download erhält über `--load-info-json` eine private, minimale Datei mit
-Video-ID, konstantem Titel und genau der geprüften URL/Sprach-/Formatkombination.
-Sie enthält absichtlich weder `webpage_url` noch Medienformate oder andere Tracks:
-yt-dlp könnte bei vorhandenem `webpage_url` nach einem Downloadfehler selbständig
-neu extrahieren. Der Abruf bekommt auch kein zweites URL-Argument. Die Kombination
-`--ignore-no-formats-error --skip-download` erlaubt diese reine Untertitelrezeptur.
-Direkte Tracks benutzen HTTPS; der erlaubte HLS-Endpunkt explizit `m3u8_native`.
-Beide Ausgabevorlagen liegen in demselben begrenzten privaten UUID-Verzeichnis.
-Ein vorhandenes `v`-Queryargument muss eindeutig zur bestätigten Video-ID passen.
-Querynamen werden vor der Prüfung dekodiert; doppelte `v`/`lang`/`tlang`-Parameter
-werden abgewiesen. Die effektive Sprache (`tlang`, sonst `lang`) muss zum
-ausgewählten Track passen, einschließlich der Originalspur-Endung `-orig`.
-Die eingelesene URL bleibt damit auch die abgerufene URL; abgelaufene URLs führen
-zu einem sichtbaren Fehler, keiner stillen Spuränderung.
+The download gets a private, minimal file via `--load-info-json`, carrying
+the video ID, a constant title, and exactly the verified URL/language/format
+combination. It deliberately omits `webpage_url`, media formats, and other
+tracks: with `webpage_url` present, yt-dlp could re-extract on its own after
+a download error. The fetch also gets no second URL argument. The
+combination `--ignore-no-formats-error --skip-download` allows this
+subtitle-only recipe. Direct tracks use HTTPS; the allowed HLS endpoint
+explicitly uses `m3u8_native`. Both output templates sit in the same
+bounded, private UUID directory. An existing `v` query argument must
+uniquely match the confirmed video ID. Query names are decoded before
+validation; duplicate `v`/`lang`/`tlang` parameters are rejected. The
+effective language (`tlang`, else `lang`) must match the selected track,
+including the original-track suffix `-orig`. The URL read in therefore stays
+the URL fetched; an expired URL produces a visible error, never a silent
+track change.
