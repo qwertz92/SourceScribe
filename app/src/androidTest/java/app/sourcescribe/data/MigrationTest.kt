@@ -5,16 +5,38 @@ import androidx.room.testing.MigrationTestHelper
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.sqlite.db.SupportSQLiteDatabase
+import java.io.File
 import java.util.UUID
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.ExternalResource
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class MigrationTest {
-    @get:Rule
+    private val databaseNames = mutableListOf<String>()
+
+    /**
+     * The helper creates its databases among the app's own, and every run of this class used to leave two behind, each
+     * with its journal and lock file. This rule wraps the helper's, so the helper has closed them by the time they go.
+     */
+    @get:Rule(order = 0)
+    val deleteDatabases = object : ExternalResource() {
+        override fun after() {
+            val context = InstrumentationRegistry.getInstrumentation().targetContext
+            for (name in databaseNames) {
+                val database = context.getDatabasePath(name)
+                context.deleteDatabase(name)
+                // The lock file is none of SQLite's own, so deleteDatabase leaves it.
+                File("${database.path}.lck").delete()
+                assertEquals(name, emptyList<String>(), database.parentFile?.list().orEmpty().filter { it.startsWith(name) })
+            }
+        }
+    }
+
+    @get:Rule(order = 1)
     val helper = MigrationTestHelper(
         InstrumentationRegistry.getInstrumentation(),
         SourceScribeDatabase::class.java,
@@ -22,7 +44,7 @@ class MigrationTest {
 
     @Test
     fun migrateFromVersion1To4PreservesRowsAndAddsNullableColumns() {
-        val databaseName = "migration-${UUID.randomUUID()}.db"
+        val databaseName = "migration-${UUID.randomUUID()}.db".also { databaseNames += it }
         helper.createDatabase(databaseName, 1).apply {
             execSQL("INSERT INTO sources(id,snapshot,title,importedPath) VALUES ('source-v1','snapshot-v1','Migration source',NULL)")
             execSQL("INSERT INTO jobs(id,sourceId,config,createdAt,state,outcome,cancelRequested) VALUES ('job-v1','source-v1','config-v1',11,'QUEUED','NONE',0)")
@@ -131,7 +153,7 @@ class MigrationTest {
 
     @Test
     fun migrateFromVersion2To3PreservesSubmissionCostAndRemoteId() {
-        val databaseName = "migration-${UUID.randomUUID()}.db"
+        val databaseName = "migration-${UUID.randomUUID()}.db".also { databaseNames += it }
         helper.createDatabase(databaseName, 2).apply {
             execSQL("INSERT INTO sources(id,snapshot,title,importedPath) VALUES ('source-v2','snapshot-v2','Migration source v2',NULL)")
             execSQL("INSERT INTO jobs(id,sourceId,config,createdAt,state,outcome,cancelRequested,deleteRequested) VALUES ('job-v2','source-v2','config-v2',21,'FINISHED','SUCCESS',0,0)")
