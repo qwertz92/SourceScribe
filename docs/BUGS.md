@@ -1,136 +1,135 @@
-# Bekannte Fehler nach Priorität
+# Known bugs by priority
 
-**Stand:** 14. September 2026, Preview 0.2.0-preview.1 am Stand `1fe2dad`, nach 23 Runden adversarischer Reviews.
-Hier steht jeder bekannte, nicht behobene Punkt mit seiner Auswirkung und einer Priorität. Nach Runde 23 hat der Nutzer
-die Reviewschleife angehalten, um die Preview selbst zu testen und danach auszuwählen, was behoben wird. Ohne diese
-Auswahl wird nur ein Fehler der Stufe P1 behoben. Stelle im Code, Ablauf und Belege stehen in [DEFECTS.md](DEFECTS.md)
-unter derselben Nummer. Die Punkte 1 bis 3 sind die offenen Rückmeldungen aus dem Test vom 10. September. Geschlossen
-und dort nur noch als Nummer geführt sind 6, 7, 8, 9, 19, 31 und 54.
+**As of:** September 14, 2026, preview 0.2.0-preview.1 at commit `1fe2dad`, after 23 rounds of adversarial review.
+This file lists every known, unfixed item with its impact and a priority. Code location, trigger, and evidence are in
+[DEFECTS.md](DEFECTS.md) under the same number. Items 1 to 3 are the open feedback from the September 10 test.
+Closed, and kept only as a number there, are 6, 7, 8, 9, 19, 31, and 54. Fixes towards 0.3.0 are in progress; see
+[NEXT_STEPS.md](NEXT_STEPS.md).
 
-## Skala
+## Scale
 
-Für funktionale Fehler gibt es kein allgemein anerkanntes Maß wie CVSS für Sicherheitslücken. Üblich ist, zwei Fragen
-zu trennen: wie schwer ein Fehler ist und wie dringend er behoben werden soll. DEFECTS führt die Schwere aus Sicht des
-Reviews: kritisch, hoch, mittel oder niedrig. Die Priorität hier fragt, was der Nutzer davon merkt und wie oft, und
-kann deshalb von der Schwere abweichen. Punkt 57 etwa ist in DEFECTS niedrig und hier P2, weil er jeden Start betrifft.
+There is no widely accepted scale for functional bugs the way CVSS exists for security vulnerabilities. The usual
+approach separates two questions: how severe a bug is, and how urgently it should be fixed. DEFECTS states severity
+from the review's viewpoint: critical, high, medium, or low. Priority here asks what the user notices and how often,
+so it can differ from severity. Item 57, for instance, is low in DEFECTS but P2 here, because it affects every app
+start.
 
-| Stufe | Bedeutung | Umgang |
+| Level | Meaning | Handling |
 |---|---|---|
-| P1 | Die App oder eine Kernfunktion ist unbrauchbar: Untertitel holen, Audio transkribieren, Ergebnis speichern oder exportieren. Ebenso Datenverlust, Kosten ohne Freigabe oder eine ausnutzbare Sicherheitslücke. | Sofort beheben. |
-| P2 | Ein normaler Ablauf liefert ein falsches oder irreführendes Ergebnis oder stört deutlich; es gibt einen Umweg. | Beheben, wenn der Nutzer es auswählt. |
-| P3 | Stört wenig: ungenauer Text, Anzeige, Diagnose, Aufräumen, oder ein Fehler, der im normalen Gebrauch nur unter seltenen Voraussetzungen auftritt. | Nur auf Wunsch. |
-| P4 | Merkt man nicht: Tests, Prüfskripte, Code, der heute richtig arbeitet, aber leicht falsch werden kann, oder ein Fall, den nur ein konstruierter Ablauf erreicht. | Nur festgehalten. |
+| P1 | The app or a core function is unusable: fetching subtitles, transcribing audio, saving or exporting a result. Also data loss, unapproved cost, or an exploitable security hole. | Fix immediately. |
+| P2 | A normal flow gives a wrong or misleading result, or is clearly disruptive; a workaround exists. | Fix when the fix is small and clear; otherwise record the effort and let the owner decide. |
+| P3 | Minor annoyance: imprecise text, display, diagnostics, cleanup, or a bug that only occurs under rare conditions in normal use. | Fix on the spot if it takes minutes; otherwise record it here and report it. |
+| P4 | Not noticeable: tests, check scripts, code that works correctly today but could easily become wrong, or a case only a contrived flow reaches. | Same as P3. |
 
-**Unbestätigt** heißt: aus dem Code abgeleitet, aber nicht nachgestellt oder nicht gemessen. Eingestuft ist, was dabei
-wahrscheinlich ist; hätte der schlimmere Fall eine höhere Stufe, steht er im Hinweis. Für die sicherheitsnahen Punkte
-37, 40 und 42 ist keine ausnutzbare Lücke belegt, deshalb steht bei ihnen kein CVSS-Wert.
+**Unverified** means: derived from the code but not reproduced or measured. The priority given is for the likely
+case; where a worse case would rate higher, that is noted. For the security-adjacent items 37, 40, and 42, no
+exploitable hole is demonstrated, so none of them carries a CVSS score.
 
-Offen sind 50 Punkte: 2 P2, 19 P3, 28 P4 und Punkt 55, der unter „Nicht geprüft“ steht.
+50 items are open: 2 P2, 19 P3, 28 P4, and item 55, which is listed under "Not verified."
 
 ## P1
 
-Keiner bekannt. Was einen P1 verbergen kann, steht im nächsten Abschnitt.
+None known. What could be hiding a P1 is in the next section.
 
-## Nicht geprüft
+## Not verified
 
-Diese Lücken sind keine bekannten Fehler. Scheitert etwas davon, ist es ein P1.
+These gaps are not known bugs. If any of them fails, it is a P1.
 
-- **Echte Transkription bei AssemblyAI, OpenAI und Groq.** In keinem Test dieses Projekts mit echtem Schlüssel
-  gelaufen, nur gegen nachgebildete Antworten der Anbieter.
-- **Ein Gerät mit ARM64, wie fast jedes aktuelle Handy.** Alle Gerätetests liefen auf x86_64-Emulatoren mit Android 17
-  (API 37). Die ARM64-Fassung der App lief in keinem dieser Tests.
-- **Punkt 55, Android vor Version 17.** Die App prüft die Signatur ihrer mitgelieferten Engine bei jedem Start mit
-  Bouncy Castle 1.86. Installieren lässt sich die App ab Android 10 (API 29), gelaufen ist diese Prüfung aber nur auf
-  API 37. Scheitert sie auf einer älteren Version, ist die Engine dort unbrauchbar, und ohne sie verarbeitet die App
-  keine YouTube-Links. Dafür, dass sie hält, sprechen die Release Notes von Bouncy Castle.
-- **Das Update einer installierten Preview 0.1.0.** Die Preview 0.2.0 stellt die Datenbank von Schema 3 auf Schema 4
-  um. Geprüft ist das nur an Testdatenbanken in `MigrationTest`.
+- **Real transcription with AssemblyAI, OpenAI, and Groq.** Never run in this project with a real key, only against
+  simulated provider responses.
+- **An ARM64 device, like almost every current phone.** All device tests ran on x86_64 emulators with Android 17
+  (API 37). The ARM64 build of the app never ran in any of these tests.
+- **Item 55, Android before version 17.** The app checks the signature of its bundled engine on every start with
+  Bouncy Castle 1.86. The app installs from Android 10 (API 29) onward, but this check has only run on API 37. If it
+  fails on an older version, the engine is unusable there, and without it the app cannot process YouTube links.
+  Bouncy Castle's release notes suggest it holds up.
+- **Updating an installed preview 0.1.0.** Preview 0.2.0 migrates the database from schema 3 to schema 4. This is
+  only verified against test databases in `MigrationTest`.
 
-Nicht geprüft ist außerdem die vollständige Bedienung mit TalkBack.
+Full operation with TalkBack is also not verified.
 
 ## P2
 
-| Punkt | Was passiert | Hinweis |
+| Item | What happens | Note |
 |---|---|---|
-| 57 | Nach jedem Start sind unter anderem das Prüfen einer Quelle, der Import einer Audiodatei und der Start eines Auftrags gesperrt, in den Einstellungen auch Sprachwahl, Anbieter und Schlüssel. Solange läuft oben ein schmaler Fortschrittsbalken. Die App prüft in dieser Zeit ihre Aufträge, Zugangsdaten und die mitgelieferte Engine. | Unbestätigt, wie lange. In der CI dauerte es auf einem frisch installierten Emulator länger als 25 Sekunden. Ist es auf dem Gerät nach einem Augenblick vorbei, ist es P4. |
-| 1 | Die Ergebnisansicht scrollte beim Test vom 10. September rechts nicht und nur bis zur Hälfte. Sie ist seither neu gebaut. Auf dem Emulator scrollt sie mit einem Transkript von 286 Abschnitten auch am rechten Rand bis zum letzten. | Unbestätigt, ob es auf dem Gerät des Nutzers noch auftritt. |
+| 57 | After every start, checking a source, importing an audio file, and starting a job are locked, along with language, provider, and key selection in settings. A thin progress bar runs at the top the whole time. During this the app checks its jobs, credentials, and bundled engine. | Unverified how long. In CI it took more than 25 seconds on a freshly installed emulator. If it is over in a moment on the device, this is P4. |
+| 1 | In the September 10 test, the result view did not scroll at the right edge and only scrolled halfway. It has since been rebuilt. On the emulator, with a 286-section transcript, it scrolls at the right edge too, all the way to the last section. | Unverified whether it still occurs on the user's device. |
 
 ## P3
 
-| Punkt | Was passiert | Hinweis |
+| Item | What happens | Note |
 |---|---|---|
-| 2 | Die untere Schaltfläche „könnte mehr Platz vertragen“. Heute sind alle Hauptschaltflächen mindestens 52 dp hoch und voll breit. | Rückfrage unten. |
-| 3 | Das Glossar sagt, ein AssemblyAI-Schlüssel gelte nur in einer Region, EU oder USA, und in der falschen ende der Aufruf mit einem Anmeldefehler. Gegen die aktuelle Doku des Anbieters ist das nicht geprüft. | Text. |
-| 4 | Dutzende Fehlercodes haben keinen eigenen Text; am 11. September waren es mindestens 43. Die App zeigt dann „Vorgang konnte nicht abgeschlossen werden“ mit dem technischen Code, auch bei gewöhnlichen Ausgängen wie `REMOTE_TIMEOUT` oder `NO_TRANSCRIPT`. | Nur im Fehlerfall; in DEFECTS mittel. |
-| 5 | Vorschau und Auftrag messen die Länge verschieden: die Vorschau mit der Angabe von yt-dlp, der Auftrag an der geladenen Tonspur. Liegt die Länge bis auf Millisekunden an der Grenze des Auftrags, kann er die Vorschau bestehen und nach dem Download ohne Kosten abbrechen, oder die Vorschau blockiert ihn zu Unrecht. | Kostet höchstens einen Download. |
-| 11 | „Nur fehlende Abschnitte erneut versuchen“ wird für ein Teilergebnis dauerhaft verweigert, wenn eine neuere Fassung der App aus seiner gespeicherten Antwort andere Warnungen liest, etwa bei einem leeren Modellfeld. | Der Fehler selbst kostet nichts; ein neuer Auftrag bezahlt aber auch die schon bezahlten Abschnitte. |
-| 12 | Für manche Tonspuren fehlt die Größenschätzung, nämlich wenn yt-dlp eine unplausible Audiobitrate und eine brauchbare Gesamtbitrate meldet. | Anzeige. |
-| 13 | Lässt sich ein exportiertes Dokument gar nicht abfragen, meldet die App, die Datei sei nicht mehr da, obwohl nur die Prüfung scheiterte. | Irreführende Meldung. |
-| 14 | Transkripte aus Untertiteln, die vor dem 11. September entstanden, melden unlesbare Abschnitte als fehlende Zeitmarken statt als fehlenden Text. | Nur ältere Ergebnisse. |
-| 17 | Die deutschen Texte sagen mal „Tonspur“, mal „Audiospur“. | Wortwahl, siehe unten. |
-| 18 | Ist jeder Abschnitt einer Anbieterantwort unlesbar, übernimmt die App den Volltext, warnt aber wie bei fehlendem Text, obwohl nur Gliederung und Zeitangaben fehlen. | Irreführende Warnung. |
-| 24 | Neben der Kostenschätzung steht nur das Datum des Tarifs, nicht die Seite des Anbieters, gegen die er geprüft wurde. | Nachprüfbarkeit. |
-| 25 | Die App erlaubt bei Groq 25 MB je Datei, auch wenn ein bezahlter Groq-Schlüssel 100 MB erlaubt. | Nur mit bezahltem Groq-Schlüssel; bewusst die sichere Seite. |
-| 35 | Bei sehr großer Schrift könnten Texte auf dem Bildschirm für eine neue Quelle und im Verlauf abgeschnitten werden. Gemessen ist nur die Kostenzeile, und sie steht auch bei doppelter Schriftgröße vollständig da. | Unbestätigt. |
-| 36 | Die Fehlerzeile der Vorschau erscheint und verschwindet, und der Startknopf darunter rückt um ihre Höhe. | Entscheidung unten. |
-| 37 | Zurück zu einer älteren Engine warnt, sperrt aber nichts, auch nicht bei einer Version mit bekannter Lücke; welche Versionen Lücken haben, weiß die App nicht. | Bräuchte eine Angabe im signierten Engine-Paket. |
-| 41 | Links der Form `youtube-nocookie.com/embed/…` lehnt die App ab. | Umweg: dieselbe Adresse mit `youtube.com`. |
-| 42 | Geteilte Exporte, auch ganze Transkripte, bleiben im privaten Cache der App, bis Android ihn räumt. | Kein neuer Abflussweg. |
-| 46 | Zwei Grenzfälle, wenn ein App-Update eine neue Engine mitbringt, nachdem Engines von Hand gewechselt wurden. Im zweiten ist eine vorher genutzte Engine nicht mehr über „Zur vorherigen Engine“ erreichbar. | Entscheidung unten. |
-| 47 | Eine selbst aktivierte Engine wird nach einem App-Update nicht erneut gegen die mitgelieferte Laufzeit geprüft. | Unbestätigt, ob sie dann scheitert. Umweg: „Zur vorherigen Engine“. |
+| 2 | The bottom button "could use more space." Today all primary buttons are at least 52dp tall and full width. | Question below. |
+| 3 | The glossary says an AssemblyAI key is valid in only one region, EU or US, and that a call in the wrong region ends with an authentication error. This is not checked against the provider's current documentation. | Text. |
+| 4 | Dozens of error codes have no dedicated text; on September 11 there were at least 43. The app then shows "Operation could not be completed" with the technical code, even for ordinary outcomes like `REMOTE_TIMEOUT` or `NO_TRANSCRIPT`. | Only on error; medium in DEFECTS. |
+| 5 | The preview and the job measure length differently: the preview from yt-dlp's reported value, the job from the downloaded audio track. If the length is within milliseconds of the job's limit, it can pass the preview and then abort after download at no cost, or the preview can wrongly block it. | Costs at most one download. |
+| 11 | "Retry only missing sections" is permanently refused for a partial result if a newer app version reads different warnings from its stored response, for instance for an empty model field. | The failure itself costs nothing, but a new job also pays for the sections already paid for. |
+| 12 | The size estimate is missing for some audio tracks, namely when yt-dlp reports an implausible audio bitrate alongside a usable overall bitrate. | Display. |
+| 13 | If an exported document cannot be queried at all, the app reports the file as gone, even though only the check failed. | Misleading message. |
+| 14 | Transcripts from captions created before September 11 report unreadable sections as missing timestamps instead of missing text. | Older results only. |
+| 17 | The German strings say "Tonspur" in some places and "Audiospur" in others (both mean "audio track"). | Word choice, see below. |
+| 18 | If every section of a provider response is unreadable, the app falls back to the full text, but warns as if text were missing, even though only the structure and timestamps are missing. | Misleading warning. |
+| 24 | Next to the cost estimate is only the pricing date, not the provider page it was checked against. | Verifiability. |
+| 25 | The app allows 25MB per file for Groq, even when a paid Groq key allows 100MB. | Only with a paid Groq key; deliberately on the safe side. |
+| 35 | At very large font sizes, text on the new-source screen and in history could be clipped. Only the cost line is measured, and it displays in full even at double font size. | Unverified. |
+| 36 | The preview's error line appears and disappears, and the start button below it shifts by its height. | Decision below. |
+| 37 | Rolling back to an older engine warns but blocks nothing, even for a version with a known vulnerability; the app does not know which versions have vulnerabilities. | Would need a field in the signed engine package. |
+| 41 | The app rejects links of the form `youtube-nocookie.com/embed/…`. | Workaround: the same address with `youtube.com`. |
+| 42 | Shared exports, including whole transcripts, remain in the app's private cache until Android clears it. | No new exposure path. |
+| 46 | Two edge cases when an app update brings a new engine after engines were switched by hand. In the second, a previously used engine is no longer reachable via "Revert to previous engine." | Decision below. |
+| 47 | A manually activated engine is not re-checked against the bundled runtime after an app update. | Unverified whether it then fails. Workaround: "Revert to previous engine." |
 
 ## P4
 
-| Punkt | Was ist |
+| Item | What it is |
 |---|---|
-| 10 | Ein Fehlertext deckt auch einen internen Programmierfehler ab; ein Auslöser im normalen Gebrauch ist nicht bekannt. |
-| 15 | Freier Text aus Großbuchstaben in der Warnungsliste würde wie ein Code angezeigt; heute legt niemand solchen Text dort ab. |
-| 16 | Eine künftig falsch benannte Warnung `RESPONSE_…` würde als verlorener Abschnitt gemeldet; heute stimmt die Regel für jede. |
-| 20 | Die Längengrenze gemeldeter Modellnamen steht in zwei Parsern unabhängig voneinander. |
-| 21 | Bei einer grob falsch gestellten Geräteuhr fehlen Tag und Monat im Dateinamen. |
-| 22 | Zwei Tonspuren mit überlanger Sprachangabe erscheinen beide als „Unbekannt“, ohne Hinweis; reale Sprachangaben sind viel kürzer. |
-| 23 | Die Höchstdauer von 600 Minuten steht im Code und in zwei Texten als eigene Zahl. |
-| 26 | Ob „25 MB“ bei Groq und OpenAI dezimal oder binär gemeint ist, ist offen; die App nimmt die kleinere Zahl. |
-| 27 | Eine Vorprüfung der Kosten rechnet ohne Zuschläge; heute gibt es dort keine, und die bindende Prüfung rechnet sie ein. |
-| 28 | Das Prüfskript des Repositorys übersieht einige Fälle: UTF-16 oder UTF-32 ohne Markierung, Text nach dem ersten Mebibyte, unversionierte Workflow-Dateien und manche Schreibweisen von Versionen in Lizenzhinweisen. Heute trifft keiner zu. |
-| 29 | Die Preisseite von OpenAI nennt `whisper-1` nicht wörtlich; der Preis stimmt. |
-| 30 | Eine Quelle unter 160 ms bekäme bei AssemblyAI einen winzigen Preis angezeigt und würde dann abgelehnt. |
-| 32 | Ein grüner CI-Lauf zeigt nicht, wie viele Gerätetests übersprungen wurden. |
-| 33 | Die Rückzugsregel im Erfassungsauftrag wird nie ausgelöst, weil kein Worker eine Wiederholung anfordert. |
-| 34 | Ein Test, der Zahlen im Code prüft, versteht verschachtelte Zeichenketten in Templates nicht; heute steht in keiner etwas, das ihn stört. |
-| 38 | Dass jede Änderung am Auftragsentwurf über `withDraft` läuft, ist eine Absprache im Code, keine Schranke. |
-| 39 | Die Wartezeit im Verlauf reserviert Platz für bis zu 999 Stunden; darüber kann die Karte einmal eine Zeile höher werden. |
-| 40 | Zwischen Prüfung und Start einer Engine liegt ein kurzes Fenster, das nur ein Prozess mit den Rechten der App nutzen könnte. |
-| 43 | Scheitert eine neue Engine an ihrem Selbsttest, nachdem für sie eine ungenutzte Installation geräumt wurde, sind beide fort. |
-| 44 | Eine Meldung zu belegten Engine-Plätzen nennt einen Update-Schritt, obwohl niemand aktualisiert; das setzt unfertige Aufträge an mindestens drei weiteren Engines voraus. |
-| 45 | Ein Schreibweg des Vollständigkeitsflags hat keinen eigenen Test. |
-| 48 | Ein Engine-Update kann an belegten Plätzen scheitern, wenn währenddessen ein Wiederholungsversuch entsteht; eine Sperre lässt das heute kaum zu. |
-| 49 | Eine Vorschau hält ihre Engine nicht fest; dieselbe Sperre lässt den Fall heute kaum zu. |
-| 50 | Gerätetests reihen Arbeit in den WorkManager der App ein, ohne Wirkung. |
-| 51 | Migrationstests legen ihre Datenbanken neben die der App und löschen sie danach. |
-| 52 | Die Einstellungen suchen ihre Datei schon beim Erzeugen, auf dem Hauptthread; ob das spürbar dauert oder je scheitert, ist nicht gemessen. |
-| 53 | Nach einer gescheiterten Reparatur kann eine Metadatei im Engine-Slot veraltet sein; gelesen wird sie nirgends. |
-| 56 | Scheitert beim Prüfen eines Engine-Pakets auch das Löschen der Prüfansicht, geht die erste Fehlermeldung verloren; abgelehnt wird das Paket so oder so. |
+| 10 | One error text also covers an internal programming error; no trigger in normal use is known. |
+| 15 | Free text made of capital letters in the warning list would display like a code; today nothing places such text there. |
+| 16 | A future misnamed `RESPONSE_…` warning would be reported as a lost section; today the rule holds for every one. |
+| 20 | The length limit for reported model names exists independently in two parsers. |
+| 21 | With a device clock set grossly wrong, the day and month are missing from the file name. |
+| 22 | Two audio tracks with an overlong language tag both appear as "Unknown," with no indication; real language tags are much shorter. |
+| 23 | The 600-minute maximum duration exists as an independent number in the code and in two text strings. |
+| 26 | Whether Groq's and OpenAI's "25MB" is meant decimally or in binary is open; the app takes the smaller number. |
+| 27 | A cost pre-check computes without surcharges; today there are none there, and the binding check does include them. |
+| 28 | The repository's check script misses some cases: UTF-16 or UTF-32 without a byte-order mark, text past the first mebibyte, unversioned workflow files, and some ways of writing versions in license notices. None apply today. |
+| 29 | OpenAI's pricing page does not name `whisper-1` verbatim; the price is correct. |
+| 30 | A source under 160ms would show a tiny price for AssemblyAI and would then be rejected. |
+| 32 | A green CI run does not show how many device tests were skipped. |
+| 33 | The backoff rule on the acquisition job is never triggered, because no worker requests a retry. |
+| 34 | A test that checks numbers in the code does not understand nested strings inside templates; today none of them contain anything that would trip it up. |
+| 38 | That every change to the job draft goes through `withDraft` is a convention in the code, not an enforced barrier. |
+| 39 | The elapsed-time display in history reserves space for up to 999 hours; beyond that, the card can grow one line taller, once. |
+| 40 | A short window exists between checking and starting an engine that only a process with the app's own privileges could exploit. |
+| 43 | If a new engine fails its self-test after an unused installation was cleared to make room for it, both are gone. |
+| 44 | A message about occupied engine slots names an update step even though nobody is updating; this requires unfinished jobs bound to at least three other engines. |
+| 45 | One write path for the completeness flag has no dedicated test. |
+| 48 | An engine update can fail on occupied slots if a retry attempt arises during it; a lock today makes this rare. |
+| 49 | A preview does not pin its engine; the same lock makes this case rare today. |
+| 50 | Device tests enqueue work in the app's own WorkManager, without effect. |
+| 51 | Migration tests create their databases next to the app's own and delete them afterward. |
+| 52 | Settings resolve their file already at construction time, on the main thread; whether this is ever noticeably slow or fails is not measured. |
+| 53 | After a failed repair, a metadata file in the engine slot can be stale; nothing ever reads it. |
+| 56 | If deleting the inspection view also fails while checking an engine package, the first error message is lost; the package is rejected either way. |
 
-## Entscheidungen des Nutzers
+## User decisions
 
-Diese Punkte sind Gestaltungsfragen; ohne Rückfrage wird an ihnen nichts geändert.
+These items are design questions; nothing about them changes without asking first.
 
-- **Punkt 2, „könnte mehr Platz vertragen“:** Gemeint war die Höhe, der Abstand zur Navigationsleiste oder die
-  Erreichbarkeit mit dem Daumen? Heute sind alle Hauptschaltflächen mindestens 52 dp hoch und voll breit.
-- **Punkt 17, Wortwahl:** „Tonspur“ oder „Audiospur“ für alle deutschen Texte?
-- **Punkt 36, Fehlerzeile der Vorschau:** Solange Anbieter, Modell oder Schlüssel fehlen, steht unter der Kostenzeile
-  eine Fehlerzeile; ist alles gewählt, verschwindet sie, und der Startknopf rückt nach oben. Entweder bleibt das so,
-  oder der Platz bleibt immer frei, im gültigen Zustand mit einem kurzen Satz wie „Diese Quelle ist startklar“, und in
-  derselben Höhe steht auch die Längenwarnung.
-- **„Aufklappen schiebt, was darunter steht“,** unter den bewussten Entscheidungen in DEFECTS: Aufklappbare Elemente
-  verschieben beim Öffnen und Schließen, was darunter steht, etwa die Auftragskarte im Verlauf, die Einträge der Hilfe,
-  die Herkunftsangaben in der Ergebnisansicht und die Expertenoptionen. Ebenso verschwindet in den
-  Auftragseinstellungen über „Quelle prüfen“ der Hinweis „Für YouTube-Untertitel ist kein Anbieter nötig. …“, sobald
-  ein Schlüssel gewählt ist. Bisher gilt: Bewegt sich etwas dort, wo gerade getippt wurde, ist das gewollt, und Platz
-  für eingeklappten Inhalt freizuhalten, höbe das Einklappen auf. Soll das anders sein, werden zuerst alle Stellen
-  gezählt und dann zusammen geändert.
-- **Punkt 46 (b), Engines:** Wer eine heruntergeladene Engine aktiviert und zur mitgelieferten zurückgeht, erreicht die
-  heruntergeladene nach einem App-Update mit neuer Engine nicht mehr über „Zur vorherigen Engine“. Entweder bleibt das
-  so, und der Weg zurück reicht einen Schritt, oder es kommt eine neue Funktion: jede installierte Engine gezielt
-  aktivieren, mit derselben Bestätigung wie beim Zurückgehen.
+- **Item 2, "could use more space":** Did this mean height, the gap to the navigation bar, or thumb reachability?
+  Today all primary buttons are at least 52dp tall and full width.
+- **Item 17, word choice:** "Tonspur" or "Audiospur" for all German text?
+- **Item 36, preview error line:** As long as provider, model, or key are missing, an error line sits below the cost
+  line; once everything is chosen, it disappears and the start button moves up. Either this stays as is, or the
+  space always stays reserved, holding a short sentence like "This source is ready to start" in the valid state,
+  with the length warning occupying the same height.
+- **"Expanding shifts what is below it,"** among the deliberate decisions in DEFECTS: expandable elements shift
+  what sits below them when opening and closing — for instance the job card in history, help entries, the
+  provenance section in the result view, and the advanced options. Likewise, in job settings above "Check source,"
+  the hint "YouTube captions need no provider. …" disappears once a key is chosen. The rule so far: movement is
+  acceptable where the user just tapped, and reserving space for collapsed content would defeat the point of
+  collapsing. If this should change, every occurrence gets counted first and then changed together.
+- **Item 46(b), engines:** Someone who activates a downloaded engine and then reverts to the bundled one can no
+  longer reach the downloaded one via "Revert to previous engine" after an app update brings a new engine. Either
+  this stays as is, with the way back reaching one step, or a new feature is added: activating any installed
+  engine directly, with the same confirmation as reverting.

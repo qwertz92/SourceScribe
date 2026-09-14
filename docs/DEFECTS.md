@@ -1,1077 +1,943 @@
-# Bekannte Probleme und offene Punkte
+# Known issues and open items
 
-**Stand:** 14. September 2026, nach dreiundzwanzig Runden adversarischer Reviews; danach hat der Nutzer die
-Schleife angehalten. Nach Priorität für den Nutzer geordnet stehen die offenen Punkte in [BUGS.md](BUGS.md). Diese
-Datei ist für den
-nächsten Agenten gedacht und listet, was **nicht** vollständig erledigt ist. Ein geschlossener Punkt
-behält seine Nummer und einen kurzen Vermerk, damit Verweise aus anderen Dokumenten gültig bleiben. Was hier nicht steht, ist entweder erledigt oder in
-[STATUS.md](STATUS.md) beschrieben.
+**As of:** September 14, 2026, after twenty-three rounds of adversarial review; the user then paused the loop. Open
+items ordered by user priority are in [BUGS.md](BUGS.md). This file is for the next agent and lists what is **not**
+fully done. A closed item keeps its number and a short note so references from other documents stay valid. What is
+not listed here is either done or described in [STATUS.md](STATUS.md).
 
-Jeder Eintrag nennt Datei und Stelle, die Voraussetzung, das erwartete gegenüber dem tatsächlichen
-Verhalten und was zum Schließen fehlt. Einträge ohne reproduzierbaren Ablauf sind als **unbestätigt**
-markiert; sie sind Verdachtsfälle, keine belegten Defekte. Eine Stelle nennt Datei und Funktion oder zitiert den
-Ausdruck, nie eine Zeilennummer: Zeilennummern wandern mit jeder Änderung darüber, und `tools/check-repository.py`
-weist sie in `docs/` ab.
+Each entry names the file and location, the precondition, expected versus actual behavior, and what is missing to
+close it. Entries without a reproducible flow are marked **unverified**; they are suspected cases, not demonstrated
+defects. A location names the file and function, or quotes the expression — never a source line number: line numbers
+shift with every change above them, and `tools/check-repository.py` rejects them in `docs/`.
 
-## Rückmeldungen aus dem Test vom 10. September 2026
+## Feedback from the September 10, 2026 test
 
-Die Liste des Nutzers umfasste 20 Punkte. 17 davon sind umgesetzt und am Emulator oder durch Tests
-belegt. Diese drei sind offen oder nur teilweise geschlossen:
+The user's list had 20 items. 17 of them are implemented and demonstrated on the emulator or through tests. These
+three are open or only partly closed:
 
-### 1. Ergebnisansicht: Scrollen „rechts nicht, nur bis zur Hälfte“ — Ursache nie reproduziert
+### 1. Result view scrolling "not at the right edge, only halfway" — cause never reproduced
 
-- **Stelle:** `app/src/main/java/app/sourcescribe/ui/TranscriptScreen.kt`
-- **Was gemacht wurde:** Die Ansicht war ein `Dialog` mit fester Größe (94 % Breite, 92 % Höhe). Sie ist
-  jetzt ein eigener Vollbildschirm mit `windowInsetsPadding(WindowInsets.safeDrawing)`, einer einzigen
-  `LazyColumn` und einer festen Fußleiste. Damit sind feste Bruchteilhöhen und verdeckte Ränder als
-  mögliche Ursachen weg.
-- **Was inzwischen belegt ist:** Am 11. September 2026 auf `emulator-5556` mit einem echten Transkript
-  von 286 Abschnitten geprüft: Wischen am rechten Rand scrollt, und die Liste läuft bis zum letzten
-  Abschnitt bei 18:25 durch. Die Volltextsuche filtert dabei weiter korrekt, auch bei offener Tastatur.
-- **Was fehlt:** Querformat und ein zweites Gerät. Der ursprünglich gemeldete Ablauf wurde damit nicht
-  reproduziert; ob er auf dem Gerät des Nutzers noch auftritt, ist ungeprüft.
+- **Location:** `app/src/main/java/app/sourcescribe/ui/TranscriptScreen.kt`
+- **What changed:** The view was a fixed-size `Dialog` (94% width, 92% height). It is now a dedicated full-screen
+  destination with `windowInsetsPadding(WindowInsets.safeDrawing)`, a single `LazyColumn`, and a fixed footer,
+  removing fixed fractional heights and hidden margins as possible causes.
+- **What is demonstrated:** verified on `emulator-5556` on September 11, 2026 with a real 286-section transcript:
+  swiping at the right edge scrolls, and the list runs to the last section. Full-text search keeps filtering
+  correctly, including with the keyboard open.
+- **What is missing:** landscape orientation and a second device. The originally reported flow was not reproduced;
+  whether it still occurs on the user's device is unverified.
 
-### 2. Untere Aktionsschaltfläche „könnte mehr Platz vertragen“
+### 2. Bottom action button "could use more space"
 
-- **Stelle:** `NewSourceScreen.kt` (`Check source` / `Confirm and start`), `TranscriptScreen.kt` (Fußleiste)
-- **Stand:** Alle Hauptschaltflächen sind jetzt mindestens 52 dp hoch und über die volle Breite. Ob das
-  dem entspricht, was gemeint war, ist nicht rückgefragt worden — die Formulierung lässt offen, ob es um
-  Höhe, Abstand zum Navigationsbalken oder um die Erreichbarkeit mit dem Daumen ging.
-- **Was fehlt:** Rückfrage oder ein Screenshot-Vergleich vorher/nachher.
+- **Location:** `NewSourceScreen.kt` ("Check source" / "Confirm and start"), `TranscriptScreen.kt` (footer)
+- **Status:** all primary buttons are now at least 52dp tall and full width. Whether this matches what was meant
+  was never asked — the wording leaves open whether it was about height, distance to the navigation bar, or thumb
+  reachability.
+- **What is missing:** asking the user, or a before/after screenshot comparison.
 
-### 3. AssemblyAI EU/USA: Aussage im Glossar nicht gegen die aktuelle Anbieterdokumentation geprüft
+### 3. AssemblyAI EU/US: glossary claim not checked against current provider documentation
 
-- **Stelle:** `app/src/main/res/values/strings.xml`, `help_region_body`
-- **Was belegt ist:** Der Adapter benutzt tatsächlich zwei verschiedene Basisadressen
-  (`api.assemblyai.com` gegenüber `api.eu.assemblyai.com`, `core/.../providers/AssemblyAiAdapter.kt`),
-  und OpenAI wie Groq kennen nur `Region.US`. Das steht so im Glossar und stimmt.
-- **Was unbestätigt ist:** Die Aussage, dass ein AssemblyAI-Schlüssel an genau eine Region gebunden ist
-  und ein Aufruf in der falschen Region als Authentifizierungsfehler endet. Das entspricht dem bekannten
-  Produktzuschnitt, wurde in dieser Sitzung aber nicht gegen die aktuelle AssemblyAI-Dokumentation
-  nachgeprüft. Zum Schließen: Primärquelle lesen, Satz bestätigen oder korrigieren, Datum im Text nennen.
+- **Location:** `app/src/main/res/values/strings.xml`, `help_region_body`
+- **Demonstrated:** the adapter genuinely uses two different base URLs (`api.assemblyai.com` vs.
+  `api.eu.assemblyai.com`, `core/.../providers/AssemblyAiAdapter.kt`), and OpenAI and Groq only know `Region.US`.
+  The glossary states this correctly.
+- **Unverified:** that an AssemblyAI key is bound to exactly one region and that a call in the wrong region ends in
+  an authentication error. This matches the known product design but was not checked against AssemblyAI's current
+  documentation this session. To close: read the primary source, confirm or correct the sentence, and date it.
 
-## Offene Reviewfunde
+## Open review findings
 
-### 4. Interne Integritätscodes ohne eigenen Text (mittel)
+### 4. Internal integrity codes without their own text (medium)
 
-- **Stelle:** `app/src/main/java/app/sourcescribe/ui/Labels.kt`, `messageText`
-- **Stand:** Die Familien, die ein Nutzer im Alltag trifft, haben eigene Texte: ungültige Links,
-  Anbieterfehler, Extraktionsfehler, Engine-Updates, Audioimport, und seit dem zweiten Reviewdurchgang
-  neun der zehn Codes der lokalen Audiovorbereitung (`AudioPreparationCode`). Der zehnte,
-  `AUDIO_STORAGE_FAILED`, teilt weiter den Sammeltext `reason_storage` mit sechs anderen Präfixen;
-  das ist tragbar, weil ein Speicherfehler in jedem dieser Fälle die Ursache benennt. Der
-  `else`-Zweig zeigt
-  weiterhin „Vorgang konnte nicht abgeschlossen werden“ plus den technischen Status.
-- **Was offen ist:** Mindestens 43 Codes fallen weiter in diesen Zweig. Ausgezählt am 11. September 2026
-  aus den Stellen, die die Felder schreiben, die `messageText` liest — `SttStep`, `JobCoordinator`,
-  `ExportStore`, `MainViewModel` —, gegen die Codes, die das `when` beantwortet.
-- **Diese Auszählung ist nachweislich unvollständig,** gefunden in Runde 9. `JobCoordinator` bildet in
-  seinem `catch` die Ausnahmen auf den Fehlercode ab und kopiert dabei `CaptionParseException.reason`,
-  `ArtifactFilesException.reason` und `StorageBudgetException.reason` unverändert hinein. Die Codes dieser
-  drei Klassen stehen in `core/.../CaptionParser.kt`, `core/.../ArtifactFiles.kt` und
-  `app/.../data/StorageBudget.kt` — keine davon war in der Liste oben. `PATH_ESCAPE` und `RAW_HASH_MISMATCH`,
-  die zwei Beispiele, die dieser Punkt von Anfang an nannte, kommen genau von dort. Wer den Punkt schließt,
-  fängt also bei diesen drei Dateien an und zählt neu; 43 ist eine Untergrenze, keine Zahl.
-- **Die Annahme dieses Punktes hält der Auszählung nicht stand:** Sie bedeuten *nicht* alle „ein interner
-  Bindungs- oder Prüfschritt hat nicht gepasst“. Ein guter Teil sind gewöhnliche Betriebsausgänge —
-  `INTERRUPTED`, `REMOTE_TIMEOUT`, `NO_TRANSCRIPT`, `ENGINE_NOT_AVAILABLE`, `AUDIO_TRACK_MISSING` —, für
-  die dieser Satz schlicht falsch wäre. Ein gemeinsamer Satz für den ganzen Zweig würde damit genau den
-  Fehler machen, den diese Reviewschleife sonst jagt: eine Ursache behaupten, die nicht die eingetretene ist.
-- **Zwei Codes standen in dieser Aufzählung zu Unrecht, gefunden in Runde 9.** `RESPONSE_NOT_READY`
-  (`SttStep.normalize`) entsteht aus `state != RESPONSE_SAVED` **oder** aus einem Fehlschlag von
-  `bindingMatches` — der zweite Fall ist wörtlich eine Bindungsprüfung, dieser Code gehört also in beide
-  Lager und braucht einen Satz, der beide trägt. Bei `SOURCE_NOT_FOUND` ist offen, ob er im Normalbetrieb
-  überhaupt erreichbar ist: Beide beteiligten Fremdschlüssel stehen auf `RESTRICT`, und `JobCoordinator`
-  wartet vor dem Löschen auf den Abbruch der Arbeit. Das spricht eher für ein internes Prüfproblem als für
-  einen gewöhnlichen Ausgang; nachgewiesen ist keins von beidem.
-- **Was das für die Lösung heißt:** Die Integritätscodes brauchen eine ausdrücklich aufgezählte Liste — kein
-  Namensmuster, denn ein Muster beansprucht jeden künftigen Code, der zufällig auf dasselbe Wort endet, was
-  Punkt 16 für `RESPONSE_` bereits als Risiko führt. Die Betriebsausgänge brauchen eigene Texte oder bleiben
-  bewusst beim generischen. Elf weitere Namen in der Auszählung sind Exportzustände und Prüfwerte, von denen
-  erst zu belegen ist, dass sie `messageText` überhaupt erreichen.
-- **Seit Runde 17** hat `ENGINE_NOT_AVAILABLE`, eines der Beispiele oben, einen eigenen Text, ohne Schrittangabe,
-  weil kein Update-Schritt gescheitert ist, und `ENGINE_SLOTS_IN_USE` ist mit eigenem Text neu hinzugekommen. Neu
-  gezählt ist die Untergrenze von 43 nicht.
+- **Location:** `app/src/main/java/app/sourcescribe/ui/Labels.kt`, `messageText`
+- **Status:** the families a user meets in everyday use have their own text: invalid links, provider errors,
+  extraction errors, engine updates, audio import, and, since the second review round, nine of the ten local audio
+  preparation codes (`AudioPreparationCode`). The tenth, `AUDIO_STORAGE_FAILED`, still shares the collective text
+  `reason_storage` with six other prefixes; that is acceptable because a storage error names the cause in every one
+  of these cases. The `else` branch still shows "Operation could not be completed" plus the technical status.
+- **Open:** at least 43 codes still fall into that branch, counted on September 11, 2026 from the sites that write
+  the fields `messageText` reads (`SttStep`, `JobCoordinator`, `ExportStore`, `MainViewModel`) against the codes the
+  `when` answers.
+- **That count is provably incomplete**, found in round 9: `JobCoordinator`'s `catch` maps exceptions to error codes
+  and copies `CaptionParseException.reason`, `ArtifactFilesException.reason`, and `StorageBudgetException.reason`
+  straight through. Those three classes' codes live in `core/.../CaptionParser.kt`, `core/.../ArtifactFiles.kt`, and
+  `app/.../data/StorageBudget.kt` — none were in the count above. `PATH_ESCAPE` and `RAW_HASH_MISMATCH`, this item's
+  two original examples, come from exactly there. Closing this item means starting from those three files and
+  recounting; 43 is a lower bound, not a count.
+- **The item's own premise does not survive the count:** these codes do *not* all mean "an internal binding or
+  validation step failed." A good share are ordinary operational outcomes — `INTERRUPTED`, `REMOTE_TIMEOUT`,
+  `NO_TRANSCRIPT`, `ENGINE_NOT_AVAILABLE`, `AUDIO_TRACK_MISSING` — for which that sentence would simply be wrong. A
+  single sentence for the whole branch would commit exactly the error this review loop otherwise hunts: claiming a
+  cause that is not the one that occurred.
+- **Two codes were wrongly listed here, found in round 9.** `RESPONSE_NOT_READY` (`SttStep.normalize`) arises from
+  `state != RESPONSE_SAVED` **or** from a `bindingMatches` failure — the second case genuinely is a binding check,
+  so this code belongs in both camps and needs wording that covers both. For `SOURCE_NOT_FOUND` it is open whether
+  it is reachable in normal operation at all: both foreign keys involved are `RESTRICT`, and `JobCoordinator` waits
+  for work to cancel before deleting. That points more toward an internal-check problem than an ordinary outcome;
+  neither is proven.
+- **What this means for the fix:** the integrity codes need an explicitly enumerated list, not a name pattern —
+  a pattern claims every future code that happens to end in the same word, which item 16 already flags as a risk
+  for `RESPONSE_`. Operational outcomes need their own text or stay deliberately generic. Eleven further names in
+  the count are export states and validation values not yet shown to reach `messageText` at all.
+- **Since round 17,** `ENGINE_NOT_AVAILABLE`, one of the examples above, has its own text with no step name, since
+  no update step failed, and `ENGINE_SLOTS_IN_USE` is new with its own text. The lower bound of 43 has not been
+  recounted since.
 
-### 5. Vorabprüfung und tatsächliche Grenze messen zwei verschiedene Dauern (mittel, teilweise unbestätigt)
+### 5. The pre-check and the actual limit measure two different durations (medium, partly unverified)
 
-- **Stelle:** `core/.../JobLimits.exceeds` (Vorschau) gegenüber `app/.../data/SttStep.kt`
-  (`preparation.probe`)
-- **Voraussetzung:** Die Vorschau prüft die von yt-dlp gemeldete Videolänge; die eigentliche Grenze prüft
-  die gemessene Länge der heruntergeladenen Tonspur. Beide vergleichen strikt mit `>` ohne Toleranz.
-- **Folge:** Weichen die beiden Werte um Millisekunden ab, kann ein Auftrag die Vorschau bestehen und
-  danach mit `AUDIO_LONGER_THAN_LIMIT` enden. Das kostet einen Download, aber kein Geld: der Abbruch
-  liegt vor `SUBMIT`. Umgekehrt kann die Vorschau einen Auftrag blockieren, der durchgelaufen wäre.
-- **Unbestätigt:** Wie oft und wie stark die beiden Werte in der Praxis auseinanderlaufen, wurde nicht
-  gemessen. Zum Schließen: an mehreren echten Videos beide Werte protokollieren und daraus entscheiden,
-  ob eine Toleranz (analog `PREPARED_DURATION_TOLERANCE_MS`) gerechtfertigt ist. Eine Toleranz weitet den
-  Kostenrahmen minimal auf und darf nicht ohne diese Messung eingeführt werden.
+- **Location:** `core/.../JobLimits.exceeds` (preview) vs. `app/.../data/SttStep.kt` (`preparation.probe`)
+- **Precondition:** the preview checks the video length yt-dlp reports; the actual limit checks the measured
+  length of the downloaded audio track. Both compare strictly with `>`, no tolerance.
+- **Consequence:** if the two values differ by milliseconds, a job can pass the preview and then end with
+  `AUDIO_LONGER_THAN_LIMIT`. That costs a download but no money — the abort happens before `SUBMIT`. Conversely,
+  the preview can block a job that would have gone through.
+- **Unverified:** how often and how far the two values diverge in practice was not measured. To close: log both
+  values on several real videos and decide from that whether a tolerance (analogous to
+  `PREPARED_DURATION_TOLERANCE_MS`) is justified. A tolerance would widen the cost boundary slightly and must not
+  be introduced without that measurement.
 
-### 6. Vier Bytes Streuwert im erzeugten Dateinamen — erledigt am 11. September 2026
+### 6. Six-byte hash suffix in the generated file name — fixed September 11, 2026
 
-Bleibt als Nummer stehen, damit Verweise gelten. Der Streuwert ist jetzt sechs Bytes breit
-(`TranscriptExporter.SHORT_ID_BYTES`), womit dieselbe Wahrscheinlichkeit erst jenseits von sechzehn
-Millionen Namen liegt. Der frühere Eintrag übertrieb: Um denselben Namen konkurrieren nur Artefakte, die
-schon in Tag, Sprache und Quellbezeichner übereinstimmen. Genau dieses Argument war aber der Grund, warum
-die Breite eine Annahme statt einer Schranke war; mit sechs Bytes braucht man es nicht mehr.
-`theIdentityInAGeneratedNameIsADigestOfAStatedWidth` hält die Breite fest und dazu, dass es ein Streuwert
-und kein Präfix ist.
+Kept as a number so references stay valid. The hash is now six bytes wide (`TranscriptExporter.SHORT_ID_BYTES`),
+pushing the same collision probability past sixteen million names.
+`theIdentityInAGeneratedNameIsADigestOfAStatedWidth` pins the width and that it is a hash, not a prefix.
 
-### 7. Gelöschtes Exportdokument bleibt als belegter Name gezählt — erledigt am 11. September 2026
+### 7. A deleted export document stayed counted as a taken name — fixed September 11, 2026
 
-Bleibt als Nummer stehen, damit Verweise gelten. `reconcile` löscht `documentUri` jetzt genau dann, wenn
-der Anbieter gefragt wurde und geantwortet hat, dass das Dokument weg ist. Der naheliegende Fix — das Feld
-bei jedem Fehlschlag leeren — wäre selbst ein Defekt gewesen: Eine beim Schreiben abgebrochene Zeile trägt
-eine wirklich vorhandene Datei, weil die URI erst nach erfolgreichem `createDocument` gespeichert wird. Der
-Prüfprovider der Tests lehnt einen kollidierenden Namen ab, statt automatisch umzubenennen; ein solcher Fix
-hätte den zweiten Export also nicht nur kosmetisch, sondern ganz scheitern lassen. Zwei Tests halten beide
-Fälle auseinander: `aChosenNameIsFreeAgainOnceItsDocumentIsProvenGone` und
-`anInterruptedExportKeepsHoldingItsNameBecauseItsFileIsThere`. Offen bleibt Punkt 13.
+Kept as a number so references stay valid. `reconcile` now clears `documentUri` exactly when the provider was asked
+and confirmed the document gone, rather than on every failure (which would itself have been a defect, since a write
+interrupted mid-line still owns a real file). Two tests cover both cases:
+`aChosenNameIsFreeAgainOnceItsDocumentIsProvenGone` and `anInterruptedExportKeepsHoldingItsNameBecauseItsFileIsThere`.
+Item 13 remains open.
 
-### 8. AssemblyAI meldet Modell ohne Längenprüfung — erledigt am 11. September 2026
+### 8. AssemblyAI reports a model with no length check — fixed September 11, 2026
 
-Bleibt als Nummer stehen, damit Verweise gelten. `speech_model_used` wird jetzt auf dieselbe Obergrenze von
-128 Zeichen geprüft, die der Parser für OpenAI und Groq schon anwendete, und bei Überlänge mit
-`REPORTED_MODEL_TOO_LONG` abgelehnt statt angezeigt. Nicht gekürzt: ein abgeschnittener Modellname wäre ein
-Wert, den niemand gemeldet hat. `aReportedModelIsRefusedRatherThanShownAtAnyLength` prüft beide Seiten der
-Grenze. Die gemeldete Sprache war schon vorher auf eine Sprachkennung geprüft.
+Kept as a number so references stay valid. `speech_model_used` is now checked against the same 128-character limit
+already used for OpenAI and Groq, and rejected with `REPORTED_MODEL_TOO_LONG` instead of being shown when too long
+(not truncated, since a truncated name would be a value nobody reported).
+`aReportedModelIsRefusedRatherThanShownAtAnyLength` covers both sides of the limit. Whether AssemblyAI ever reports
+anything but a short model name remains unverified — no real provider run has happened in this project — but the
+check does not depend on that.
 
-Weiter unbestätigt bleibt, ob AssemblyAI je etwas anderes als einen kurzen Modellnamen liefert: ein echter
-Anbieterlauf hat in diesem Projekt nicht stattgefunden. Die Prüfung hängt nicht davon ab — sie verhindert,
-dass eine unbekannte Antwort ungeprüft als Modellangabe erscheint.
+### 9. Warning codes in the result view — fixed September 11, 2026
 
-### 9. Warncodes in der Ergebnisansicht — erledigt am 11. September 2026
+Kept as a number so references stay valid. Over 50 code families now map to thirteen sentences
+(`core/.../TranscriptWarnings.kt`, testable without a device). A second list, copied from the generators, catches
+any name that drifts from its generator. Raw codes still show under result-view details; an unmapped code still
+displays technically instead of being swallowed.
 
-Bleibt als Nummer stehen, damit Verweise aus anderen Dokumenten gelten. Aus über 50 Codefamilien
-werden jetzt dreizehn Sätze; die Zuordnung liegt in `core/.../TranscriptWarnings.kt` und ist ohne Gerät
-testbar. Die Zahl war hier und in [Restarbeiten](NEXT_STEPS.md) bis Runde 7 mit zwölf angegeben, obwohl
-`SECTION_ALIGNMENT` schon in Runde 5 als dreizehnte Gruppe dazugekommen war. Seit Runde 7 ist die
-Zuordnung Daten statt eines `when`, und jeder einzelne Familienname wird in fünf Schreibweisen durch die
-Zusammenfassung geführt — vorher kamen 21 der 59 Namen in keinem Test vor und 32 nicht durch die
-Zusammenfassung. Seit Runde 8 steht
-neben der Zuordnung eine zweite, aus den Erzeugern abgeschriebene Liste, damit ein gegenüber dem Erzeuger
-falsch geschriebener Name auffällt statt beiden Seiten gleichzeitig zu entgehen. Die rohen Codes stehen weiterhin unter den Details der Ergebnisansicht. Ein Code, für den es
-keinen Satz gibt, wird weiterhin technisch angezeigt statt verschluckt, und ein Eintrag, der gar nicht
-wie ein Code aussieht, wird unverändert durchgereicht.
+### 10. One error text covers two different causes (low, unverified)
 
-### 10. Ein Fehlertext deckt zwei verschiedene Ursachen ab (niedrig, unbestätigt)
+- **Location:** `app/src/main/java/app/sourcescribe/ui/Labels.kt`, `AUDIO_INVALID_INPUT` / `AUDIO_INPUT_NOT_FILE`
+  branch
+- **Status:** both show "This job's audio file was not readable." That is correct for `AUDIO_INPUT_NOT_FILE`.
+  `AUDIO_INVALID_INPUT` instead arises in `AudioPreparation.validateChunkRequest` from an impossible parameter — a
+  programming error, not a broken file.
+- **Unverified:** no trigger in normal use was found; the check guards against internal misuse.
+- **Missing:** either dedicated text in the internal-integrity-code family (item 4), or proof the code never
+  reaches the user.
 
-- **Stelle:** `app/src/main/java/app/sourcescribe/ui/Labels.kt`, Zweig
-  `AUDIO_INVALID_INPUT` / `AUDIO_INPUT_NOT_FILE`
-- **Stand:** Beide zeigen „Die Audiodatei dieses Auftrags war nicht lesbar.“ Für
-  `AUDIO_INPUT_NOT_FILE` stimmt das. `AUDIO_INVALID_INPUT` entsteht dagegen in
-  `AudioPreparation.validateChunkRequest` bei einem unmöglichen Parameter, also bei einem
-  Programmierfehler, nicht bei einer kaputten Datei.
-- **Unbestätigt:** Ein Auslöser in normaler Nutzung wurde nicht gefunden; die Prüfung schützt gegen
-  internen Fehlgebrauch. Deshalb kein eigener Text, sondern hier notiert.
-- **Was fehlt:** Entweder ein eigener Text in der Familie der internen Integritätscodes (Punkt 4) oder
-  der Nachweis, dass der Code nie beim Nutzer ankommt.
+### 11. A change to warning generation permanently blocks reusing paid sections (low)
 
-### 11. Eine Änderung an der Warnungserzeugung sperrt die Wiederverwendung bezahlter Abschnitte (niedrig)
+- **Location:** `app/src/main/java/app/sourcescribe/data/SttStep.kt`, `prepareMissingRetry()`: the comparison
+  `artifact.warningCount != partial.warnings.size` and the comparison against `providerWarnings.distinct()`
+- **Precondition:** a job is `PARTIAL_SUCCESS`. For an already-paid section, the response had more than 64 distinct
+  warnings, and the app was later updated to a build with the warning cap.
+- **Flow:** "Retry only missing sections" re-parses the stored raw data and compares it to what was saved on the
+  first run. The new parse yields 65 entries instead of the old count, the comparison fails, and the path is
+  permanently refused with `MISSING_RETRY_DATA`.
+- **What is already fine:** the failure is safe, not silent. `JobCoordinator.retry` catches it before the
+  transaction; no cost, no silent retry, and the partial state is preserved.
+  `SttMissingRetryTest.retainedProviderWarningsMustMatchPartialArtifact` covers exactly this with
+  `assertEquals(0, requestAttempts.get())`.
+- **Not reachable today:** no real provider run has happened in this project (see item 8), so no stored partial
+  state with provider warnings exists yet. It becomes reachable once real runs exist and warning generation is
+  changed again afterward.
+- **On September 11, 2026 that exact kind of change happened, a second case of it:** `SyncTranscriptParser` now
+  reports `REPORTED_MODEL_MALFORMED` for a present but unusable `model` field, where it used to stay silent. A
+  stored response with `"model":""` therefore yields one more warning than the count on re-parse, and "missing
+  sections only" is permanently refused for that partial state. The failure stays the safe one described above —
+  no cost risk, no silent retry, partial state kept — but it shows this is not a one-off: every future correction
+  to warning generation hits it again as long as `normalizationVersion` is undecided.
+- **Missing:** `TranscriptDocument.normalizationVersion` in `core/.../Domain.kt` is fixed at `"1"`, never bumped,
+  never checked — only shown in export. It appears meant for exactly this case. To close: write a short
+  architecture decision on what a version mismatch should mean (skip the comparison? re-normalize the partial
+  state?), then implement it. This touches job semantics and must not happen incidentally inside another fix.
 
-- **Stelle:** `app/src/main/java/app/sourcescribe/data/SttStep.kt`, `prepareMissingRetry()`: der Vergleich
-  `artifact.warningCount != partial.warnings.size` und der Vergleich der Warnungen behaltener Abschnitte mit
-  `providerWarnings.distinct()`
-- **Voraussetzung:** Ein Auftrag steht auf `PARTIAL_SUCCESS`. Für einen bereits bezahlten Abschnitt
-  hatte die Antwort mehr als 64 verschiedene Warnungen. Danach wird die App auf einen Stand mit der
-  Warndeckelung aktualisiert.
-- **Ablauf:** „Nur fehlende Abschnitte erneut versuchen“ parst die gespeicherten Rohdaten neu und
-  vergleicht das Ergebnis mit dem, was beim ersten Lauf gespeichert wurde. Die neue Fassung liefert
-  65 Einträge statt der alten Zahl, der Vergleich schlägt fehl, und der Weg wird mit
-  `MISSING_RETRY_DATA` dauerhaft verweigert.
-- **Was daran schon in Ordnung ist:** Der Ausfall ist sicher, nicht heimlich. `JobCoordinator.retry`
-  fängt den Fehler vor der Transaktion ab, es entstehen keine Kosten und keine stille Wiederholung,
-  und der Teilstand bleibt erhalten. `SttMissingRetryTest.retainedProviderWarningsMustMatchPartialArtifact`
-  deckt genau diesen Mechanismus mit `assertEquals(0, requestAttempts.get())` ab.
-- **Heute nicht erreichbar:** In diesem Projekt hat noch kein echter Anbieterlauf stattgefunden (siehe
-  Punkt 8), es gibt also keinen gespeicherten Teilstand mit Anbieterwarnungen. Erreichbar wird es,
-  sobald echte Läufe existieren und danach die Warnungserzeugung erneut verändert wird.
-- **Am 11. September 2026 ist genau so eine Änderung passiert, zweiter Fall dieser Art:**
-  `SyncTranscriptParser` meldet für ein vorhandenes, aber unbrauchbares `model`-Feld jetzt
-  `REPORTED_MODEL_MALFORMED`, wo es vorher schwieg. Eine gespeicherte Antwort mit `"model":""` liefert
-  beim Neuparsen also eine Warnung mehr als die gezählte, und der Weg „nur fehlende Abschnitte“ wird
-  für diesen Teilstand dauerhaft verweigert. Der Ausfall bleibt der sichere aus dem Absatz darüber:
-  kein Kostenrisiko, keine stille Wiederholung, Teilstand erhalten. Die Änderung ist trotzdem richtig,
-  weil sie eine Meldepflicht erfüllt, und sie zeigt, dass dieser Punkt keine Einzelfallfrage ist: jede
-  künftige Korrektur an der Warnungserzeugung trifft ihn wieder, solange `normalizationVersion` nicht
-  entschieden ist.
-- **Was fehlt:** `TranscriptDocument.normalizationVersion` in `core/.../Domain.kt` steht fest auf
-  `"1"`, wird nirgends erhöht und nirgends geprüft — nur im Export angezeigt. Es ist offenbar genau
-  für diesen Fall gedacht. Zum Schließen: einen kurzen Architekturentscheid schreiben, was ein
-  Versionsunterschied bedeuten soll (Vergleich überspringen? Teilstand neu normalisieren?), dann
-  umsetzen. Das berührt die Job-Semantik und darf nicht nebenbei in einem anderen Fix passieren.
+### 12. `abr` overrides `tbr` even when its value is then discarded (low)
 
-### 12. `abr` verdrängt `tbr`, auch wenn sein Wert dann verworfen wird (niedrig)
+- **Location:** `core/src/main/kotlin/app/sourcescribe/core/ExtractorMetadata.kt`, `rate`
+- **Precondition:** a format carries a number outside 1..10000 in `abr` and a usable one in `tbr`.
+- **Expected vs. actual:** the usable value should win. Instead `abr` wins merely by being present; when it then
+  fails the range check, `bitrateKbps` stays empty even though `tbr` would have worked, and the track gets no size
+  estimate.
+- **Why it stands:** found while closing the provenance line in round 4. Which field supplies a bitrate is a data
+  decision, not part of a provenance fix, so it is recorded here rather than changed in passing.
+- **Missing:** a decision on switching to "first usable value," plus a test. The new test
+  `provenanceDoesNotNameANumberFieldWhoseValueWasRejectedAsImplausible` pins today's behavior and would be
+  deliberately updated on such a change.
 
-- **Stelle:** `core/src/main/kotlin/app/sourcescribe/core/ExtractorMetadata.kt`, `rate`
-- **Voraussetzung:** Ein Format trägt in `abr` eine Zahl außerhalb von 1..10000 und in `tbr` eine
-  brauchbare.
-- **Erwartet gegen tatsächlich:** Erwartet wäre, dass die brauchbare Angabe gewinnt. Tatsächlich
-  gewinnt `abr` bereits dadurch, dass überhaupt eine Zahl darin steht; scheitert sie dann an der
-  Bereichsprüfung, bleibt `bitrateKbps` leer, obwohl `tbr` gereicht hätte. Folge: keine
-  Größenschätzung für diese Spur.
-- **Warum es so steht:** Aufgefallen beim Schließen der Herkunftsangabe in Runde 4. Welche Angabe
-  eine Bitrate liefert, ist eine Datenänderung; sie gehört nicht in einen Fix für die
-  Herkunftszeile und ist deshalb hier festgehalten statt nebenbei geändert.
-- **Was fehlt:** Entscheidung, ob die Auswahl auf „erste brauchbare Angabe“ umgestellt wird, plus
-  Test. Der neue Test `provenanceDoesNotNameANumberFieldWhoseValueWasRejectedAsImplausible` hält das
-  heutige Verhalten fest und würde bei einer Umstellung bewusst angepasst.
+### 13. An unverifiable export document is reported as provably gone (low)
 
-### 13. Ein ungeprüftes Exportdokument wird gemeldet, als wäre es nachweislich weg (niedrig)
+- **Location:** `app/src/main/java/app/sourcescribe/data/ExportStore.kt`, `reconcile`, the `IllegalArgumentException`
+  branch
+- **Precondition:** the stored document URI cannot be queried at the provider at all, for instance because it is no
+  longer a usable document URI.
+- **Expected vs. actual:** expected is a statement of what was actually established. Instead the line carries the
+  same reason, `EXTERNAL_DOCUMENT_MISSING`, as a genuinely deleted document, and the user reads "The exported file
+  is no longer there," even though only the check failed — the same class of error as presenting an uncertain
+  outcome as a certain one.
+- **Why it stands:** found while closing item 7. The naming half is solved, because the unverifiable case keeps its
+  URI and the name counts as taken out of caution; the text needs its own error code and its own sentence in both
+  languages, which is a separate change.
+- **Missing:** a second error code, two strings, a test with a URI that cannot be queried.
 
-- **Stelle:** `app/src/main/java/app/sourcescribe/data/ExportStore.kt`, `reconcile`, der
-  `IllegalArgumentException`-Zweig
-- **Voraussetzung:** Die gespeicherte Dokument-URI lässt sich beim Anbieter gar nicht abfragen, etwa weil
-  sie keine brauchbare Dokument-URI mehr ist.
-- **Erwartet gegen tatsächlich:** Erwartet wäre eine Aussage über das, was festgestellt wurde. Tatsächlich
-  trägt die Zeile denselben Grund `EXTERNAL_DOCUMENT_MISSING` wie ein wirklich gelöschtes Dokument, und der
-  Nutzer liest „Die exportierte Datei ist nicht mehr da“, obwohl nur die Prüfung fehlgeschlagen ist. Das
-  ist derselbe Fehler wie ein ungewisser Ausgang, der als sicherer dargestellt wird.
-- **Warum es so steht:** Beim Schließen von Punkt 7 aufgefallen. Der Namensteil ist gelöst, weil der
-  ungeprüfte Fall seine URI behält und der Name damit vorsichtshalber als belegt gilt. Der Text braucht
-  aber einen eigenen Fehlercode und je einen Satz in beiden Sprachen; das ist eine eigene Änderung.
-- **Was fehlt:** Zweiter Fehlercode, zwei Texte, ein Test mit einer nicht abfragbaren URI.
+### 14. Old artifacts keep the old caption code and keep getting the timestamp sentence (low)
 
-### 14. Alte Artefakte tragen den alten Untertitelcode und bekommen weiter den Zeitmarkensatz (niedrig)
-
-- **Stelle:** `core/src/main/kotlin/app/sourcescribe/core/CaptionParser.kt` gegen bereits gespeicherte
+- **Location:** `core/src/main/kotlin/app/sourcescribe/core/CaptionParser.kt` against already-stored
   `TranscriptDocument.warnings`
-- **Voraussetzung:** Ein Transkript, das vor dem 11. September 2026 aus einer Untertitelspur entstand und
-  dabei `MALFORMED_SEGMENTS_<n>` aufgezeichnet hat.
-- **Erwartet gegen tatsächlich:** Der Untertitelfall heißt jetzt `MALFORMED_CAPTION_SEGMENTS_<n>`, weil der
-  Anbieterparser denselben Namen mit anderer Bedeutung benutzte. Neue Aufträge bekommen den richtigen Satz;
-  ein alter Eintrag fällt weiter in die Zeitmarkengruppe und sagt damit „Zeitmarken fehlen“, obwohl der Text
-  dieser Stelle fehlt.
-- **Warum es so steht:** Der Index, der beide Quellen unterscheiden würde, wird beim Zusammenfassen
-  absichtlich entfernt. Eine Umschrift gespeicherter Warnlisten berührt `normalizationVersion` und hängt an
-  derselben Entscheidung wie Punkt 11.
-- **Was fehlt:** Entscheidung zusammen mit Punkt 11, ob gespeicherte Warnlisten je migriert werden.
+- **Precondition:** a transcript created from a caption track before September 11, 2026, which recorded
+  `MALFORMED_SEGMENTS_<n>`.
+- **Expected vs. actual:** the caption case is now called `MALFORMED_CAPTION_SEGMENTS_<n>`, because the provider
+  parser used the same name with a different meaning. New jobs get the correct sentence; an old entry still falls
+  into the timestamp group and says "timestamps are missing" even though text is what is missing.
+- **Why it stands:** the index that would distinguish the two sources is deliberately dropped when summarizing.
+  Rewriting stored warning lists touches `normalizationVersion` and hinges on the same decision as item 11.
+- **Missing:** a decision, together with item 11, on whether stored warning lists are ever migrated.
 
-### 15. Eine Notiz aus reinen Großbuchstaben würde wie ein Code behandelt (niedrig, unbestätigt)
+### 15. A note made of capital letters would be treated like a code (low, unverified)
 
-- **Stelle:** `core/src/main/kotlin/app/sourcescribe/core/TranscriptWarnings.kt`, `looksLikeCode`
-- **Voraussetzung:** Jemand legt später freien Text in `TranscriptDocument.warnings`, der nur aus
-  Großbuchstaben, Ziffern und Unterstrichen besteht.
-- **Erwartet gegen tatsächlich:** So ein Text würde am ersten Doppelpunkt abgeschnitten und als technischer
-  Status gerahmt. Heute erreichbar ist das nicht: Die einzige Stelle, die freien Text in diese Liste legt,
-  ist der UI-Prüfdatensatz, und dessen zwei Sätze enthalten Leerzeichen und Kleinbuchstaben.
-- **Was fehlt:** Nichts, solange die Liste Codes trägt. Wird sie je für Text vorgesehen, braucht sie ein
-  eigenes Feld statt einer Formprüfung.
+- **Location:** `core/src/main/kotlin/app/sourcescribe/core/TranscriptWarnings.kt`, `looksLikeCode`
+- **Precondition:** something later puts free text into `TranscriptDocument.warnings` that consists only of capital
+  letters, digits, and underscores.
+- **Expected vs. actual:** such text would be cut at the first colon and framed as a technical status. Not reachable
+  today: the only place that puts free text into this list is the UI test fixture, and its two sentences contain
+  spaces and lowercase letters.
+- **Missing:** nothing, as long as the list carries codes. If it is ever meant for text, it needs its own field
+  instead of a shape check.
 
-### 16. Der `RESPONSE_`-Zweig ist nicht gegen einen künftig falsch benannten Code geschützt (niedrig)
+### 16. The `RESPONSE_` branch is not protected against a future misnamed code (low)
 
-- **Stelle:** `core/src/main/kotlin/app/sourcescribe/core/TranscriptWarnings.kt`, der `else`-Zweig von
-  `group`
-- **Voraussetzung:** Jemand nennt eine neue Warnung `RESPONSE_...`, die keinen verlorenen Abschnitt bedeutet.
-- **Erwartet gegen tatsächlich:** Sie würde stillschweigend als verlorener Abschnitt gemeldet, also als
-  größerer Schaden, als entstanden ist. Heute stimmt die Regel: Jeder real erzeugte `RESPONSE_`-Code
-  entsteht in `SttStep` an einer Stelle, die im selben Schritt `missing += chunk.index` setzt — nachgeprüft
-  für alle zwölf Werte von `ProviderErrorCode` durch
+- **Location:** `core/src/main/kotlin/app/sourcescribe/core/TranscriptWarnings.kt`, the `else` branch of `group`
+- **Precondition:** someone names a new warning `RESPONSE_...` that does not mean a lost section.
+- **Expected vs. actual:** it would silently be reported as a lost section, i.e. worse damage than actually
+  occurred. The rule holds today: every `RESPONSE_` code actually produced arises in `SttStep` at a site that sets
+  `missing += chunk.index` in the same step — verified for all twelve `ProviderErrorCode` values by
   `everyRefusalTheProviderGivesForOneSectionCountsAsALostSection`.
-- **Was fehlt:** Entweder eine geschlossene Liste statt der Präfixregel oder ein Test, der die Kopplung an
-  `missing` am Erzeugungsort festhält.
-- **Seit Runde 7:** Die Zahl dieser Familien ist als `TranscriptWarnings.PREFIXED_FAMILY_COUNT` zählbar und
-  geht in die Obergrenze von `Warnings` ein. Das ändert nichts an der Zuordnungsfrage hier.
+- **Missing:** either a closed list instead of the prefix rule, or a test that pins the coupling to `missing` at the
+  point of creation.
+- **Since round 7:** the count of these families is available as `TranscriptWarnings.PREFIXED_FAMILY_COUNT` and
+  feeds into `Warnings`'s upper bound. That does not change the mapping question here.
 
-### 17. „Tonspur“ gegen „Audiospur“: Englisch ist einheitlich, Deutsch nicht (niedrig)
+### 17. "Tonspur" vs. "Audiospur": English is consistent, German is not (low)
 
-- **Stelle:** `app/src/main/res/values/strings.xml`, `step_prepare_audio` und die vier
-  `reason_audio_*`-Texte gegen den Rest der Datei
-- **Erwartet gegen tatsächlich:** Im Englischen heißt jede der zehn entsprechenden Stellen „audio track“.
-  Im Deutschen sagen die Verarbeitungstexte „Tonspur“ und die Auswahltexte „Audiospur“. Eine Lesart dafür
-  gibt es — wählbare Spur gegen verarbeiteten Inhalt —, aber `help_audio_track_body` durchbricht sie selbst.
-- **Was fehlt:** Entscheidung für ein Wort und eine Durchsicht aller Vorkommen in einem Zug.
+- **Location:** `app/src/main/res/values/strings.xml`, `step_prepare_audio` and the four `reason_audio_*` strings
+  against the rest of the file
+- **Expected vs. actual:** English says "audio track" at all ten corresponding places. German processing text says
+  "Tonspur," selection text says "Audiospur." One reading would justify this — selectable track vs. processed
+  content — but `help_audio_track_body` breaks that reading itself.
+- **Missing:** a decision for one word and a pass over every occurrence in one sweep.
 
-### 18. Fällt die ganze Segmentliste aus, behauptet der Satz fehlenden Text (niedrig)
+### 18. If the whole segment list fails, the sentence claims missing text (low)
 
-- **Stelle:** `core/src/main/kotlin/app/sourcescribe/core/providers/SyncTranscriptParser.kt`, `parse`, gegen
-  `TranscriptWarnings.group` für `MALFORMED_SEGMENT`
-- **Voraussetzung:** Jeder Eintrag der Segmentliste einer Anbieterantwort ist unlesbar.
-- **Erwartet gegen tatsächlich:** Ist am Ende kein einziges Segment übrig, ersetzt der Parser die Liste durch
-  das vollständige Textfeld der Antwort. Dann fehlt kein Text, sondern nur die Gliederung samt Zeitangaben.
-  Die Warnungen sehen aber genauso aus wie bei einem Teilverlust, und der Satz sagt, Stellen fehlten im
-  Ergebnis. Für den häufigen Fall — einzelne unlesbare Einträge — ist der Satz richtig, und nur dieser Fall
-  ist gefährlich, weil ein Teilverlust leise ist.
-- **Warum es so steht:** Die Zuordnung sieht nur die Codeliste und kann nicht erkennen, ob der Ersatz gegriffen
-  hat. Sichtbar würde das erst durch eine eigene Warnung am Erzeugungsort.
-- **Was fehlt:** Eine Warnung, die den Ersatz der Segmentliste durch das Textfeld festhält, plus eigener Satz.
-  Das ist zugleich unabhängig nützlich: Heute ist ein Ergebnis ohne jede Gliederung von einem gegliederten
-  nicht zu unterscheiden.
+- **Location:** `core/src/main/kotlin/app/sourcescribe/core/providers/SyncTranscriptParser.kt`, `parse`, against
+  `TranscriptWarnings.group` for `MALFORMED_SEGMENT`
+- **Precondition:** every entry of a provider response's segment list is unreadable.
+- **Expected vs. actual:** if no segment survives, the parser replaces the list with the response's full-text
+  field. No text is then missing, only structure and timestamps. But the warnings look identical to a partial loss,
+  and the sentence says sections are missing from the result. For the common case — a few unreadable entries — the
+  sentence is correct, and only that case is dangerous, because a partial loss is quiet.
+- **Why it stands:** the mapping only sees the code list and cannot tell whether the fallback engaged; that would
+  need a dedicated warning at the point of creation.
+- **Missing:** a warning that records the fallback from segment list to full text, plus its own sentence — also
+  independently useful, since today a result with no structure at all is indistinguishable from a structured one.
 
-### 19. Die RAW-Regel der Wiederholungsprüfung — erledigt am 11. September 2026
+### 19. The RAW rule in the retry check — fixed September 11, 2026
 
-Am selben Tag aufgenommen und geschlossen. Eine Geschwisterzeile im Format `RAW` liefert `null` als
-Endung, weil die Endung aus der aufbewahrten Anbieterdatei kommt und nicht in der Exportzeile steht; sie
-zählt deshalb vorsichtshalber als belegter Name. Belegt war das nur durch den Einzeltest zum Namensbauer.
-`aRawSiblingCountsAsATakenNameBecauseTheRowDoesNotRecordItsExtension` führt jetzt einen echten RAW-Export
-aus und danach einen Textexport desselben Artefakts mit selbst vergebenem Namen. Die Zeile bekommt einen
-Unterscheidungszusatz, obwohl `.json3` und `.txt` gar nicht kollidieren könnten — das ist die bewusst
-vorsichtige Seite, und der Test hält sie fest statt sie zu behaupten. Der Zusatz wäre vermeidbar, wenn die
-Exportzeile die geschriebene Endung führte; das ist eine Spalte mehr samt Migration für einen kosmetischen
-Gewinn und deshalb nicht gemacht.
+Recorded and closed the same day. A sibling line in `RAW` format yields `null` for its extension, because the
+extension comes from the retained provider file rather than the export row, so it counts as a taken name out of
+caution. `aRawSiblingCountsAsATakenNameBecauseTheRowDoesNotRecordItsExtension` now runs a real RAW export followed
+by a text export of the same artifact with a self-assigned name; it gets a disambiguating suffix even though
+`.json3` and `.txt` could not actually collide — the deliberately cautious side, which the test records rather than
+asserts as necessary. Recording the written extension in the export row would avoid the suffix but costs a column
+and a migration for a cosmetic gain, so it was not done.
 
-### 20. Die zwei Modelllängengrenzen sind unabhängig hartkodiert (niedrig)
+### 20. The two model-length limits are independently hardcoded (low)
 
-- **Stelle:** `core/.../providers/AssemblyAiAdapter.kt` und `core/.../providers/SyncTranscriptParser.kt`,
-  je ein privates `MAX_REPORTED_MODEL_LENGTH = 128`; in den Tests je ein eigenes `129`
-- **Voraussetzung:** Jemand ändert die Grenze an einer der beiden Stellen.
-- **Erwartet gegen tatsächlich:** Erwartet wäre, dass beide Parser dieselbe Antwort auf denselben Wert
-  geben — das ist die Zusage, die Runde 7 mit der Reihenfolge der Ablehnungsgründe hergestellt hat.
-  Tatsächlich hält nichts die beiden Zahlen zusammen: kein gemeinsamer Wert, kein Test, der sie
-  vergleicht. Die Abweichung fiele erst auf, wenn jemand beide Parser mit demselben Wert prüft.
-- **Was fehlt:** Ein gemeinsamer Ort für die Grenze. Er gehört nicht in einen der beiden Adapter, und ob
-  `ProviderContract` der richtige Platz für eine Parsergrenze ist, ist eine Entscheidung und kein Handgriff
-  — deshalb hier notiert statt nebenbei gemacht.
-- **Seit Runde 8 gilt dasselbe für die Warnnamen:** `SyncTranscriptParser` schreibt
-  `"REPORTED_MODEL_MALFORMED"` und `"REPORTED_MODEL_TOO_LONG"` als rohe Zeichenketten, der AssemblyAI-Adapter
-  führt sie als benannte Konstanten mit denselben Werten. Benennt jemand eine Seite um, meldeten die beiden
-  Parser dieselbe Lage unter verschiedenen Codes, und die Zusammenfassung ordnete den neuen Namen keiner
-  Gruppe mehr zu. Der Test aus Runde 8, der jede Familie gegen eine zweite Liste hält, fängt den zweiten
-  Teil davon — nicht aber, dass die zwei Parser auseinanderlaufen.
+- **Location:** `core/.../providers/AssemblyAiAdapter.kt` and `core/.../providers/SyncTranscriptParser.kt`, each a
+  private `MAX_REPORTED_MODEL_LENGTH = 128`; tests each hardcode a separate `129`
+- **Precondition:** someone changes the limit at one of the two sites.
+- **Expected vs. actual:** both parsers should give the same answer for the same value — the guarantee round 7
+  established via the order of rejection reasons. Nothing actually ties the two numbers together: no shared
+  constant, no test comparing them. The drift would only surface if someone tested both parsers with the same value.
+- **Missing:** a shared location for the limit. It does not belong in either adapter, and whether `ProviderContract`
+  is the right place for a parser limit is a decision, not a mechanical edit — recorded here instead of done in
+  passing.
+- **Since round 8, the same applies to the warning names:** `SyncTranscriptParser` writes `"REPORTED_MODEL_MALFORMED"`
+  and `"REPORTED_MODEL_TOO_LONG"` as raw strings; the AssemblyAI adapter carries them as named constants with the
+  same values. Renaming one side would make the two parsers report the same situation under different codes, and
+  the summary would no longer group the new name. The round-8 test that checks each family against a second list
+  catches that second half, not the parsers drifting apart.
 
-### 21. Ein Zeitstempel weit außerhalb des Üblichen ergibt kein Datum im Dateinamen (niedrig)
+### 21. A timestamp far outside the ordinary range yields no date in the file name (low)
 
-- **Stelle:** `core/src/main/kotlin/app/sourcescribe/core/TranscriptExporter.kt`, `identitySuffix`,
+- **Location:** `core/src/main/kotlin/app/sourcescribe/core/TranscriptExporter.kt`, `identitySuffix`,
   `createdAtUtc(document.createdAt).take(10)`
-- **Voraussetzung:** `createdAt` liegt außerhalb der Jahre 0000–9999.
-- **Erwartet gegen tatsächlich:** Erwartet wird ein Ausschnitt der Form `YYYY-MM-DD`. Tatsächlich schreibt
-  `Instant.toString()` solche Jahre mit Vorzeichen und variabler Stellenzahl, sodass die ersten zehn Zeichen
-  `+292278994` lauten — Tag und Monat fehlen, und zwei Läufe desselben Tages könnten sich im Namen nicht
-  mehr über das Datum unterscheiden.
-- **Warum nicht gefixt:** `createdAt` kommt aus der Uhr des Geräts, nicht aus einer Antwort; der Fall setzt
-  eine grob falsch gestellte Uhr voraus. Die Bytegrenzen des Namens bleiben eingehalten, weil diese
-  Darstellung reines ASCII ist. Hergeleitet aus der dokumentierten Form von `Instant.toString()`, nicht
-  ausgeführt — entscheiden würde
-  `assertEquals("+292278994", Instant.ofEpochMilli(Long.MAX_VALUE).toString().take(10))`.
-- **Der Wert stand hier zuerst mit einer Ziffer zu wenig.** `Long.MAX_VALUE` Millisekunden liegen im Jahr
-  292 278 994, also neun Ziffern plus Vorzeichen — genau die zehn Zeichen, die `take(10)` nimmt. Schon an
-  der Zeichenzahl war die alte Angabe als falsch erkennbar, ohne irgendetwas auszuführen.
+- **Precondition:** `createdAt` falls outside the years 0000–9999.
+- **Expected vs. actual:** a `YYYY-MM-DD` slice is expected. Instead `Instant.toString()` writes such years with a
+  sign and a variable digit count, so the first ten characters read `+292278994` — day and month are gone, and two
+  runs on the same day could no longer be told apart by date in the name.
+- **Why not fixed:** `createdAt` comes from the device clock, not a response; the case needs a grossly wrong clock.
+  The name's byte limits still hold, since this representation is plain ASCII. Derived from the documented form of
+  `Instant.toString()`, not executed — `assertEquals("+292278994", Instant.ofEpochMilli(Long.MAX_VALUE).toString().take(10))`
+  would settle it. (An earlier version of this entry had the value one digit short: `Long.MAX_VALUE` milliseconds
+  fall in the year 292,278,994 — nine digits plus sign, exactly the ten characters `take(10)` takes.)
 
-### 22. Die Rückfrage nach der Tonspur zeigt nicht, warum sie gestellt wird (Anzeige niedrig, Herkunftsnachweis war hoch — behoben)
+### 22. The audio-track follow-up question does not show why it is asked (display: low; provenance claim: high — fixed)
 
-- **Stelle:** `core/src/main/kotlin/app/sourcescribe/core/AudioTracks.kt`, `describe`, zusammen mit der
-  Spurauswahl in der Vorbereitungsansicht.
-- **Voraussetzung:** Zwei Tonspuren, deren Sprachangaben die Quelle genannt hat, die aber länger als hundert
-  Zeichen waren und deshalb nicht in den Datensatz übernommen wurden (`AudioTrack.languageRefused`).
-- **Erwartet gegen tatsächlich:** Seit Runde 10 verweigert `automatic` hier die stille Wahl, was richtig
-  ist — die Quelle hat die beiden auseinandergehalten. Der Nutzer bekommt dann aber eine Liste, in der
-  beide Spuren gar keine Sprache nennen, und keinen Hinweis darauf, dass eine genannt wurde. Die Frage ist
-  damit richtig gestellt, aber schwer zu beantworten.
-- **Der Herkunftsnachweis sagt es seit Runde 11.** Ein Reviewer hat die zweite Hälfte dieses Punktes
-  gefunden, die schwerer wiegt als die erste: `TranscriptExporter` schrieb `language=unknown`, wenn die
-  Quelle sehr wohl eine Sprache genannt hatte. Der Export ist der Herkunftsnachweis, und die Offenlegung
-  von Sprache und Unsicherheit ist eine Invariante dieses Projekts — dort stand also eine unwahre Aussage.
-  Er schreibt jetzt `language=stated-but-unusable`.
-- **Warum die Anzeige nicht gefixt ist:** Der Fall ist nicht beobachtet worden und mit echten yt-dlp-Daten
-  praktisch nicht erreichbar — reale Sprach-Tags sind unter zwanzig Zeichen lang. Ein eigener Text dafür
-  bräuchte zwei neue übersetzte Zeichenketten für einen Zustand, den niemand je sehen wird; die Alternative
-  wäre, die Angabe gekürzt und als gekürzt gekennzeichnet mitzuführen, was der Regel „ganz oder gar nicht“
-  widerspräche. Die falsche stille Entscheidung ist behoben, die schlechte Frage bleibt.
-- **Und warum die Sortierung so bleibt:** `AudioTracks.readingOrder` legt eine Spur mit verworfener Sprache
-  in dieselbe Gruppe wie eine ohne jede Sprache, ebenfalls in Runde 11 gefunden. Das bleibt absichtlich so,
-  solange die Anzeige beide als „Unbekannt“ führt: Würde nach einem Unterschied sortiert, den die Liste
-  nicht zeigt, wäre ihre Reihenfolge für den Leser nicht mehr erklärbar. Wer den Text ergänzt, ändert
-  beides zusammen.
+- **Location:** `core/src/main/kotlin/app/sourcescribe/core/AudioTracks.kt`, `describe`, together with track
+  selection in the preparation view.
+- **Precondition:** two audio tracks whose language the source named, but which were longer than a hundred
+  characters and therefore not carried into the record (`AudioTrack.languageRefused`).
+- **Expected vs. actual:** since round 10, `automatic` correctly refuses to choose silently here — the source did
+  distinguish the two. But the user then gets a list where neither track names a language, with no hint that one
+  actually was named. The question is correctly asked but hard to answer.
+- **Fixed since round 11 — the more serious half:** a reviewer found that `TranscriptExporter` wrote
+  `language=unknown` even when the source had in fact named a language. Since the export is this project's
+  provenance record, and disclosing language and uncertainty is an invariant, that was a false statement. It now
+  writes `language=stated-but-unusable`.
+- **Why the display half is not fixed:** unobserved in practice and practically unreachable with real yt-dlp data —
+  real language tags run under twenty characters. A dedicated sentence would need two new translated strings for a
+  state nobody will likely see; truncating and flagging the value as truncated would break the project's
+  all-or-nothing rule. The false silent decision is fixed; the badly answerable question remains, along with
+  `AudioTracks.readingOrder` deliberately keeping a refused-language track in the same sort group as one with no
+  language at all, since sorting by a difference the list does not display would be unexplainable to the reader.
 
-### 23. Die Höchstdauer steht an drei Stellen als eigene Zahl (niedrig)
+### 23. The maximum duration exists as an independent number in three places (low)
 
-- **Stelle:** `core/src/main/kotlin/app/sourcescribe/core/JobLimits.kt` (`MAX_AUDIO_SECONDS = 36_000`) und
-  `invalid_duration` in `app/src/main/res/values/strings.xml` sowie `values-en/strings.xml`, beide mit
-  „600 Minuten“ im Text.
-- **Voraussetzung:** Jede Änderung an der Höchstdauer.
-- **Erwartet gegen tatsächlich:** Erwartet wäre eine Zahl, aus der die anderen folgen. Tatsächlich stehen
-  drei unabhängige Zahlen da; die beiden Texte lesen nichts aus der Konstante. Eine geänderte Konstante
-  hätte die App etwas anderes durchsetzen lassen, als beide Texte versprechen.
-- **Was seit Runde 10 gilt:** `JobLimitsTest` nagelt die Konstante auf 36 000 Sekunden und 600 Minuten fest
-  und nennt den Textschlüssel im Kommentar, sodass eine Änderung dort einen Test fällt und auf die Texte
-  zeigt. Das ist eine Brücke, keine Behebung: Wer die Texte ändert und die Konstante nicht, fällt weiter
-  durch kein Netz. Eine Formatzeichenkette mit `%d` aus `MAX_AUDIO_MINUTES` wäre die Behebung.
+- **Location:** `core/src/main/kotlin/app/sourcescribe/core/JobLimits.kt` (`MAX_AUDIO_SECONDS = 36_000`) and
+  `invalid_duration` in `app/src/main/res/values/strings.xml` and `values-en/strings.xml`, both saying "600 minutes."
+- **Precondition:** any change to the maximum duration.
+- **Expected vs. actual:** one number should imply the others. Instead three independent numbers exist; neither
+  text reads the constant, so a changed constant would let the app enforce something other than what both texts
+  promise.
+- **Since round 10:** `JobLimitsTest` pins the constant at 36,000 seconds and 600 minutes and names the text key in
+  a comment, so a change there fails a test that points at the texts. That is a bridge, not a fix: changing the
+  texts without the constant still falls through no net. A format string with `%d` sourced from `MAX_AUDIO_MINUTES`
+  would be the actual fix.
 
-### 24. Die Quellseite eines Preises wird mitgeführt und nirgends gezeigt (niedrig)
+### 24. A price's source page is recorded but shown nowhere (low)
 
-- **Stelle:** `ProviderCapabilities.pricingSource` in
-  `core/src/main/kotlin/app/sourcescribe/core/ProviderContract.kt`, gesetzt von allen drei Adaptern.
-- **Voraussetzung:** Keine. Der Wert existiert immer.
-- **Erwartet gegen tatsächlich:** Neben der Kostenschätzung steht der Tarifstand — ein Datum. Das Datum
-  ist genau dann etwas wert, wenn man nachsehen kann, wogegen es geprüft wurde; die Seite dafür liegt im
-  Datensatz und erreicht weder Anzeige noch Export noch Diagnose. Eine Suche nach `pricingSource` findet
-  drei Zuweisungen und keinen einzigen Leser.
-- **Warum es offen bleibt:** Die Hilfe ist ein statischer Text pro Thema und kennt den gewählten Anbieter
-  nicht; ein dynamischer Absatz dort wäre eine Änderung am Hilfemodell, keine Zeile. Die Alternative,
-  die drei Adressen als Text in `help_cost_body` zu schreiben, würde jede Adresse ein zweites Mal
-  behaupten — genau das, wogegen `StatedNumbersTest` angelegt wurde. Gefunden in Runde 12 beim Prüfen
-  der Behauptung, Stichtag und Quelle stünden beide beim Betrag.
+- **Location:** `ProviderCapabilities.pricingSource` in `core/src/main/kotlin/app/sourcescribe/core/ProviderContract.kt`,
+  set by all three adapters.
+- **Precondition:** none; the value always exists.
+- **Expected vs. actual:** next to the cost estimate is the pricing date. That date is only useful if the reader can
+  check what it was verified against; the page for that lives in the record but reaches neither the display, nor
+  export, nor diagnostics. A search for `pricingSource` finds three assignments and no reader.
+- **Why it stays open:** help text is static per topic and does not know the chosen provider; a dynamic paragraph
+  there is a change to the help model, not a one-liner. Writing the three URLs into `help_cost_body` instead would
+  state each address a second time — exactly what `StatedNumbersTest` exists to prevent. Found in round 12 while
+  checking the claim that both the pricing date and its source appear next to the amount.
 
-### 25. Die Uploadgrenze für Groq ist die kleinere von zwei Stufen (niedrig)
+### 25. Groq's upload limit is the smaller of two tiers (low)
 
-- **Stelle:** `GroqAdapter.MAX_UPLOAD_BYTES` in
-  `core/src/main/kotlin/app/sourcescribe/core/providers/GroqAdapter.kt`.
-- **Voraussetzung:** Ein bezahlter Groq-Schlüssel („dev tier“) und eine Datei zwischen 25 und 100 MB.
-- **Erwartet gegen tatsächlich:** Groq dokumentiert (nachgelesen am 11. September 2026) 25 MB für die
-  kostenlose und 100 MB für die bezahlte Stufe. Die App kennt die Stufe eines selbst mitgebrachten
-  Schlüssels nicht und hält deshalb alle an die kleinere; ein zahlender Nutzer bekommt eine lokale
-  Ablehnung für eine Datei, die der Anbieter angenommen hätte.
-- **Warum es so bleibt:** Die Gegenrichtung ist schlechter. Wer die Grenze anhebt, verwandelt eine lokale
-  Ablehnung in einen Fehlschlag beim Anbieter, und der ist bei einem kostenpflichtigen Dienst die teurere
-  der beiden Auskünfte. Die Behebung wäre eine Angabe der Stufe in den Zugangsdaten, nicht eine größere
-  Zahl. Seit Runde 12 sagen Kommentar und `StatedNumbersTest`, dass dies eine Entscheidung dieses
-  Programms ist und keine Zahl des Anbieters.
+- **Location:** `GroqAdapter.MAX_UPLOAD_BYTES` in `core/src/main/kotlin/app/sourcescribe/core/providers/GroqAdapter.kt`.
+- **Precondition:** a paid Groq key ("dev tier") and a file between 25 and 100MB.
+- **Expected vs. actual:** Groq documents (checked September 11, 2026) 25MB for the free tier and 100MB for the paid
+  tier. The app does not know the tier of a user-supplied key and holds everyone to the smaller limit; a paying user
+  gets a local rejection for a file the provider would have accepted.
+- **Why it stays this way:** the alternative is worse. Raising the limit turns a local rejection into a failure at
+  the provider, the costlier of the two outcomes for a paid service. The real fix is a tier field in the
+  credentials, not a bigger number. Since round 12, a comment and `StatedNumbersTest` say this is a decision of this
+  program, not a provider figure.
 
-### 26. „25 MB“ ist bei zwei Anbietern nicht als dezimal oder binär bestimmt (niedrig)
+### 26. "25MB" is not defined as decimal or binary at two providers (low)
 
-- **Stelle:** `GroqAdapter.MAX_UPLOAD_BYTES` und `OpenAiAdapter.MAX_UPLOAD_BYTES`, beide `25_000_000`.
-- **Voraussetzung:** Eine Datei zwischen 25 000 000 und 26 214 400 Byte.
-- **Erwartet gegen tatsächlich:** Beide Anbieter schreiben „25 MB“ ohne zu sagen, ob sie dezimal oder
-  binär rechnen. Der Code nimmt dezimal, also die kleinere Auslegung, und liegt damit auf der sicheren
-  Seite — aber ob der Server bei 25 000 000 oder bei 26 214 400 Byte abschneidet, ist nicht belegt.
-- **Warum es offen bleibt:** Das ließe sich nur mit einem echten Request an der Grenze klären, also mit
-  einem kostenpflichtigen Aufruf. Als Vermutung gekennzeichnet, nicht als Fund. Aufgeworfen vom lesenden
-  Reviewer in Runde 12 und von ihm selbst ausdrücklich als nicht ausgeführt markiert.
+- **Location:** `GroqAdapter.MAX_UPLOAD_BYTES` and `OpenAiAdapter.MAX_UPLOAD_BYTES`, both `25_000_000`.
+- **Precondition:** a file between 25,000,000 and 26,214,400 bytes.
+- **Expected vs. actual:** both providers write "25MB" without saying whether they mean decimal or binary. The code
+  takes decimal, the smaller and safer reading — but whether the server actually cuts off at 25,000,000 or
+  26,214,400 bytes is unproven.
+- **Why it stays open:** only a real request at the boundary — i.e. a paid call — could settle it. Flagged as
+  speculation, not a finding, by the reviewer who raised it in round 12 and marked it explicitly not executed.
 
-### 27. Eine vierte Kostenrechnung, als einzige ohne Zuschläge (niedrig, heute folgenlos)
+### 27. A fourth cost calculation, the only one without surcharges (low, harmless today)
 
-- **Stelle:** `SyncProviderSupport.validateOptions` in
-  `core/src/main/kotlin/app/sourcescribe/core/providers/SyncTranscriptParser.kt`, verwendet von
-  `GroqAdapter` und `OpenAiAdapter`.
-- **Voraussetzung:** Ein Groq- oder OpenAI-Modell, das einen bepreisten Zusatz bekommt —
-  Sprechertrennung oder eine Fachbegriffsliste mit eigenem Stundensatz. Heute gibt es keins.
-- **Erwartet gegen tatsächlich:** Vier Stellen dieses Programms rechnen eine Dauer in Geld um. Drei
-  addieren die Zuschläge, diese nicht. Dass das heute nichts ändert, ist geprüft und nicht vermutet: Groq
-  meldet `diarization = false` für jedes Modell, und OpenAIs einziges diarisierendes Modell hat
-  `priceMicrousdPerHour = null` und wird eine Zeile weiter abgelehnt, statt geschätzt zu werden.
-  **Runde 13 hat dafür einen falschen Grund in den Code geschrieben** — „kein veröffentlichter Preis“.
-  `gpt-4o-transcribe-diarize` ist bepreist, aber je Token: 2,50 und 10,00 Dollar je Million. Die
-  „$0.006 / minute“ daneben stehen in einer Spalte, die die Seite selbst „Estimated cost“ überschreibt.
-  Eine Dauer lässt sich nicht mit einer Tokenzahl multiplizieren, also gibt es keinen Stundensatz zu
-  führen, und `null` ist die richtige Angabe aus einem anderen Grund als dem genannten. Am
-  12. September 2026 aus dem Markup der Seite nachgelesen.
-- **Warum es offen bleibt:** Die Zuschläge stehen nicht in `ProviderCapabilities`, sondern beim jeweiligen
-  Adapter; sie hier einzurechnen hieße, sie in den Vertrag aufzunehmen. Das ist eine Vertragsänderung und
-  keine Zeile. Als Vorprüfung bleibt die Stelle ungefährlich — was bindet, ist `SttStep.submit`, das mit
-  den Zuschlägen und über den ganzen Abschnittsplan prüft. Seit Runde 13 sagt der Kommentar beides.
-  Gefunden vom lesenden Reviewer in Runde 13 auf die Frage, welche Rechnung mehr als einmal im Baum steht.
+- **Location:** `SyncProviderSupport.validateOptions` in `core/src/main/kotlin/app/sourcescribe/core/providers/SyncTranscriptParser.kt`,
+  used by `GroqAdapter` and `OpenAiAdapter`.
+- **Precondition:** a Groq or OpenAI model with a priced add-on — speaker separation or a term list with its own
+  hourly rate. There is none today.
+- **Expected vs. actual:** four places in this program convert a duration to money; three add surcharges, this one
+  does not. That this changes nothing today is checked, not assumed: Groq reports `diarization = false` for every
+  model, and OpenAI's one diarizing model has `priceMicrousdPerHour = null` and is rejected a line later instead of
+  estimated. Round 13 recorded the wrong reason for that — "no published price." `gpt-4o-transcribe-diarize` is in
+  fact priced, but per token: $2.50 and $10.00 per million. The "$0.006/minute" nearby sits in a column the page
+  itself labels "Estimated cost." A duration cannot be multiplied by a token count, so there is no hourly rate to
+  carry, and `null` is correct for a different reason than stated (re-read from the page's markup on
+  September 12, 2026).
+- **Why it stays open:** surcharges live per adapter, not in `ProviderCapabilities`; folding them in here would mean
+  adding them to the contract — a contract change, not a line. As a pre-check the site stays harmless; what binds is
+  `SttStep.submit`, which checks with surcharges across the whole section plan. Since round 13 the comment says
+  both. Found by the reading reviewer in round 13 while asking which calculation appears more than once in the tree.
 
-### 28. Was `tools/check-repository.py` weiterhin nicht liest (niedrig)
+### 28. What `tools/check-repository.py` still does not read (low)
 
-- **Stelle:** `_read_text`, `_check_actions` und `_check_notice_versions` in `tools/check-repository.py`.
-- **Voraussetzung:** Je nach Fall: eine UTF-16- oder UTF-32-Datei **ohne** Byte-Reihenfolge-Markierung,
-  eine Textdatei über einem Mebibyte, oder eine noch nicht versionierte Datei unter `.github/workflows/`.
-- **Erwartet gegen tatsächlich:** Drei Reste, nachdem Runde 13 UTF-16 und Runde 14 UTF-32 **mit**
-  Markierung geschlossen haben. Ohne Markierung ist beides an den Bytes nicht von einer Binärdatei zu
-  unterscheiden und fällt weiter durch. Eine Textdatei über `MAX_SCAN_BYTES` wird bei 1 048 576 Byte
-  gekappt; ein Geheimnis dahinter wird nicht gefunden, und der Abschlusszeile ist die Kappung anzusehen
-  (`… read only to 1048576 bytes`), dem Exitcode nicht. Und `_check_actions` durchsucht das Dateisystem
-  statt `git ls-files`, prüft eine unversionierte Workflow-Datei also auf ungepinnte Actions, während der
-  Geheimnisscan sie nie sieht.
-- **Was Runde 14 hier geschlossen hat, und warum es schlimmer war als die Lücke davor:** Eine
-  UTF-32LE-Markierung lautet `ff fe 00 00`, und ihre ersten zwei Bytes sind genau eine UTF-16LE-Markierung.
-  Runde 13 prüfte zwei Bytes, also wurde eine UTF-32LE-Datei als UTF-16 dekodiert — Text mit einem Nullbyte
-  zwischen jedem Zeichen, an dem kein Muster greift — und **als gelesen gezählt**. Vor Runde 13 hätte die
-  Nullbyte-Probe dieselbe Datei ehrlich als binär gemeldet. Die vier Bytes werden jetzt zuerst geprüft.
-- **Was Runde 15 dazu nachgetragen hat:** Das gilt nur für Little-Endian. Eine UTF-32BE-Datei beginnt mit
-  `00 00 fe ff`, und die Zwei-Byte-Prüfung der Runde 13 hätte sie nie für UTF-16 gehalten. Den
-  Big-Endian-Eintrag in `UTF32_BOMS` durchlief aber kein Test, weil `.encode("utf-32")` auf den Maschinen
-  hier die Little-Endian-Markierung schreibt; der Selbsttest enthält jetzt eine UTF-32BE-Datei.
-- **Warum der Rest offen bleibt:** Alle drei sind heute leer — keine Datei im Baum trägt eine UTF-16- oder
-  UTF-32-Markierung, die einzige Datei über einem Mebibyte ist die gepackte Extraktor-Engine und echt
-  binär, und `.github/workflows/` enthält nur Versioniertes. Die Reihenfolge ist Absicht: Die weitere
-  Richtung — mehr prüfen, nicht weniger — ist bei der Actions-Prüfung die sichere. Gefunden vom lesenden
-  Reviewer in Runde 13 und in Runde 14 erneut, beide Male durch Ausführen der Funktionen außerhalb des
-  Repositorys gegen selbstgebaute Dateien.
-- **Was Runde 22 dazu nachgetragen hat:** `_check_notice_versions` verbindet einen Namen aus dem Versionskatalog nur
-  mit einer Version, die ihm in derselben Zeile folgt, seit Runde 22 mit oder ohne „v“ davor. Eine Version in einer
-  eigenen Tabellenspalte und ein Name, den ein Lizenzhinweis anders schreibt als der Versionskatalog, etwa
-  „Bouncy Castle PG“ statt `bcpg`, bleiben unerkannt. Heute steht in der Tabelle von `THIRD_PARTY_NOTICES.md` keine
-  Version eines Namens aus dem Versionskatalog in einer eigenen Spalte; die Zeile zu WebP trennt Name und Version,
-  und WebP steht nicht im Katalog. Gefunden vom Code-Reviewer der Runde 22, mit der Funktion gegen selbstgebaute
-  Hinweise.
+- **Location:** `_read_text`, `_check_actions`, and `_check_notice_versions` in `tools/check-repository.py`.
+- **Precondition:** a UTF-16 or UTF-32 file **without** a byte-order mark, a text file over one mebibyte, or an
+  unversioned file under `.github/workflows/`.
+- **Expected vs. actual:** three gaps remain after round 13 closed UTF-16 and round 14 closed UTF-32 **with** a
+  mark. Without one, both are indistinguishable from binary by bytes alone and still slip through. A text file over
+  `MAX_SCAN_BYTES` is cut at 1,048,576 bytes; a secret past that point is not found, and only the closing line shows
+  the truncation (`… read only to 1048576 bytes`), not the exit code. `_check_actions` searches the filesystem
+  instead of `git ls-files`, so it checks an unversioned workflow file for unpinned actions while the secret scan
+  never sees it.
+- **What round 14 closed, and why it was worse than the gap before it:** a UTF-32LE mark is `ff fe 00 00`, whose
+  first two bytes are exactly a UTF-16LE mark. Round 13 checked only two bytes, so a UTF-32LE file was decoded as
+  UTF-16 — text with a null byte between every character, which matches no pattern — and **counted as read**.
+  Before round 13, the null-byte probe would have honestly called the same file binary. The four bytes are now
+  checked first.
+- **What round 15 added:** this only holds for little-endian. A UTF-32BE file begins with `00 00 fe ff`, which
+  round 13's two-byte check would never have mistaken for UTF-16 — but the big-endian entry in `UTF32_BOMS` had no
+  test exercising it, because `.encode("utf-32")` writes the little-endian mark on these machines; the self-test now
+  includes a UTF-32BE file.
+- **Why the rest stays open:** all three are empty today — no file in the tree carries a UTF-16 or UTF-32 mark, the
+  only file over one mebibyte is the packed extractor engine and is genuinely binary, and `.github/workflows/`
+  contains only versioned files. The further direction — checking more, not less — is the safe one for the actions
+  check. Found by the reading reviewer in rounds 13 and 14, both times by running the functions outside the
+  repository against purpose-built files.
+- **What round 22 added:** `_check_notice_versions` only ties a version-catalogue name to a version that follows it
+  on the same line (with or without a leading "v" since round 22). A version in its own table column, or a name a
+  license notice spells differently than the catalogue (e.g. "Bouncy Castle PG" instead of `bcpg`), goes
+  unrecognized. Today no version-catalogue name's version sits in its own table column in `THIRD_PARTY_NOTICES.md`;
+  the WebP row separates name and version, and WebP is not in the catalogue. Found by the round-22 code reviewer,
+  running the function against purpose-built notices.
 
-### 29. Die Preisseite von OpenAI nennt `whisper-1` nicht (niedrig)
+### 29. OpenAI's pricing page does not name `whisper-1` (low)
 
-- **Stelle:** `OpenAiAdapter.PRICING_SOURCE` und `PRICE_WHISPER_MICRO_USD_PER_HOUR` in
+- **Location:** `OpenAiAdapter.PRICING_SOURCE` and `PRICE_WHISPER_MICRO_USD_PER_HOUR` in
   `core/src/main/kotlin/app/sourcescribe/core/providers/OpenAiAdapter.kt`.
-- **Voraussetzung:** Jemand folgt der Adresse, um die Zahl neben dem Stichtag nachzuprüfen.
-- **Erwartet gegen tatsächlich:** Die Zahl stimmt — 0,006 Dollar je Minute sind genau 360 000 Mikro-Dollar
-  je Stunde. Die Zeichenfolge `whisper-1` kommt auf der Seite aber überhaupt nicht vor (am 12. September
-  2026 im Markup nachgezählt: null Treffer); die Zeile mit diesem Preis heißt „Whisper“ und steht in der
-  eingeklappten Hälfte der Tabelle. Wer `whisper-1` sucht, findet nur `gpt-realtime-whisper`, ein anderes
-  Modell zu einem anderen Preis. Für `gpt-transcribe` steht die Zeile offen in der Tabelle.
-- **Warum es offen bleibt:** Die Seite gehört dem Anbieter. Was dieses Projekt tun kann, ist den letzten
-  Schritt auszusprechen statt ihn anzunehmen — das steht seit Runde 13 im Kommentar neben der Zahl.
-  Hängt an Punkt 24 weiter oben in dieser Datei:
-  Solange die Adresse niemanden erreicht, erreicht auch diese Einschränkung niemanden.
+- **Precondition:** someone follows the URL to verify the number next to the pricing date.
+- **Expected vs. actual:** the number is correct — $0.006/minute is exactly 360,000 micro-USD/hour. But the string
+  `whisper-1` does not appear on the page at all (checked in the markup on September 12, 2026: zero hits); the row
+  with this price is named "Whisper" and sits in the table's collapsed half. Searching for `whisper-1` only finds
+  `gpt-realtime-whisper`, a different model at a different price. The row for `gpt-transcribe` is open in the table.
+- **Why it stays open:** the page belongs to the provider. What this project can do is state the last step instead
+  of assuming it — recorded in a comment next to the number since round 13. Depends on item 24 above: as long as
+  the URL reaches nobody, this caveat reaches nobody either.
 
-### 30. Die Mindestdauer eines Modells ist eine dritte Längenschranke, die die Anzeige nicht kennt (niedrig)
+### 30. A model's minimum duration is a third length boundary the display does not know (low)
 
-- **Stelle:** `AssemblyAiAdapter.MIN_DURATION_MS` (160 ms) und `GroqAdapter.MIN_DURATION_MS` (10 ms) gegen
-  `MainViewModel.sourceTooLong` und `MainViewModel.estimatedCostMicrousd`.
-- **Voraussetzung:** Eine Quelle unter 160 ms bei AssemblyAI beziehungsweise unter 10 ms bei Groq. Die
-  Abschnittsplanung reicht sie als einen Abschnitt durch, weil `MIN_FINAL_CHUNK_DURATION_MS` nur bei mehr
-  als einem Abschnitt eingreift.
-- **Erwartet gegen tatsächlich:** Runde 13 hat die Kostenzeile daran gehindert, eine **zu lange** Quelle zu
-  bepreisen. Am anderen Ende gilt dasselbe nicht: Eine Quelle unter der Mindestdauer bekommt einen
-  winzigen Preis angezeigt, während die Übermittlung sie mit `INVALID_INPUT` ablehnen würde.
-- **Warum es offen bleibt:** Eine Quelle unter einer Zehntelsekunde ist für ein Transkriptionswerkzeug
-  praxisfremd, und die Behebung wäre eine dritte Bedingung in einer Regel, die „zu lang“ heißt — eine zu
-  kurze Quelle braucht eine andere Aussage, nicht dieselbe. Bewusst als Punkt notiert statt beiläufig
-  mitgefixt. Gefunden vom lesenden Reviewer in Runde 14.
+- **Location:** `AssemblyAiAdapter.MIN_DURATION_MS` (160ms) and `GroqAdapter.MIN_DURATION_MS` (10ms) vs.
+  `MainViewModel.sourceTooLong` and `MainViewModel.estimatedCostMicrousd`.
+- **Precondition:** a source under 160ms for AssemblyAI or under 10ms for Groq. Section planning passes it through
+  as a single section, since `MIN_FINAL_CHUNK_DURATION_MS` only applies with more than one section.
+- **Expected vs. actual:** round 13 stopped the cost line from pricing a source that is **too long**. The same does
+  not hold at the other end: a source under the minimum duration shows a tiny estimated price, while submission
+  would reject it with `INVALID_INPUT`.
+- **Why it stays open:** a source under a tenth of a second is unrealistic for a transcription tool, and the fix
+  would be a third condition inside a rule named "too long" — a too-short source needs a different statement, not
+  the same one. Deliberately recorded rather than fixed in passing. Found by the reading reviewer in round 14.
 
-### 31. Eine leere Fachbegriffsliste wird erst bei der Übermittlung abgelehnt — erledigt am 13. September 2026
+### 31. An empty term list was only rejected at submission — fixed September 13, 2026
 
-Aufgenommen in Runde 14, geschlossen in Runde 15, und weiter als beschrieben: Der Punkt nannte Listen aus
-lauter Leereinträgen, der Mechanismus traf aber jede Liste mit einem leeren Eintrag, auch eine gemischte wie
-`["Kubernetes", ""]` — und für die rechnete die Kostenzeile trotz der Runde-14-Korrektur den Zuschlag noch
-ein. Erreichbar blieb beides nur über einen gespeicherten oder übernommenen Auftrag, weil das Eingabefeld
-Leerzeilen beim Tippen entfernt. Die Regel steht jetzt einmal, in
-`core/src/main/kotlin/app/sourcescribe/core/ContextTerms.kt`, und jede Stelle, die über eine Liste
-entscheidet, fragt sie: beide Anbieterpfade, `SttStep.validate`, die Kostenformel in `SttStep` sowie
-`configError` und `estimatedCostMicrousd` in `MainViewModel`. Die Vorschau meldet `CONTEXT_TERM_BLANK` mit
-eigenem Text und zeigt keinen Preis. Die Vertragsänderung, die dieser Punkt für den richtigen Zug hielt —
-`configError` ruft die Adapterprüfung auf —, war nicht nötig: Eine gemeinsame Regel in `core` ersetzt die
-Kopien, statt eine weitere hinzuzufügen. Belegt durch
-`ViewRulesTest.aTermListTheProviderRefusesIsNamedAsAnErrorAndNotPriced` und zwei Zusicherungen in
-`SttStepTest.estimateCostCeilsMinimumAndAssemblyAddonsAndBlocksUnknownPrice`. Gefunden vom lesenden Reviewer
-in Runde 14, verbreitert vom Code-Reviewer in Runde 15.
+Raised in round 14, closed in round 15, and broader than described: the item named lists made entirely of blank
+entries, but the mechanism actually caught any list with one blank entry, including a mixed one like
+`["Kubernetes", ""]` — for which, despite the round-14 fix, the cost line still added the surcharge. Both were only
+reachable via a stored or resumed job, since the input field strips blank lines while typing. The rule now lives
+once, in `core/src/main/kotlin/app/sourcescribe/core/ContextTerms.kt`, and every site that decides about a list asks
+it: both provider paths, `SttStep.validate`, the cost formula in `SttStep`, and `configError` and
+`estimatedCostMicrousd` in `MainViewModel`. Covered by
+`ViewRulesTest.aTermListTheProviderRefusesIsNamedAsAnErrorAndNotPriced` and two assertions in
+`SttStepTest.estimateCostCeilsMinimumAndAssemblyAddonsAndBlocksUnknownPrice`. Round 17 additionally closed a related
+gap: a stored `[""]` list looked like an empty field while the preview still reported `CONTEXT_TERM_BLANK`; start
+now drops blank entries (`MainViewModel.configurationForStart` via `ContextTerms.withoutBlanks`), and both the error
+and cost lines judge the configuration that start actually builds. A job stored before round 17 still hits
+`CONTEXT_TERM_BLANK` at `SttStep.validate` even after a retry that reuses its stored configuration; "Prepare again"
+and a subsequent start create a job without blank entries.
 
-Runde 17 hat eine Lücke dahinter geschlossen: Eine gespeicherte Liste `[""]` zeigte sich als leeres Feld, und die
-Vorschau meldete `CONTEXT_TERM_BLANK`, ohne dass sich auf dem Bildschirm etwas entfernen ließ. Start lässt leere
-Einträge jetzt weg (`MainViewModel.configurationForStart` über `ContextTerms.withoutBlanks`), und Fehlerzeile wie
-Kostenzeile urteilen über die Konfiguration, die Start anlegt. Ein vor Runde 17 so gespeicherter Auftrag bleibt bei
-`SttStep.validate` mit `CONTEXT_TERM_BLANK` stehen, auch nach einer Wiederholung, die die gespeicherte Konfiguration
-übernimmt; „Neu vorbereiten“ und ein Start danach legen einen Auftrag ohne leere Einträge an.
+### 32. A green CI run does not show how many instrumentation tests were skipped (low)
 
-### 32. Ein grüner CI-Lauf zeigt nicht, wie viele Instrumentierungstests übersprungen wurden (niedrig)
+- **Location:** `.github/workflows/android.yml`, the step running `:app:connectedDebugAndroidTest` and
+  `:extractor:connectedDebugAndroidTest`, and its `cleanup()` function.
+- **Precondition:** a CI run that ends green.
+- **Expected vs. actual:** an instrumentation run ends green even when tests are skipped by assumption — without
+  `sourcescribeEngineUpdate` that is eighteen in the `extractor` module (see the instrumentation-test maintenance
+  note below). The workflow sets that flag, but a skip is not made visible: `cleanup()` only prints test reports on
+  failure, and there is no `upload-artifact` step. If a larger share of the suite silently shifts to skipped later,
+  say because a flag stops being passed through, CI stays green and the count only exists in files discarded with
+  the runner.
+- **Why it stays open:** the change would be small — a summary of `tests`, `failures`, `errors`, and `skipped` per
+  report, regardless of outcome — but it is not locally runnable, and a workflow step nobody has seen work would be
+  exactly the unverified claim this loop otherwise removes. Reported by the invariant reviewer in round 15; their
+  claim that `cleanup()` "never reads `<skipped>`" holds only for individual elements — on failure the script also
+  prints `root.attrib`, and whether a skip count lives there is unchecked against any real report.
 
-- **Stelle:** `.github/workflows/android.yml`, der Schritt mit `:app:connectedDebugAndroidTest` und
-  `:extractor:connectedDebugAndroidTest` und seine Funktion `cleanup()`.
-- **Voraussetzung:** Ein CI-Lauf, der grün endet.
-- **Erwartet gegen tatsächlich:** Ein Instrumentierungslauf endet grün, auch wenn Tests per Annahme
-  übersprungen werden — ohne `sourcescribeEngineUpdate` sind es im Modul `extractor` achtzehn, siehe den
-  Wartungshinweis zu Instrumentierungstests unten. Der Workflow setzt diese Flagge, aber sichtbar wird eine
-  Überspringung dort nicht: `cleanup()` gibt die Testberichte nur aus, wenn der Lauf gescheitert ist, und
-  einen `upload-artifact`-Schritt gibt es nicht. Kippt künftig ein größerer Teil der Suite unbemerkt ins
-  Überspringen, etwa weil eine Flagge nicht mehr durchgereicht wird, bleibt CI grün, und die Zahl steht nur
-  in Dateien, die mit dem Runner verworfen werden.
-- **Warum es offen bleibt:** Die Änderung wäre klein — eine Zusammenfassung von `tests`, `failures`,
-  `errors` und `skipped` je Bericht, unabhängig vom Ausgang —, aber nicht lokal ausführbar, und ein
-  Workflowschritt, dessen Wirkung niemand gesehen hat, wäre genau die ungeprüfte Behauptung, die diese
-  Schleife sonst abbaut. Gemeldet vom Invarianten-Reviewer in Runde 15. Seine Fassung, `cleanup()` lese
-  „nie `<skipped>`“, stimmt nur für die Elemente: Im Fehlerfall gibt das Skript auch `root.attrib` aus, und
-  ob darin eine Überspringzahl steht, ist an keinem echten Bericht geprüft.
+### 33. `setBackoffCriteria` on the acquisition job never engages (low, informational)
 
-### 33. `setBackoffCriteria` im Erfassungsauftrag greift nie (niedrig, informativ)
-
-- **Stelle:** `app/src/main/java/app/sourcescribe/data/JobCoordinator.kt`,
+- **Location:** `app/src/main/java/app/sourcescribe/data/JobCoordinator.kt`,
   `.setBackoffCriteria(BackoffPolicy.LINEAR, 30, TimeUnit.SECONDS)`.
-- **Voraussetzung:** Keine; die Zeile steht in jedem eingereihten Erfassungsauftrag.
-- **Erwartet gegen tatsächlich:** WorkManager wendet eine Rückzugsregel nach `Result.retry()` an. Kein
-  Worker gibt `Result.retry()` zurück — `git grep` findet es weder in `app/src/main` noch in
-  `extractor/src/main` —, und die App plant Wiederholungen selbst: `nextAt` in der Datenbank und frisches
-  Einreihen mit `setInitialDelay`. Die Zeile legt einen Mechanismus nahe, der hier nicht arbeitet.
-- **Warum es offen bleibt:** Ob WorkManager die Regel auch auf einen vom System gestoppten und neu
-  eingeplanten Worker anwendet, ist nicht am Gerät geprüft. Die Zeile zu entfernen könnte genau diesen Pfad
-  verändern, und ein ungemessenes Verhalten zu ändern wäre schlimmer als eine irreführende Zeile. Gemeldet
-  vom Invarianten-Reviewer in Runde 15.
+- **Precondition:** none; the line is in every enqueued acquisition job.
+- **Expected vs. actual:** WorkManager applies a backoff rule after `Result.retry()`. No worker ever returns
+  `Result.retry()` — `git grep` finds it in neither `app/src/main` nor `extractor/src/main` — the app schedules
+  retries itself via `nextAt` in the database and fresh enqueuing with `setInitialDelay`. The line suggests a
+  mechanism that does not operate here.
+- **Why it stays open:** whether WorkManager still applies the rule to a worker the system stopped and rescheduled
+  is unchecked on-device. Removing the line could change exactly that path, and changing unmeasured behavior would
+  be worse than a misleading line. Reported by the invariant reviewer in round 15.
 
-### 34. Der Lexer der Zahlenprüfung kennt keine Zeichenkette innerhalb eines String-Templates (niedrig, heute folgenlos)
+### 34. The number-check lexer does not understand a string inside a string template (low, harmless today)
 
-- **Stelle:** `codeOnly` in `core/src/test/kotlin/app/sourcescribe/core/StatedNumbersTest.kt`.
-- **Voraussetzung:** Ein String-Template, dessen Ausdruck selbst eine Zeichenkette enthält, und in dieser
-  inneren Zeichenkette ein Kommentar-Anfang, etwa `"${x ?: "/*"}"`.
-- **Erwartet gegen tatsächlich:** Der Lexer beendet die äußere Zeichenkette am ersten inneren
-  Anführungszeichen und liest den Inhalt der inneren als Code. Ein `/*` dort öffnet einen Kommentar, den es
-  nicht gibt, bis zum nächsten `*/` irgendwo dahinter; ein `//` verwirft den Rest der Zeile. Beides kann eine
-  echte Deklaration verschlucken, still, aus demselben Grund wie die zwei stillen Formen der Runde 15.
-- **Warum es offen bleibt:** Eine Suche nach Zeilen mit `${` und einem späteren Anführungszeichen findet im
-  Modul `core` 54, darunter Templates mit innerer Zeichenkette in `TranscriptExporter`, `ExtractorMetadata`
-  und `SyncTranscriptParser`, und in keiner steht `/*` oder `//`. Über den Baum liest der Lexer dieselben 33
-  Konstanten wie der Scanner davor, am Modell gemessen. Verschachtelte Templates zu modellieren hieße, einen
-  Stapel von Lexerzuständen zu führen — mehr Code, der selbst geprüft werden müsste, für einen Fall, den es
-  nicht gibt. Die Fassung der Runde 14 hatte denselben Fall schlechter: Ihr Blockkommentarmuster griff in
-  jeder Zeichenkette, nicht nur in Templates. Selbst gefunden beim Nachfragen, was die Korrektur der
-  Runde 15 nicht kann.
-- **Nachtrag aus Runde 16, die zweite Richtung:** Derselbe Fehler kann eine Deklaration auch erfinden. Endet
-  die äußere Zeichenkette am öffnenden Anführungszeichen der inneren, beginnt am schließenden eine neue, die
-  erst am nächsten echten Anführungszeichen endet, und was zwischen beiden steht, liest der Lexer als Code.
-  Stünde dort `; const val FAKE = 1`, fände `DECLARATION` eine Konstante, die es nicht gibt, ganz ohne `/*`
-  oder `//`. Diese Richtung wäre laut, weil der Vergleich am Baum an einem Namen scheitert, der in der Liste
-  fehlt. Der Code-Reviewer der Runde 16 hat den Ablauf am Code von Hand nachgerechnet, nicht ausgeführt.
-  Nachgezählt am 13. September 2026: `grep -rnoE '\$\{[^}]*"[^}]*\}' core/src/main/kotlin` findet 16 Templates
-  mit innerer Zeichenkette, vor und nach den Änderungen der Runde 16 gleich viele, und in keinem steht mehr
-  als ein kurzes Wort wie `unknown`, `WORD` oder `;hls-vtt-assembled`.
+- **Location:** `codeOnly` in `core/src/test/kotlin/app/sourcescribe/core/StatedNumbersTest.kt`.
+- **Precondition:** a string template whose expression itself contains a string, and inside that inner string a
+  comment opener, e.g. `"${x ?: "/*"}"`.
+- **Expected vs. actual:** the lexer ends the outer string at the first inner quote and reads the inner string's
+  contents as code. A `/*` there opens a comment that does not exist, up to the next `*/` anywhere after it; a `//`
+  discards the rest of the line. Either can silently swallow a real declaration, the same way as the two silent
+  forms round 15 closed.
+- **Why it stays open:** a search for lines with `${` and a later quote finds 54 in the `core` module, including
+  templates with an inner string in `TranscriptExporter`, `ExtractorMetadata`, and `SyncTranscriptParser`, and none
+  contain `/*` or `//`. Across the tree the lexer reads the same 33 constants as the scanner before it, measured
+  against the model. Modeling nested templates would mean tracking a stack of lexer states — more code that would
+  itself need checking, for a case that does not exist. Round 14's version had the same case worse: its
+  block-comment pattern fired inside any string, not only templates. Found while asking what round 15's correction
+  cannot do.
+- **Addendum from round 16, the other direction:** the same bug can also fabricate a declaration. If the outer
+  string ends at the inner string's opening quote, a new one begins at its closing quote and runs to the next real
+  quote, and whatever sits between the two is read as code. `; const val FAKE = 1` there would make `DECLARATION`
+  find a constant that does not exist, with no `/*` or `//` needed. This direction would be loud, since the tree
+  comparison would fail on a name missing from the list. The round-16 code reviewer traced this by hand against the
+  code, not by executing it. Recounted on September 13, 2026:
+  `grep -rnoE '\$\{[^}]*"[^}]*\}' core/src/main/kotlin` finds 16 templates with an inner string, the same count
+  before and after round 16's changes, none containing more than a short word like `unknown`, `WORD`, or
+  `;hls-vtt-assembled`.
 
-### 35. Die Zeilengrenzen auf zwei Bildschirmen sind nur zum Teil am Gerät gemessen (niedrig)
+### 35. Line-wrapping limits on two screens are only partly measured on-device (low)
 
-- **Stelle:** Kostenzeile in `NewSourceScreen.kt`, seit `579f972` ein `ReservedText` mit der Höhe des höchsten
-  ihrer Texte; Fehlerzeile der Vorschau in `NewSourceScreen.kt`, Wartezeit und Bytezähler in `HistoryScreen.kt`
-  (`ReservedText`).
-- **Gemessen:** Vor `579f972` schnitt die Kostenzeile bei 200 % Schrift ab, im Englischen das Tarifdatum zur Hälfte,
-  im Deutschen ganz (`emulator-5556`, 1080 × 2424 px, 420 dpi).
-  Nachgemessen am 14. September auf dem Stand von `39a1cdc`, jedes Mal ganz innerhalb des scrollenden Formulars: In
-  beiden Sprachen ist die Zeile bei Schriftgröße 1.0 und 1.3 zweizeilig, 84 und 110 px hoch, bei 2.0 dreizeilig und
-  252 px hoch, und auf allen sechs Bildschirmfotos steht ihr Text vollständig, das Tarifdatum eingeschlossen.
-  Gemessen ist nur `estimated_cost`, nicht `cost_source_too_long` und nicht `price_unknown`.
-- **Nicht gemessen:** ob die Platzhalter der Verlaufskarte (`LONGEST_ELAPSED`, `LONGEST_BYTE_SIZE`) die höchsten
-  Fälle sind, und die Fehlerzeile der Vorschau bei 200 % Schrift.
-- **Eine Messfalle:** uiautomator meldet von einem Knoten nur den sichtbaren Teil. Auf `8e41bf4` lag die Kostenzeile
-  bei 130 % im Englischen und bei 200 % im Deutschen zum Teil unter der Navigationsleiste und maß weniger, als sie
-  hoch ist. Eine Messung gilt erst, wenn die Zeile ganz innerhalb des scrollenden Formulars liegt.
-- **Warum es offen bleibt:** Es fehlt ein Compose-UI-Test, der über `onTextLayout` Zeilenzahl und Abschneiden prüft;
-  er wäre der bessere Weg, weil er bleibt. Vorschlag des Code-Reviewers in Runde 15.
+- **Location:** cost line in `NewSourceScreen.kt`, since `579f972` a `ReservedText` sized to its tallest text;
+  preview error line in `NewSourceScreen.kt`; elapsed time and byte count in `HistoryScreen.kt` (`ReservedText`).
+- **Measured:** before `579f972`, the cost line clipped at 200% font — the pricing date halfway in English, entirely
+  in German (`emulator-5556`, 1080×2424px, 420dpi). Remeasured on September 14 at `39a1cdc`, each time fully inside
+  the scrolling form: in both languages the line wraps to two lines at font scale 1.0 and 1.3 (84px and 110px tall)
+  and three lines at 2.0 (252px), with the full text, pricing date included, visible in all six screenshots. Only
+  `estimated_cost` is measured, not `cost_source_too_long` or `price_unknown`.
+- **Not measured:** whether the history card's placeholders (`LONGEST_ELAPSED`, `LONGEST_BYTE_SIZE`) are actually
+  the tallest cases, and the preview error line at 200% font.
+- **A measurement trap:** uiautomator reports only a node's visible portion. On `8e41bf4` the cost line sat partly
+  under the navigation bar at 130% (English) and 200% (German) and measured shorter than it actually was. A
+  measurement only counts once the line sits fully inside the scrolling form.
+- **Why it stays open:** a Compose UI test using `onTextLayout` to check line count and clipping is missing; it
+  would be the better approach because it persists. Proposed by the round-15 code reviewer.
 
-### 36. Die Fehlerzeile der Vorschau erscheint und verschwindet (niedrig)
+### 36. The preview's error line appears and disappears (low)
 
-- **Stelle:** `PreviewCard` in `NewSourceScreen.kt`, der Zweig unter der Kostenzeile.
-- **Voraussetzung:** Eine Vorschau, deren Einstellungen erst unvollständig und dann vollständig sind, oder
-  eine Quelle, die länger ist als die Grenze des Auftrags.
-- **Ablauf:** Anbieter, Modell und Schlüssel wählen. Solange etwas fehlt, steht die Fehlerzeile da; sobald
-  nichts mehr fehlt, verschwindet sie, und der Startknopf unter der Karte rückt um ihre Höhe nach oben —
-  der Knopf, den man als Nächstes antippt. Die Längenwarnung (`SOURCE_LONGER_THAN_LIMIT`) ersetzt die Zeile
-  durch einen Satz mit eigenem Knopf und anderer Höhe.
-- **Erwartet gegen tatsächlich:** Erwartet ist, dass sich unter der Karte nichts bewegt. Seit Runde 15
-  bewegt sich nichts mehr, wenn ein Fehlertext einen anderen ablöst; beim Erscheinen und Verschwinden
-  ändert die Karte ihre Höhe weiterhin.
-- **Warum es offen bleibt:** Die Höhe auch ohne Fehler freizuhalten, ließe im häufigsten Zustand eine
-  leere Fläche von der Höhe des längsten Fehlertextes stehen. Ein Vorschlag wäre, den Platz im gültigen
-  Zustand mit einem kurzen Satz wie „Diese Quelle ist startklar“ zu füllen und die Längenwarnung in
-  dieselbe reservierte Höhe zu legen. Das ist eine Gestaltungsentscheidung und keine Korrektur, deshalb
-  nicht eigenmächtig getroffen. Gefunden in Runde 15 beim Umbau der Zeile.
+- **Location:** `PreviewCard` in `NewSourceScreen.kt`, the branch below the cost line.
+- **Precondition:** a preview whose settings go from incomplete to complete, or a source longer than the job limit.
+- **Flow:** choosing provider, model, and key. While anything is missing, the error line is shown; once nothing is
+  missing, it disappears and the start button below the card shifts up by its height — the button tapped next. The
+  length warning (`SOURCE_LONGER_THAN_LIMIT`) replaces the line with a sentence with its own button and different
+  height.
+- **Expected vs. actual:** expected is that nothing below the card moves. Since round 15, nothing moves when one
+  error text replaces another; the card's height still changes on appearing and disappearing.
+- **Why it stays open:** reserving the height even without an error would leave an empty area the size of the
+  longest error text in the most common state. A proposal: fill that space in the valid state with a short sentence
+  like "This source is ready to start," and give the length warning the same reserved height. That is a design
+  decision, not a fix, so it was not made unilaterally. Found in round 15 while rebuilding the line.
 
-### 37. Zurück zu einer älteren Engine warnt, sperrt aber nichts (niedrig)
+### 37. Rolling back to an older engine warns but blocks nothing (low)
 
-- **Stelle:** `EngineUpdateManager.rollbackTarget` und `rollback(expectedId)` in
-  `extractor/src/main/java/app/sourcescribe/extractor/EngineUpdateManager.kt`, die Bestätigung über
-  `MainViewModel.prepareRollback` in `SettingsScreen.kt`. Vorgabe in `docs/SECURITY_UPDATES.md`, Abschnitt S7:
-  „Rollback auf bekannte Sicherheitslücken warnend kennzeichnen und ggf. sperren.“
-- **Voraussetzung:** Eine aktualisierte Engine ist aktiv, und eine frühere gesunde oder die gebündelte ist da.
-- **Stand seit Runde 16:** Bis dahin stellte ein einzelner Tap um, ohne jeden Hinweis; gemeldet hat das der
-  Invarianten-Reviewer der Runde 16 als mittleren Fund. Jetzt öffnet der Knopf eine Bestätigung, die nennt,
-  welche Version wieder aktiv würde, und sagt, dass eine ältere Version Lücken enthalten kann, die eine
-  spätere schon schließt, und dass SourceScribe das nicht prüft. Umgestellt wird nur auf die genannte
-  Installation: Hat sich das Ziel seit dem Öffnen geändert, endet `rollback` mit `ROLLBACK_TARGET_CHANGED`
-  (in der App `ENGINE_ROLLBACK_TARGET_CHANGED`) und stellt nichts um.
-- **Was fehlt:** Das Wissen, welche Version eine bekannte Lücke hat. Im Baum gibt es dafür nichts, weder eine
-  Mindestversion noch eine Liste betroffener Versionen; gesucht am 13. September 2026 nach `CVE-`,
-  `vulnerab`, `blocklist`, `denylist`, `minVersion` und `Sicherheitslück`. Also gibt es nichts, woran sich
-  eine Sperre halten könnte. Eine Liste im App-Code wäre mit der nächsten bekannt gewordenen Lücke veraltet;
-  es bräuchte ein signiertes Feld im Engine-Paket, und das ist eine Entscheidung über das Updateformat, nicht
-  über diesen Knopf.
+- **Location:** `EngineUpdateManager.rollbackTarget` and `rollback(expectedId)` in
+  `extractor/src/main/java/app/sourcescribe/extractor/EngineUpdateManager.kt`, confirmed via
+  `MainViewModel.prepareRollback` in `SettingsScreen.kt`. Required by `docs/SECURITY_UPDATES.md`, section S7: "flag
+  rollback to known security holes as a warning and block it where applicable."
+- **Precondition:** an updated engine is active, and an earlier healthy or the bundled one is available.
+- **Status since round 16:** until then, a single tap switched with no warning at all, reported as a medium finding
+  by the round-16 invariant reviewer. Now the button opens a confirmation naming the version that would become
+  active again, stating that an older version can contain vulnerabilities a later one already closes, and that
+  SourceScribe does not check for that. Only the named installation is switched to: if the target changed since
+  opening, `rollback` ends with `ROLLBACK_TARGET_CHANGED` (`ENGINE_ROLLBACK_TARGET_CHANGED` in the app) and switches
+  nothing.
+- **Missing:** knowledge of which version has a known hole. Nothing in the tree carries that — no minimum version,
+  no list of affected versions; searched on September 13, 2026 for `CVE-`, `vulnerab`, `blocklist`, `denylist`,
+  `minVersion`, and the German term for "security hole." So there is nothing for a block to check against. A list
+  in app code would be outdated by the next disclosed vulnerability; this needs a signed field in the engine
+  package, which is a decision about the update format, not about this button.
 
-### 38. Dass jede Änderung des Entwurfs über `withDraft` geht, ist eine Absprache, keine Schranke (niedrig, heute folgenlos)
+### 38. That every draft change goes through `withDraft` is a convention, not a barrier (low, harmless today)
 
-- **Stelle:** `ScreenState.draft` und `withDraft` in `app/src/main/java/app/sourcescribe/MainViewModel.kt`,
+- **Location:** `ScreenState.draft` and `withDraft` in `app/src/main/java/app/sourcescribe/MainViewModel.kt`,
   `DraftTextField` in `app/src/main/java/app/sourcescribe/ui/NewSourceScreen.kt`.
-- **Voraussetzung:** Eine künftige Stelle im View-Model setzt den Entwurf mit `copy(draft = …)` statt über
+- **Precondition:** a future call site in the view model sets the draft with `copy(draft = …)` instead of via
   `withDraft`.
-- **Erwartet gegen tatsächlich:** Ein Textfeld der Auftragseinstellungen zeigt seinen getippten Text nur,
-  solange die Epoche seiner Einstellung dieselbe ist, und `withDraft` rückt die Epoche jeder Einstellung
-  weiter, die eine Änderung verschiebt. Eine Änderung an `withDraft` vorbei rückt nichts weiter. Ein Feld, in
-  das zuvor getippt wurde, zeigt dann weiter den alten Text über einem Entwurf, der ihn nicht mehr enthält —
-  der Fehler, den die Epochen in Runde 16 geschlossen haben.
-- **Warum es offen bleibt:** Heute schreiben acht Stellen den Entwurf, alle über `withDraft`: `inspect`,
-  `selectTrack`, `startPreviews`, `clearPreview`, `changeDraft`, `importAudio`, `prepareAgain` und
-  `deleteCredential`. Eine Suche nach `draft =` außerhalb von `withDraft` findet nichts. `ViewModelStateTest`
-  prüft die Epochen beim Tippen, bei einer Voreinstellung, bei der Spurwahl, beim Schließen der Vorschau und
-  bei „Neu vorbereiten“, nicht aber einzeln für `inspect`, `startPreviews`, `importAudio` und
-  `deleteCredential`. Eine Schranke wäre eine Klasse für Entwurf und Epochen mit privatem Konstruktor, deren
-  einzige Änderung beide zugleich fortschreibt. Das berührt jede Stelle, die `ScreenState(draft = …)` baut,
-  darunter viele Tests, und ist deshalb nicht in derselben Runde gemacht worden wie die Epochen selbst.
+- **Expected vs. actual:** a job-settings text field shows its typed text only while its setting's epoch matches,
+  and `withDraft` advances the epoch of any setting a change displaces. A change bypassing `withDraft` advances
+  nothing, so a previously typed field would keep showing stale text over a draft that no longer contains it — the
+  bug the epochs closed in round 16.
+- **Why it stays open:** today eight call sites write the draft, all through `withDraft`: `inspect`, `selectTrack`,
+  `startPreviews`, `clearPreview`, `changeDraft`, `importAudio`, `prepareAgain`, and `deleteCredential`. A search for
+  `draft =` outside `withDraft` finds nothing. `ViewModelStateTest` checks epochs on typing, on a preset, on track
+  selection, on closing the preview, and on "Prepare again," but not individually for `inspect`, `startPreviews`,
+  `importAudio`, and `deleteCredential`. A real barrier would be a class for draft-plus-epochs with a private
+  constructor whose only mutator advances both together. That touches every site that builds
+  `ScreenState(draft = …)`, tests included, and was therefore not done in the same round as the epochs themselves.
 
-### 39. Die Wartezeit im Verlauf reserviert Platz für höchstens dreistellige Stunden (niedrig)
+### 39. History's elapsed-time display reserves space for at most three-digit hours (low)
 
-- **Stelle:** `LONGEST_ELAPSED = "000:00:00"` in `app/src/main/java/app/sourcescribe/ui/HistoryScreen.kt`
-  gegen `duration` in `app/src/main/java/app/sourcescribe/ui/Labels.kt`.
-- **Voraussetzung:** Ein Auftrag steht 1000 Stunden oder länger, also gut 41 Tage, auf `WAITING_REMOTE`.
-- **Erwartet gegen tatsächlich:** `duration` begrenzt die Stunden nicht, ab 1000 Stunden steht dort
-  `1000:00:00`, ein Zeichen breiter als der Platzhalter. `ReservedText` schneidet nichts ab und misst den
-  gezeigten Text mit. Höher wird die Karte also nur, wenn dieses eine Zeichen eine neue Zeile braucht, und
-  dann einmal, beim Übergang. Der Code-Reviewer der Runde 16 hat den Fall berechnet und dabei „11 Zeichen“
-  geschrieben; es sind 10 gegen 9.
-- **Warum es offen bleibt:** Ein breiterer Platzhalter verschiebt die Grenze nur, bei vier Stellen auf gut
-  416 Tage, und kann bei großer Schrift eine Zeile reservieren, die im Regelfall leer bleibt. Ob ein Anbieter
-  einen Auftrag so lange offen hält, ist nicht geprüft.
+- **Location:** `LONGEST_ELAPSED = "000:00:00"` in `app/src/main/java/app/sourcescribe/ui/HistoryScreen.kt` vs.
+  `duration` in `app/src/main/java/app/sourcescribe/ui/Labels.kt`.
+- **Precondition:** a job sits on `WAITING_REMOTE` for 1000 hours or more (about 41 days).
+- **Expected vs. actual:** `duration` does not cap the hours; from 1000 hours it shows `1000:00:00`, one character
+  wider than the placeholder. `ReservedText` truncates nothing and measures the shown text, so the card only grows
+  taller if that one character needs a new line, and only once, at the transition. (The round-16 code reviewer
+  computed this case and wrote "11 characters"; it is 10 against 9.)
+- **Why it stays open:** a wider placeholder only moves the boundary — to about 416 days at four digits — and could
+  reserve a line that stays empty in the normal case at large font sizes. Whether any provider keeps a job open that
+  long is unchecked.
 
-### 40. Zwischen Prüfsumme und Start einer Engine liegt ein kurzes Fenster (niedrig, Restrisiko aus S1)
+### 40. A short window sits between checksum and start of an engine (low, residual risk from S1)
 
-- **Stelle:** `EngineUpdateManager.file` in
-  `extractor/src/main/java/app/sourcescribe/extractor/EngineUpdateManager.kt` prüft bei jedem Aufruf über
-  `validSlot` den SHA-256 des Slots. Gestartet wird die Datei danach in `NativeRuntime`.
-- **Voraussetzung:** Ein Prozess, der mit der UID der App schreiben darf, ersetzt die Datei genau zwischen
-  Prüfung und Start.
-- **Warum es offen bleibt:** Wer mit derselben UID schreibt, braucht dieses Fenster nicht, er kann App-Daten
-  und Slots ohnehin ändern. `docs/SECURITY_UPDATES.md` nennt genau das in S1 als akzeptiertes Restrisiko: Ein
-  Prozess mit eigener PID, aber derselben Android-UID bleibt im selben Vertrauensbereich. Einen Weg darüber
-  hinaus hat niemand gezeigt; der Invarianten-Reviewer der Runde 16 hat den Punkt selbst als spekulativ
-  eingestuft.
+- **Location:** `EngineUpdateManager.file` in `extractor/src/main/java/app/sourcescribe/extractor/EngineUpdateManager.kt`
+  checks the slot's SHA-256 via `validSlot` on every call; the file is started afterward in `NativeRuntime`.
+- **Precondition:** a process able to write with the app's UID replaces the file exactly between check and start.
+- **Why it stays open:** anyone writing with the same UID does not need this window — they can already change app
+  data and slots directly. `docs/SECURITY_UPDATES.md` names exactly this in S1 as an accepted residual risk: a
+  process with its own PID but the same Android UID stays inside the same trust boundary. Nobody has shown a path
+  beyond that; the round-16 invariant reviewer classified the point itself as speculative.
 
-### 41. `youtube-nocookie.com` wird nicht als YouTube-Quelle erkannt (niedrig, sichere Richtung)
+### 41. `youtube-nocookie.com` is not recognized as a YouTube source (low, safe direction)
 
-- **Stelle:** `youtubeHosts` in `core/src/main/kotlin/app/sourcescribe/core/SourceResolver.kt`, geprüft in
+- **Location:** `youtubeHosts` in `core/src/main/kotlin/app/sourcescribe/core/SourceResolver.kt`, checked in
   `SourceResolver.youtube`.
-- **Voraussetzung:** Ein Link der Form `https://www.youtube-nocookie.com/embed/<id>`.
-- **Erwartet gegen tatsächlich:** Die Einbettungsadresse wird mit `INVALID_HOST` abgelehnt, während
-  `youtube.com/embed/<id>` angenommen wird. Nichts wird falsch verarbeitet, der Link wird nur nicht
-  angenommen.
-- **Warum es offen bleibt:** Nicht verlangt und nicht ohne einen Test für genau diese Form aufzunehmen, der
-  auch zeigt, dass die kanonische Adresse dieselbe bleibt. Gefunden vom Invarianten-Reviewer der Runde 16.
+- **Precondition:** a link of the form `https://www.youtube-nocookie.com/embed/<id>`.
+- **Expected vs. actual:** the embed address is rejected with `INVALID_HOST`, while `youtube.com/embed/<id>` is
+  accepted. Nothing is processed incorrectly; the link is simply not accepted.
+- **Why it stays open:** not requested, and not worth adding without a test for exactly this form that also shows
+  the canonical address stays the same. Found by the round-16 invariant reviewer.
 
-### 42. Geteilte Exporte bleiben im Cache liegen (niedrig, Hygiene)
+### 42. Shared exports remain in the cache (low, hygiene)
 
-- **Stelle:** `shareArtifact` und `shareDiagnostics` in `app/src/main/java/app/sourcescribe/MainViewModel.kt`
-  schreiben nach `cacheDir/shares/`.
-- **Erwartet gegen tatsächlich:** Die Datei bleibt nach dem Teilen liegen, bis Android den Cache räumt, auch
-  ein vollständiges Transkript. Der Ordner liegt im app-privaten Cache; ein neuer Abflussweg entsteht dadurch
-  nicht.
-- **Warum es offen bleibt:** Wann die empfangende App die Datei gelesen hat, erfährt SourceScribe nicht.
-  Löschen beim nächsten Teilen oder beim Start der App kann einer App die Datei entziehen, die sie erst später
-  liest; denkbar, nicht geprüft, etwa bei einem Mailentwurf. Eine Frist wäre möglich, jede Zahl dafür aber
-  geraten. Gefunden vom Invarianten-Reviewer der Runde 16.
+- **Location:** `shareArtifact` and `shareDiagnostics` in `app/src/main/java/app/sourcescribe/MainViewModel.kt` write
+  to `cacheDir/shares/`.
+- **Expected vs. actual:** the file stays after sharing until Android clears the cache, including a full transcript.
+  The folder is inside the app-private cache; this creates no new exposure path.
+- **Why it stays open:** SourceScribe never learns when the receiving app has read the file. Deleting on the next
+  share or at app start could take the file away from an app that reads it only later, say a draft email — plausible
+  but unverified. A time limit is possible, but any number for it would be a guess. Found by the round-16 invariant
+  reviewer.
 
-### 43. Scheitert ein Update nach dem Räumen, bleibt die entfernte Installation entfernt (niedrig)
+### 43. If an update fails after cleanup, the removed installation stays removed (low)
 
-- **Stelle:** `EngineUpdateManager.stage` in
-  `extractor/src/main/java/app/sourcescribe/extractor/EngineUpdateManager.kt`: `materializeSlot` räumt, danach läuft
-  `verifyRuntimeCompatibility`.
-- **Ablauf:** Geräumt wird erst nach Download und Signaturprüfung, aber vor dem Selbsttest der Laufzeit. Besteht die
-  neue Engine ihn nicht, ist der neue Slot fort und der geräumte ebenso.
-- **Warum es offen bleibt:** Den Selbsttest vor dem Räumen laufen zu lassen hieße, eine Datei außerhalb ihres
-  Hash-Slots auszuführen, und `file()` erlaubt das bewusst nicht. Geräumt wird ohnehin nur eine Installation, auf die
-  nichts verweist ([ADR 0009](adr/0009-engine-slot-cleanup.md)). Aufgenommen in Runde 17.
+- **Location:** `EngineUpdateManager.stage` in `extractor/src/main/java/app/sourcescribe/extractor/EngineUpdateManager.kt`:
+  `materializeSlot` cleans up, then `verifyRuntimeCompatibility` runs.
+- **Flow:** cleanup happens only after download and signature verification, but before the runtime self-test. If the
+  new engine fails it, the new slot is gone and so is the cleaned-up one.
+- **Why it stays open:** running the self-test before cleanup would mean executing a file outside its hash slot,
+  which `file()` deliberately disallows. Only an installation nothing references is ever cleaned up anyway
+  ([ADR 0009](adr/0009-engine-slot-cleanup.md)). Raised in round 17.
 
-### 44. `ENGINE_SLOTS_IN_USE` nennt auch dort einen Update-Schritt, wo niemand aktualisiert (niedrig)
+### 44. `ENGINE_SLOTS_IN_USE` names an update step even where nobody is updating (low)
 
-- **Stelle:** `stepText` in `app/src/main/java/app/sourcescribe/ui/Labels.kt`, das jedem Code mit dem Präfix `ENGINE_`
-  „Beim Aktualisieren der Extraktionskomponente“ voranstellt.
-- **Ablauf:** Findet die gebündelte Engine nach einem App-Update keinen Platz, endet mit diesem Code jeder Aufruf des
-  Managers, der zuerst `ensureBundledLocked` durchläuft, darunter Vorschau, Start und ein Auftrag, der seine Engine
-  sucht, und die Anzeige nennt den Update-Schritt.
-  Aktualisiert hat der Nutzer nichts; die App hat ihre mitgelieferte Engine eingerichtet.
-- **Warum es offen bleibt:** Der Satz danach stimmt, nur der Schritt ist ungenau, und der Fall setzt voraus, dass
-  unfertige Aufträge an mindestens drei Engines gebunden sind, die weder aktiv noch vorherig sind. Aufgenommen in
-  Runde 17.
+- **Location:** `stepText` in `app/src/main/java/app/sourcescribe/ui/Labels.kt`, which prefixes every code with the
+  `ENGINE_` prefix with "While updating the extraction component."
+- **Flow:** if the bundled engine finds no room after an app update, every caller of the manager that first runs
+  `ensureBundledLocked` — preview, start, and a job looking up its engine — ends with this code, and the display
+  names the update step, even though the user updated nothing; the app was setting up its own bundled engine.
+- **Why it stays open:** the sentence after it is correct, only the step name is wrong, and the case requires
+  unfinished jobs bound to at least three engines that are neither active nor previous. Raised in round 17.
 
-### 45. Der STT-Schreiber von `ArtifactRow.complete` hat keinen eigenen Test (niedrig, heute folgenlos)
+### 45. `ArtifactRow.complete`'s STT writer has no dedicated test (low, harmless today)
 
-- **Stelle:** `app/src/main/java/app/sourcescribe/data/SttStep.kt`, `complete = document.scope.confirmedComplete`.
-- **Warum es offen bleibt:** Der Unterschied zu `technicallyComplete` zeigt sich nur an einem Umfang mit gesetztem
-  Flag und fehlendem Abschnitt, und den erzeugt der STT-Zweig nicht; ein Test müsste ihn am Normalisieren vorbei in
-  den Speicherschritt schieben. Die beiden Schreiber in `JobCoordinator` sind belegt
-  (`AppPipelineTest.aResultWithAMissingChunkIsStoredAsPartialByBothArtifactWriters`), die Gegenprobe dazu steht in
-  STATUS unter Runde 17. Aufgenommen in Runde 17.
+- **Location:** `app/src/main/java/app/sourcescribe/data/SttStep.kt`, `complete = document.scope.confirmedComplete`.
+- **Why it stays open:** the difference from `technicallyComplete` only shows with a scope whose flag is set and a
+  section missing, and the STT branch never produces that; a test would have to push it past normalization straight
+  into the storage step. `JobCoordinator`'s two writers are covered
+  (`AppPipelineTest.aResultWithAMissingChunkIsStoredAsPartialByBothArtifactWriters`); the counter-check is recorded
+  in STATUS under round 17. Raised in round 17.
 
-### 46. Zwei Grenzfälle der Umstellung auf die neu gebündelte Engine (niedrig)
+### 46. Two edge cases in switching to a newly bundled engine (low)
 
-- **Stelle:** `EngineUpdateManager.ensureBundledLocked`, der Zweig für eine neu gebündelte Engine;
+- **Location:** `EngineUpdateManager.ensureBundledLocked`, the branch for a newly bundled engine;
   [ADR 0010](adr/0010-bundled-engine-after-app-update.md).
-- **(a) Eine schon geladene Version kommt gebündelt wieder.** Hatte jemand genau die Version, die ein App-Update
-  mitbringt, vorher als Update geladen und war danach zur alten gebündelten zurückgegangen, stellt das App-Update
-  trotzdem auf sie um, weil ihr Eintrag bis dahin nicht als gebündelt markiert war.
-- **(b) Eine dritte Engine verliert ihren Platz als vorherige.** Jemand aktiviert eine geladene Engine D und geht zur
-  gebündelten A zurück; D ist jetzt die vorherige. Bringt ein App-Update die gebündelte Engine C, wird C aktiv und A
-  die vorherige. D ist danach über „Zur vorherigen Engine“ nicht mehr zu erreichen. Sie steht weiter in der Liste
-  der Einstellungen, die aber nur anzeigt, und eine Aktualisierung bietet nur das neueste Release des Kanals an.
-  Beim Räumen kann sie weichen, weil nichts sie mehr schützt. Gemeldet vom Code-Reviewer der Runde 18, der es als
-  mittel einstufte.
-- **Warum niedrig und offen:** Jede Aktivierung von Hand verdrängt die vorherige Engine auf dieselbe Weise; der Weg
-  zurück reicht in diesem Modell genau einen Schritt, und das App-Update ist selbst eine ausdrückliche Handlung. Eine
-  beliebige installierte Engine gezielt zu aktivieren wäre eine neue Funktion mit derselben Bestätigung wie der
-  Rollback (S7), keine Korrektur der Umstellung, und ist deshalb eine Frage an den Nutzer. Für (b) fehlt ein Test;
-  `anAppUpdateMakesItsBundledEngineActiveOnceAndKeepsTheOldOneAsTheWayBack` setzt nie eine vorherige Engine.
+- **(a) An already-loaded version comes back bundled.** If someone had loaded, as an update, exactly the version an
+  app update now bundles, and had since reverted to the old bundled one, the app update still switches to it,
+  because its entry was never marked bundled.
+- **(b) A third engine loses its place as "previous."** Someone activates a loaded engine D and reverts to bundled
+  A; D is now "previous." An app update brings bundled engine C; C becomes active and A becomes previous. D is then
+  no longer reachable via "Revert to previous engine." It still lists in settings, which is display-only, and an
+  update only offers the channel's newest release. It can be cleared up during cleanup, since nothing protects it
+  anymore. Reported by the round-18 code reviewer, who rated it medium.
+- **Why low and open:** any manual activation displaces the previous engine the same way; in this model the way back
+  reaches exactly one step, and the app update is itself an explicit action. Activating any installed engine
+  directly would be a new feature with the same confirmation as rollback (S7), not a fix to the switch-over, and is
+  therefore a question for the user. (b) has no test yet;
+  `anAppUpdateMakesItsBundledEngineActiveOnceAndKeepsTheOldOneAsTheWayBack` never sets a previous engine.
 
-### 47. Eine aktivierte Engine wird nach einem App-Update nicht neu gegen die Laufzeit geprüft (niedrig, unbestätigt)
+### 47. An activated engine is not re-checked against the runtime after an app update (low, unverified)
 
-- **Stelle:** `EngineUpdateManager.active`; `verifyRuntimeCompatibility` läuft nur in `stage`, `activate` und
+- **Location:** `EngineUpdateManager.active`; `verifyRuntimeCompatibility` only runs in `stage`, `activate`, and
   `ensureBundledLocked`.
-- **Voraussetzung:** Eine selbst aktivierte heruntergeladene Engine und ein App-Update, das Python oder die
-  JavaScript-Laufzeit ändert.
-- **Unbestätigt:** Ob eine yt-dlp-Version mit einer neueren gebündelten Laufzeit tatsächlich scheitert, ist nicht
-  geprüft; yt-dlp unterstützt mehrere Python-Versionen. Scheitert sie, zeigen es die Extraktionsfehler, und
-  „Zur vorherigen Engine“ oder ein Update hilft. Zum Schließen: `active()` prüft nach einem Versionswechsel der App
-  einmal die Laufzeit, mit Test. Aufgenommen in Runde 17.
+- **Precondition:** a manually activated, downloaded engine and an app update that changes Python or the JavaScript
+  runtime.
+- **Unverified:** whether a yt-dlp version actually fails against a newer bundled runtime — yt-dlp supports multiple
+  Python versions. If it fails, extraction errors would show it, and "Revert to previous engine" or an update helps.
+  To close: have `active()` check the runtime once after an app version change, with a test. Raised in round 17.
 
-### 48. `stage` fragt die Referenzen vor dem Download und beim Räumen getrennt (niedrig)
+### 48. `stage` checks references separately before download and during cleanup (low)
 
-- **Stelle:** `EngineUpdateManager.stage`: `ensureRoomLocked(update.sha256, remove = false)` vor dem Download,
-  `materializeSlot` mit `ensureRoomLocked(installation.id, remove = true)` danach. `JobCoordinator.retry` gibt einem
-  Versuch „Nur Fehlendes“ die Engine seines Vorgängers, ohne den Manager zu fragen.
-- **Voraussetzung:** Fünf belegte Slots, von denen genau eine Installation entbehrlich ist, und ein Auftrag mit
-  Teilergebnis, dessen letzter STT-Versuch an genau diese gebunden war.
-- **Ablauf:** Der Trockenlauf findet Platz. Während des gedrosselten Downloads, 64 KiB je Sekunde, entsteht für diesen
-  Auftrag ein Versuch „Nur Fehlendes“. Er ist unfertig und hält die Engine seines Vorgängers, das Räumen nach dem
-  Download findet keinen Platz mehr, `stage` endet mit `SLOTS_IN_USE`, der geprüfte Download ist verworfen, und
-  entfernt ist nichts.
-- **Warum es heute kaum eintritt:** Update und Wiederholung laufen beide über `MainViewModel.action`, dessen Sperre
-  eine Aktion zurzeit zulässt, und `stageAndActivate` hält sie über den ganzen Download. Die Sperre gehört aber zu
-  einem View-Model. `MainActivity` hat den Startmodus `standard` und nimmt geteilte Texte an; eine zweite Instanz
-  mit eigenem View-Model, etwa nach dem Teilen aus einer anderen App, ist deshalb nicht ausgeschlossen, am Gerät
-  geprüft ist sie nicht. Jeder andere neue Versuch einer YouTube-Quelle fragt den Manager nach der aktiven Engine und
-  wartet, bis `stage` ihn freigibt, oder übernimmt als Rückfall auf STT die Engine eines Untertitelversuchs, der sie
-  in diesem Moment noch hält.
-- **Warum es offen bleibt:** Der Ausgang ist sicher und hat einen eigenen Text; er kostet den Download. Die Referenzen
-  unter der Sperre des Managers festzuhalten hieße, dass Aufträge für ihre Schreibzugriffe in Room auf den Manager
-  warten. Gemeldet vom Code-Reviewer der Runde 18; [ADR 0009](adr/0009-engine-slot-cleanup.md) nennt den Fall.
+- **Location:** `EngineUpdateManager.stage`: `ensureRoomLocked(update.sha256, remove = false)` before download,
+  `materializeSlot` with `ensureRoomLocked(installation.id, remove = true)` afterward. `JobCoordinator.retry` gives a
+  "missing only" retry its predecessor's engine without asking the manager.
+- **Precondition:** five occupied slots where exactly one installation is dispensable, and a job with a partial
+  result whose last STT attempt was bound to exactly that one.
+- **Flow:** the dry run finds room. During the throttled download (64 KiB/s), a "missing only" attempt for this job
+  starts; it is unfinished and holds its predecessor's engine. Cleanup after download then finds no room, `stage`
+  ends with `SLOTS_IN_USE`, the verified download is discarded, and nothing is removed.
+- **Why it barely happens today:** update and retry both run through `MainViewModel.action`, whose lock allows one
+  action at a time, and `stageAndActivate` holds it for the whole download. But the lock belongs to a view model. A
+  second `MainActivity` instance — startup mode `standard`, accepting shared text — with its own view model is not
+  excluded, and unverified on-device. Any other new YouTube-source attempt asks the manager for the active engine
+  and waits for `stage` to release it, or falls back to STT holding a caption attempt's engine while it still has it.
+- **Why it stays open:** the outcome is safe and has its own text; it costs the download. Holding references under
+  the manager's lock would mean jobs wait on the manager for their own Room writes. Reported by the round-18 code
+  reviewer; [ADR 0009](adr/0009-engine-slot-cleanup.md) names the case.
 
-### 49. Eine Vorschau hält ihre Engine nicht (niedrig)
+### 49. A preview does not pin its engine (low)
 
-- **Stelle:** `JobCoordinator.inspect` gibt `engines.file(engines.active())` an `extractor.resolve`, ohne einen Versuch
-  anzulegen; `EngineReferences.inUse` kennt nur Versuche.
-- **Was es bräuchte:** Während yt-dlp für die Vorschau läuft, müsste deren Engine weder aktiv noch vorherig werden und
-  dann beim Räumen weichen, also zwei Aktivierungen und ein Räumen während eines einzigen Aufrufs.
-- **Warum es heute kaum eintritt:** `inspect` und `prepareAgain` laufen unter derselben Sperre von
-  `MainViewModel.action` wie `stageAndActivate` und `rollback`, und nur diese beiden aktivieren, gehen zurück oder
-  räumen für ein Update. Umstellung und Räumen nach einem App-Update geschehen im ersten Aufruf des Managers im
-  Prozess, und `inspect` fragt `engines.active()`, bevor es die Datei nimmt. Eine zweite Instanz der Aktivität mit
-  eigenem View-Model hebt die Sperre auf wie in Punkt 48; die zwei Aktivierungen müssten dann dort während eines
-  einzigen Aufrufs von yt-dlp geschehen.
-- **Warum es trotzdem hier steht:** Die Sicherheit hängt an einer Sperre des View-Models, nicht am Manager. Ein
-  künftiger Aufrufer von `stage`, `activate` oder `rollback` außerhalb dieser Sperre, etwa ein Update im Hintergrund,
-  öffnet das Fenster. Gemeldet vom Code-Reviewer der Runde 18.
+- **Location:** `JobCoordinator.inspect` passes `engines.file(engines.active())` to `extractor.resolve` without
+  creating an attempt; `EngineReferences.inUse` only knows attempts.
+- **What it would take:** while yt-dlp runs for the preview, its engine would need to become neither active nor
+  previous and then get cleaned up, meaning two activations and a cleanup inside one call.
+- **Why it barely happens today:** `inspect` and `prepareAgain` run under the same `MainViewModel.action` lock as
+  `stageAndActivate` and `rollback`, and only those two activate, revert, or clean up for an update. Switch-over and
+  cleanup after an app update happen on the manager's first call in the process, and `inspect` asks
+  `engines.active()` before taking the file. A second activity instance with its own view model lifts the lock as in
+  item 48; the two activations would then need to happen there during one `yt-dlp` call.
+- **Why it is still recorded:** safety here rests on a view-model lock, not on the manager. A future caller of
+  `stage`, `activate`, or `rollback` outside that lock — a background update, say — opens the window. Reported by
+  the round-18 code reviewer.
 
-### 50. Instrumentierungstests reihen Arbeit in den WorkManager der App ein (niedrig, heute folgenlos)
+### 50. Instrumentation tests enqueue work in the app's own WorkManager (low, harmless today)
 
-- **Stelle:** `ensureWorkManager` in `AppPipelineTest`, `BatchCreationTest`, `EngineJobPinningTest`,
-  `ParallelJobsTest`, `ProcessRecoveryTest` und `ViewModelStateTest` unter `app/src/androidTest/java/app/sourcescribe/`;
-  `SourceScribeApplication` als `Configuration.Provider`.
-- **Was geschieht:** Die Tests laufen im Prozess der App. `WorkManager.getInstance` liefert dort die Instanz der App
-  mit ihrer Datenbank `androidx.work.workdb`, weil die Anwendung selbst die Konfiguration liefert; der Rückfall auf
-  `WorkManagerTestInitHelper` im `catch` wird deshalb nie erreicht. Jede Testumgebung baut einen eigenen
-  `JobCoordinator` mit eigener Room-Datenbank, reiht aber über denselben Code Arbeit unter `attempt:<id>` und
-  `exports:<id>` in diese Datenbank ein. Eine Kopie vom 14. September, 01:47, enthielt 235 abgeschlossene Einträge,
-  176 erfolgreich und 59 abgebrochen; wie viele davon aus Tests stammen, ist nicht gezählt.
-- **Warum heute folgenlos:** Die Ids sind zufällige UUIDs, und die Tests brechen beim Aufräumen nur Arbeit mit den
-  Tags ihrer eigenen Aufträge ab. Ein Worker, dessen Versuch in der Datenbank der App nicht existiert, findet ihn
-  nicht und endet ohne Wirkung mit `Result.success()` (`AcquisitionWorker.doWork`, `SourceScribeDao.claim`). Die
-  Eingabedaten tragen nur die Versuchs-Id. Stirbt ein Testlauf vor dem Aufräumen, kann solche Arbeit später im
-  Prozess der App laufen, ebenso ohne Wirkung; beobachtet ist das nicht.
-- **Warum es offen bleibt:** Getrennt wäre es mit einer eigenen WorkManager-Instanz für Tests, etwa über
-  `WorkManagerTestInitHelper` mit einer eigenen Test-Anwendung, und das ändert, wie diese Klassen ihre Worker
-  ausführen. Gefunden in Runde 18 beim Lesen der App-Daten auf `emulator-5556`; nachgelesen hat es ein Hilfsagent,
-  die tragenden Stellen sind nachgeprüft.
+- **Location:** `ensureWorkManager` in `AppPipelineTest`, `BatchCreationTest`, `EngineJobPinningTest`,
+  `ParallelJobsTest`, `ProcessRecoveryTest`, and `ViewModelStateTest` under
+  `app/src/androidTest/java/app/sourcescribe/`; `SourceScribeApplication` as `Configuration.Provider`.
+- **What happens:** tests run in the app's own process. `WorkManager.getInstance` there returns the app's own
+  instance with its `androidx.work.workdb` database, since the application itself supplies the configuration, so the
+  `catch` fallback to `WorkManagerTestInitHelper` is never reached. Each test environment builds its own
+  `JobCoordinator` with its own Room database but enqueues work under `attempt:<id>` and `exports:<id>` into this
+  same WorkManager database. A copy taken September 14 at 01:47 held 235 completed entries, 176 successful and 59
+  aborted; how many originate from tests is not counted.
+- **Why harmless today:** the IDs are random UUIDs, and tests only cancel work tagged with their own job IDs during
+  cleanup. A worker whose attempt does not exist in the app's database finds nothing and ends without effect via
+  `Result.success()` (`AcquisitionWorker.doWork`, `SourceScribeDao.claim`). The input data carries only the attempt
+  ID. If a test run dies before cleanup, such work could later run in the app's own process, also without effect;
+  unobserved.
+- **Why it stays open:** the fix is a dedicated WorkManager instance for tests, e.g. via `WorkManagerTestInitHelper`
+  with its own test application, which changes how these classes run their workers. Found in round 18 while reading
+  app data on `emulator-5556`; a helper agent verified the load-bearing points.
 
-### 51. Die Migrationstests legen ihre Datenbanken zwischen denen der App an (niedrig, heute folgenlos)
+### 51. Migration tests create their databases between the app's own (low, harmless today)
 
-- **Stelle:** `MigrationTest` unter `app/src/androidTest/java/app/sourcescribe/data/`:
-  `MigrationTestHelper(InstrumentationRegistry.getInstrumentation(), SourceScribeDatabase::class.java)` und die Namen
+- **Location:** `MigrationTest` under `app/src/androidTest/java/app/sourcescribe/data/`:
+  `MigrationTestHelper(InstrumentationRegistry.getInstrumentation(), SourceScribeDatabase::class.java)` and names
   `migration-<UUID>.db`.
-- **Was geschieht:** Der Helfer legt die Testdatenbanken mit dem Kontext der App an, also in ihrem Verzeichnis
-  `databases/` neben ihrer eigenen Datenbank. Getrennt sind sie nur durch den zufälligen Namen. Seit `39a1cdc` löscht
-  eine äußere Regel nach jedem Test die Datenbank samt `-journal`, `-shm`, `-wal` und `.lck` und prüft, dass nichts
-  mit ihrem Namen bleibt.
-- **Warum heute folgenlos:** Die Namen treffen nicht den der App, und gelöscht wird nur, was die Tests selbst anlegen.
-  Stirbt der Prozess mitten in einem Test, bleiben die Dateien liegen wie vor `39a1cdc`.
-- **Warum es offen bleibt:** Ein eigenes Verzeichnis bräuchte absolute Pfade als Datenbanknamen oder einen Kontext mit
-  eigenem Datenbankverzeichnis; ob `MigrationTestHelper` und die Sperrdatei `.lck` damit arbeiten, ist nicht geprüft.
-  Gemeldet vom Invarianten-Reviewer der Runde 19; von derselben Art wie Punkt 50.
+- **What happens:** the helper creates test databases using the app's context, i.e. in its own `databases/`
+  directory next to its real database, separated only by the random name. Since `39a1cdc`, an outer rule deletes
+  each test's database plus `-journal`, `-shm`, `-wal`, and `.lck` afterward and checks nothing with its name
+  remains.
+- **Why harmless today:** the names never collide with the app's own, and only what the tests themselves create gets
+  deleted. If the process dies mid-test, the files remain, as they did before `39a1cdc`.
+- **Why it stays open:** a separate directory would need absolute paths as database names, or a context with its own
+  database directory; whether `MigrationTestHelper` and the `.lck` lock file work with that is unchecked. Reported
+  by the round-19 invariant reviewer; the same kind of issue as item 50.
 
-### 52. `SettingsStore` sucht seinen DataStore im Konstruktor und hält ihn für den ganzen Prozess (niedrig)
+### 52. `SettingsStore` resolves its DataStore in the constructor and keeps it for the process's lifetime (low)
 
-- **Stelle:** `settingsDataStore` und die Map `stores` in `app/src/main/java/app/sourcescribe/data/SettingsStore.kt`,
-  seit `8fe0dd5`, aufgerufen im Konstruktor von `SettingsStore`.
-- **Was geschieht:** Der Konstruktor ruft `preferencesDataStoreFile`, das `Context.getFilesDir()` fragt, und
-  `File.canonicalPath`, das den Pfad im Dateisystem auflöst und `IOException` werfen darf. Hilt erzeugt den
-  `@Singleton` beim ersten Bedarf, und unter den Empfängern ist `MainViewModel`, das auf dem Hauptthread entsteht.
-  Der ersetzte Delegat `preferencesDataStore` fragte nach der Datei erst, wenn DataStore sie zum ersten Mal las.
-  Außerdem legt jeder neue Pfad einen Eintrag in `stores` an, der bis zum Ende des Prozesses bleibt.
-- **Warum niedrig:** In der App gibt es einen Pfad und damit einen Eintrag, wie beim alten Delegaten, und DataStore
-  verbietet zwei Instanzen für dieselbe Datei. Weitere Einträge entstehen nur in Instrumentierungstests mit eigenen
-  Kontexten. Ob der Zugriff im Konstruktor spürbar dauert oder je wirft, ist nicht gemessen.
-- **Was zum Schließen fehlt:** den DataStore erst beim ersten Lesen oder Schreiben suchen, ohne dass zwei Stores für
-  dieselbe Datei entstehen können. Gemeldet vom Code-Reviewer der Runde 19; dass der alte Delegat die Datei ebenso
-  im Konstruktor fragte, wie er schrieb, trifft nicht zu.
+- **Location:** `settingsDataStore` and the `stores` map in `app/src/main/java/app/sourcescribe/data/SettingsStore.kt`,
+  since `8fe0dd5`, called from `SettingsStore`'s constructor.
+- **What happens:** the constructor calls `preferencesDataStoreFile`, which asks `Context.getFilesDir()`, and
+  `File.canonicalPath`, which resolves the path on the filesystem and may throw `IOException`. Hilt builds the
+  `@Singleton` on first need, and `MainViewModel`, created on the main thread, is among the consumers. The replaced
+  `preferencesDataStore` delegate only asked for the file when DataStore first read it. Each new path also creates
+  an entry in `stores` that persists for the rest of the process.
+- **Why low:** the app has one path and therefore one entry, as with the old delegate, and DataStore forbids two
+  instances for the same file. Further entries only arise in instrumentation tests with their own contexts. Whether
+  the constructor access is ever noticeably slow or throws is unmeasured.
+- **Missing to close:** resolve the DataStore only on first read or write, without allowing two stores for the same
+  file. Reported by the round-19 code reviewer; the claim that the old delegate queried the file in its constructor
+  just the same does not hold.
 
-### 53. Nach einer gescheiterten zweiten Umbenennung bleiben alte Metadaten im Slot (niedrig, heute folgenlos)
+### 53. After a failed second rename, stale metadata can remain in the slot (low, harmless today)
 
-- **Stelle:** `replaceInSlot` in `extractor/src/main/java/app/sourcescribe/extractor/EngineUpdateManager.kt`, seit
+- **Location:** `replaceInSlot` in `extractor/src/main/java/app/sourcescribe/extractor/EngineUpdateManager.kt`, since
   `a1a5af1`.
-- **Was geschieht:** Beim Reparieren eines beschädigten Slots der gebündelten Engine benennt `replaceInSlot` erst die
-  geprüfte Datei in den Slot und dann `metadata.json`. Scheitert nur die zweite Umbenennung, endet der Aufruf mit
-  `STORAGE`, und im Slot liegt die geprüfte Datei neben den Metadaten, die vorher dort lagen. Der nächste Aufruf
-  findet den Slot gültig, weil `validSlot` nur die Datei prüft, und schreibt die Metadaten nicht neu.
-- **Warum folgenlos:** `metadata.json` wird nur geschrieben und verschoben, nirgends gelesen. Im Normalfall hat die
-  alten Metadaten eine frühere Einrichtung desselben Hashes geschrieben.
-- **Was zum Schließen fehlt:** Wer `metadata.json` künftig liest, muss mit Metadaten einer früheren Einrichtung
-  rechnen oder sie beim Prüfen des Slots abgleichen. Der Ausgang steht in
-  [ADR 0011](adr/0011-damaged-bundled-engine-slot.md), und
-  `aSlotRepairWhoseMetadataCannotFollowFailsWithStorageAndLeavesTheEngineRepaired` hält ihn fest. Gemeldet vom
-  Invarianten-Reviewer der Runde 20.
+- **What happens:** when repairing a damaged bundled-engine slot, `replaceInSlot` first renames the verified file
+  into the slot, then `metadata.json`. If only the second rename fails, the call ends with `STORAGE`, leaving the
+  verified file in the slot next to the metadata that was there before. The next call finds the slot valid, since
+  `validSlot` only checks the file, and never rewrites the metadata.
+- **Why harmless:** `metadata.json` is only written and moved, never read anywhere. In the normal case, the stale
+  metadata describes an earlier setup of the same hash.
+- **Missing to close:** whoever reads `metadata.json` in the future must account for metadata from an earlier setup,
+  or reconcile it while checking the slot. The intended outcome is in
+  [ADR 0011](adr/0011-damaged-bundled-engine-slot.md), pinned by
+  `aSlotRepairWhoseMetadataCannotFollowFailsWithStorageAndLeavesTheEngineRepaired`. Reported by the round-20
+  invariant reviewer.
 
-### 54. `ChoiceAccessibilityTest` scheiterte in der CI, solange die App noch startete — erledigt am 14. September 2026
+### 54. `ChoiceAccessibilityTest` failed in CI while the app was still starting up — fixed September 14, 2026
 
-Bleibt als Nummer stehen, damit Verweise gelten. `appLanguageChoiceExposesButtonSemanticsAndOpensItsDialog` wartete 25
-Sekunden auf eine aktivierte Sprachwahl und scheiterte daran in vier CI-Läufen: am 10. September in Run 34544393441, am
-14. September in den Runs 34838928729, 34841018134 und 34855355701. Den Grund zeigte Run 34855355701 mit der Meldung
-aus `20ca738`: Die Sprachwahl stand auf der Seite, anklickbar, sichtbar und mit dem Wert „English“, aber mit
-`enabled=false`, weil `MainViewModel` noch mit dem Start beschäftigt war. Seit `1fe2dad` wartet der Test
-zuerst bis zu 150 Sekunden, bis die App keinen Fortschrittsbalken mehr zeigt. Auf `emulator-5556` scheiterte der alte
-Test wie in der CI, als die Aktion beim Start 40 Sekunden länger dauerte, und der neue bestand mit derselben
-Verzögerung. Im CI-Lauf 34865638431 am Stand `1fe2dad` bestand der Geräteschritt, die Tests von `extractor`
-eingeschlossen. Wie lange die App beim Start ihre Bedienung sperrt, steht unter Punkt 57.
+Kept as a number so references stay valid. The language-choice control was visible and clickable but
+`enabled=false` while `MainViewModel` was still busy starting up, causing four CI failures (September 10 run
+34544393441; September 14 runs 34838928729, 34841018134, 34855355701); root cause identified via commit `20ca738`.
+Fixed in `1fe2dad`: the test now waits up to 150 seconds for the startup progress bar to clear before proceeding.
+How long startup locks the UI is tracked as item 57.
 
-### 55. Bouncy Castle 1.86 lief auf keiner Android-Version vor API 37 (niedrig, unbestätigt)
+### 55. Bouncy Castle 1.86 has not run on any Android version before API 37 (low, unverified)
 
-- **Stelle:** `bcpg` und `bcprov` in `gradle/libs.versions.toml`, genutzt von `EngineVerifier` beim Prüfen jedes
-  Engine-Updates. `minSdk` ist 29.
-- **Was fehlt:** ein Lauf der Signaturprüfung auf API 29 bis 36. Lokal gibt es nur ein System-Image mit API 37, und
-  die CI nutzt ebenfalls API 37.
-- **Was dafür spricht, dass es hält:** Laut den Release Notes prüft der Build von 1.86 die Basisklassen jedes Moduls
-  mit AnimalSniffer gegen API-Level 26. In den drei Dateien von 1.86 verweist keine Klasse auf eine der
-  `…ValueExact`-Methoden von `java.math.BigInteger`, an denen 1.85 laut denselben Notes auf älteren Android-Versionen
-  scheiterte (STATUS, Runde 21).
-- **Was zum Schließen fehlt:** die Suite des Moduls `extractor` mit einem signierten Update auf einem Emulator mit
-  API 29.
+- **Location:** `bcpg` and `bcprov` in `gradle/libs.versions.toml`, used by `EngineVerifier` on every engine-update
+  check. `minSdk` is 29.
+- **Missing:** a run of the signature check on API 29 through 36. Only an API-37 system image exists locally, and CI
+  also uses API 37.
+- **What suggests it holds:** per the release notes, 1.86's build checks every module's base classes with
+  AnimalSniffer against API level 26. None of 1.86's three files reference any of `java.math.BigInteger`'s
+  `…ValueExact` methods, which the same notes say made 1.85 fail on older Android versions (STATUS, round 21).
+- **Missing to close:** the `extractor` module's suite with a signed update on an API-29 emulator.
 
-### 56. Scheitert nach einem Prüffehler auch das Löschen der Prüfansicht, geht die erste Meldung verloren (niedrig, unbestätigt)
+### 56. If deleting the inspection view also fails after a check error, the first message is lost (low, unverified)
 
-- **Stelle:** der `finally`-Block von `inspectArchive` in `core/src/main/kotlin/app/sourcescribe/core/EngineVerifier.kt`.
-- **Voraussetzung:** Die Prüfung eines Archivs scheitert, nachdem `inspectArchive` seine Prüfansicht
-  `.engine-inspect-*.zip` neben dem Archiv angelegt hat, und das Löschen dieser Ansicht scheitert ebenfalls.
-- **Erwartet gegen tatsächlich:** Erwartet ist die Meldung des ersten Fehlers, etwa zu einem zu großen Eintrag. Der
-  `finally`-Block wirft beim gescheiterten Löschen eine eigene `EngineVerificationException`, und eine Ausnahme aus
-  einem `finally` ersetzt die, die gerade durchläuft. Es bliebe „temporary inspection view could not be removed“.
-  Abgelehnt wird das Update in beiden Fällen; verloren ginge nur die Diagnose.
-- **Warum unbestätigt:** Ein Test müsste das Löschen genau zwischen Anlegen und Aufräumen scheitern lassen, und dafür
-  hat `EngineVerifier` keine Stelle. Dass die Ansicht nach einem Fehlschlag verschwindet, hält seit Runde 22
-  `aFailedInspectionRemovesItsTemporaryView` fest. Gemeldet vom Code-Reviewer der Runde 22.
+- **Location:** the `finally` block of `inspectArchive` in `core/src/main/kotlin/app/sourcescribe/core/EngineVerifier.kt`.
+- **Precondition:** checking an archive fails after `inspectArchive` created its inspection view
+  `.engine-inspect-*.zip` next to the archive, and deleting that view also fails.
+- **Expected vs. actual:** the first error, e.g. an oversized entry, should be reported. The `finally` block throws
+  its own `EngineVerificationException` on a failed delete, and an exception from `finally` replaces the one in
+  flight — leaving "temporary inspection view could not be removed." The update is rejected either way; only the
+  diagnosis is lost.
+- **Why unverified:** a test would need to fail the delete exactly between creation and cleanup, and `EngineVerifier`
+  has no seam for that. That the view disappears after a failure is covered since round 22 by
+  `aFailedInspectionRemovesItsTemporaryView`. Reported by the round-22 code reviewer.
 
-### 57. Die App sperrt ihre Bedienung bei jedem Start, und wie lange, ist nicht gemessen (niedrig)
+### 57. The app locks its UI on every start, and for how long is unmeasured (low)
 
-- **Stelle:** der `init`-Block von `MainViewModel`, der `coordinator.recover()`, `refreshCredentials()` und
-  `refreshEngines()` als eine exklusive Aktion ausführt, und `EngineUpdateManager.ensureBundledLocked`, das
-  `refreshEngines()` über `installations()` erreicht.
-- **Voraussetzung:** jeder Start des App-Prozesses. `ensureBundledLocked` hält die geprüfte Engine nur im Speicher.
-  Nach einem Neustart des Prozesses kopiert es die mitgelieferte Engine erneut in ein Arbeitsverzeichnis, prüft
-  Prüfsummen und Signatur, legt ihren Slot nur an, wenn er fehlt oder ungültig ist, und prüft sie gegen die Laufzeit.
-- **Erwartet gegen tatsächlich:** Erwartet ist eine Bedienung, die kurz nach dem Start frei ist. Solange die Aktion
-  läuft, zeigt `MainActivity` oben einen Fortschrittsbalken, und `state.busy` sperrt unter anderem das Prüfen einer
-  Quelle, den Import einer Audiodatei und den Start eines Auftrags sowie in den Einstellungen die Sprachwahl, den
-  Anbieter und die Schlüssel. In der CI dauerte das auf einem frisch installierten Emulator länger als 25 Sekunden
-  (Punkt 54); wie lange genau und in welchem Schritt, zeigt kein Log. Auf `emulator-5556` bestanden beide Tests von `ChoiceAccessibilityTest` zusammen in 24 und in 29 Sekunden, und der Test der Sprachwahl wartete dabei jeweils das Ende des Starts ab. Wie lange die Sperre selbst dauerte, ist nicht gemessen.
-- **Was zum Schließen fehlt:** die Dauer der Sperre auf einem physischen Gerät messen, beim ersten Start nach einer
-  Installation und bei einem späteren, und zeigen, welcher Schritt sie verursacht. Danach entscheiden, ob die Prüfung
-  der Engine die Bedienung sperren muss oder im Hintergrund laufen kann, ohne dass ein Auftrag eine ungeprüfte Engine
-  benutzt.
+- **Location:** the `init` block of `MainViewModel`, which runs `coordinator.recover()`, `refreshCredentials()`, and
+  `refreshEngines()` as one exclusive action, and `EngineUpdateManager.ensureBundledLocked`, reached from
+  `refreshEngines()` via `installations()`.
+- **Precondition:** every start of the app process. `ensureBundledLocked` holds the verified engine only in memory,
+  so after a process restart it re-copies the bundled engine into a working directory, checks hashes and signature,
+  creates its slot only if missing or invalid, and checks it against the runtime.
+- **Expected vs. actual:** expected is a UI that becomes usable shortly after start. While the action runs,
+  `MainActivity` shows a thin progress bar at the top, and `state.busy` locks, among other things, checking a
+  source, importing an audio file, starting a job, and, in settings, language, provider, and key selection. In CI
+  this took more than 25 seconds on a freshly installed emulator (item 54); exactly how long, and which step causes
+  it, is not logged. On `emulator-5556`, both `ChoiceAccessibilityTest` tests together passed in 24 and 29 seconds,
+  each waiting out the end of startup; the lock's own duration is not measured separately.
+- **Missing to close:** measure the lock's duration on a physical device, both on first start after install and on a
+  later one, and show which step causes it. Then decide whether checking the engine must lock the UI or can run in
+  the background without a job ever using an unverified engine.
 
-## Bewusste Entscheidungen, die wie Fehler aussehen
+## Deliberate decisions that look like bugs
 
-### Ein gewöhnlicher Start-Tap nach „Neu vorbereiten“ genügt für die Freigabe
+### A normal tap of Start after "Prepare again" is enough authorization
 
-Ein Review der vierten Runde hat gemeldet, dass ein wieder vorbereiteter Auftrag mit einem einzigen
-Antippen von „Start“ kostenpflichtig losläuft, weil `configurationForStart` die Freigabe aus Modus,
-Modell und passendem gespeichertem Schlüssel neu berechnet und den bisherigen Wert nie liest. Der
-Mechanismus stimmt, die Einordnung als Defekt nicht.
+A fourth-round review reported that a re-prepared job starts and incurs cost with a single tap of "Start," because
+`configurationForStart` recomputes authorization from mode, model, and matching stored key and never reads the prior
+value. The mechanism is correctly described; classifying it as a defect is not.
 
-So ist es gewollt, und zwar app-weit, nicht nur beim erneuten Vorbereiten: Das Antippen von „Start“
-**ist** die bewusste Freigabe, gebunden an genau diese Konfiguration. `ViewRulesTest.
-deliberateStartBindsApprovalToModeCredentialProviderAndRegionWithoutChangingTheDraft` hält das seit
-längerem fest. Genau darauf beruht die Behebung des blockierenden Nutzerfehlers vom 10. September:
-Ein Auftrag, der an seiner eigenen Längengrenze hängen geblieben ist, soll mit einem geänderten Wert
-wieder startbar sein, ohne Anbieter und Schlüssel erneut auszuwählen. Die Invariante verlangt keine
-zusätzliche Hürde, sondern dass nichts **still** wiederholt wird — ein Tap ist nicht still.
+This is intentional, app-wide, not only on re-preparing: tapping "Start" **is** the deliberate authorization, bound
+to exactly that configuration.
+`ViewRulesTest.deliberateStartBindsApprovalToModeCredentialProviderAndRegionWithoutChangingTheDraft` has long pinned
+this. It is exactly what the September 10 fix for a blocking user error relies on: a job stuck at its own length
+limit should be startable again with one changed value, without re-choosing provider and key. The invariant requires
+no extra hurdle, only that nothing is repeated **silently** — a tap is not silent. What was fair in the original
+report: the test only checked the draft before this gate, and its comment read as if more than an ordinary tap were
+needed. Both are corrected; the test now checks, with a genuinely registered key, what happens at the gate, and
+additionally that nothing is authorized without a matching key.
 
-Was an der Meldung berechtigt war: Der Test prüfte nur den Entwurf vor diesem Tor, und sein Kommentar
-ließ sich so lesen, als brauchte es mehr als das gewöhnliche Antippen. Beides ist korrigiert; der Test
-prüft jetzt mit einem wirklich registrierten Schlüssel, was am Tor passiert, und zusätzlich, dass ohne
-passenden Schlüssel gar nichts freigegeben wird.
+### `MALFORMED_SEGMENT` and `MALFORMED_WORD` deliberately sit in different groups
 
-### `MALFORMED_SEGMENT` und `MALFORMED_WORD` liegen absichtlich in verschiedenen Gruppen
+Both arise on the same line of `parseEntries`, and both drop the entry. They still do not tell the reader the same
+thing: the segment list is the displayed reading text, so a missing entry there is a missing passage. The word list
+only carries per-word timing and appears in export as a word count, so a missing entry there is a missing timestamp.
+That is why `MALFORMED_SEGMENT` and `MISSING_SEGMENT_TEXT` belong with missing text, and `MALFORMED_WORD` and
+`MISSING_WORD_TEXT` belong with word timing — even though both pairs come from the same line of the same function.
 
-Beide entstehen in derselben Zeile von `parseEntries`, und beide lassen den Eintrag fallen. Sie sagen dem
-Leser trotzdem nicht dasselbe: Die Segmentliste ist der angezeigte Lesetext, ein fehlender Eintrag ist dort
-eine fehlende Passage. Die Wortliste trägt nur die Zeiten je Wort und erscheint im Export als Wortzahl; ein
-fehlender Eintrag ist dort eine fehlende Zeitangabe. Deshalb gehören `MALFORMED_SEGMENT` und
-`MISSING_SEGMENT_TEXT` zu den fehlenden Texten, `MALFORMED_WORD` und `MISSING_WORD_TEXT` zu den Wortzeiten —
-obwohl beide Paare aus derselben Zeile derselben Funktion stammen.
+### The title's 40-byte cap also carries the name-length limit
 
-### Die 40-Byte-Schranke des Titels trägt die Namenslänge mit
+A round-7 reviewer reported as a high-severity finding that `TranscriptExporter.compose` computes the title's budget
+as the byte limit minus the *character count* of the part that must survive. Language and source ID each reserve 40
+bytes, so with three-byte characters the budget can run up to 52 bytes too large, the name overflows its limit, and
+the final truncation cuts from the end — where the hash sits.
 
-Ein Reviewer hat in Runde 7 als hohen Fund gemeldet, dass `TranscriptExporter.compose` das Budget für den
-Titel als Bytegrenze minus der *Zeichenzahl* des Teils berechnet, der überleben muss. Sprache und Quell-ID
-reichen je 40 Byte, bei Dreibytezeichen also 13 Zeichen, das Budget fällt um bis zu 52 Byte zu groß aus, der
-Name überläuft seine Grenze, und der abschließende Schnitt nimmt das Ende — wo der Streuwert sitzt.
+The unit mix-up was real and is fixed. It was never triggerable, and that part has to stay recorded here, since
+otherwise it gets reported again as a high finding every round: `generatedStem` already runs the title through
+`safePart` with its default of 40 bytes beforehand. The widest name the builder can assemble stays under the
+180-byte limit — demonstrated by reintroducing the bug, under which its test passes while six others fail.
 
-Die Einheitenverwechslung war echt und ist korrigiert. Auslösbar war sie nicht, und das ist der Teil, der
-hier stehen muss, weil er sonst in jeder Runde neu als hoher Fund gemeldet wird: `generatedStem` schickt den
-Titel vorher durch `safePart` mit dessen Standardwert von 40 Byte. Der breiteste Name, den der Namensbauer
-zusammensetzen kann, bleibt damit unter der Grenze von 180 Byte — nachgewiesen mit wieder eingebautem Fehler,
-unter dem der zugehörige Test grün durchläuft, während sechs andere fallen.
+It follows that the title's 40-byte cap is load-bearing, not cosmetic. Increasing the title's share of the name — the
+most obvious next change to this file — removes the limit's second backstop. The test
+`noPartOfANameMeasuredInCharactersPushesTheIdentityOutOfIt` is therefore not a regression probe but a boundary probe
+over 648 name combinations.
 
-Daraus folgt umgekehrt: Die Schranke von 40 Byte auf dem Titel ist tragend, nicht kosmetisch. Wer den Anteil
-des Titels am Namen erhöht — die naheliegendste nächste Änderung an dieser Datei —, nimmt der Grenze ihren
-zweiten Halt. Der Test `noPartOfANameMeasuredInCharactersPushesTheIdentityOutOfIt` ist deshalb keine
-Regressionsprobe, sondern eine Schrankenprobe über 648 Namenskombinationen.
+### Unreachable `PROVIDER_` and `RESPONSE_` branches in `messageText`
 
-### Nicht erreichbare `PROVIDER_`- und `RESPONSE_`-Zweige in `messageText`
+A review showed that most `PROVIDER_*` and `RESPONSE_*` branches are unreachable today, because `SttStep` handles
+provider errors itself within each phase and stores the bare code. The branches stay regardless: they are the
+safety net for a `ProviderError` that escapes phase handling, and the step name ("While submitting to the provider")
+would be correct in exactly that case. The eight `AUDIO_*` branches modeled after `ExtractionFailure` were different
+— no conceivable producer existed for them, and they were removed.
 
-Ein Review hat gezeigt, dass die meisten `PROVIDER_*`- und `RESPONSE_*`-Zweige heute nicht erreichbar
-sind, weil `SttStep` die Anbietfehler in den einzelnen Phasen selbst behandelt und den nackten Code
-speichert. Die Zweige bleiben trotzdem stehen: Sie sind das Auffangnetz für einen `ProviderError`, der
-einer Phasenbehandlung entkommt, und die Schrittangabe („Beim Absenden an den Anbieter“) wäre in genau
-diesem Fall richtig. Anders lag der Fall bei den acht `AUDIO_*`-Zweigen, die nach `ExtractionFailure`
-modelliert waren: dort gab es keinen denkbaren Erzeuger, und sie sind entfernt.
+### Expanding shifts what is below it
 
-### Aufklappen schiebt, was darunter steht
+The invariant reviewer noted in round 15 that expandable elements shift their neighbors on opening and closing: the
+job card in history, help entries, the provenance section in the result view, and, in job settings above "Check
+source," the hint `no_provider_help`, which disappears once a key is chosen. Until round 16 this list also named, as
+a fourth site, that model and key selection in the preview only appear once a provider is chosen — a different
+location, also in job settings rather than the preview, found by the round-16 consistency reviewer. Neither list is
+complete: the advanced options expand the same way, and further conditionally shown blocks are not counted. This
+stays as is, recorded here so it is not re-reported every round. The no-jump rule here is read as a rule against
+motion nobody triggered — a line growing while someone is reading or operating something else. Here the change
+happens where the user just tapped and shows what was asked for; reserving space for collapsed content would defeat
+the point of collapsing. Anyone deciding otherwise counts every occurrence first and changes them together.
 
-Der Invarianten-Reviewer hat in Runde 15 als Hinweis gemeldet, dass aufklappbare Elemente beim Öffnen und
-Schließen ihre Nachbarn verschieben: die Auftragskarte im Verlauf, die Einträge der Hilfe, die
-Herkunftsangaben in der Ergebnisansicht und in den Auftragseinstellungen über „Quelle prüfen“ der Hinweis
-`no_provider_help`, der verschwindet, sobald ein Schlüssel gewählt ist. Bis Runde 16 stand hier als vierte
-Stelle, dass in der Vorschau Modell- und Schlüsselauswahl erst mit einem Anbieter erscheinen. Das ist eine
-andere Stelle als die genannte, und auch sie liegt in den Auftragseinstellungen, nicht in der Vorschau;
-gefunden vom Konsistenz-Reviewer der Runde 16. Vollständig ist keine dieser Aufzählungen: Die
-Expertenoptionen klappen auf dieselbe Weise auf, und weitere bedingt eingeblendete Blöcke sind nicht
-gezählt. Das bleibt so, und die Abwägung steht hier, damit sie nicht jede Runde neu gemeldet
-wird. Diese Datei liest die Regel, dass nichts springt, als Regel gegen Bewegung, die niemand ausgelöst hat:
-eine Zeile, die wächst, während jemand liest oder etwas anderes bedient. Hier ändert sich der Platz dort, wo
-gerade getippt wurde, und zeigt, worum gebeten wurde; Platz für eingeklappten Inhalt freizuhalten, hebt das
-Einklappen auf. Wer das anders entscheidet, zählt die Stellen zuerst vollständig und ändert sie zugleich.
+### After a process death, job fields show the draft, not the typed text
 
-### Nach einem Prozesstod zeigen die Auftragsfelder den Entwurf, nicht den getippten Text
+The round-16 code reviewer reported that text preserved via `rememberSaveable` vanished again immediately after
+process death. This is intentional since the epochs were introduced: the draft lives only in the view model and dies
+with the process; the new view model has a new session ID, and a field then shows what the draft holds, i.e. the
+saved defaults. Showing the preserved text would mean displaying a value no job would actually start with, since
+start reads the draft, not the field. Verified on-device in round 18 at `39a1cdc`: typed `0.5` into the budget field,
+sent the app to background, killed its process (`am kill`, confirmed nothing left running), and started the app as
+the launcher would. The field was then empty, not `0.5`. Preserving typed values across a process death means saving
+the draft, e.g. via `SavedStateHandle`, not a field's text.
 
-Der Code-Reviewer der Runde 16 hat gemeldet, dass ein über `rememberSaveable` geretteter Text nach dem Tod des
-Prozesses sofort wieder verschwand. Seit den Epochen ist das gewollt. Der Entwurf lebt nur im View-Model und ist mit
-dem Prozess fort; das neue View-Model hat eine neue Sitzungskennung, und ein Feld zeigt dann, was der Entwurf hält,
-also die gespeicherten Vorgaben. Den geretteten Text zu zeigen hieße, einen Wert anzuzeigen, mit dem kein Auftrag
-starten würde, denn der Start liest den Entwurf und nicht das Feld.
-Am Gerät geprüft in Runde 18, auf dem Stand von `39a1cdc`: `0.5` ins Budgetfeld getippt, die App in den
-Hintergrund geschickt, ihr Prozess beendet (`am kill`, danach lief keiner mehr) und die App gestartet, wie es der
-Launcher tut. Danach war das Feld leer und zeigte nicht `0.5`.
-Wer getippte Werte über einen Prozesstod retten will, rettet den Entwurf, etwa über `SavedStateHandle`, nicht den
-Text eines Feldes.
+## Maintenance notes that are not defects
 
-## Wartungshinweise, die keine Defekte sind
+### A provider figure is read from markup, not from a summary
 
-### Eine Anbieterzahl wird aus dem Markup gelesen, nicht aus einer Zusammenfassung
+Round 12 removed a correct pricing condition because the pricing page had been read through a summarizing fetch
+tool that hands a small model the page and returns its answer. AssemblyAI's add-on table has one column per model,
+and its "Keyterms Prompting" row says **"Included"** under Universal-2. The summary turned that into
+"+$0.05/hr for both models" — reproduced with the same tool on September 12, 2026 to rule out a page change.
 
-Runde 12 hat eine richtige Preisbedingung entfernt, weil die Preisseite über ein zusammenfassendes
-Abrufwerkzeug gelesen wurde: Es gibt die Seite an ein kleines Modell und reicht dessen Antwort zurück. Die
-Zusatztabelle von AssemblyAI hat eine Spalte je Modell, und in der Zeile „Keyterms Prompting“ steht unter
-Universal-2 das Wort **„Included“**. Die Zusammenfassung machte daraus „+$0.05/hr für beide Modelle“ — am
-12. September 2026 mit demselben Werkzeug reproduziert, um auszuschließen, dass sich die Seite geändert
-hatte.
-
-Wer eine Zahl ändert, die Geld betrifft, holt die Seite selbst und liest ihre Tabelle aus:
+Anyone changing a number that affects money should fetch the page directly and read its table:
 
 ```bash
 curl -sL --max-time 60 -A "Mozilla/5.0" https://www.assemblyai.com/pricing -o page.html
 ```
 
-Danach die `<table>`-Blöcke mit Kopfzeile und Zellen ausgeben, statt nach der Zahl allein zu suchen —
-welche Spalte eine Zelle trägt, ist hier die ganze Frage. Ein Wort wie „Included“ steht an derselben
-Stelle, an der sonst ein Preis steht, und geht in jeder Zusammenfassung als Preis durch.
+Then print the `<table>` blocks with header and cells, rather than searching for the number alone — which column a
+cell belongs to is the whole question. A word like "Included" sits exactly where a price otherwise sits and passes
+as a price in any summary.
 
-### Instrumentierungstests laufen nicht über Gradle aus WSL heraus
+### Instrumentation tests do not run over Gradle from WSL
 
-Der Gradle-Lauf findet in WSL statt, der Emulator läuft unter Windows. Der Windows-`adb`-Server hört nur
-auf `127.0.0.1`, und WSL erreicht diese Adresse nicht (nachgemessen am 11. September 2026:
-`ADB_SERVER_SOCKET=tcp:172.20.112.1:5037` läuft in `Connection timed out`). `connectedDebugAndroidTest`
-ist deshalb lokal nicht ausführbar, ohne den Windows-`adb`-Server neu zu starten — was den Emulator des
-Nutzers mit abhängen würde. Der gangbare Weg ohne Eingriff in fremde Geräte:
+Gradle runs in WSL; the emulator runs under Windows. The Windows `adb` server only listens on `127.0.0.1`, which WSL
+cannot reach (measured September 11, 2026: `ADB_SERVER_SOCKET=tcp:172.20.112.1:5037` ends in `Connection timed out`).
+`connectedDebugAndroidTest` is therefore not runnable locally without restarting the Windows `adb` server, which
+would also disconnect the user's own emulator. The working path without touching someone else's device:
 
 ```bash
 bash tools/build-local.sh :app:assembleDebug :app:assembleDebugAndroidTest :extractor:assembleDebugAndroidTest
 ```
 
-Danach unter Windows die APKs installieren und beide Instrumentierungssuiten starten:
+then, under Windows, install the APKs and start both instrumentation suites:
 
 ```powershell
 $adb = "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe"
@@ -1082,72 +948,63 @@ $adb = "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe"
 & $adb -s emulator-5556 shell am instrument -w -r -e sourcescribeEngineUpdate true app.sourcescribe.extractor.test/androidx.test.runner.AndroidJUnitRunner
 ```
 
-Die erste Zeile gehört dazu: `$adb` stand hier seit dem 7. September in fünf Aufrufen und wurde nirgends
-gesetzt, sodass der Block beim Einfügen an der ersten Zeile scheiterte.
+**The second suite and its flag both matter.** The `extractor` module has 39 of its own instrumentation tests;
+review rounds 6 through 10 only ran the `app` module's 191 and reported that count as the gate. Without
+`-e sourcescribeEngineUpdate true`, the second suite skips fourteen `EngineUpdateManagerTest` tests by assumption and
+still looks green with 21 passed; with the flag it is 35 passed, 4 skipped, 0 failed. The four need a real source or
+a real release and stay `BLOCKED/NOT_RUN`. One of them,
+`EngineUpdateManagerTest.realReleaseStageActivateAndRollbackSurvivesManagerRestart`, additionally needs
+`-e sourcescribeEngineLiveUpdate true` and `-e engineProbeSource <URL>`; the procedure in [NEXT_STEPS.md](NEXT_STEPS.md)
+names all three.
 
-**Die zweite Suite gehört dazu, und die Flagge auch.** Das Modul `extractor` hat eigene 39
-Instrumentierungstests; die Reviewrunden 6 bis 10 haben nur die 191 des Moduls `app` ausgeführt und deren
-Zahl als das Gate berichtet. Ohne `-e sourcescribeEngineUpdate true` überspringt die zweite Suite vierzehn
-Tests von `EngineUpdateManagerTest` per Annahme und sieht mit 21 bestanden trotzdem grün aus; mit der
-Flagge sind es 35 bestanden, 4 übersprungen, 0 Fehler. Die vier brauchen eine echte Quelle beziehungsweise
-ein echtes Release und bleiben `BLOCKED/NOT_RUN`. Einer von ihnen,
-`EngineUpdateManagerTest.realReleaseStageActivateAndRollbackSurvivesManagerRestart`, braucht dazu noch
-`-e sourcescribeEngineLiveUpdate true` und `-e engineProbeSource <URL>`; der Ablauf in
-[NEXT_STEPS.md](NEXT_STEPS.md) nennt alle drei.
+**A failed install looks like a code defect.** On September 13, 2026, `/data` on `emulator-5556` was 91% full, and
+`adb install -r` failed for the app APK and the `extractor` test APK with `INSTALL_FAILED_INSUFFICIENT_STORAGE`,
+while the app's small test APK installed. Instrumentation then ran new tests against a previous round's app and
+reported two failures that looked like defects. After every install, check the output says `Success`; when in doubt,
+read `adb shell dumpsys package app.sourcescribe.debug | grep lastUpdateTime`, and uninstall old debug and test
+packages first when storage is tight. The same evening, installation failed a second time, this time with 523MB
+free, and the check run aborted as designed before any test ran. `adb shell pm trim-caches 4G` plus uninstalling
+`app.sourcescribe.extractor.test` freed `/data` from 609MB to 933MB; the retried `extractor` run that evening brought
+the test package back, leaving 607MB free. The second failed install had happened at 523MB.
 
-**Eine gescheiterte Installation sieht aus wie ein Codefehler.** Am 13. September 2026 war `/data` auf
-`emulator-5556` zu 91 % belegt, und `adb install -r` scheiterte für die App-APK und die Test-APK des Moduls
-`extractor` mit `INSTALL_FAILED_INSUFFICIENT_STORAGE`, während die kleine Test-APK der App installiert wurde.
-Die Instrumentierung lief also mit neuen Tests gegen die App einer früheren Runde und meldete zwei
-Fehlschläge, die nach einem Defekt aussahen. Nach jeder Installation die Ausgabe auf `Success` prüfen, im
-Zweifel `adb shell dumpsys package app.sourcescribe.debug | grep lastUpdateTime` lesen, und bei vollem
-Speicher die alten Debug- und Testpakete zuerst deinstallieren. Am selben Abend scheiterte die Installation
-ein zweites Mal, diesmal mit 523 MB frei, und der Prüflauf brach wie vorgesehen ab, bevor ein Test lief.
-`adb shell pm trim-caches 4G` und das Deinstallieren von `app.sourcescribe.extractor.test` brachten `/data`
-von 609 MB auf 933 MB frei. Für die Wiederholung des `extractor`-Laufs am selben Abend kam das Testpaket
-zurück; danach waren 607 MB frei. Die zweite gescheiterte Installation hatte bei 523 MB stattgefunden.
+Since September 12, when the Play Store updated preinstalled apps on `emulator-5556`, there is no longer enough room
+there to install the test packages over their old versions. The check scripts now uninstall both test packages,
+`app.sourcescribe.extractor.test` and `app.sourcescribe.debug.test`, before every install, never the app itself
+(which would erase its settings and history). In round 18 this raised free space from 565MB to 886MB, settling at
+560MB after the three installs.
 
-Seit dem 12. September, als der Play Store auf `emulator-5556` vorinstallierte Apps aktualisiert hat, reicht der Platz
-dort nicht mehr, um die Testpakete über ihre alten Fassungen zu installieren. Die Prüfskripte deinstallieren deshalb
-vor jeder Installation beide Testpakete, `app.sourcescribe.extractor.test` und `app.sourcescribe.debug.test`, nie
-die App selbst: Das löschte ihre Einstellungen und ihren Verlauf. In Runde 18 stieg der freie Platz damit von 565 MB
-auf 886 MB und lag nach den drei Installationen bei 560 MB.
+### The debug app on `emulator-5556` carries settings left by tests
 
-### Die Debug-App auf `emulator-5556` trägt Einstellungen aus Tests
-
-Bis Runde 18 haben Instrumentierungstests die Einstellungen von `app.sourcescribe.debug` geschrieben, zuletzt am
-14. September 2026 um 00:47. Die Datei `files/datastore/settings.preferences_pb` hält seitdem nur STT, Groq mit
-`whisper-large-v3`, den Fachbegriff `mutated-default`, zwei parallele Aufträge, das Systemdesign, 2 GiB
-Speichergrenze und keine Voreinstellung. Zurückgesetzt ist nichts, weil niemand weiß, was vorher darin stand, und die
-App zu deinstallieren löschte auch den Verlauf. Wer an diesem Gerät etwas prüft, das von Einstellungen abhängt, liest
-sie zuerst. Ob ein Lauf sie ändert, zeigt ihr SHA-256 davor und danach:
+Until round 18, instrumentation tests wrote to `app.sourcescribe.debug`'s settings, most recently on September 14,
+2026 at 00:47. `files/datastore/settings.preferences_pb` has since held only: STT, Groq with `whisper-large-v3`, the
+term `mutated-default`, two parallel jobs, system theme, a 2GiB storage limit, and no preset. Nothing has been reset,
+since nobody knows its prior contents, and uninstalling the app would also delete its history. Anyone testing
+something on this device that depends on settings should read them first. Whether a run changes them shows in the
+SHA-256 before and after:
 
 ```bash
 adb -s emulator-5556 exec-out run-as app.sourcescribe.debug cat files/datastore/settings.preferences_pb | sha256sum
 ```
 
-### Abhängigkeitsprüfung nach jedem Versionswechsel neu erzeugen
+### Regenerate dependency verification after every version change
 
-`gradle/verification-metadata.xml` enthält SHA-256-Prüfsummen für jedes aufgelöste Artefakt. Ein
-Versionswechsel im Versionskatalog scheitert deshalb zunächst mit `dependency verification failed`. Der
-Ablauf ist:
+`gradle/verification-metadata.xml` holds SHA-256 checksums for every resolved artifact. A version change in the
+catalogue therefore first fails with `dependency verification failed`. The procedure:
 
 ```bash
 bash tools/build-local.sh --write-verification-metadata sha256 :core:test :app:compileDebugKotlin :app:lintDebug
 ```
 
-Danach den Diff der Datei ansehen: Es dürfen nur Einträge für die neuen Versionen hinzukommen. Werden
-bestehende Einträge entfernt, hat der Lauf zu wenige Konfigurationen aufgelöst; dann mit mehr Tasks
-wiederholen, statt den Verlust zu übernehmen.
+Then check the file's diff: only entries for the new versions should be added. If existing entries disappear, the
+run resolved too few configurations; repeat with more tasks rather than accepting the loss.
 
-### Lint meldet neue Bibliotheksversionen als Fehler
+### Lint reports new library versions as an error
 
-`lint { warningsAsErrors = true }` macht aus `GradleDependency` einen Fehler. Sobald Google eine neue
-Compose-BOM oder Room-Version veröffentlicht, schlägt der Lint-Lauf fehl, ohne dass sich am Code etwas
-geändert hat. Das ist beabsichtigt: Die Regel erzwingt, dass Aktualisierungen tatsächlich gemacht werden.
-Der zugehörige Ablauf ist der Abschnitt darüber.
+`lint { warningsAsErrors = true }` turns `GradleDependency` into an error. As soon as Google publishes a new Compose
+BOM or Room version, the lint run fails with nothing changed in the code. This is intentional: the rule forces
+updates to actually happen. The procedure is the section above.
 
-Lokal kann der Befund fehlen, während die CI an ihm scheitert: `NewerVersionAvailable` liest die neuesten Versionen
-aus `maven-metadata.xml` im Lint-Cache unter `build/intermediates/lint-cache` jedes Moduls. Dort lagen lokal Dateien
-vom 7. und 8. September, als Bouncy Castle 1.86 am 11. September erschien, und nur die CI scheiterte, bis
-`d994c23` die Version nachzog. Vor einem lokalen Lintlauf, der für die CI stehen soll, diese Verzeichnisse löschen.
+Locally the finding can be absent while CI fails on it: `NewerVersionAvailable` reads the latest versions from each
+module's `maven-metadata.xml` in the lint cache under `build/intermediates/lint-cache`. Local copies there were dated
+September 7–8 when Bouncy Castle 1.86 appeared on September 11, so only CI failed until `d994c23` caught the version
+up. Delete these directories before a local lint run meant to match CI.

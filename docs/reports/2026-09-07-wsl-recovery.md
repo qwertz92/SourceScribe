@@ -1,55 +1,45 @@
-# WSL-Speicherfehler und Wiederaufnahme
+# WSL out-of-memory error and recovery
 
-Tatsächlich geprüft am 7. September 2026 gegen 18:24 CEST. Keine globalen
-Sicherheitseinstellungen, Swap-Konfigurationen oder laufenden Dienste geändert.
+Checked September 7, 2026, around 18:24 CEST. No global security settings, swap configuration, or running services
+changed.
 
-## Befund
+## Findings
 
-- Kerneljournal des vorherigen Boots: am 7. September um 18:14:17 und 18:16:50
-  `Out of memory: Killed process 26230 (python3)`, `anon-rss:7463876kB`.
-- Dabei `Total swap = 4194304kB` und `Free swap = 0kB`: die alte 4-GiB-Grenze
-  war noch aktiv. Der konkrete Python-Aufruf ist dadurch noch nicht identifiziert.
-- Im letzten Speicherdump zusätzlich `shmem:4425320kB`. `/tmp` ist tatsächlich
-  tmpfs; dort lagen zuvor mehrere GiB SDK-/Gradle-Dateien. Diese Einrichtung
-  erhöhte den Speicherdruck. Sie beweist nicht alleine den Python-Verbrauch.
-- Neuer Kernelboot um 18:17:25, Boot-ID
-  `f9343bc4-7b90-47ae-becd-7c673e4cf0f5`. Vorherige Boot-ID
+- Previous boot's kernel log: at 18:14:17 and 18:16:50, `Out of memory: Killed process 26230 (python3)`,
+  `anon-rss:7463876kB`.
+- At the time, `Total swap = 4194304kB` and `Free swap = 0kB`: the old 4GiB limit was still active. This does not by
+  itself identify the specific Python call.
+- The last memory dump also showed `shmem:4425320kB`. `/tmp` is tmpfs; several GiB of SDK/Gradle files had been
+  sitting there, raising memory pressure — not by itself proof of the Python usage.
+- New kernel boot at 18:17:25, boot ID `f9343bc4-7b90-47ae-becd-7c673e4cf0f5`; previous boot ID
   `d7a9bf09d45642ca952c45d9b131d1ca`.
-- `Adding 16777216k swap on /dev/sdc`; `/proc/swaps` und `free -h` bestätigen
-  **16 GiB tatsächlich aktiven Swap**, zum Prüfzeitpunkt unbenutzt.
-- Rund 15,4 GiB Linux-RAM gesamt, 940 MiB belegt und 14,4 GiB verfügbar bei der
-  ersten Messung nach Wiederaufnahme.
-- `systemctl poweroff` beendete um 18:18:35 die Distribution; um 18:19:01 wurde
-  deren Dateisystem neu eingehängt. Die VM blieb innerhalb desselben Kernelboots.
+- `Adding 16777216k swap on /dev/sdc`; `/proc/swaps` and `free -h` confirm **16GiB of swap actually active**, unused
+  at check time.
+- About 15.4GiB total Linux RAM, 940MiB used, 14.4GiB available at the first measurement after recovery.
+- `systemctl poweroff` shut down the distro at 18:18:35; its filesystem was remounted at 18:19:01. The VM stayed
+  within the same kernel boot.
 
-`VmmemWSL` bilanziert die WSL-VM unter Windows. Der Prozess ist kein Beleg,
-dass ein einzelner Linux-Prozess oder eine bestimmte Distribution noch läuft.
-Mehrere Distributionen teilen Kernel, RAM und Swap; die Windows-Desktop-Oberfläche
-von Codex verwendet hier Werkzeuge in WSL. Vollständiges `wsl --shutdown` beendet
-auch die VM; ein erneuter Zugriff kann sie wieder starten.
-Primärquellen: [Microsoft WSL-Architektur](https://learn.microsoft.com/en-us/windows/wsl/about),
-[Shutdown und Terminate](https://learn.microsoft.com/en-us/windows/wsl/basic-commands).
+`VmmemWSL` accounts for the whole WSL VM under Windows; it is not evidence that any one Linux process or specific
+distro is still running — several distros share kernel, RAM, and swap, and the Codex Windows desktop app uses tools
+inside WSL here. A full `wsl --shutdown` ends the VM; a later access can restart it. Primary sources:
+[Microsoft WSL architecture](https://learn.microsoft.com/en-us/windows/wsl/about),
+[Shutdown and terminate](https://learn.microsoft.com/en-us/windows/wsl/basic-commands).
 
-## Änderung im Projekt
+## Project change
 
-- SDK, Gradle-Cache und temporäre Build-Dateien liegen künftig unter dem bereits
-  ignorierten `.local-tools/` auf dem Projektlaufwerk, nicht in `/tmp`.
-- Gradle: maximal 2 GiB Heap, 768 MiB Metaspace, ein Worker, keine parallelen
-  Projekte und kein dauerhaft laufender Daemon.
-- `tools/build-local.sh` serialisiert Builds mit `flock`, setzt die lokalen
-  Cachepfade und begrenzt einen Lauf einschließlich Wartezeit auf 20 Minuten.
-- Quellcode und Room-Schemas blieben erhalten. Laufende Shell-/Gradle-Aufrufe und
-  Dateien im tmpfs gingen verloren. Frühere Testberichte werden nicht rückwirkend
-  als neue Tests ausgegeben; aktuelle Prüfungen werden erneut ausgeführt.
+- SDK, Gradle cache, and temporary build files now live under the already-ignored `.local-tools/` on the project
+  drive, not in `/tmp`.
+- Gradle: max 2GiB heap, 768MiB metaspace, one worker, no parallel projects, no persistent daemon.
+- `tools/build-local.sh` serializes builds with `flock`, sets the local cache paths, and caps one run, including
+  wait time, at 20 minutes.
+- Source code and Room schemas survived. Running shell/Gradle calls and files in tmpfs were lost. Earlier test
+  reports are not retroactively presented as new tests; current checks are rerun.
 
-Diagnosebefehle: `journalctl --list-boots`, `journalctl -k -b -1`, `dmesg -T`,
-`free -h`, `cat /proc/swaps`, `cat /proc/sys/kernel/random/boot_id`,
-`findmnt -no TARGET,FSTYPE /tmp`.
+Diagnostic commands: `journalctl --list-boots`, `journalctl -k -b -1`, `dmesg -T`, `free -h`, `cat /proc/swaps`,
+`cat /proc/sys/kernel/random/boot_id`, `findmnt -no TARGET,FSTYPE /tmp`.
 
-Status: Speicherfehler, Neustart und Swap-Aktivierung `LIVE_VERIFIED`.
-Die Zuordnung des Python-Prozesses wurde anhand der erhaltenen Agenten-/Hostprotokolle
-untersucht, bleibt aber unbelegt (`BLOCKED`: fehlender Prozessaufruf). Erneute
-App-Gesamttests waren zu diesem Diagnosezeitpunkt `NOT_RUN`.
+**Status:** the out-of-memory error, restart, and swap activation are `LIVE_VERIFIED`. Attributing the Python
+process was investigated from the surviving agent/host logs but remains unproven (`BLOCKED`: the specific process
+call is missing). A full app test rerun was `NOT_RUN` at this diagnostic point.
 
-Bei laufendem Build r22 um 18:57 CEST: 3,1 GiB RAM belegt, 12 GiB verfügbar,
-16 GiB Swap weiterhin vollständig unbenutzt.
+During build r22 at 18:57 CEST: 3.1GiB RAM used, 12GiB available, 16GiB swap still entirely unused.
