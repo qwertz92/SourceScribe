@@ -125,16 +125,23 @@ Stand: 14. September 2026. Fehlversuche und Korrekturen im
   hatte aus dem Quelltext von Compose auf GitHub das Gegenteil geschlossen, ohne eine Fassung zu nennen. Ein Feld ohne
   Maskierung gibt seinen Inhalt dagegen im Klartext weiter; das zeigt der Test aus Runde 22, bevor er die Meldung
   prüft.
-- **ASCII-Armor endet für Bouncy Castle an seiner Fußzeile.** `PGPUtil.getDecoderStream` liest Armor über
-  `ArmoredInputStream`, und in 1.86 liefert dieser Strom nach `-----END PGP SIGNATURE-----` nichts mehr, auch wenn
-  dahinter ein zweiter Block steht; `PGPObjectFactory.nextObject()` gibt dann `null` zurück. Wer genau eine Signatur
-  verlangt, prüft zusätzlich die Bytes, die der Parser nicht gelesen hat.
+- **ASCII-Armor endet für Bouncy Castle an seiner Fußzeile, und die Fußzeile an ihrem Zeilenumbruch.**
+  `PGPUtil.getDecoderStream` liest Armor über `ArmoredInputStream`, und in 1.86 liefert dieser Strom nach
+  `-----END PGP SIGNATURE-----` nichts mehr, auch wenn dahinter ein zweiter Block steht;
+  `PGPObjectFactory.nextObject()` gibt dann `null` zurück. Die Fußzeile selbst liest er bis zu ihrem Zeilenumbruch.
+  Fehlt dieser, verschwindet angehängter Text mit ihr, und auch hinter dem Parser bleibt nichts übrig. Wer genau eine
+  Signatur verlangt, prüft deshalb die rohen Bytes hinter der Fußzeile, nicht nur, was der Parser nicht gelesen hat.
 - **Ein grüner CI-Lauf beendet keinen zeitweisen Fehler.** `ChoiceAccessibilityTest` scheiterte in drei CI-Läufen,
   bestand am Stand `7d9ce41`, ohne dass sich seine Bedingung oder der Code der App geändert hatte, und scheiterte am
-  Stand `17bc156` wieder. Einen Punkt in DEFECTS schließt erst die gefundene Ursache.
+  Stand `17bc156` wieder. Einen Punkt in DEFECTS schließt erst die gefundene Ursache. Gezeigt hat sie eine Meldung,
+  die den Zustand des gesuchten Elements nennt: Es war da, aber gesperrt, weil die App noch startete.
 - **Leitet Git Bash die Ausgabe von `wsl.exe` in eine Datei, überschreibt stderr den Anfang von stdout.** Am
   14. September auf HomeBase gezeigt: Nach `wsl.exe -e bash -lc '…' > datei 2>&1` stand in der Datei die Zeile von
   stderr an der Stelle der ersten Zeile von stdout, und von dieser blieb nur ihr Rest. `wsl.exe` schreibt beide
   Ströme von getrennten Positionen aus, die beim Start des Aufrufs am selben Punkt stehen; was vorher in der Datei
   stand, bleibt. Mit `2>&1 | cat > datei` oder einer Umleitung innerhalb von WSL bleibt alles in der Reihenfolge,
   in der es geschrieben wurde.
+- **Ein Test, der eine Bedienung prüft, wartet zuerst, bis die App sie freigibt.** `MainViewModel` führt beim Start
+  eine exklusive Aktion aus. Solange sie läuft, sperrt `state.busy` unter anderem die Sprachwahl, und `MainActivity`
+  zeigt einen Fortschrittsbalken; in der CI dauerte das länger als 25 Sekunden. In der Accessibility erscheint der
+  Balken als `android.widget.ProgressBar`: Auf `emulator-5556` fand ihn `ChoiceAccessibilityTest` noch nach 150 Sekunden, als die Aktion beim Start 600 Sekunden länger dauerte, und nicht mehr, sobald sie beendet war. Seit Runde 23 wartet der Test, bis keiner mehr zu sehen ist.

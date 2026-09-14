@@ -1,6 +1,8 @@
 # Bekannte Probleme und offene Punkte
 
-**Stand:** 14. September 2026, nach zweiundzwanzig Runden adversarischer Reviews. Diese Datei ist für den
+**Stand:** 14. September 2026, nach dreiundzwanzig Runden adversarischer Reviews; danach hat der Nutzer die
+Schleife angehalten. Nach Priorität für den Nutzer geordnet stehen die offenen Punkte in [BUGS.md](BUGS.md). Diese
+Datei ist für den
 nächsten Agenten gedacht und listet, was **nicht** vollständig erledigt ist. Ein geschlossener Punkt
 behält seine Nummer und einen kurzen Vermerk, damit Verweise aus anderen Dokumenten gültig bleiben. Was hier nicht steht, ist entweder erledigt oder in
 [STATUS.md](STATUS.md) beschrieben.
@@ -893,28 +895,17 @@ Kostenzeile urteilen über die Konfiguration, die Start anlegt. Ein vor Runde 17
   `aSlotRepairWhoseMetadataCannotFollowFailsWithStorageAndLeavesTheEngineRepaired` hält ihn fest. Gemeldet vom
   Invarianten-Reviewer der Runde 20.
 
-### 54. `ChoiceAccessibilityTest` scheitert in der CI, solange die App noch startet (mittel)
+### 54. `ChoiceAccessibilityTest` scheiterte in der CI, solange die App noch startete — erledigt am 14. September 2026
 
-- **Stelle:** `appLanguageChoiceExposesButtonSemanticsAndOpensItsDialog` in
-  `app/src/androidTest/java/app/sourcescribe/ChoiceAccessibilityTest.kt`, im Geräteschritt von
-  `.github/workflows/android.yml`.
-- **Was geschieht:** Der Test wartet 25 Sekunden vergeblich auf ein anklickbares, aktiviertes Element mit dem Label
-  der App-Sprache und dem Wert „Deutsch“ oder „English“: am 10. September in Run 34544393441, am 14. September in den
-  Runs 34838928729, 34841018134 und 34855355701. Bestanden hat er in der CI am 14. September in Run 34845673702. Der
-  Geräteschritt ruft die Tests von `app` vor denen von `extractor` auf, und nach dem Fehlschlag laufen die von
-  `extractor` in der CI nicht.
-- **Was die Meldung zeigt:** Run 34855355701 lief mit der Meldung aus `20ca738`. Das Element stand auf der Seite,
-  anklickbar, sichtbar und mit dem Wert „English“, aber mit `enabled=false`. `SettingsScreen` übergibt der Sprachwahl
-  `enabled = !state.busy`, und `Choice` reicht das an seine `Surface` weiter. `busy` setzt `MainViewModel`, solange
-  eine exklusive Aktion läuft, beim Start `coordinator.recover()`, das Laden der Zugangsdaten und `refreshEngines()`.
-  Dieses ruft `EngineUpdateManager.installations()` auf, das die gebündelte Engine kopiert, verifiziert und gegen die
-  Laufzeit prüft, solange der Manager sie nicht zwischengespeichert hat. Die App startete also noch. Welcher der
-  Schritte in der CI so lange brauchte, zeigt das Log nicht.
-- **Was nicht die Ursache ist:** die Anzeige allein. Auf `emulator-5556` besteht der Test mit 1080 × 2424 Pixeln bei
-  420 dpi und mit den 320 × 640 Pixeln bei 160 dpi, die das Log des Emulators der CI nennt.
-- **Was zum Schließen fehlt:** Der Test prüft die Bedienung der Sprachwahl, nicht, wie schnell die App startet. Er
-  muss warten, bis die App mit dem Start fertig ist, mit einer eigenen Grenze und Meldung dafür, und so in der CI
-  bestehen. Seit Runde 22 lässt die Meldung aus, was ein Feld hält, und kürzt jeden Text nach 60 Zeichen.
+Bleibt als Nummer stehen, damit Verweise gelten. `appLanguageChoiceExposesButtonSemanticsAndOpensItsDialog` wartete 25
+Sekunden auf eine aktivierte Sprachwahl und scheiterte daran in vier CI-Läufen: am 10. September in Run 34544393441, am
+14. September in den Runs 34838928729, 34841018134 und 34855355701. Den Grund zeigte Run 34855355701 mit der Meldung
+aus `20ca738`: Die Sprachwahl stand auf der Seite, anklickbar, sichtbar und mit dem Wert „English“, aber mit
+`enabled=false`, weil `MainViewModel` noch mit dem Start beschäftigt war. Seit `1fe2dad` wartet der Test
+zuerst bis zu 150 Sekunden, bis die App keinen Fortschrittsbalken mehr zeigt. Auf `emulator-5556` scheiterte der alte
+Test wie in der CI, als die Aktion beim Start 40 Sekunden länger dauerte, und der neue bestand mit derselben
+Verzögerung. Im CI-Lauf 34865638431 am Stand `1fe2dad` bestand der Geräteschritt, die Tests von `extractor`
+eingeschlossen. Wie lange die App beim Start ihre Bedienung sperrt, steht unter Punkt 57.
 
 ### 55. Bouncy Castle 1.86 lief auf keiner Android-Version vor API 37 (niedrig, unbestätigt)
 
@@ -941,6 +932,24 @@ Kostenzeile urteilen über die Konfiguration, die Start anlegt. Ein vor Runde 17
 - **Warum unbestätigt:** Ein Test müsste das Löschen genau zwischen Anlegen und Aufräumen scheitern lassen, und dafür
   hat `EngineVerifier` keine Stelle. Dass die Ansicht nach einem Fehlschlag verschwindet, hält seit Runde 22
   `aFailedInspectionRemovesItsTemporaryView` fest. Gemeldet vom Code-Reviewer der Runde 22.
+
+### 57. Die App sperrt ihre Bedienung bei jedem Start, und wie lange, ist nicht gemessen (niedrig)
+
+- **Stelle:** der `init`-Block von `MainViewModel`, der `coordinator.recover()`, `refreshCredentials()` und
+  `refreshEngines()` als eine exklusive Aktion ausführt, und `EngineUpdateManager.ensureBundledLocked`, das
+  `refreshEngines()` über `installations()` erreicht.
+- **Voraussetzung:** jeder Start des App-Prozesses. `ensureBundledLocked` hält die geprüfte Engine nur im Speicher.
+  Nach einem Neustart des Prozesses kopiert es die mitgelieferte Engine erneut in ein Arbeitsverzeichnis, prüft
+  Prüfsummen und Signatur, legt ihren Slot nur an, wenn er fehlt oder ungültig ist, und prüft sie gegen die Laufzeit.
+- **Erwartet gegen tatsächlich:** Erwartet ist eine Bedienung, die kurz nach dem Start frei ist. Solange die Aktion
+  läuft, zeigt `MainActivity` oben einen Fortschrittsbalken, und `state.busy` sperrt unter anderem das Prüfen einer
+  Quelle, den Import einer Audiodatei und den Start eines Auftrags sowie in den Einstellungen die Sprachwahl, den
+  Anbieter und die Schlüssel. In der CI dauerte das auf einem frisch installierten Emulator länger als 25 Sekunden
+  (Punkt 54); wie lange genau und in welchem Schritt, zeigt kein Log. Auf `emulator-5556` bestanden beide Tests von `ChoiceAccessibilityTest` zusammen in 24 und in 29 Sekunden, und der Test der Sprachwahl wartete dabei jeweils das Ende des Starts ab. Wie lange die Sperre selbst dauerte, ist nicht gemessen.
+- **Was zum Schließen fehlt:** die Dauer der Sperre auf einem physischen Gerät messen, beim ersten Start nach einer
+  Installation und bei einem späteren, und zeigen, welcher Schritt sie verursacht. Danach entscheiden, ob die Prüfung
+  der Engine die Bedienung sperren muss oder im Hintergrund laufen kann, ohne dass ein Auftrag eine ungeprüfte Engine
+  benutzt.
 
 ## Bewusste Entscheidungen, die wie Fehler aussehen
 

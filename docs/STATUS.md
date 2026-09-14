@@ -1859,6 +1859,86 @@ Parser lieferte, und hinter der Fußzeile lieferte er nichts. Und ein Fund über
 kann für die gebündelte Fassung falsch sein; eine Korrektur, die sich trotzdem nicht auf die Bibliothek verlässt,
 braucht einen Test an einem Fall, den die Bibliothek nicht schon abfängt.
 
+### Runde 23
+
+Gelesen haben die sechs Commits der Runde 22 ein Code- und ein Invarianten-Reviewer, beide nur lesend auf einem Export
+von `17bc156`. Beide liefen als `claude-sonnet-5`, abgelesen an den Antworten in ihren Transkripten. Keiner meldete
+einen kritischen oder hohen Fund. Der Code-Reviewer meldete einen mittleren und zwei niedrige, von denen sich einer als
+falsch erwies, der Invarianten-Reviewer einen niedrigen. Einen weiteren Fund zeigte der CI-Lauf am Stand `17bc156`.
+
+**Text, der ohne Zeilenumbruch an der Fußzeile des Armors hing, sah die Prüfung aus Runde 22 nicht.** Code-Reviewer,
+mittel. `8097c08` prüfte, was der Parser hinter der Signatur übrig ließ. Bouncy Castle 1.86 liest die Fußzeile von
+ASCII-Armor aber bis zu ihrem Zeilenumbruch: Fehlt dieser, gehört angehängter Text für Bouncy Castle zur Fußzeile, und
+hinter dem Parser bleibt nichts übrig. Der Reviewer hängte an eine Signatur ohne abschließenden Zeilenumbruch 6 und
+2000 Bytes ohne Zeilenumbruch; beide Dateien kamen durch die Prüfung wie die Signatur allein. Eine falsche Signatur
+ließ sich so nicht durchbringen, geprüft wurde weiter die eine vor der Fußzeile. `EngineVerifier` prüft bei Armor jetzt
+auch die rohen Bytes der Datei: Hinter der ersten Fußzeile darf nur Leerraum stehen, und findet es keine Fußzeile, gilt
+die Datei als ungültig; für diesen letzten Fall gibt es keinen eigenen Test. `nothingMayBeGluedToTheArmorFooter` hängt
+`SNEAKY` und eine zweite BEGIN-Zeile ohne Zeilenumbruch an und verlangt beide Male `SIGNATURE`, und dasselbe Armor ohne
+abschließenden Zeilenumbruch verifiziert wie mit ihm (`20c0689`).
+
+**Die Prüfsummen von Bouncy Castle 1.80.2 seien verwaist.** Code-Reviewer, niedrig; widerlegt. Die Build-Skripte und
+der Versionskatalog nennen diese Fassung nicht, und daraus schloss der Reviewer, nichts löse sie noch auf. Ohne ihre
+drei Einträge in `gradle/verification-metadata.xml` scheiterte aber schon `:app:help` an der Abhängigkeitsprüfung für
+die Konfiguration `classpath`, mit den Jars und POMs von bcpkix, bcprov und bcutil 1.80.2. Die POMs von `builder` und
+`apkzlib` 9.4.0 des Android-Gradle-Plugins und von `sdk-common` 32.4.0 verlangen bcpkix und bcprov in dieser Fassung.
+Die Einträge bleiben.
+
+**Die Schlusszeile der Skriptprüfung zählte die neuen Befunde nicht.** Code-Reviewer, niedrig. Seit `1c7d629` meldet
+`_check_executable_scripts` einen Pfad, den der Git-Index führt und der Baum nicht liefert. Die Schlusszeile sagte
+daneben weiter „0 unreadable“, denn diese Zahl zählt nur Dateien, die die Prüfung liest. Jetzt nennt sie auch, wie
+viele Pfade des Git-Index sich nicht lesen ließen, und der Selbsttest verlangt dort eins für das gelöschte
+`tools/gone.sh` (`5d1f2d5`).
+
+**Die Nachricht von `391ca8b` nannte ein Ergebnis, bevor sein Beleg vorlag.** Invarianten-Reviewer, niedrig. Dass die
+Debug-, Test- und Release-APKs keine Klasse von DocumentFile enthalten, stand in der Commit-Nachricht, bevor der Scan
+der APKs dieses Stands lief. Er lief danach in den Release-Gates am Stand `17bc156` und fand in keiner der vier APKs
+eine Zeichenkette mit `documentfile`; schon vorher hatte der Invarianten-Reviewer der Runde 22 die vier dex-Dateien der
+Release-APK am Stand `7d9ce41` ohne Treffer durchsucht. Die Nachricht bleibt, denn ändern ließe sie sich nur durch
+Umschreiben der Historie. Die Nachrichten der Runde 23 entstanden erst, als ihre Belege vorlagen.
+
+**`ChoiceAccessibilityTest` wartete kürzer, als die App zum Starten brauchte.** Eigener Fund aus dem CI-Lauf
+34855355701 ([Punkt 54](DEFECTS.md)). Der Test prüft die Bedienung der Sprachwahl, nicht die Dauer des Starts. Er
+wartet jetzt zuerst bis zu 150 Sekunden, bis die App die Navigation zu den Einstellungen zeigt und keinen
+Fortschrittsbalken mehr: `MainActivity` zeigt den Balken genau, solange `MainViewModel` mit einer exklusiven Aktion
+beschäftigt ist, und so lange ist die Sprachwahl gesperrt. Endet dieses Warten ohne Erfolg, sagt die Meldung das. Die
+Meldung, mit der `waitForNode` aufgibt, nennt jetzt auch, ob ein Fortschrittsbalken zu sehen war. Die Zeitgrenze
+beider Tests der Klasse stieg von 60 auf 240 Sekunden (`1fe2dad`). Im CI-Lauf 34865638431 am Stand `1fe2dad`
+bestand der Geräteschritt, die Tests von `extractor` eingeschlossen. Wie lange die App beim Start ihre Bedienung
+sperrt, misst der Test nicht ([Punkt 57](DEFECTS.md)).
+
+**Gegenprobe der Runde 23.**
+Zurückgenommen oder nachgestellt, was die Korrekturen festhalten, auf dem Baum mit allen drei Korrekturen, für die
+erste Geräteprobe mit dem Test von `17bc156`; kein Build lief neben einem Gerätelauf.
+
+- `EngineVerifier` nimmt alles an, was in den rohen Bytes hinter der Fußzeile steht: Von den 16 Tests von
+  `EngineVerifierTest` fiel genau `nothingMayBeGluedToTheArmorFooter`. `SNEAKY` kam durch die Prüfung der Signatur und
+  scheiterte erst an der fehlenden Engine, mit `HASH` statt `SIGNATURE`.
+- `_check_executable_scripts` zählt einen unlesbaren Pfad des Git-Index nicht: Der Selbsttest scheitert an der
+  Zusicherung, dass genau ein solcher Pfad gezählt wird.
+- Die exklusive Aktion beim Start dauert 40 Sekunden länger, mit dem Test von `17bc156`: Der Test scheiterte wie in der CI: Die Sprachwahl stand anklickbar, sichtbar und mit dem Wert „English“ auf der Seite, aber mit `enabled=false`.
+- Dieselbe Verzögerung mit dem neuen Test: Der Test bestand.
+- 600 Sekunden länger, mit dem neuen Test: Der Test scheiterte nach 150 Sekunden mit „The app was still busy after 150 s“ und `busy=true`.
+- Die Sprachwahl bleibt ohne Verzögerung gesperrt, mit dem neuen Test: Der Test wartete das Ende des Starts ab und scheiterte dann an der Sprachwahl, mit `enabled=false` und `busy=false`.
+
+**Gates der Runde 23.**
+Runde 23 ändert `EngineVerifier` und seinen Test in `core`, einen Test in `app`, `tools/check-repository.py` und die
+Doku. Gelaufen sind `tools/check-repository.py` mit Selbsttest und der ganze Build-Schritt der CI lokal mit allen drei
+Korrekturen: 187 JVM-Tests von `core` ohne Fehler, die APKs von `app` und die Test-APK von `extractor`, die vier
+Lintberichte ohne Befund. Auf `emulator-5556` bestanden beide Tests von `ChoiceAccessibilityTest` vor und nach den
+Gegenproben; vor und nach allen Geräteläufen dieser Runde hatte die Einstellungsdatei der App denselben SHA-256. Jede Korrektur lief vor ihrem Commit auf einem Baum, den das Gate als `17bc156` plus
+genau die drei Korrekturen bestätigte, und die Fassung von `tools/check-repository.py` im Commit, der sie ändert,
+bestand ihren Selbsttest, bevor der Commit entstand. Auf `1fe2dad`, dem letzten dieser Commits, liefen danach die
+Release-Gates der Preview 0.2.0 lokal durch: der Build, die statische Releaseprüfung, beide Suiten samt den vier
+Prozessstufen auf `emulator-5556` und der Signatur-Probelauf. Der CI-Lauf 34865638431 am selben Stand ist grün.
+
+**Die Schleife ist nicht konvergiert; nach dieser Runde hat der Nutzer sie angehalten.** Dreiundzwanzig Runden, keine
+davon leer. Die bekannten offenen Punkte stehen nach Priorität in [BUGS.md](BUGS.md), und was davon behoben wird, wählt
+der Nutzer nach dem eigenen Test der Preview 0.2.0 aus. Eine vierundzwanzigste Runde wurde nach ihrem Beginn ohne
+Bericht abgebrochen. Runde 23 fügt zwei Dinge hinzu. Eine Prüfung hinter einem Parser sieht nur, was er übrig lässt;
+was er als Rest einer Zeile verschluckt, zeigen erst die rohen Bytes. Und eine Meldung, die den Zustand des gesuchten
+Elements nennt, zeigte beim ersten Fehlschlag mit ihr den Grund, den die drei Fehlschläge davor offen ließen.
+
 ## UI-Feedback umgesetzt
 
 Auswahlfelder haben abgestimmte Label-/Wertabstände und reservieren auch bei großer

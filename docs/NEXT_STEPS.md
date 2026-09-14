@@ -2,33 +2,37 @@
 
 ## Wiederaufnahme: hier weitermachen
 
-Geschrieben am 11. September 2026, zuletzt nach der zweiundzwanzigsten Reviewrunde nachgeführt, damit die
+Geschrieben am 11. September 2026, zuletzt nach der dreiundzwanzigsten Reviewrunde nachgeführt, damit die
 Arbeit ohne Wiedereinlesen der ganzen Sitzung weitergehen kann. Reihenfolge ist Absicht.
 
 **Wo der Stand steht:** Die Reviewrunden und was sie gefunden haben, stehen in
 [STATUS.md](STATUS.md); was offen ist, mit Stelle und fehlendem Nachweis, in
 [DEFECTS.md](DEFECTS.md). Die Punktnummern unten sind die Nummern dort.
 
-### 1. Dreiundzwanzigste Reviewrunde über die Korrekturen der zweiundzwanzigsten
+### 1. Test der Preview 0.2.0 durch den Nutzer, danach die Auswahl aus BUGS
 
-Runden 3 bis 16 haben ihren wichtigsten Fund jeweils in den Korrekturen der Vorrunde gehabt, Runde 17 in einer nie
-umgesetzten Vorgabe aus S7 in [SECURITY_UPDATES.md](SECURITY_UPDATES.md), Runde 18 in der Begründung eines ADR,
-Runde 19 und Runde 20 wieder in Korrekturen der Vorrunde, dem Ersetzen eines beschädigten Slots und der Regel gegen
-Zeilennummern, Runde 21 in den Lizenzhinweisen nach dem Wechsel auf Bouncy Castle 1.86, Runde 22 in einer Korrektur
-der Vorrunde: Hinter der Signatur in Armor, deren Test Runde 21 schrieb, blieb ein zweiter Block ungelesen. Commits der
-zweiundzwanzigsten Runde sind `8097c08`, `3863da4`, `391ca8b`, `1c7d629`, `d99ff67` und `17bc156`, dazu ihr Doku-Commit; einzeln benennen, nicht als Bereich, weil `a..b` den
-Anfangscommit auslässt. Die Doku der Preview 0.2.0 entsteht erst nach ihrem Build.
+Am 14. September 2026, nach Runde 23, hat der Nutzer die Reviewschleife angehalten. Zuerst testet der Nutzer die
+Preview 0.2.0-preview.1 und wählt danach aus [BUGS.md](BUGS.md), welche bekannten Punkte behoben werden; dort steht
+jeder offene Punkt mit seiner Auswirkung und einer Priorität von P1 bis P4. Ohne diese Auswahl wird nur ein Fehler der
+Stufe P1 behoben. Eine vierundzwanzigste Runde hatte mit einem Code- und einem Invarianten-Reviewer begonnen und wurde
+ohne Bericht abgebrochen; ein Konsistenzreviewer über die Doku-Commits lief nicht.
 
-**Stand am 14. September 2026, nach Runde 22:** Die Korrekturen der Runde 22 sind committet und gepusht, ihre Funde,
-Gegenproben und Gates stehen in [STATUS.md](STATUS.md). Offen aus Runde 22 bleiben eine gescheiterte Löschung der
-Prüfansicht, deren Meldung die erste ersetzt ([Punkt 56](DEFECTS.md)), und zwei Schreibweisen, die die
-Versionsprüfung der Lizenzhinweise nicht erkennt ([Punkt 28](DEFECTS.md)). Die lokalen Release-Gates auf `17bc156`
-bestanden, der CI-Lauf auf demselben Commit scheiterte an `ChoiceAccessibilityTest`, weil die App noch startete
-([Punkt 54](DEFECTS.md)). Runde 23 hat die sechs Commits der Runde 22 mit einem Code- und einem Invarianten-Reviewer
-gelesen. Als Nächstes: deren Korrekturen und die des Tests, danach Build und Gates der Preview 0.2.0 auf dem letzten
-dieser Commits; ein Code- und ein Invarianten-Reviewer über die Korrekturen der Runde 23 und ein Konsistenzreviewer
-über die Doku-Commits der Runden 22 und 23 und den der Preview. Meldet keiner einen hohen oder mittleren Fund, kommt
-das Tag `v0.2.0-preview.1` auf den letzten Doku-Commit.
+**Stand am 14. September 2026, nach Runde 23:** Die Korrekturen der Runde 23 sind committet und gepusht, ihre Funde,
+Gegenproben und Gates stehen in [STATUS.md](STATUS.md). `ChoiceAccessibilityTest` wartet auf das Ende des Starts, und
+der CI-Lauf 34865638431 am Stand `1fe2dad` ist grün ([Punkt 54](DEFECTS.md)). Offen aus Runde 23 bleibt, wie lange die App
+beim Start ihre Bedienung sperrt ([Punkt 57](DEFECTS.md)). Am Stand `1fe2dad` ist die Preview 0.2.0 gebaut, und ihre
+Release-Gates bestanden; beschrieben wird sie im Doku-Commit nach diesem, der das Tag `v0.2.0-preview.1` bekommt.
+
+**Falls die Schleife wieder aufgenommen wird:** Runden 3 bis 16 haben ihren wichtigsten Fund jeweils in den
+Korrekturen der Vorrunde gehabt, Runde 17 in einer nie umgesetzten Vorgabe aus S7 in
+[SECURITY_UPDATES.md](SECURITY_UPDATES.md), Runde 18 in der Begründung eines ADR, Runde 19 und Runde 20 wieder in
+Korrekturen der Vorrunde, dem Ersetzen eines beschädigten Slots und der Regel gegen Zeilennummern, Runde 21 in den
+Lizenzhinweisen nach dem Wechsel auf Bouncy Castle 1.86, Runde 22 und Runde 23 in Korrekturen der Vorrunde: Hinter der
+Signatur in Armor, deren Test Runde 21 schrieb, blieb ein zweiter Block ungelesen, und hinter der Prüfung, die Runde 22
+dafür schrieb, Text ohne Zeilenumbruch an der Fußzeile. Commits der dreiundzwanzigsten Runde sind
+`20c0689`, `5d1f2d5` und `1fe2dad`; einzeln benennen, nicht als Bereich, weil
+`a..b` den Anfangscommit auslässt. Kein Reviewer hat den Doku-Commit der Runde 22, `12e1040`, gelesen, und keiner
+die Doku-Commits danach.
 
 Rein lesende Reviewer zuerst, gleichzeitig; ein verändernder danach allein. Diese Lehren gehören in den
 Auftrag:
@@ -117,20 +121,21 @@ Auftrag:
 - **Ein grüner CI-Lauf schließt keinen zeitweisen Fehler.** Runde 22: `ChoiceAccessibilityTest` bestand am Stand
   `7d9ce41` nach drei Fehlschlägen, ohne Änderung an seiner Bedingung oder am Code der App, und scheiterte am Stand
   `17bc156` wieder.
+- **Eine Prüfung hinter einem Parser sieht nicht, was der Parser verschluckt.** Runde 23: Text ohne Zeilenumbruch
+  hinter der Fußzeile von ASCII-Armor las Bouncy Castle als Rest der Fußzeile; übrig blieb nichts, und erst die rohen
+  Bytes zeigten ihn.
+- **Ein Test, der eine Bedienung prüft, wartet zuerst, bis die App sie freigibt.** Runde 23: Die Sprachwahl war in der
+  CI gesperrt, weil die App noch startete, und der Test lief in seine Zeitgrenze, bevor der Start endete. Den Grund
+  zeigte erst eine Meldung, die den Zustand des gesuchten Elements nennt.
 
 Die Jagdliste:
 
-- **Der Rest hinter der Signatur** (`8097c08`): Liest `PGPUtil.getDecoderStream` oder der Parser einen
-  Teil des Rests in einen eigenen Puffer, sodass `onlyWhitespaceRemains` ihn nicht mehr sieht, etwa bei einer binären
-  Signatur, auf die Bytes folgen, die kein Paket sind?
-- **Die unlesbaren Pfade** (`1c7d629`): Die Prüfung meldet jetzt jeden Pfad im Git-Index, den der Baum
-  nicht liefert, nicht nur Skripte. Stört das in einem Arbeitsbaum mit `sparse-checkout` oder mitten in einer
-  Änderung, die eine Datei gelöscht, aber noch nicht aus dem Index genommen hat?
-- **Das „v“ vor einer Version** (`d99ff67`): Hält das Muster jetzt etwas für die Version eines Namens aus
-  dem Versionskatalog, das keine ist?
-- **Die Meldung von `ChoiceAccessibilityTest`** (`17bc156`): Zeigt ein Knoten den Inhalt eines Feldes, ohne
-  selbst bearbeitbar zu sein, etwa eine Vorschau oder ein Zähler? Und reichen 60 Zeichen je Text, um die Ursache von
-  [Punkt 54](DEFECTS.md) zu erkennen?
+- **Die Fußzeile des Armors** (`20c0689`): Welche Fußzeilen nimmt Bouncy Castle an, die das Muster in
+  `EngineVerifier` nicht findet, und was steht vor der BEGIN-Zeile, ohne dass eine Prüfung es sieht?
+- **Die Zahl der unlesbaren Pfade** (`5d1f2d5`): Stimmt sie mit den gemeldeten Befunden überein,
+  auch bei einem Pfad, der zugleich unmerged ist?
+- **Das Warten auf das Ende des Starts** (`1fe2dad`): Kann die App ohne Fortschrittsbalken beschäftigt sein,
+  etwa zwischen zwei Aktionen, oder ein anderer Fortschrittsbalken das Warten nie enden lassen?
 - **Die Testlücken des Code-Reviewers der Runde 21:** Kein Selbsttest hält die Schlusszeile ohne Git-Index fest, und
   keiner zeigt, dass die neuen Formen gegen Zeilennummern außerhalb von `docs/` durchgehen.
 - **Der Test der gescheiterten Umbenennung der Metadaten** (`dc9e6dd`) setzt voraus, dass `rename(2)` eine
