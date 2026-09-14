@@ -1,6 +1,6 @@
 # Bekannte Probleme und offene Punkte
 
-**Stand:** 14. September 2026, nach zwanzig Runden adversarischer Reviews. Diese Datei ist für den
+**Stand:** 14. September 2026, nach einundzwanzig Runden adversarischer Reviews. Diese Datei ist für den
 nächsten Agenten gedacht und listet, was **nicht** vollständig erledigt ist. Ein geschlossener Punkt
 behält seine Nummer und einen kurzen Vermerk, damit Verweise aus anderen Dokumenten gültig bleiben. Was hier nicht steht, ist entweder erledigt oder in
 [STATUS.md](STATUS.md) beschrieben.
@@ -886,6 +886,37 @@ Kostenzeile urteilen über die Konfiguration, die Start anlegt. Ein vor Runde 17
   `aSlotRepairWhoseMetadataCannotFollowFailsWithStorageAndLeavesTheEngineRepaired` hält ihn fest. Gemeldet vom
   Invarianten-Reviewer der Runde 20.
 
+### 54. `ChoiceAccessibilityTest` scheitert in der CI und sonst nirgends (mittel, Ursache unbekannt)
+
+- **Stelle:** `appLanguageChoiceExposesButtonSemanticsAndOpensItsDialog` in
+  `app/src/androidTest/java/app/sourcescribe/ChoiceAccessibilityTest.kt`, im Geräteschritt von
+  `.github/workflows/android.yml`.
+- **Was geschieht:** Der Test wartet 25 Sekunden vergeblich auf ein anklickbares, aktiviertes Element mit dem Label
+  der App-Sprache und dem Wert „Deutsch“ oder „English“: am 10. September in Run 34544393441, am 14. September in den
+  Runs 34838928729 und 34841018134. Der Geräteschritt ruft die Tests von `app` vor denen von `extractor` auf, und
+  nach dem Fehlschlag laufen die von `extractor` in der CI nicht.
+- **Was nicht die Ursache ist:** die Anzeige allein. Auf `emulator-5556` besteht der Test mit 1080 × 2424 Pixeln bei
+  420 dpi und mit den 320 × 640 Pixeln bei 160 dpi, die das Log des Emulators der CI nennt.
+- **Vermutung, unbestätigt:** `MainViewModel` sperrt beim Start die Bedienung, während es die Wiederherstellung, die
+  Zugangsdaten und die Engines prüft, und das Auswahlfeld der Sprache ist in dieser Zeit deaktiviert. Auf einem frisch
+  installierten Emulator richtet die Prüfung der Engines erst die gebündelte Engine ein; auf `emulator-5556` liegt sie
+  schon. Das könnte in der CI länger dauern als die Wartezeit.
+- **Was zum Schließen fehlt:** ein CI-Lauf mit der Meldung aus `20ca738`, die zeigt, ob das Element fehlte,
+  deaktiviert war oder einen anderen Wert zeigte, und danach die Behebung der Ursache.
+
+### 55. Bouncy Castle 1.86 lief auf keiner Android-Version vor API 37 (niedrig, unbestätigt)
+
+- **Stelle:** `bcpg` und `bcprov` in `gradle/libs.versions.toml`, genutzt von `EngineVerifier` beim Prüfen jedes
+  Engine-Updates. `minSdk` ist 29.
+- **Was fehlt:** ein Lauf der Signaturprüfung auf API 29 bis 36. Lokal gibt es nur ein System-Image mit API 37, und
+  die CI nutzt ebenfalls API 37.
+- **Was dafür spricht, dass es hält:** Laut den Release Notes prüft der Build von 1.86 die Basisklassen jedes Moduls
+  mit AnimalSniffer gegen API-Level 26. In den drei Dateien von 1.86 verweist keine Klasse auf eine der
+  `…ValueExact`-Methoden von `java.math.BigInteger`, an denen 1.85 laut denselben Notes auf älteren Android-Versionen
+  scheiterte (STATUS, Runde 21).
+- **Was zum Schließen fehlt:** die Suite des Moduls `extractor` mit einem signierten Update auf einem Emulator mit
+  API 29.
+
 ## Bewusste Entscheidungen, die wie Fehler aussehen
 
 ### Ein gewöhnlicher Start-Tap nach „Neu vorbereiten“ genügt für die Freigabe
@@ -1081,3 +1112,8 @@ wiederholen, statt den Verlust zu übernehmen.
 Compose-BOM oder Room-Version veröffentlicht, schlägt der Lint-Lauf fehl, ohne dass sich am Code etwas
 geändert hat. Das ist beabsichtigt: Die Regel erzwingt, dass Aktualisierungen tatsächlich gemacht werden.
 Der zugehörige Ablauf ist der Abschnitt darüber.
+
+Lokal kann der Befund fehlen, während die CI an ihm scheitert: `NewerVersionAvailable` liest die neuesten Versionen
+aus `maven-metadata.xml` im Lint-Cache unter `build/intermediates/lint-cache` jedes Moduls. Dort lagen lokal Dateien
+vom 7. und 8. September, als Bouncy Castle 1.86 am 11. September erschien, und nur die CI scheiterte, bis
+`d994c23` die Version nachzog. Vor einem lokalen Lintlauf, der für die CI stehen soll, diese Verzeichnisse löschen.

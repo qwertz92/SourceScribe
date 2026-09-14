@@ -56,7 +56,9 @@ Stand: 14. September 2026. Fehlversuche und Korrekturen im
 - **„Internal error: Unexpected lint invalid arguments“ kann Speichermangel sein.** In Runde 16 endete ein Lintlauf
   so; im Kernelprotokoll von WSL stand eine fehlgeschlagene Seitenanforderung beim Lesen eines Verzeichnisses über
   9p. Ein zweiter Lauf, nachdem der Speicher wieder frei war, lief durch. Nicht den Code verdächtigen, sondern
-  `free -m` und `dmesg` lesen und die Gradle-Aufrufe teilen.
+  `free -m` und `dmesg` lesen und die Gradle-Aufrufe teilen. In Runde 21 zeigte sich dieselbe Meldung von `dmesg`, eine
+  gescheiterte Seitenanforderung der Ordnung 4 in `p9pdu_readf`, als `Could not read directory path` in
+  `mergeDebugAndroidTestResources`; der nächste Build derselben Aufgabe lief durch.
 - **Lint vor jedem Commit einer UI-Änderung.** `1b2dc45` ging mit einem Lintfehler (`ModifierParameter`) in den
   Baum, weil Lint erst im Gate danach lief.
 - **K2 zieht Smart-Casts durch lokale Boolean-`val`s.** Stammt `existingHealthy` aus `existing?.healthy == true`,
@@ -102,3 +104,17 @@ Stand: 14. September 2026. Fehlversuche und Korrekturen im
   `EISDIR`, und `Files.move` mit `ATOMIC_MOVE` meldet eine `IOException`. Auf dem Emulator mit API 37 zeigt das
   `aSlotRepairWhoseMetadataCannotFollowFailsWithStorageAndLeavesTheEngineRepaired`, der mit `STORAGE` endet. Ein Test
   kann so die zweite von zwei Umbenennungen gezielt scheitern lassen: Er legt ein Verzeichnis an ihr Ziel.
+- **`grep -l` zählt Dateien, in denen eine Zeichenkette steht, keine Aufrufe.** `d994c23` nannte 55 Klassen von
+  `bcprov` 1.85.2, die `BigInteger.intValueExact` aufrufen, und der Release-Reviewer der Runde 21 bestätigte die Zahl
+  mit `grep -lr intValueExact`. Die Zeichenkette steht auch in Klassen, die gleichnamige Methoden von Bouncy Castle
+  selbst aufrufen, und keine Klasse ruft die von `BigInteger` auf. Aufrufe stehen als Methodenverweise im
+  Konstantenpool einer Klasse; wer sie zählt, liest diese, mit `javap -c` oder einem kleinen Leser, und prüft den
+  Leser an einem Verweis, der sicher vorkommt.
+- **Lint vergleicht Versionen mit einem Cache.** `NewerVersionAvailable` liest die neuesten Versionen aus
+  `maven-metadata.xml` unter `build/intermediates/lint-cache` jedes Moduls. Lokal stammten sie vom 7. und
+  8. September, und so scheiterte vom 11. bis 14. September nur die CI an Bouncy Castle 1.86. Vor einem lokalen
+  Lintlauf, der für die CI stehen soll, diesen Cache löschen.
+- **Ein Beleg nennt den Code, der lief, nicht nur den HEAD.** Die Gates der Runde 20 trugen `HEAD=b204a47` und liefen
+  mit Code, der erst danach als `dc9e6dd` committet wurde; an diesen Code band den Lauf nur der Fingerabdruck
+  daneben. Die Gates der Runde 21 prüfen, dass der Baum HEAD plus genau die benannten Korrekturen ist, und schreiben
+  das in ihre Ausgabe.

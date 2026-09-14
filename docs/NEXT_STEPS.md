@@ -2,40 +2,31 @@
 
 ## Wiederaufnahme: hier weitermachen
 
-Geschrieben am 11. September 2026, zuletzt nach der zwanzigsten Reviewrunde nachgeführt, damit die
+Geschrieben am 11. September 2026, zuletzt nach der einundzwanzigsten Reviewrunde nachgeführt, damit die
 Arbeit ohne Wiedereinlesen der ganzen Sitzung weitergehen kann. Reihenfolge ist Absicht.
 
 **Wo der Stand steht:** Die Reviewrunden und was sie gefunden haben, stehen in
 [STATUS.md](STATUS.md); was offen ist, mit Stelle und fehlendem Nachweis, in
 [DEFECTS.md](DEFECTS.md). Die Punktnummern unten sind die Nummern dort.
 
-### 1. Einundzwanzigste Reviewrunde über die Korrekturen der zwanzigsten
+### 1. Zweiundzwanzigste Reviewrunde über die Korrekturen der einundzwanzigsten
 
 Runden 3 bis 16 haben ihren wichtigsten Fund jeweils in den Korrekturen der Vorrunde gehabt, Runde 17 in einer nie
 umgesetzten Vorgabe aus S7 in [SECURITY_UPDATES.md](SECURITY_UPDATES.md), Runde 18 in der Begründung eines ADR,
 Runde 19 und Runde 20 wieder in Korrekturen der Vorrunde, dem Ersetzen eines beschädigten Slots und der Regel gegen
-Zeilennummern. Commits der zwanzigsten Runde sind `3bca289`, `203114f`, `8b3ffb8` und
-`dc9e6dd`, dazu ihr Doku-Commit über `152d7a6`; einzeln benennen, nicht als Bereich, weil `a..b` den
-Anfangscommit auslässt.
+Zeilennummern, Runde 21 in den Lizenzhinweisen nach dem Wechsel auf Bouncy Castle 1.86. Commits der
+einundzwanzigsten Runde sind `eb654ae`, `c523a16`, `3e99231`, `5397ae9`, `20ca738`,
+`c7089f6`, `6415661` und `035d1e8`, dazu ihr Doku-Commit; einzeln benennen, nicht als Bereich,
+weil `a..b` den Anfangscommit auslässt. Den Doku-Commit der Runde 20, `eb4eb1d`, hat noch kein Reviewer gelesen.
 
-**Stand am 14. September 2026:** Die Code- und Invarianten-Reviewer der Runde 21 haben die vier Commits
-der Runde 20 auf einem Export von `dc9e6dd` gelesen, beide als `claude-sonnet-5`. Jeder meldete einen
-niedrigen Fund, keiner einen höheren. Der Code-Reviewer zeigte, dass `_check_executable_scripts` bei einem ungelösten
-Merge-Konflikt jeden Eintrag eines Pfades im Git-Index einzeln auswertet: Es zählt eine Datei dreimal und übersieht
-einen falschen Modus, wenn der Konflikt in der Shebang-Zeile liegt. Dasselbe gilt für `git ls-files --cached`, aus
-dem `_tracked_paths` die Liste der gelesenen Dateien nimmt. Der Invarianten-Reviewer bemerkte, dass die Belege der
-Runde 20 `HEAD=b204a47` tragen, obwohl Build und Suite schon den Code von `dc9e6dd` liefen. In der Sache ist
-das ausgeräumt: Aus dem Baum von `dc9e6dd` gegen `b204a47` nachgerechnet, ergibt sich genau der
-aufgezeichnete Fingerabdruck. Danach kamen Bouncy Castle 1.86 (`d994c23`) und die Version 0.2.0 (`152d7a6`)
-hinzu; ihre Commits liest ein weiterer Reviewer. Offen für Runde 21 sind die Korrektur des Merge-Fundes und zwei
-eigene Funde: `THIRD_PARTY_NOTICES.md` und die Hinweise in der App nennen noch Bouncy Castle 1.85, und
-`EngineVerifierTest` prüft das Fixture direkt in `extractor/src/main/res/raw`, neben das `EngineVerifier` seine
-Prüfansicht legt, sodass ein abgebrochener Testlauf dort eine Datei zurücklassen kann. Dazu kommt ein Gerätefehler der
-CI: `ChoiceAccessibilityTest` wartete am 10. September vergeblich auf die Wahl der App-Sprache, und ebenso im ersten
-CI-Lauf mit Bouncy Castle 1.86, Run 34838928729. Der bestand Build und Lint und scheiterte im Geräteschritt allein an
-diesem Test; die übrigen sechs Fehlschläge im Bericht sind Tests, deren Annahme nicht erfüllt war, und die Suite des
-Moduls `extractor` lief danach nicht mehr. Der Emulator der CI zeigt 320 × 640 Pixel, `emulator-5556` 1080 × 2424 bei
-420 dpi.
+**Stand am 14. September 2026, nach Runde 21:** Die Korrekturen der Runde 21 sind committet und gepusht, ihre
+Funde, Gegenproben und Gates stehen in [STATUS.md](STATUS.md). Offen aus Runde 21 ist, dass README, STATUS, HANDOFF
+und TRY_PREVIEW die Version 0.2.0 nicht kennen; das holt der Doku-Commit der Preview nach, der die Hashes der APK und
+die Ergebnisse der Release-Gates braucht. Ob `ChoiceAccessibilityTest` in der CI an einem fehlenden, deaktivierten
+oder anders beschrifteten Element scheitert, zeigt erst ein CI-Lauf mit der neuen Meldung ([Punkt 54](DEFECTS.md)).
+Als Nächstes: ein Code- und ein Invarianten-Reviewer über die acht Commits der Runde 21 und ein Konsistenzreviewer
+über `eb4eb1d` und den Doku-Commit der Runde 21; danach, wenn keiner einen hohen oder mittleren Fund meldet, Build
+und Gates der Preview 0.2.0 auf dem letzten Code-Commit.
 
 Rein lesende Reviewer zuerst, gleichzeitig; ein verändernder danach allein. Diese Lehren gehören in den
 Auftrag:
@@ -108,15 +99,25 @@ Auftrag:
   beide Reviewer fanden es an den Modi in Git. Den Modus aus HEAD übernehmen und `git show --summary` lesen.
 - **Eine neue Regel braucht Gegenbeispiele in beide Richtungen, bevor sie gilt.** Runde 20: Die Regel gegen
   Zeilennummern kannte die drei Formen aus DEFECTS, nicht den Linkanker auf eine Zeile.
+- **Eine Zahl aus einer Textsuche zählt Zeichenketten, keine Aufrufe.** Runde 21: `d994c23` nannte 55 Klassen, die
+  eine Methode aufrufen, die ältere Android-Versionen nicht haben, und der Release-Reviewer bestätigte die Zahl mit
+  derselben Suche. Keine Klasse ruft sie auf.
+- **Ein Versionswechsel trifft jede Datei, die die Version nennt.** Runde 21: Nach Bouncy Castle 1.86 nannten beide
+  Lizenzhinweise 1.85, und die Statusdokumente kannten die Version 0.2.0 nicht.
 
 Die Jagdliste:
 
-- **`_check_executable_scripts`** (`3bca289`): Die Modi kommen aus dem Git-Index, der Inhalt aus dem
-  Arbeitsbaum. Was meldet die Prüfung für ein Skript, das im Index anders aussieht als im Baum, und für eines unter
-  einem Verzeichnis, das nur zufällig `src` heißt? Ohne Git-Index sagt es die Schlusszeile; kann die CI je ohne Index
-  laufen, ohne dass es auffällt?
-- **Die Muster gegen Zeilennummern** (`203114f`): Welche Form eines Zeilenverweises kommt noch durch, und welcher
-  gewöhnliche Satz in `docs/` wird fälschlich abgewiesen?
+- **Die Einträge je Seite** (`eb654ae`): Welche anderen Zustände eines Pfades im Git-Index ändern, was
+  `git ls-files --stage` meldet, etwa ein Pfad, der nur im Index steht, oder einer mit `skip-worktree`?
+- **Die Versionen in den Lizenzhinweisen** (`3e99231`): Welche Schreibweise kommt durch, etwa „v1.86“, eine
+  Version in einer eigenen Tabellenspalte oder ein Name, der im Text anders heißt als im Versionskatalog?
+- **Der Vergleich der Lizenzhinweise** (`035d1e8`): Gibt es eine weitere Kopie, die niemand vergleicht?
+- **Die Meldung von `ChoiceAccessibilityTest`** (`20ca738`): Kann sie Text in ein CI-Log schreiben, der dort nicht
+  hingehört, etwa einen Schlüssel oder ein Transkript, wenn der Test auf einem anderen Bildschirm scheitert?
+- **Die Tests mit Armor** (`c7089f6`): Was nimmt `ArmoredInputStream` von 1.86 sonst an, etwa Kopfzeilen, Text vor
+  dem Armor oder zwei Blöcke hintereinander, und endet jedes davon als `SIGNATURE`?
+- **Die Testlücken des Code-Reviewers der Runde 21:** Kein Selbsttest hält die Schlusszeile ohne Git-Index fest, und
+  keiner zeigt, dass die neuen Formen gegen Zeilennummern außerhalb von `docs/` durchgehen.
 - **Der Test der gescheiterten Umbenennung der Metadaten** (`dc9e6dd`) setzt voraus, dass `rename(2)` eine
   Datei nicht über ein Verzeichnis benennt. Gilt das auf jedem Dateisystem, auf dem App-Daten liegen können?
 - **Die Testlücken des Code-Reviewers der Runde 19:** eine symbolische Verknüpfung auf eine Verknüpfung an der Stelle

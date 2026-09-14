@@ -3,9 +3,9 @@
 **Stand:** 14. September 2026. **Freigabe:** Persönliche Preview; vollständige v1 weiterhin blockiert.
 Der Preview-Abschluss vom 8. September steht unten; seither ist die Nutzerrückmeldung vom
 10. September eingearbeitet, siehe den nächsten Abschnitt. **Die Testzahlen weiter unten in diesem
-Abschnitt sind der Stand vom 8. September und nicht der heutige.** Heute, nach Runde 20, sind es 182
+Abschnitt sind der Stand vom 8. September und nicht der heutige.** Heute, nach Runde 21, sind es 184
 JVM-Tests im Modul `core`, 207 Instrumentierungstests im Modul `app` und 50 im Modul `extractor`,
-zusammen 439, davon 433 ausgeführt, `core` zuletzt im Build für Bouncy Castle 1.86, `app` im Gate der Runde 18; die
+zusammen 441, davon 435 ausgeführt, `core` im Gate der Runde 21, `app` vollständig zuletzt im Gate der Runde 18; die
 Runde-11-Passage sagt, warum die Tests im Modul `extractor` zehn Runden lang in keiner Gate-Meldung vorkamen.
 Diese Zahlen standen bis Runde 14 unter dem Wort „Heute“ auf dem Stand der
 zwölften Runde — die Gate-Zahlen einer Runde stehen in ihrer eigenen Passage, und dieser Satz oben muss
@@ -1645,6 +1645,116 @@ alle.
 Werkzeug, das Commits aus Textersetzungen baut, schreibt mehr als Text: Das der Runde 19 legte den Dateimodus fest,
 und keine Prüfung sah Dateimodi an. Und eine neue Regel braucht Gegenbeispiele in beide Richtungen, bevor sie gilt:
 Die gegen Zeilennummern kannte genau die Formen, die das Dokument schon benutzt hatte.
+
+### Runde 21
+
+Gelesen haben die vier Commits der Runde 20 ein Code- und ein Invarianten-Reviewer auf einem Export von `dc9e6dd`,
+die zwei Commits für Bouncy Castle 1.86 (`d994c23`) und die Version 0.2.0 (`152d7a6`) ein Release-Reviewer, alle nur
+lesend. Alle drei liefen als `claude-sonnet-5`, abgelesen an den Antworten in ihren Transkripten. Keiner meldete einen
+kritischen oder hohen Fund. Der Code- und der Invarianten-Reviewer meldeten je einen niedrigen, der Release-Reviewer
+drei mittlere und einen niedrigen; dazu kommen eigene Funde.
+
+**Ein Pfad mitten in einem Merge wurde einmal je Seite gezählt.** Code-Reviewer, niedrig. Solange ein Konflikt nicht
+gelöst ist, führt der Git-Index einen Pfad einmal je Seite, und `git ls-files --stage` wie `--cached` nennen ihn so
+oft. `_check_executable_scripts` zählte eine Datei deshalb dreimal. Lag der Konflikt in der Shebang-Zeile, begann die
+Datei im Baum mit Konfliktmarkern, und ein falscher Modus auf einer Seite blieb ungemeldet. Jetzt meldet die Prüfung
+einen solchen Pfad einmal als ungelöst im Git-Index und zählt ihn nicht, und `_tracked_paths` liest jede Datei einmal.
+Der Selbsttest baut zwei Pfade mit je drei Einträgen im Index, einen davon mit dem Konflikt in der ersten Zeile
+(`eb654ae`). In der CI tritt der Fall nicht auf, weil `actions/checkout` einen einzelnen Commit auscheckt.
+
+**Die Belege der Runde 20 waren mit einem HEAD beschriftet, der nicht den Code enthielt, der lief.**
+Invarianten-Reviewer, niedrig. Build und Suite der Runde 20 tragen `HEAD=b204a47`, liefen aber schon mit dem Test,
+der erst danach als `dc9e6dd` committet wurde. Welcher Code lief, sagt der Fingerabdruck daneben: Aus dem Baum von
+`dc9e6dd` gegen `b204a47` nachgerechnet, ergibt er genau den aufgezeichneten Wert. Die Gates der Runde 21 schreiben
+außerdem in ihre Ausgabe, dass der Baum HEAD plus genau die benannten Korrekturen ist, und brechen sonst ab.
+
+**Die Lizenzhinweise nannten Bouncy Castle 1.85.** Release-Reviewer, mittel; vorher als eigener Fund notiert.
+`THIRD_PARTY_NOTICES.md` und die Kopie, die die App anzeigt, nannten nach `d994c23` weiter `bcpg` 1.85 und `bcprov`
+1.85.2 (`c523a16`). `tools/check-repository.py` meldet jetzt eine Version in beiden Dateien, die der Versionskatalog
+anders führt. Über den Stand vor dieser Korrektur meldete es in beiden Dateien genau die zwei Zeilen mit den alten
+Versionen, jede für `bcpg` und für `bcprov` (`3e99231`). Nebenbei vermerkte der Reviewer, dass die beiden Dateien voneinander abweichen: Seit `812c4dc`,
+das die Abhängigkeit DocumentFile entfernte, nannte nur noch die Datei im Repository ihren Namen. In keiner dex-Datei
+der Release-APK vom 14. September liegt eine Klasse unter `androidx/documentfile`. Die Datei nennt den Namen nicht
+mehr (`6415661`), und die Prüfung meldet die erste Zeile, in der die Kopie der App abweicht (`035d1e8`).
+
+**Die Statusdokumente kennen die Version 0.2.0 nicht.** Release-Reviewer, mittel. README, STATUS, HANDOFF und
+TRY_PREVIEW beschreiben nach `152d7a6` nur die erste Preview. Das bleibt offen, bis der Doku-Commit der Preview 0.2.0
+entsteht; der braucht die Hashes der APK und die Ergebnisse der Release-Gates.
+
+**Keine Signatur in ASCII-Armor war getestet, und die Grenze der Signatur nicht von ihrem Parser zu unterscheiden.**
+Release-Reviewer, mittel, und eigener Fund. `EngineVerifier` gibt die geladene Signatur an `PGPUtil.getDecoderStream`,
+das auch ASCII-Armor liest; die einzige Signatur im Testbaum ist binär, und durch den Parser für Armor ging in einem
+Test nur der vertrauenswürdige Schlüssel aus den Ressourcen der App. Ein neuer Test verifiziert eine Kopie des
+Fixtures mit der offiziellen Signatur in Armor und verlangt dasselbe Ergebnis wie mit der binären. Ein zweiter baut
+Armor aus wiederholten Prüfsummenzeilen „=twTO“, mit denen Bouncy Castle vor 1.86 laut den Release Notes ab etwa
+360 KB den Stack überlief, mit einem `StackOverflowError`, den der `catch` von `Exception` in `EngineVerifier` nicht
+fängt. 400 KiB davon muss die Grenze von 32 KiB mit ihrer eigenen Meldung abweisen, und was in die Grenze passt, muss
+als `SIGNATURE` enden (`c7089f6`). Die Meldung ist nötig: Die Nullen in
+`inputLimitsAreEnforcedBeforeCryptographicWork` scheitern ohne die Grenze mit demselben Code am Parser, sodass kein
+Test die Grenze festhielt.
+
+**Die Commit-Nachricht von `d994c23` zählte Zeichenketten statt Aufrufe.** Eigener Fund beim Prüfen des vierten Funds
+des Release-Reviewers, niedrig. Sie sagt, 55 Klassen von `bcprov` 1.85.2 verwiesen auf die Methode, die Android laut
+den Release Notes erst ab API-Level 33 hat, und der Reviewer bestätigte die Zahl mit `grep -lr intValueExact`. Beides
+zählt Klassen, in denen die Zeichenkette steht, also auch solche, die `ASN1Integer.intValueExact` oder
+`BigIntegers.intValueExact` aus Bouncy Castle selbst aufrufen. Aus den Methodenverweisen im Konstantenpool jeder Klasse
+gelesen, verweist in `bcprov-jdk18on-1.85.2.jar`, `bcutil-jdk18on-1.85.jar` und `bcpg-jdk18on-1.85.jar` aus dem
+Gradle-Cache keine Klasse auf `intValueExact`, `longValueExact`, `shortValueExact` oder `byteValueExact` von
+`java.math.BigInteger`, und in den drei Dateien von 1.86 ebenso keine. `BigIntegers` rechnet in 1.85.2 mit `bitLength`
+und `intValue`. Derselbe Leser fand die Verweise auf die gleichnamigen Methoden von Bouncy Castle. Der Fehler aus den
+Release Notes steckte also nicht in der Fassung, die die App bis `d994c23` bündelte. Die Nachricht bleibt in der
+Historie; richtiggestellt ist sie hier.
+
+**`ChoiceAccessibilityTest` scheitert nur in der CI.** Eigener Fund. Im Geräteschritt der CI wartet der Test
+vergeblich auf die Wahl der App-Sprache: am 10. September in Run 34544393441 und am 14. September in den Runs
+34838928729 (`152d7a6`) und 34841018134 (`eb4eb1d`). Dazwischen kam die CI nicht bis zu diesem Schritt, weil Lint im
+Build-Schritt an `NewerVersionAvailable` für Bouncy Castle scheiterte; das behob `d994c23`. Auf `emulator-5556` besteht
+der Test, auch mit der Anzeige des Emulators der CI, den ihr Log mit 320 × 640 Pixeln bei 160 dpi nennt. Bei einer
+Zeitüberschreitung nennt der Test jetzt bis zu fünf anklickbare Elemente mit dem Label der Sprachwahl samt ihrem
+Zustand und die ersten Texte des Fensters (`20ca738`). Die Ursache ist [Punkt 54](DEFECTS.md).
+
+**`EngineVerifierTest` prüfte das Fixture im Quellbaum.** Eigener Fund. `verifiesOfficialFixtureAndMetadata`
+verifizierte die Engine direkt in `extractor/src/main/res/raw`, und `EngineVerifier` legt seine Prüfansicht neben die
+geprüfte Datei; ein abgebrochener Testlauf hätte sie dort liegen lassen können. Jetzt prüft der Test eine Kopie in
+einem eigenen Verzeichnis und verlangt, dass danach nur die Kopie darin liegt (`5397ae9`).
+
+**Gegenprobe der Runde 21.**
+Zurückgenommen, was die Korrekturen festhalten, jeweils auf dem Stand vor ihrem Commit; kein Build lief neben einem
+Gerätelauf.
+
+- `_tracked_paths` ohne Entdopplung: Der Selbsttest scheitert an der Zusicherung über die gelesenen Dateien, zehn
+  statt sechs.
+- `_check_executable_scripts` ohne Behandlung der Einträge je Seite: Der Selbsttest scheitert, weil
+  `tools/conflicted.sh` zusätzlich als Skript mit falschem Modus gemeldet wird.
+- `_check_notice_versions` nicht aufgerufen: Der Selbsttest scheitert, weil der erwartete Befund fehlt.
+- `EngineVerifier` räumt seine Prüfansicht nicht mehr: Von den elf Tests von `EngineVerifierTest` fiel genau
+  `verifiesOfficialFixtureAndMetadata`, mit der Prüfansicht in der Meldung.
+- `ChoiceAccessibilityTest` wartet auf einen Sprachwert, den kein Element zeigt: Der Test scheiterte nach 25 Sekunden
+  mit der neuen Meldung. Sie nannte das Element der App-Sprache anklickbar, aktiviert und sichtbar mit dem Wert
+  „English“, dazu die Texte des Einstellungsbildschirms. Der erste Versuch kam nicht zum Lauf: Gradle konnte ein
+  Verzeichnis unter `app/build/intermediates` auf `/mnt/c` nicht lesen, und `dmesg` in WSL nennt 16 Sekunden vor dem
+  Ende dieses Builds eine fehlgeschlagene Seitenanforderung beim Lesen über 9p.
+- `EngineVerifier` gibt die Signatur ohne `getDecoderStream` an den Parser: Von den dreizehn Tests von
+  `EngineVerifierTest` fiel genau `anArmoredCopyOfTheOfficialSignatureVerifiesLikeTheBinaryOne`.
+- Die Grenze der Signatur ist sechzehnmal so groß: Von den dreizehn Tests fiel genau
+  `repeatedArmorChecksumLinesAreRefusedByTheSignatureLimitBeforeAnyParsing`, und `inputLimitsAreEnforcedBeforeCryptographicWork` bestand.
+- `THIRD_PARTY_NOTICES.md` nennt DocumentFile wieder: Die Prüfung über das Repository scheitert mit genau einem
+  Befund, der vierzigsten Zeile der Kopie der App.
+
+**Gates der Runde 21.**
+Runde 21 ändert Tests in `core` und `app`, `tools/check-repository.py`, beide Lizenzhinweise und die Doku. Gelaufen
+sind `tools/check-repository.py` mit Selbsttest; die JVM-Tests von `core`, zuerst 182 mit den ersten vier Korrekturen,
+dann 184 mit allen, jeweils ohne Fehler; Build, Test-APK und Lint des Moduls `app` ohne Befund; und
+`ChoiceAccessibilityTest` auf `emulator-5556` vor und nach seiner Gegenprobe, bestanden. Jede Korrektur lief vor ihrem
+Commit auf einem Baum, den das Gate als HEAD plus genau die benannten Korrekturen bestätigte, und die Fassung von
+`tools/check-repository.py` in jedem Commit, der sie ändert, bestand ihren Selbsttest, bevor der Commit entstand. Nach
+dem letzten Commit bestand der Lauf über das Repository. Die Suite des Moduls `app` lief zuletzt vollständig im Gate
+der Runde 18, die von `extractor` in Runde 20; beide laufen in den Release-Gates der Preview 0.2.0 wieder. Vor und nach
+den Geräteläufen hatte die Einstellungsdatei der App denselben SHA-256.
+
+**Die Schleife ist nicht konvergiert.** Einundzwanzig Runden, keine davon leer. Runde 21 fügt zwei Dinge hinzu. Eine
+Zahl aus einer Textsuche zählt Zeichenketten, und ein Reviewer, der sie mit derselben Suche nachprüft, bestätigt den
+Fehler. Und ein Versionswechsel ändert mehr als den Katalog: Die Lizenzhinweise nannten die Version auch.
 
 ## UI-Feedback umgesetzt
 
