@@ -20,6 +20,7 @@ import app.sourcescribe.core.Outcome
 import app.sourcescribe.core.Phase
 import app.sourcescribe.core.Provenance
 import app.sourcescribe.core.Provider
+import app.sourcescribe.core.ProviderErrorCode
 import app.sourcescribe.core.Region
 import app.sourcescribe.core.TranscriptWarnings
 import app.sourcescribe.core.Translation
@@ -249,133 +250,216 @@ internal fun byteSize(bytes: Long): String {
     Generation.UNKNOWN -> R.string.origin_unknown
 })
 
-@Composable internal fun messageText(code: String): String = when (code) {
-    "NO_ACCEPTABLE_CAPTIONS" -> stringResource(R.string.no_captions)
-    "NO_AUDIO" -> stringResource(R.string.no_audio)
-    "CHOOSE_AUDIO_TRACK" -> stringResource(R.string.audio_track_choose_language)
-    "AUDIO_TRACK_CHANGED" -> stringResource(R.string.audio_track_changed)
-    "IMPORTED_AUDIO_NOT_FOUND" -> stringResource(R.string.reimport_audio)
-    "MISSING_RETRY_DATA" -> stringResource(R.string.missing_retry_data)
-    "MISSING_RETRY_RESPONSE_SAVED" -> stringResource(R.string.missing_retry_response_saved)
-    "JOB_CONFIG_INVALID" -> stringResource(R.string.job_config_invalid)
-    "ARTIFACT_FILE_MISSING" -> stringResource(R.string.artifact_file_missing)
-    "SCHEDULING_FAILED" -> stringResource(R.string.scheduling_failed)
-    "ACTION_BUSY" -> stringResource(R.string.action_busy)
-    "CHOOSE_CAPTION_TRACK" -> stringResource(R.string.choose_caption_help)
-    "CAPTION_TRACK_CHANGED" -> stringResource(R.string.caption_track_changed)
-    "CREDENTIAL_NOT_FOUND", "KEY_NOT_FOUND" -> stringResource(R.string.restore_key)
+/**
+ * How [messageText] words one code, kept as data so that a test can walk every code the app shows through
+ * [messageSpec] without composing anything. A code without an entry reaches the reader only as the generic sentence
+ * and its technical name (defect 4).
+ */
+internal sealed interface MessageSpec {
+    /** One sentence. */
+    data class Text(val text: Int) : MessageSpec
+
+    /** A reason, named with the step the code's prefix says it happened in; see [stepText]. */
+    data class Step(val code: String, val reason: Int) : MessageSpec
+
+    /** Two sentences joined by a middle dot. */
+    data class Joined(val first: Int, val second: Int) : MessageSpec
+
+    /** A message followed by a note of its own; see [rawSavedSpec]. */
+    data class WithNote(val base: MessageSpec, val note: Int) : MessageSpec
+}
+
+@Composable internal fun messageText(code: String): String {
+    val spec = messageSpec(code)
+        ?: return stringResource(R.string.operation_failed) + "\n" + stringResource(R.string.error_detail, code)
+    return messageText(spec)
+}
+
+@Composable private fun messageText(spec: MessageSpec): String = when (spec) {
+    is MessageSpec.Text -> stringResource(spec.text)
+    is MessageSpec.Step -> stepText(spec.code, spec.reason)
+    is MessageSpec.Joined -> stringResource(spec.first) + " · " + stringResource(spec.second)
+    is MessageSpec.WithNote -> messageText(spec.base) + " " + stringResource(spec.note)
+}
+
+internal fun messageSpec(code: String): MessageSpec? = when (code) {
+    "NO_ACCEPTABLE_CAPTIONS" -> MessageSpec.Text(R.string.no_captions)
+    "NO_AUDIO" -> MessageSpec.Text(R.string.no_audio)
+    "CHOOSE_AUDIO_TRACK" -> MessageSpec.Text(R.string.audio_track_choose_language)
+    "AUDIO_TRACK_CHANGED" -> MessageSpec.Text(R.string.audio_track_changed)
+    "IMPORTED_AUDIO_NOT_FOUND" -> MessageSpec.Text(R.string.reimport_audio)
+    "MISSING_RETRY_DATA" -> MessageSpec.Text(R.string.missing_retry_data)
+    "MISSING_RETRY_RESPONSE_SAVED" -> MessageSpec.Text(R.string.missing_retry_response_saved)
+    "JOB_CONFIG_INVALID" -> MessageSpec.Text(R.string.job_config_invalid)
+    "ARTIFACT_FILE_MISSING" -> MessageSpec.Text(R.string.artifact_file_missing)
+    "SCHEDULING_FAILED" -> MessageSpec.Text(R.string.scheduling_failed)
+    "ACTION_BUSY" -> MessageSpec.Text(R.string.action_busy)
+    "CHOOSE_CAPTION_TRACK" -> MessageSpec.Text(R.string.choose_caption_help)
+    "CAPTION_TRACK_CHANGED" -> MessageSpec.Text(R.string.caption_track_changed)
+    "CREDENTIAL_NOT_FOUND", "KEY_NOT_FOUND" -> MessageSpec.Text(R.string.restore_key)
     "KEY_LOCKED_OR_INVALIDATED", "CREDENTIAL_LOCKED_OR_INVALIDATED", "KEY_CORRUPT", "CREDENTIAL_CORRUPT" ->
-        stringResource(R.string.key_unavailable_help)
-    "KEY_STORAGE", "CREDENTIAL_STORAGE" -> stringResource(R.string.key_storage_help)
-    "REMOTE_DELETE_CONFIRMED" -> stringResource(R.string.remote_delete_confirmed)
-    "NO_REMOTE_HANDLE" -> stringResource(R.string.no_remote_handle)
-    "DELETE_PENDING" -> stringResource(R.string.delete_pending)
-    "NO_MISSING_BRANCH" -> stringResource(R.string.no_missing_branch)
-    "JOB_STILL_RUNNING" -> stringResource(R.string.job_still_running)
-    "SUBMISSION_UNCERTAIN" ->
-        stringResource(R.string.state_submission_uncertain) + " · " + stringResource(R.string.remote_may_continue)
-    "EXPORT_PENDING", "EXPORT_WRITING" -> stringResource(R.string.export_pending)
-    "EXTERNAL_DOCUMENT_MISSING" -> stringResource(R.string.external_document_missing)
-    "EXPORT_INTERRUPTED" -> stringResource(R.string.export_interrupted)
-    "EXPORT_FAILED" -> stringResource(R.string.export_failed)
-    "EXPORT_SCHEDULING_FAILED" -> stringResource(R.string.export_scheduling_failed)
-    "JOBS_CREATED" -> stringResource(R.string.jobs_created)
-    "KEY_SAVED" -> stringResource(R.string.key_saved)
-    "PRESET_SAVED" -> stringResource(R.string.preset_saved)
-    "DEFAULTS_SAVED" -> stringResource(R.string.defaults_saved)
-    "FILE_NAME_SAVED" -> stringResource(R.string.file_name_saved)
-    "CLIPBOARD_EMPTY" -> stringResource(R.string.clipboard_empty)
-    "ENGINE_CURRENT" -> stringResource(R.string.engine_current)
-    "ENGINE_ACTIVE" -> stringResource(R.string.engine_active)
-    "EXPORT_EXPORTED" -> stringResource(R.string.export_complete)
-    "EXPORT_PERMISSION_REQUIRED", "PERMISSION_REQUIRED" -> stringResource(R.string.export_permission_required)
-    "NOTIFICATIONS_DENIED" -> stringResource(R.string.notifications_denied)
-    "REMOTE_MAY_CONTINUE" -> stringResource(R.string.remote_may_continue)
+        MessageSpec.Text(R.string.key_unavailable_help)
+    "KEY_STORAGE", "CREDENTIAL_STORAGE" -> MessageSpec.Text(R.string.key_storage_help)
+    "REMOTE_DELETE_CONFIRMED" -> MessageSpec.Text(R.string.remote_delete_confirmed)
+    "NO_REMOTE_HANDLE" -> MessageSpec.Text(R.string.no_remote_handle)
+    "DELETE_PENDING" -> MessageSpec.Text(R.string.delete_pending)
+    "NO_MISSING_BRANCH" -> MessageSpec.Text(R.string.no_missing_branch)
+    "JOB_STILL_RUNNING" -> MessageSpec.Text(R.string.job_still_running)
+    "SUBMISSION_UNCERTAIN" -> MessageSpec.Joined(R.string.state_submission_uncertain, R.string.remote_may_continue)
+    "EXPORT_PENDING", "EXPORT_WRITING" -> MessageSpec.Text(R.string.export_pending)
+    "EXTERNAL_DOCUMENT_MISSING" -> MessageSpec.Text(R.string.external_document_missing)
+    "EXPORT_INTERRUPTED" -> MessageSpec.Text(R.string.export_interrupted)
+    "EXPORT_FAILED" -> MessageSpec.Text(R.string.export_failed)
+    "EXPORT_SCHEDULING_FAILED" -> MessageSpec.Text(R.string.export_scheduling_failed)
+    "JOBS_CREATED" -> MessageSpec.Text(R.string.jobs_created)
+    "KEY_SAVED" -> MessageSpec.Text(R.string.key_saved)
+    "PRESET_SAVED" -> MessageSpec.Text(R.string.preset_saved)
+    "DEFAULTS_SAVED" -> MessageSpec.Text(R.string.defaults_saved)
+    "FILE_NAME_SAVED" -> MessageSpec.Text(R.string.file_name_saved)
+    "CLIPBOARD_EMPTY" -> MessageSpec.Text(R.string.clipboard_empty)
+    "ENGINE_CURRENT" -> MessageSpec.Text(R.string.engine_current)
+    "ENGINE_ACTIVE" -> MessageSpec.Text(R.string.engine_active)
+    "EXPORT_EXPORTED" -> MessageSpec.Text(R.string.export_complete)
+    "EXPORT_PERMISSION_REQUIRED", "PERMISSION_REQUIRED" -> MessageSpec.Text(R.string.export_permission_required)
+    "NOTIFICATIONS_DENIED" -> MessageSpec.Text(R.string.notifications_denied)
+    "REMOTE_MAY_CONTINUE" -> MessageSpec.Text(R.string.remote_may_continue)
     "PROVIDER_REQUIRED", "CREDENTIAL_REQUIRED", "UPLOAD_APPROVAL_REQUIRED", "MODEL_REQUIRED" ->
-        stringResource(R.string.missing_provider)
-    "STORAGE_LIMIT", "AUDIO_IMPORT_STORAGE_LIMIT", "DEVICE_STORAGE_LOW" -> stringResource(R.string.storage_full)
-    "BUDGET_EXCEEDED" -> stringResource(R.string.budget_exceeded)
-    "BUDGET_INVALID" -> stringResource(R.string.invalid_budget)
-    "AUDIO_DURATION_LIMIT" -> stringResource(R.string.invalid_duration)
-    "AUDIO_LONGER_THAN_LIMIT", "SOURCE_LONGER_THAN_LIMIT" -> stringResource(R.string.audio_longer_than_limit)
-    "AUDIO_DURATION_UNKNOWN" -> stringResource(R.string.audio_duration_unknown)
+        MessageSpec.Text(R.string.missing_provider)
+    "STORAGE_LIMIT", "AUDIO_IMPORT_STORAGE_LIMIT", "DEVICE_STORAGE_LOW" -> MessageSpec.Text(R.string.storage_full)
+    "BUDGET_EXCEEDED" -> MessageSpec.Text(R.string.budget_exceeded)
+    "BUDGET_INVALID" -> MessageSpec.Text(R.string.invalid_budget)
+    "AUDIO_DURATION_LIMIT" -> MessageSpec.Text(R.string.invalid_duration)
+    "AUDIO_LONGER_THAN_LIMIT", "SOURCE_LONGER_THAN_LIMIT" -> MessageSpec.Text(R.string.audio_longer_than_limit)
+    "AUDIO_DURATION_UNKNOWN" -> MessageSpec.Text(R.string.audio_duration_unknown)
     "UNSUPPORTED_OPTION", "PROVIDER_UNSUPPORTED_OPTION", "RESPONSE_UNSUPPORTED_OPTION",
-    "PROVIDER_CAPABILITY_OR_CREDENTIAL_INVALID" -> stringResource(R.string.unsupported_options)
-    "PRICE_UNKNOWN" -> stringResource(R.string.price_unknown)
-    "CONTEXT_TERM_BLANK" -> stringResource(R.string.context_term_blank)
+    "PROVIDER_CAPABILITY_OR_CREDENTIAL_INVALID" -> MessageSpec.Text(R.string.unsupported_options)
+    "PRICE_UNKNOWN" -> MessageSpec.Text(R.string.price_unknown)
+    "CONTEXT_TERM_BLANK" -> MessageSpec.Text(R.string.context_term_blank)
 
     // What the reader typed or shared could not be turned into exactly one finished video.
     "INVALID_URL", "INVALID_HOST", "INVALID_PATH", "INVALID_QUERY", "INVALID_VIDEO_ID" ->
-        stringResource(R.string.source_not_a_video_link)
-    "AMBIGUOUS_VIDEO", "TOO_MANY_VIDEOS" -> stringResource(R.string.source_several_videos)
-    "EXPLICIT_VIDEO_REQUIRED" -> stringResource(R.string.source_needs_explicit_video)
-    "LIVE_OR_PLAYLIST_UNSUPPORTED" -> stringResource(R.string.source_live_or_playlist)
-    "INPUT_TOO_LARGE" -> stringResource(R.string.source_input_too_large)
-    "METADATA_TOO_LARGE" -> stringResource(R.string.source_metadata_too_large)
+        MessageSpec.Text(R.string.source_not_a_video_link)
+    "AMBIGUOUS_VIDEO", "TOO_MANY_VIDEOS" -> MessageSpec.Text(R.string.source_several_videos)
+    "EXPLICIT_VIDEO_REQUIRED" -> MessageSpec.Text(R.string.source_needs_explicit_video)
+    "LIVE_OR_PLAYLIST_UNSUPPORTED" -> MessageSpec.Text(R.string.source_live_or_playlist)
+    "INPUT_TOO_LARGE" -> MessageSpec.Text(R.string.source_input_too_large)
+    "METADATA_TOO_LARGE" -> MessageSpec.Text(R.string.source_metadata_too_large)
     "INVALID_METADATA", "INVALID_DURATION", "SOURCE_ID_MISMATCH", "SOURCE_VALIDATION" ->
-        stringResource(R.string.source_metadata_unusable)
-    "INVALID_CAPTION_URL" -> stringResource(R.string.source_caption_url_rejected)
+        MessageSpec.Text(R.string.source_metadata_unusable)
+    "INVALID_CAPTION_URL" -> MessageSpec.Text(R.string.source_caption_url_rejected)
 
     // Reasons that can arise in more than one step; stepText names the step where the code carries one.
     "NETWORK", "PROVIDER_NETWORK", "RESPONSE_NETWORK", "ENGINE_NETWORK" ->
-        stepText(code, R.string.reason_network)
+        MessageSpec.Step(code, R.string.reason_network)
     "RATE_LIMIT", "PROVIDER_RATE_LIMIT", "RESPONSE_RATE_LIMIT", "ENGINE_RATE_LIMIT" ->
-        stepText(code, R.string.reason_rate_limit)
+        MessageSpec.Step(code, R.string.reason_rate_limit)
     "INVALID_RESPONSE", "PROVIDER_INVALID_RESPONSE", "RESPONSE_INVALID_RESPONSE" ->
-        stepText(code, R.string.reason_invalid_response)
+        MessageSpec.Step(code, R.string.reason_invalid_response)
     "STORAGE", "AUDIO_STORAGE_FAILED", "ENGINE_STORAGE", "AUDIO_IMPORT_STORAGE",
     "RESPONSE_STORAGE", "PROVIDER_RESPONSE_STORAGE", "RESPONSE_RESPONSE_STORAGE" ->
-        stepText(code, R.string.reason_storage)
+        MessageSpec.Step(code, R.string.reason_storage)
 
     // Reasons only a speech-to-text provider can give.
     "AUTHENTICATION", "PROVIDER_AUTHENTICATION", "RESPONSE_AUTHENTICATION" ->
-        stepText(code, R.string.reason_authentication)
+        MessageSpec.Step(code, R.string.reason_authentication)
     "ACCESS_DENIED", "PROVIDER_ACCESS_DENIED", "RESPONSE_ACCESS_DENIED" ->
-        stepText(code, R.string.reason_access_denied)
-    "QUOTA", "PROVIDER_QUOTA", "RESPONSE_QUOTA" -> stepText(code, R.string.reason_quota)
-    "SERVER", "PROVIDER_SERVER", "RESPONSE_SERVER" -> stepText(code, R.string.reason_server)
+        MessageSpec.Step(code, R.string.reason_access_denied)
+    "QUOTA", "PROVIDER_QUOTA", "RESPONSE_QUOTA" -> MessageSpec.Step(code, R.string.reason_quota)
+    "SERVER", "PROVIDER_SERVER", "RESPONSE_SERVER" -> MessageSpec.Step(code, R.string.reason_server)
     "REMOTE_FAILED", "PROVIDER_REMOTE_FAILED", "RESPONSE_REMOTE_FAILED" ->
-        stepText(code, R.string.reason_remote_failed)
+        MessageSpec.Step(code, R.string.reason_remote_failed)
     "INVALID_INPUT", "PROVIDER_INVALID_INPUT", "RESPONSE_INVALID_INPUT" ->
-        stepText(code, R.string.reason_invalid_input)
+        MessageSpec.Step(code, R.string.reason_invalid_input)
 
     // Reasons only the YouTube extraction can give.
-    "SOURCE_UNAVAILABLE" -> stepText(code, R.string.reason_source_unavailable)
-    "CHALLENGE_REQUIRED" -> stepText(code, R.string.reason_challenge_required)
-    "NO_CAPTIONS" -> stepText(code, R.string.reason_no_captions)
-    "NATIVE" -> stepText(code, R.string.reason_native)
+    "SOURCE_UNAVAILABLE" -> MessageSpec.Step(code, R.string.reason_source_unavailable)
+    "CHALLENGE_REQUIRED" -> MessageSpec.Step(code, R.string.reason_challenge_required)
+    "NO_CAPTIONS" -> MessageSpec.Step(code, R.string.reason_no_captions)
+    "NATIVE" -> MessageSpec.Step(code, R.string.reason_native)
 
-    "ENGINE_VERIFICATION" -> stepText(code, R.string.reason_engine_verification)
-    "ENGINE_REQUIRES_APP_UPDATE" -> stepText(code, R.string.reason_engine_app_update)
-    "ENGINE_PROBE_FAILED" -> stepText(code, R.string.reason_engine_probe)
-    "ENGINE_UNCERTAIN_PROBE" -> stepText(code, R.string.reason_engine_probe_uncertain)
-    "ENGINE_NO_PREVIOUS" -> stepText(code, R.string.reason_engine_no_previous)
-    "ENGINE_ROLLBACK_TARGET_CHANGED" -> stepText(code, R.string.reason_engine_rollback_target_changed)
-    "ENGINE_SLOTS_IN_USE" -> stepText(code, R.string.reason_engine_slots_in_use)
+    "ENGINE_VERIFICATION" -> MessageSpec.Step(code, R.string.reason_engine_verification)
+    "ENGINE_REQUIRES_APP_UPDATE" -> MessageSpec.Step(code, R.string.reason_engine_app_update)
+    "ENGINE_PROBE_FAILED" -> MessageSpec.Step(code, R.string.reason_engine_probe)
+    "ENGINE_UNCERTAIN_PROBE" -> MessageSpec.Step(code, R.string.reason_engine_probe_uncertain)
+    "ENGINE_NO_PREVIOUS" -> MessageSpec.Step(code, R.string.reason_engine_no_previous)
+    "ENGINE_ROLLBACK_TARGET_CHANGED" -> MessageSpec.Step(code, R.string.reason_engine_rollback_target_changed)
+    "ENGINE_SLOTS_IN_USE" -> MessageSpec.Step(code, R.string.reason_engine_slots_in_use)
     // No update step: the job is bound to an engine that is gone, so the step prefix `stepText` adds would be wrong.
-    "ENGINE_NOT_AVAILABLE" -> stringResource(R.string.engine_not_available)
+    "ENGINE_NOT_AVAILABLE" -> MessageSpec.Text(R.string.engine_not_available)
 
-    "KEY_INVALID_INPUT", "CREDENTIAL_INVALID_INPUT" -> stringResource(R.string.key_invalid_input)
+    "KEY_INVALID_INPUT", "CREDENTIAL_INVALID_INPUT" -> MessageSpec.Text(R.string.key_invalid_input)
 
-    "AUDIO_INVALID_INPUT", "AUDIO_INPUT_NOT_FILE" -> stepText(code, R.string.reason_audio_input_unusable)
-    "AUDIO_INVALID_OUTPUT_DIRECTORY" -> stepText(code, R.string.reason_audio_workspace)
-    "AUDIO_OUTPUT_EXISTS" -> stepText(code, R.string.reason_audio_leftover)
-    "AUDIO_OUT_OF_RANGE" -> stepText(code, R.string.reason_audio_out_of_range)
-    "AUDIO_PROBE_FAILED" -> stepText(code, R.string.reason_audio_probe)
-    "AUDIO_CONVERSION_FAILED" -> stepText(code, R.string.reason_audio_conversion)
-    "AUDIO_OUTPUT_TOO_LARGE" -> stepText(code, R.string.reason_audio_too_large)
-    "AUDIO_OUTPUT_INVALID" -> stepText(code, R.string.reason_audio_output_invalid)
+    "AUDIO_INVALID_INPUT", "AUDIO_INPUT_NOT_FILE" -> MessageSpec.Step(code, R.string.reason_audio_input_unusable)
+    "AUDIO_INVALID_OUTPUT_DIRECTORY" -> MessageSpec.Step(code, R.string.reason_audio_workspace)
+    "AUDIO_OUTPUT_EXISTS" -> MessageSpec.Step(code, R.string.reason_audio_leftover)
+    "AUDIO_OUT_OF_RANGE" -> MessageSpec.Step(code, R.string.reason_audio_out_of_range)
+    "AUDIO_PROBE_FAILED" -> MessageSpec.Step(code, R.string.reason_audio_probe)
+    "AUDIO_CONVERSION_FAILED" -> MessageSpec.Step(code, R.string.reason_audio_conversion)
+    "AUDIO_OUTPUT_TOO_LARGE" -> MessageSpec.Step(code, R.string.reason_audio_too_large)
+    "AUDIO_OUTPUT_INVALID" -> MessageSpec.Step(code, R.string.reason_audio_output_invalid)
 
-    "AUDIO_IMPORT_INVALID_INPUT" -> stepText(code, R.string.reason_import_invalid)
-    "AUDIO_IMPORT_INPUT_UNAVAILABLE" -> stepText(code, R.string.reason_import_unavailable)
-    "AUDIO_IMPORT_PROBE_FAILED" -> stepText(code, R.string.reason_import_probe)
-    "AUDIO_IMPORT_CORRUPT" -> stepText(code, R.string.reason_import_corrupt)
+    "AUDIO_IMPORT_INVALID_INPUT" -> MessageSpec.Step(code, R.string.reason_import_invalid)
+    "AUDIO_IMPORT_INPUT_UNAVAILABLE" -> MessageSpec.Step(code, R.string.reason_import_unavailable)
+    "AUDIO_IMPORT_PROBE_FAILED" -> MessageSpec.Step(code, R.string.reason_import_probe)
+    "AUDIO_IMPORT_CORRUPT" -> MessageSpec.Step(code, R.string.reason_import_corrupt)
 
-    "CHECKPOINT_DAMAGED" -> stringResource(R.string.checkpoint_damaged)
-    "LOCAL_PROCESSING_FAILED" -> stringResource(R.string.local_failed)
-    "CLEANUP_FAILED" -> stringResource(R.string.cleanup_failed)
-    else -> stringResource(R.string.operation_failed) + "\n" + stringResource(R.string.error_detail, code)
+    "CHECKPOINT_DAMAGED" -> MessageSpec.Text(R.string.checkpoint_damaged)
+    "LOCAL_PROCESSING_FAILED" -> MessageSpec.Text(R.string.local_failed)
+    "CLEANUP_FAILED" -> MessageSpec.Text(R.string.cleanup_failed)
+
+    // What a job records while it waits, stops or fails, and what an export row records beside its state (defect 4).
+    // A code that stops the job says so, and each names what the reader can do in the state it leaves behind:
+    // resuming only where resuming gets further, preparing again, or saving an export again.
+    "SOURCE_NOT_FOUND", "SOURCE_SNAPSHOT_INVALID", "SOURCE_MISSING" -> MessageSpec.Text(R.string.error_source_record)
+    "SOURCE_CHANGED" -> MessageSpec.Text(R.string.error_source_changed)
+    "AUDIO_TRACK_MISSING", "SOURCE_AUDIO_UNBOUND", "DOWNLOADED_AUDIO_INVALID", "SOURCE_AUDIO_HASH_FAILED",
+    "AUDIO_INPUT_MISSING", "PREPARED_AUDIO_ORPHAN", "PREPARED_AUDIO_CHANGED", "PREPARED_AUDIO_INVALID" ->
+        MessageSpec.Text(R.string.error_audio_unverified)
+    // Both put the job back in the queue with a time to try again.
+    "AUDIO_RESOURCE_BUSY", "PROVIDER_RESOURCE_BUSY" -> MessageSpec.Text(R.string.error_waiting_resource)
+    "INTERRUPTED" -> MessageSpec.Text(R.string.error_interrupted)
+    "INVALID_STT_PHASE", "SUBMISSION_BINDING_MISMATCH", "SUBMISSION_CHUNK_MISSING", "INVALID_ATTEMPT_ID" ->
+        MessageSpec.Text(R.string.error_checkpoint_mismatch)
+    "REMOTE_HANDLE_INVALID", "REMOTE_RECEIPT_MISSING" -> MessageSpec.Text(R.string.error_remote_id_unusable)
+    "REMOTE_RESPONSE_ID_MISMATCH" -> MessageSpec.Text(R.string.error_remote_response_mismatch)
+    "REMOTE_TIMEOUT" -> MessageSpec.Text(R.string.error_remote_timeout)
+    "RESPONSE_NOT_READY" -> MessageSpec.Text(R.string.error_response_not_ready)
+    "NO_TRANSCRIPT" -> MessageSpec.Text(R.string.error_no_transcript)
+    "RAW_RESPONSE_TOO_LARGE", "RAW_TOO_LARGE" -> MessageSpec.Text(R.string.error_raw_too_large)
+    "CANONICAL_ARTIFACT_TOO_LARGE", "CANONICAL_TOO_LARGE" -> MessageSpec.Text(R.string.error_transcript_too_large)
+    "NORMALIZED_ARTIFACT_INVALID", "ARTIFACT_BINDING_MISMATCH", "RAW_RESPONSE_MISSING", "INVALID_ARTIFACT_ID",
+    "INVALID_RAW_EXTENSION", "RAW_EXTENSION_WITHOUT_DATA", "RAW_DATA_WITHOUT_EXTENSION", "RAW_NOT_ALLOWED",
+    "RAW_REQUIRED", "RAW_HASH_MISMATCH", "CONFLICTING_CONTENT", "INCOMPLETE_ARTIFACT", "MALFORMED_CANONICAL",
+    "CORRUPT_CANONICAL", "MALFORMED_METADATA", "MALFORMED_ARTIFACT", "CORRUPT_RAW", "SYMLINK_NOT_ALLOWED",
+    "PATH_ESCAPE" -> MessageSpec.Text(R.string.error_result_damaged)
+    "NOT_FOUND" -> MessageSpec.Text(R.string.artifact_file_missing)
+    "STORAGE_FAILURE" -> MessageSpec.Text(R.string.reason_storage)
+    "UNSUPPORTED_FORMAT", "EMPTY_INPUT", "MALFORMED_INPUT", "NO_SEGMENTS" ->
+        MessageSpec.Text(R.string.error_captions_unreadable)
+    "STORAGE_SCAN_FAILED" -> MessageSpec.Text(R.string.error_storage_scan)
+    "PROVIDER_SUBMISSION_UNCERTAIN", "RESPONSE_SUBMISSION_UNCERTAIN" ->
+        MessageSpec.Joined(R.string.state_submission_uncertain, R.string.remote_may_continue)
+    "CANCELLED" -> MessageSpec.Text(R.string.export_cancelled)
+    "RAW_NOT_RETAINED" -> MessageSpec.Text(R.string.export_raw_not_retained)
+    "TOO_LARGE" -> MessageSpec.Text(R.string.export_too_large)
+    "MISMATCH" -> MessageSpec.Text(R.string.export_mismatch)
+    "IO_FAILURE" -> MessageSpec.Text(R.string.export_io_failure)
+    "INVALID_EXPORT" -> MessageSpec.Text(R.string.export_invalid)
+    "EXPORT_NOT_REQUESTED" -> MessageSpec.Text(R.string.export_not_requested)
+    else -> rawSavedSpec(code)
 }
+
+/**
+ * A provider answer that could not be read after it was saved is recorded as its reason with `_RAW_SAVED` appended
+ * (`SttStep`). It reads as that reason's sentence followed by the note that the answer is kept.
+ */
+private fun rawSavedSpec(code: String): MessageSpec? {
+    val reason = code.removeSuffix(RAW_SAVED_SUFFIX)
+    if (reason == code || ProviderErrorCode.entries.none { it.name == reason }) return null
+    return messageSpec(reason)?.let { MessageSpec.WithNote(it, R.string.raw_saved_note) }
+}
+
+private const val RAW_SAVED_SUFFIX = "_RAW_SAVED"
 
 /**
  * The sentences a result's warnings add up to, in the order they are shown. The grouping itself lives in
