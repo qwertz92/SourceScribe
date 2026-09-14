@@ -394,6 +394,21 @@ class ViewModelStateTest {
         assertEquals("ENGINE_NO_PREVIOUS", answered.message)
     }
 
+    @Test
+    fun startUpWorkLeavesTheSettingsAndKeysUsable() = withFixture {
+        // The fixture starts on empty storage, so this start checks the bundled engine fully, which takes seconds.
+        // Language, provider and key controls are enabled exactly while nothing holds the screen busy.
+        assertTrue(viewModel.screen.value.preparingEngine)
+        assertFalse(viewModel.screen.value.busy)
+
+        onMain { viewModel.saveCredential(Provider.GROQ, Region.US, UUID.randomUUID().toString()) }
+        val saved = withTimeout(TIMEOUT_MS) {
+            viewModel.screen.first { it.message == "KEY_SAVED" || it.message == "ACTION_BUSY" }
+        }
+
+        assertEquals("KEY_SAVED", saved.message)
+    }
+
     private fun <T> withFixture(block: suspend Fixture.() -> T): T {
         val base = InstrumentationRegistry.getInstrumentation().targetContext
         runBlocking { NativeRuntime(base).initialize() }
@@ -485,8 +500,14 @@ class ViewModelStateTest {
         }
 
         suspend fun awaitInitialization() {
-            val initialized = withTimeout(TIMEOUT_MS) { viewModel.screen.first { !it.busy } }
-            check(initialized.message == null) { "ViewModel initialization failed: ${initialized.message}" }
+            withTimeout(TIMEOUT_MS) {
+                viewModel.screen.first { !it.busy && !it.preparingEngine }
+                // Recovery runs beside the engine preparation and sets no flag. This waits for the recovery the view
+                // model started and then returns, since the coordinator recovers once per instance.
+                coordinator.recover()
+            }
+            val message = viewModel.screen.value.message
+            check(message == null) { "ViewModel initialization failed: $message" }
         }
 
         fun onMain(action: () -> Unit) = instrumentation.runOnMainSync(action)
@@ -525,7 +546,8 @@ class ViewModelStateTest {
 
         fun close() {
             instrumentation.runOnMainSync { viewModelStore.clear() }
-            runBlocking { withTimeout(TIMEOUT_MS) { viewModel.screen.first { !it.busy } } }
+            // A cancelled engine preparation ends only once the native call it is in returns; the storage goes after it.
+            runBlocking { withTimeout(TIMEOUT_MS) { viewModel.screen.first { !it.busy && !it.preparingEngine } } }
             val providerRequests = providerGuard.requestCount
             database.close()
             if (Files.isSymbolicLink(runtimeLink.toPath())) Files.delete(runtimeLink.toPath())

@@ -83,7 +83,8 @@
     <string name="engine_rollback">Zur vorherigen Engine</string>
     <string name="engine_rollback_help">Wieder aktiv wird: %1$s. Eine ältere Version kann Sicherheitslücken enthalten, die eine spätere schon schließt, und SourceScribe prüft das nicht. Nur zurückgehen, wenn die aktuelle Engine nicht funktioniert, und bald wieder aktualisieren.</string>
     <string name="engine_probe">Öffentliche YouTube-Quelle für den Funktionstest</string>
-    <string name="engine_help">yt-dlp und EJS werden gemeinsam signiert geprüft. Python, JavaScript-Runtime und FFmpeg benötigen ein APK-Update. Laufende Aufträge behalten ihre Engine.</string>
+    <string name="engine_help">Die Engine ist yt-dlp, das Programm, mit dem die App YouTube-Seiten liest und Untertitel und Audio herunterlädt. yt-dlp und EJS werden gemeinsam signiert geprüft. Python, JavaScript-Runtime und FFmpeg benötigen ein APK-Update. Laufende Aufträge behalten ihre Engine.</string>
+    <string name="engine_preparing">YouTube-Unterstützung wird vorbereitet …</string>
     <string name="engine_current">Kein neues Update ermittelt</string>
     <string name="engine_active">Engine aktiviert</string>
     <string name="jobs_created">Aufträge im Verlauf gespeichert</string>

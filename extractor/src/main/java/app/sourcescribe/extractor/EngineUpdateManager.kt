@@ -2,6 +2,8 @@ package app.sourcescribe.extractor
 
 import android.content.Context
 import android.util.AtomicFile
+import app.sourcescribe.core.BundledEngineIdentity
+import app.sourcescribe.core.BundledEngineMarker
 import app.sourcescribe.core.EngineVerificationException
 import app.sourcescribe.core.EngineVerifier
 import app.sourcescribe.core.ExtractorMetadata
@@ -55,6 +57,21 @@ internal fun classifyHttpResponse(code: Int): EngineHttpResponseKind = when {
     code in 300..399 -> EngineHttpResponseKind.REDIRECT
     code in 200..299 -> EngineHttpResponseKind.SUCCESS
     else -> EngineHttpResponseKind.OTHER
+}
+
+/**
+ * The installed build of the app as ADR 0012 tells builds apart: its version code, and when the package was last
+ * installed or updated. Installing the same version again changes the second.
+ */
+internal fun installedBuild(context: Context): Pair<Long, Long> {
+    val packages = context.packageManager
+    val info = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+        packages.getPackageInfo(context.packageName, android.content.pm.PackageManager.PackageInfoFlags.of(0))
+    } else {
+        @Suppress("DEPRECATION") // The overload with PackageInfoFlags exists from API 33 on; minSdk is 29.
+        packages.getPackageInfo(context.packageName, 0)
+    }
+    return info.longVersionCode to info.lastUpdateTime
 }
 
 class EngineUpdateException(
@@ -111,6 +128,14 @@ class EngineUpdateManager internal constructor(
     private val runtime: NativeRuntime,
     private val calls: Call.Factory,
     private val writeDownloadedFile: (File, ByteArray) -> Unit,
+    /** Verifies an engine against its signed checksum file. Only tests that count the checks pass another. */
+    private val verifyEngine: (File, ByteArray, ByteArray) -> app.sourcescribe.core.VerifiedEngine =
+        { artifact, checksums, signature -> EngineVerifier.verify(artifact, checksums, signature) },
+    /** Runs the runtime self-test with an engine. Only tests that count the checks pass another. */
+    private val probeRuntime: suspend (File) -> Map<String, String> = { engine ->
+        runtime.initialize()
+        runtime.versions(engine)
+    },
     private val references: suspend () -> EngineReferences = { EngineReferences() },
 ) {
     constructor(
@@ -122,7 +147,7 @@ class EngineUpdateManager internal constructor(
         runtime,
         defaultClient(),
         ::writeSyncedBytes,
-        references,
+        references = references,
     )
 
     private val appContext = context.applicationContext
@@ -210,7 +235,7 @@ class EngineUpdateManager internal constructor(
             val signature = downloadBytes(urls.signature, EngineVerifier.MAX_SIGNATURE_BYTES)
             downloadFile(urls.artifact, artifact, EngineVerifier.MAX_ARTIFACT_BYTES.toLong())
             val verified = try {
-                EngineVerifier.verify(artifact, checksums, signature)
+                verifyEngine(artifact, checksums, signature)
             } catch (failure: EngineVerificationException) {
                 throw verificationFailure(failure)
             }
@@ -365,6 +390,16 @@ class EngineUpdateManager internal constructor(
             bundledCache = null
         }
         val state = stateLocked()
+        // A later start of the app build a full check already passed for hashes the engine in its slot and trusts the
+        // rest. Everything else, a damaged slot included, goes through the full check below (ADR 0012).
+        val identity = bundledIdentity()
+        if (identity != null && !BundledEngineMarker.fullCheckNeeded(readMarker(), identity)) {
+            val recorded = healthySlot(state, identity.resourceSha256)
+            if (recorded != null && recorded.bundled) {
+                bundledCache = recorded
+                return recorded
+            }
+        }
 
         val staging = File(enginesDirectory(), ".bundled-${UUID.randomUUID()}")
         if (!staging.mkdirs()) throw EngineUpdateException(EngineUpdateCode.STORAGE)
@@ -374,7 +409,7 @@ class EngineUpdateManager internal constructor(
             val checksums = resourceBytes(R.raw.ytdlp_checksums, EngineVerifier.MAX_CHECKSUM_BYTES)
             val signature = resourceBytes(R.raw.ytdlp_checksums_sig, EngineVerifier.MAX_SIGNATURE_BYTES)
             val verified = try {
-                EngineVerifier.verify(artifact, checksums, signature)
+                verifyEngine(artifact, checksums, signature)
             } catch (failure: EngineVerificationException) {
                 throw verificationFailure(failure)
             }
@@ -416,17 +451,91 @@ class EngineUpdateManager internal constructor(
                 state.activeId = healthy.id
             }
             saveStateLocked(state)
+            // Before the cache and the marker, so a start that fails in it runs the whole check again next time.
+            recheckActiveLocked(state, healthy)
             bundledCache = healthy
+            if (identity != null && identity.resourceSha256 == healthy.id) writeMarker(identity)
             healthy
         } finally {
             deleteOwnedTree(staging)
         }
     }
 
+    /**
+     * Runs the runtime self-test with the active installation when that is not [bundled], typically a downloaded engine
+     * activated under an earlier app build, whose runtime may differ from this one (ADR 0012, defect 47). An
+     * installation the runtime does not confirm stops being healthy, and [active] falls back to the bundled engine.
+     * A probe that timed out counts as not confirmed, as it does when an engine is staged.
+     */
+    private suspend fun recheckActiveLocked(state: ManagerState, bundled: EngineInstallation) {
+        val active = state.activeId?.takeIf { it != bundled.id }?.let { healthySlot(state, it) } ?: return
+        try {
+            verifyRuntimeCompatibility(active)
+        } catch (_: EngineUpdateException) {
+            state.installations[active.id] = active.copy(healthy = false)
+            state.healthyIds.remove(active.id)
+            saveStateLocked(state)
+        }
+    }
+
+    /**
+     * The installed app build and the SHA-256 of the engine it bundles, which the marker of ADR 0012 is keyed on. Null
+     * when any of it cannot be read; that costs the full check and nothing else.
+     */
+    private fun bundledIdentity(): BundledEngineIdentity? {
+        return try {
+            val (versionCode, lastUpdateTime) = installedBuild(appContext)
+            val hash = appContext.resources.openRawResource(R.raw.ytdlp).use { input ->
+                sha256Bounded(input, EngineVerifier.MAX_ARTIFACT_BYTES.toLong())
+            } ?: return null
+            BundledEngineIdentity(versionCode, lastUpdateTime, hash)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /** The marker's text, or null when there is none or it is larger than any marker this manager writes. */
+    private fun readMarker(): String? {
+        return try {
+            AtomicFile(File(enginesDirectory(), MARKER_FILE_NAME)).openRead().use { input ->
+                val output = ByteArrayOutputStream()
+                val buffer = ByteArray(MAX_MARKER_BYTES)
+                while (true) {
+                    val count = input.read(buffer)
+                    if (count < 0) break
+                    if (output.size() > MAX_MARKER_BYTES - count) return null
+                    output.write(buffer, 0, count)
+                }
+                String(output.toByteArray(), StandardCharsets.UTF_8)
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /** Best effort: a marker that is not written makes the next start run the full check again, nothing else. */
+    private fun writeMarker(identity: BundledEngineIdentity) {
+        var output: FileOutputStream? = null
+        try {
+            val atomic = AtomicFile(File(enginesDirectory(), MARKER_FILE_NAME))
+            try {
+                output = atomic.startWrite()
+                output.write(BundledEngineMarker.encode(identity).toByteArray(StandardCharsets.UTF_8))
+                output.flush()
+                output.fd.sync()
+                atomic.finishWrite(output)
+                output = null
+            } finally {
+                output?.let { runCatching { atomic.failWrite(it) } }
+            }
+        } catch (_: Exception) {
+            // Nothing to undo: without a marker the next start checks the engine fully.
+        }
+    }
+
     private suspend fun verifyRuntimeCompatibility(installation: EngineInstallation) {
         val versions = try {
-            runtime.initialize()
-            runtime.versions(file(installation))
+            probeRuntime(file(installation))
         } catch (failure: NativeRuntimeException) {
             throw EngineUpdateException(EngineUpdateCode.PROBE_FAILED).also { it.initCause(failure) }
         }
@@ -1012,18 +1121,25 @@ class EngineUpdateManager internal constructor(
 
     private fun sha256Bounded(file: File, maxBytes: Long): String? {
         return try {
+            Files.newInputStream(file.toPath(), LinkOption.NOFOLLOW_LINKS).use { input -> sha256Bounded(input, maxBytes) }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /** The SHA-256 of everything [input] holds, or null when that is more than [maxBytes] or cannot be read. */
+    private fun sha256Bounded(input: java.io.InputStream, maxBytes: Long): String? {
+        return try {
             val digest = MessageDigest.getInstance("SHA-256")
-            Files.newInputStream(file.toPath(), LinkOption.NOFOLLOW_LINKS).use { input ->
-                val buffer = ByteArray(READ_BUFFER_BYTES)
-                var total = 0L
-                while (true) {
-                    val count = input.read(buffer)
-                    if (count < 0) break
-                    if (count == 0) continue
-                    if (total > maxBytes - count) return null
-                    digest.update(buffer, 0, count)
-                    total += count
-                }
+            val buffer = ByteArray(READ_BUFFER_BYTES)
+            var total = 0L
+            while (true) {
+                val count = input.read(buffer)
+                if (count < 0) break
+                if (count == 0) continue
+                if (total > maxBytes - count) return null
+                digest.update(buffer, 0, count)
+                total += count
             }
             digest.digest().joinToString("") { (it.toInt() and 0xff).toString(16).padStart(2, '0') }
         } catch (_: Exception) {
@@ -1206,6 +1322,10 @@ class EngineUpdateManager internal constructor(
 
         const val ENGINES_DIRECTORY = "engines"
         const val STATE_FILE_NAME = "state.json"
+        /** Says which app build and bundled engine last passed the full check (ADR 0012). */
+        const val MARKER_FILE_NAME = "bundled-check.json"
+        /** A marker holds two numbers and a hash; anything much larger is not one. */
+        const val MAX_MARKER_BYTES = 4 * 1024
         const val METADATA_FILE_NAME = "metadata.json"
         const val YTDLP_FILE_NAME = "yt-dlp"
         const val CHECKSUM_FILE_NAME = "SHA2-256SUMS"

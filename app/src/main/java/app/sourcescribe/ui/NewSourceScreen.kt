@@ -102,6 +102,12 @@ internal fun NewSourceScreen(
         }
         item {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                // As tall as the sentence while it is empty too, so the buttons stay where they are when it comes and goes.
+                ReservedText(
+                    if (state.waitingForEngine) stringResource(R.string.engine_preparing) else "",
+                    listOf(stringResource(R.string.engine_preparing)),
+                    MaterialTheme.typography.bodySmall,
+                )
                 Button(inspect, Modifier.fillMaxWidth().heightIn(min = 52.dp), enabled = input.isNotBlank() && !state.busy) {
                     Text(stringResource(R.string.inspect_source))
                 }

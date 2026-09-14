@@ -31,8 +31,9 @@ class ChoiceAccessibilityTest {
                 ),
             )
 
-            // This test is about the control, not about how fast the app starts. While MainViewModel does its start,
-            // busy disables the control, and on the CI emulator that outlasted NODE_TIMEOUT_MS (DEFECTS, item 54).
+            // This test is about the control, not about how fast the app starts. Up to release 0.2.0 the start of
+            // MainViewModel set busy, which disables the control, and on the CI emulator that outlasted NODE_TIMEOUT_MS
+            // (DEFECTS, item 54). The start no longer does (ADR 0012), but any action still does while it runs.
             waitUntilIdle(automation)
             val settings = waitForNode(automation, "Settings navigation") { node ->
                 node.isClickable && node.hasAnyLabel(SETTINGS_LABELS)

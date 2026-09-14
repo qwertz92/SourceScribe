@@ -17,6 +17,7 @@ import javax.inject.Inject
 import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -68,6 +69,13 @@ data class DraftEdits(
 data class ScreenState(
     val busy: Boolean = false,
     val starting: Boolean = false,
+    /**
+     * True from the start of the view model until the bundled engine is ready or its preparation failed. It disables
+     * nothing: an action that needs the engine waits for it inside the engine manager (ADR 0012).
+     */
+    val preparingEngine: Boolean = false,
+    /** True while an action that needs the engine waits for that preparation, which the new-source screen says. */
+    val waitingForEngine: Boolean = false,
     /** Written only through `MainViewModel.withDraft`, which keeps [draftEdits] in step with it. */
     val draft: JobConfig? = null,
     val draftEdits: DraftEdits = DraftEdits(),
@@ -99,7 +107,7 @@ class MainViewModel @Inject constructor(
     private val audioImport: AudioImport,
     private val diagnostics: Diagnostics,
 ) : ViewModel() {
-    private val mutable = MutableStateFlow(ScreenState())
+    private val mutable = MutableStateFlow(ScreenState(preparingEngine = true))
     private val actionGate = Mutex()
     val screen = mutable.asStateFlow()
     val settings = settingsStore.settings.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AppSettings())
@@ -114,13 +122,29 @@ class MainViewModel @Inject constructor(
     private val previewRevision = AtomicLong()
     private val abandonedImports = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
 
-    init { action { coordinator.recover(); refreshCredentials(); refreshEngines() } }
+    /**
+     * Start-up work runs beside the screen instead of as an action, so it never holds the action gate or sets `busy`
+     * (ADR 0012). Recovery takes well under a second, and every exclusive action waits for it, so none of them runs
+     * before interrupted work is reconciled, as before. The engine preparation can take seconds after an install or an
+     * update; only the actions that need the engine wait for it, see [awaitEngine].
+     */
+    private val recovery: Job = viewModelScope.launch(Dispatchers.IO) { startUpStep { coordinator.recover() } }
+    private val enginePreparation: Job = viewModelScope.launch(Dispatchers.IO) {
+        startUpStep { refreshEngines() }
+    }.also { preparation ->
+        // A completion handler rather than `finally`: it also runs for a preparation cancelled before it started.
+        preparation.invokeOnCompletion { _ -> mutable.update { state -> state.copy(preparingEngine = false) } }
+    }
+
+    init { viewModelScope.launch(Dispatchers.IO) { startUpStep { refreshCredentials() } } }
 
     fun inspect(text: String, config: JobConfig) {
         val revision = previewRevision.incrementAndGet()
         action(revision) {
         val selected = config.copy(uploadApproved = false, captionTrackId = null, audioTrackId = null)
         val sources = SourceResolver.sharedText(text)
+        // Reading a YouTube address needs the engine. An address the resolver refused is reported without waiting.
+        awaitEngine()
         val previews = sources.map { source ->
             val resolved = coordinator.inspect(source)
             val captions = TrackSelection.captions(resolved, selected)
@@ -295,6 +319,7 @@ class MainViewModel @Inject constructor(
         action(revision) {
         val job = requireNotNull(records.job(jobId))
         val source = coordinator.sourceForPreview(job.sourceId, previewOwner)
+        if (source.kind == SourceKind.YOUTUBE) awaitEngine()
         val resolved = if (source.kind == SourceKind.YOUTUBE) coordinator.inspect(source)
             else ResolvedSource(source, emptyList(), emptyList(), emptyMap())
         // Re-preparing reuses what the job was configured with, so limits and options can be adjusted in place.
@@ -404,6 +429,36 @@ class MainViewModel @Inject constructor(
     private suspend fun refreshEngines() { val installed = engines.installations(); mutable.update { it.copy(installations = installed) } }
 
     private fun refreshCredentials() { mutable.update { it.copy(credentials = credentialStore.list()) } }
+
+    /** Runs one piece of start-up work and reports its failure as an action would, without holding the screen. */
+    private suspend fun startUpStep(step: suspend () -> Unit) {
+        try { step() }
+        catch (cancelled: CancellationException) { throw cancelled }
+        catch (failure: Exception) { mutable.update { it.copy(message = failureCode(failure)) } }
+    }
+
+    /**
+     * Waits for the start-up engine preparation while it still runs, and lets the new-source screen say so meanwhile.
+     * The engine manager's lock would hold the action back anyway; this gives the wait its reason on the screen.
+     */
+    private suspend fun awaitEngine() {
+        if (!enginePreparation.isActive) return
+        mutable.update { it.copy(waitingForEngine = true) }
+        try { enginePreparation.join() } finally { mutable.update { it.copy(waitingForEngine = false) } }
+    }
+
+    private fun failureCode(failure: Exception): String = when (failure) {
+        is InvalidSource -> failure.reason
+        is ExtractionException -> failure.failure.name
+        is EngineUpdateException -> "ENGINE_${failure.code.name}"
+        is CredentialException -> "KEY_${failure.code.name}"
+        is ProviderError -> failure.code.name
+        is JobActionException -> failure.code
+        is AudioImportException -> "AUDIO_IMPORT_${failure.code.name}"
+        // Same wording as the coordinator uses, so one code covers the case everywhere.
+        else -> "LOCAL_PROCESSING_FAILED"
+    }
+
     private fun action(revision: Long? = null, starting: Boolean = false, exclusive: Boolean = true, block: suspend () -> Unit) {
         if (exclusive && !actionGate.tryLock()) {
             mutable.update { it.copy(message = "ACTION_BUSY") }
@@ -411,20 +466,11 @@ class MainViewModel @Inject constructor(
         }
         if (exclusive) mutable.update { it.copy(busy = true, starting = starting, message = null) }
         viewModelScope.launch {
-            try { withContext(Dispatchers.IO) { if (exclusive) cleanupAbandonedImports(); block() } }
+            // An exclusive action waits for start-up recovery, which is short, so it never runs before it.
+            try { withContext(Dispatchers.IO) { if (exclusive) { recovery.join(); cleanupAbandonedImports() }; block() } }
             catch (cancelled: CancellationException) { throw cancelled }
             catch (failure: Exception) {
-                val code = when (failure) {
-                    is InvalidSource -> failure.reason
-                    is ExtractionException -> failure.failure.name
-                    is EngineUpdateException -> "ENGINE_${failure.code.name}"
-                    is CredentialException -> "KEY_${failure.code.name}"
-                    is ProviderError -> failure.code.name
-                    is JobActionException -> failure.code
-                    is AudioImportException -> "AUDIO_IMPORT_${failure.code.name}"
-                    // Same wording as the coordinator uses, so one code covers the case everywhere.
-                    else -> "LOCAL_PROCESSING_FAILED"
-                }
+                val code = failureCode(failure)
                 if (revision == null || revision == previewRevision.get()) mutable.update { it.copy(message = code) }
             } finally {
                 try { if (exclusive) withContext(NonCancellable + Dispatchers.IO) { cleanupAbandonedImports() } }

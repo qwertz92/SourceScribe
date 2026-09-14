@@ -246,6 +246,16 @@ internal fun SettingsScreen(
         item {
             SectionTitle(R.string.engines, HelpTopic.ENGINES, openHelp)
             Text(stringResource(R.string.engine_help), style = MaterialTheme.typography.bodySmall)
+            if (state.installations.isEmpty()) {
+                // The list stays empty until the engine is ready. This line stands in for its first entry, in the style
+                // and padding of one, so that entry does not push the buttons below down when it arrives.
+                ReservedText(
+                    if (state.preparingEngine) stringResource(R.string.engine_preparing) else "",
+                    listOf(stringResource(R.string.engine_preparing)),
+                    MaterialTheme.typography.bodyLarge,
+                    Modifier.padding(vertical = 8.dp),
+                )
+            }
             state.installations.forEach {
                 Text("yt-dlp ${it.version} · EJS ${it.ejsVersion} · ${channelName(it.channel)}", Modifier.padding(vertical = 8.dp))
             }

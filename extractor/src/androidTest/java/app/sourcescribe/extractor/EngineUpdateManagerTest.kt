@@ -5,6 +5,8 @@ import android.content.ContextWrapper
 import android.os.Bundle
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import app.sourcescribe.core.BundledEngineIdentity
+import app.sourcescribe.core.BundledEngineMarker
 import app.sourcescribe.core.EngineVerificationCode
 import app.sourcescribe.core.EngineVerificationException
 import app.sourcescribe.core.EngineVerifier
@@ -16,6 +18,7 @@ import java.io.RandomAccessFile
 import java.nio.file.Files
 import java.nio.file.LinkOption
 import java.util.UUID
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
@@ -647,6 +650,60 @@ class EngineUpdateManagerTest {
         }
     }
 
+    @Test
+    fun aLaterStartOfTheSameAppBuildSkipsTheSignatureAndRuntimeChecks() = runBlocking {
+        withIsolatedManager { harness ->
+            val bundled = harness.manager.bundled()
+            val checks = StartupChecks()
+
+            val restarted = checks.newManager(harness)
+
+            assertEquals(bundled.id, restarted.active().id)
+            assertEquals(0, checks.verifications.get())
+            assertEquals(emptyList<String>(), checks.probedIds())
+        }
+    }
+
+    @Test
+    fun aLaterStartStillHashesTheBundledEngineAndChecksADamagedOneFully() = runBlocking {
+        withIsolatedManager { harness ->
+            val bundled = harness.manager.bundled()
+            val file = File(harness.root, "engines/${bundled.id}/yt-dlp")
+            RandomAccessFile(file, "rw").use { it.setLength(it.length() - 1) }
+            val checks = StartupChecks()
+
+            val restarted = checks.newManager(harness)
+
+            assertEquals(bundled.id, restarted.active().id)
+            assertEquals(bundled.id, sha256(file))
+            assertEquals(1, checks.verifications.get())
+            assertEquals(listOf(bundled.id), checks.probedIds())
+        }
+    }
+
+    @Test
+    fun anotherAppBuildChecksTheBundledEngineAgainAndTheActivatedOneAgainstItsRuntime() = runBlocking {
+        withIsolatedManager { harness ->
+            val bundled = harness.manager.bundled()
+            // Recorded as a version the runtime of this build no longer reports for it.
+            val activated = createScriptedCandidate(harness, "never run").copy(version = "2026.08.18")
+            writeState(harness, active = activated, previous = bundled, candidate = activated)
+            writeMarkerOfThePreviousBuild(harness, bundled)
+            val checks = StartupChecks()
+
+            val restarted = checks.newManager(harness)
+
+            assertEquals(bundled.id, restarted.active().id)
+            assertEquals(1, checks.verifications.get())
+            assertEquals(listOf(bundled.id, activated.id), checks.probedIds())
+            // Checked once for this build: the start after it trusts the result.
+            val later = StartupChecks()
+            assertEquals(bundled.id, later.newManager(harness).active().id)
+            assertEquals(0, later.verifications.get())
+            assertEquals(emptyList<String>(), later.probedIds())
+        }
+    }
+
     private suspend fun withIsolatedManager(block: suspend (Harness) -> Unit) {
         requireEnabled()
         NativeRuntime(context).initialize()
@@ -677,6 +734,45 @@ class EngineUpdateManagerTest {
 
     private fun newManager(harness: Harness, calls: Call.Factory, references: EngineReferences): EngineUpdateManager =
         EngineUpdateManager(harness.storage, NativeRuntime(harness.storage), calls, ::writeBytes) { references }
+
+    /** Counts what a start of the manager verifies, and still verifies it for real. */
+    private inner class StartupChecks {
+        val verifications = AtomicInteger()
+        private val probed = CopyOnWriteArrayList<String>()
+
+        /** The slot names of the engines a runtime check ran for, in order. */
+        fun probedIds(): List<String> = probed.toList()
+
+        fun newManager(harness: Harness): EngineUpdateManager {
+            val runtime = NativeRuntime(harness.storage)
+            return EngineUpdateManager(
+                harness.storage,
+                runtime,
+                fixtureCalls { throw AssertionError("A start must not reach the network") },
+                { destination, bytes -> writeBytes(destination, bytes) },
+                verifyEngine = { artifact, checksums, signature ->
+                    verifications.incrementAndGet()
+                    EngineVerifier.verify(artifact, checksums, signature)
+                },
+                probeRuntime = { engine ->
+                    probed += engine.parentFile?.name.orEmpty()
+                    runtime.initialize()
+                    runtime.versions(engine)
+                },
+            )
+        }
+    }
+
+    /**
+     * What the first start of another app build finds: the marker the build before it wrote for the same engine. Only
+     * the version code differs; `BundledEngineMarkerTest` covers the other parts of the key.
+     */
+    private fun writeMarkerOfThePreviousBuild(harness: Harness, bundled: EngineInstallation) {
+        val (versionCode, lastUpdateTime) = installedBuild(harness.storage)
+        File(harness.root, "engines/bundled-check.json").writeText(
+            BundledEngineMarker.encode(BundledEngineIdentity(versionCode - 1, lastUpdateTime, bundled.id)),
+        )
+    }
 
     /**
      * Replaces the recorded installations, the active and the previous one by exactly these, in this order. Slot
