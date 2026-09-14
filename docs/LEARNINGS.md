@@ -118,3 +118,23 @@ Stand: 14. September 2026. Fehlversuche und Korrekturen im
   mit Code, der erst danach als `dc9e6dd` committet wurde; an diesen Code band den Lauf nur der Fingerabdruck
   daneben. Die Gates der Runde 21 prüfen, dass der Baum HEAD plus genau die benannten Korrekturen ist, und schreiben
   das in ihre Ausgabe.
+- **Compose gibt vom Inhalt eines Passwortfelds nur Punkte an die Accessibility, in der Fassung, die die App
+  bündelt.** Auf `emulator-5556` mit API 37 und `compose-bom` 2026.09.00 erschien Text, den `adb shell input text` in
+  das Schlüsselfeld der Einstellungen tippte, im Dump von `uiautomator` als Punkte, mit `password=true`, und nirgends
+  im Klartext. `uiautomator` liest denselben Baum wie `UiAutomation.rootInActiveWindow`. Ein Reviewer der Runde 22
+  hatte aus dem Quelltext von Compose auf GitHub das Gegenteil geschlossen, ohne eine Fassung zu nennen. Ein Feld ohne
+  Maskierung gibt seinen Inhalt dagegen im Klartext weiter; das zeigt der Test aus Runde 22, bevor er die Meldung
+  prüft.
+- **ASCII-Armor endet für Bouncy Castle an seiner Fußzeile.** `PGPUtil.getDecoderStream` liest Armor über
+  `ArmoredInputStream`, und in 1.86 liefert dieser Strom nach `-----END PGP SIGNATURE-----` nichts mehr, auch wenn
+  dahinter ein zweiter Block steht; `PGPObjectFactory.nextObject()` gibt dann `null` zurück. Wer genau eine Signatur
+  verlangt, prüft zusätzlich die Bytes, die der Parser nicht gelesen hat.
+- **Ein grüner CI-Lauf beendet keinen zeitweisen Fehler.** `ChoiceAccessibilityTest` scheiterte in drei CI-Läufen,
+  bestand am Stand `7d9ce41`, ohne dass sich seine Bedingung oder der Code der App geändert hatte, und scheiterte am
+  Stand `17bc156` wieder. Einen Punkt in DEFECTS schließt erst die gefundene Ursache.
+- **Leitet Git Bash die Ausgabe von `wsl.exe` in eine Datei, überschreibt stderr den Anfang von stdout.** Am
+  14. September auf HomeBase gezeigt: Nach `wsl.exe -e bash -lc '…' > datei 2>&1` stand in der Datei die Zeile von
+  stderr an der Stelle der ersten Zeile von stdout, und von dieser blieb nur ihr Rest. `wsl.exe` schreibt beide
+  Ströme von getrennten Positionen aus, die beim Start des Aufrufs am selben Punkt stehen; was vorher in der Datei
+  stand, bleibt. Mit `2>&1 | cat > datei` oder einer Umleitung innerhalb von WSL bleibt alles in der Reihenfolge,
+  in der es geschrieben wurde.

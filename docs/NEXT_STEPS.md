@@ -2,31 +2,33 @@
 
 ## Wiederaufnahme: hier weitermachen
 
-Geschrieben am 11. September 2026, zuletzt nach der einundzwanzigsten Reviewrunde nachgeführt, damit die
+Geschrieben am 11. September 2026, zuletzt nach der zweiundzwanzigsten Reviewrunde nachgeführt, damit die
 Arbeit ohne Wiedereinlesen der ganzen Sitzung weitergehen kann. Reihenfolge ist Absicht.
 
 **Wo der Stand steht:** Die Reviewrunden und was sie gefunden haben, stehen in
 [STATUS.md](STATUS.md); was offen ist, mit Stelle und fehlendem Nachweis, in
 [DEFECTS.md](DEFECTS.md). Die Punktnummern unten sind die Nummern dort.
 
-### 1. Zweiundzwanzigste Reviewrunde über die Korrekturen der einundzwanzigsten
+### 1. Dreiundzwanzigste Reviewrunde über die Korrekturen der zweiundzwanzigsten
 
 Runden 3 bis 16 haben ihren wichtigsten Fund jeweils in den Korrekturen der Vorrunde gehabt, Runde 17 in einer nie
 umgesetzten Vorgabe aus S7 in [SECURITY_UPDATES.md](SECURITY_UPDATES.md), Runde 18 in der Begründung eines ADR,
 Runde 19 und Runde 20 wieder in Korrekturen der Vorrunde, dem Ersetzen eines beschädigten Slots und der Regel gegen
-Zeilennummern, Runde 21 in den Lizenzhinweisen nach dem Wechsel auf Bouncy Castle 1.86. Commits der
-einundzwanzigsten Runde sind `eb654ae`, `c523a16`, `3e99231`, `5397ae9`, `20ca738`,
-`c7089f6`, `6415661` und `035d1e8`, dazu ihr Doku-Commit; einzeln benennen, nicht als Bereich,
-weil `a..b` den Anfangscommit auslässt. Den Doku-Commit der Runde 20, `eb4eb1d`, hat noch kein Reviewer gelesen.
+Zeilennummern, Runde 21 in den Lizenzhinweisen nach dem Wechsel auf Bouncy Castle 1.86, Runde 22 in einer Korrektur
+der Vorrunde: Hinter der Signatur in Armor, deren Test Runde 21 schrieb, blieb ein zweiter Block ungelesen. Commits der
+zweiundzwanzigsten Runde sind `8097c08`, `3863da4`, `391ca8b`, `1c7d629`, `d99ff67` und `17bc156`, dazu ihr Doku-Commit; einzeln benennen, nicht als Bereich, weil `a..b` den
+Anfangscommit auslässt. Die Doku der Preview 0.2.0 entsteht erst nach ihrem Build.
 
-**Stand am 14. September 2026, nach Runde 21:** Die Korrekturen der Runde 21 sind committet und gepusht, ihre
-Funde, Gegenproben und Gates stehen in [STATUS.md](STATUS.md). Offen aus Runde 21 ist, dass README, STATUS, HANDOFF
-und TRY_PREVIEW die Version 0.2.0 nicht kennen; das holt der Doku-Commit der Preview nach, der die Hashes der APK und
-die Ergebnisse der Release-Gates braucht. Ob `ChoiceAccessibilityTest` in der CI an einem fehlenden, deaktivierten
-oder anders beschrifteten Element scheitert, zeigt erst ein CI-Lauf mit der neuen Meldung ([Punkt 54](DEFECTS.md)).
-Als Nächstes: ein Code- und ein Invarianten-Reviewer über die acht Commits der Runde 21 und ein Konsistenzreviewer
-über `eb4eb1d` und den Doku-Commit der Runde 21; danach, wenn keiner einen hohen oder mittleren Fund meldet, Build
-und Gates der Preview 0.2.0 auf dem letzten Code-Commit.
+**Stand am 14. September 2026, nach Runde 22:** Die Korrekturen der Runde 22 sind committet und gepusht, ihre Funde,
+Gegenproben und Gates stehen in [STATUS.md](STATUS.md). Offen aus Runde 22 bleiben eine gescheiterte Löschung der
+Prüfansicht, deren Meldung die erste ersetzt ([Punkt 56](DEFECTS.md)), und zwei Schreibweisen, die die
+Versionsprüfung der Lizenzhinweise nicht erkennt ([Punkt 28](DEFECTS.md)). Die lokalen Release-Gates auf `17bc156`
+bestanden, der CI-Lauf auf demselben Commit scheiterte an `ChoiceAccessibilityTest`, weil die App noch startete
+([Punkt 54](DEFECTS.md)). Runde 23 hat die sechs Commits der Runde 22 mit einem Code- und einem Invarianten-Reviewer
+gelesen. Als Nächstes: deren Korrekturen und die des Tests, danach Build und Gates der Preview 0.2.0 auf dem letzten
+dieser Commits; ein Code- und ein Invarianten-Reviewer über die Korrekturen der Runde 23 und ein Konsistenzreviewer
+über die Doku-Commits der Runden 22 und 23 und den der Preview. Meldet keiner einen hohen oder mittleren Fund, kommt
+das Tag `v0.2.0-preview.1` auf den letzten Doku-Commit.
 
 Rein lesende Reviewer zuerst, gleichzeitig; ein verändernder danach allein. Diese Lehren gehören in den
 Auftrag:
@@ -90,7 +92,9 @@ Auftrag:
   Debug-App, und die Korrektur der Einstellungen brach sieben Tests einer Nachbarklasse, die erst das Gate lief.
 - **Ein Fund über das Verhalten einer Bibliothek gilt für eine Version.** Runde 19: Der Code-Reviewer beschrieb
   `ExternalResource` wie in JUnit 4.12; das Projekt nutzt 4.13.2, und dort tritt der gemeldete Fehler nicht auf. Die
-  Version aus dem Build lesen, bevor ein solcher Fund zählt.
+  Version aus dem Build lesen, bevor ein solcher Fund zählt. Runde 22 wieder: Laut dem Quelltext, den der
+  Invarianten-Reviewer las, gibt Compose den Inhalt eines Passwortfelds an die Accessibility weiter; mit der Fassung
+  der App erschienen auf dem Emulator nur Punkte.
 - **Eine Korrektur, die ein Fenster schließt, zählt auf, wo es offen bleibt.** Runde 19: Die erste Fassung von
   ADR 0011 zum Ersetzen im Slot ließ aus, dass eine gescheiterte Umbenennung über eine intakte Datei den Slot weiter
   entfernt und neu anlegt.
@@ -104,18 +108,29 @@ Auftrag:
   derselben Suche. Keine Klasse ruft sie auf.
 - **Ein Versionswechsel trifft jede Datei, die die Version nennt.** Runde 21: Nach Bouncy Castle 1.86 nannten beide
   Lizenzhinweise 1.85, und die Statusdokumente kannten die Version 0.2.0 nicht.
+- **Eine Zusicherung über die Form einer Eingabe gilt für die Schicht, die sie liest.** Runde 22: „genau eine
+  Signatur“ prüfte, was der Parser lieferte, und hinter der Fußzeile von ASCII-Armor liefert er nichts, auch keinen
+  zweiten Block.
+- **Eine Gegenprobe braucht einen Fall, den nur die Korrektur abfängt.** Runde 22: Ohne Filter erscheint der Inhalt
+  des Schlüsselfelds schon als Punkte. Der Test setzt seinen Text deshalb in ein Feld ohne Maskierung und prüft
+  zuerst, dass der Text im Baum steht.
+- **Ein grüner CI-Lauf schließt keinen zeitweisen Fehler.** Runde 22: `ChoiceAccessibilityTest` bestand am Stand
+  `7d9ce41` nach drei Fehlschlägen, ohne Änderung an seiner Bedingung oder am Code der App, und scheiterte am Stand
+  `17bc156` wieder.
 
 Die Jagdliste:
 
-- **Die Einträge je Seite** (`eb654ae`): Welche anderen Zustände eines Pfades im Git-Index ändern, was
-  `git ls-files --stage` meldet, etwa ein Pfad, der nur im Index steht, oder einer mit `skip-worktree`?
-- **Die Versionen in den Lizenzhinweisen** (`3e99231`): Welche Schreibweise kommt durch, etwa „v1.86“, eine
-  Version in einer eigenen Tabellenspalte oder ein Name, der im Text anders heißt als im Versionskatalog?
-- **Der Vergleich der Lizenzhinweise** (`035d1e8`): Gibt es eine weitere Kopie, die niemand vergleicht?
-- **Die Meldung von `ChoiceAccessibilityTest`** (`20ca738`): Kann sie Text in ein CI-Log schreiben, der dort nicht
-  hingehört, etwa einen Schlüssel oder ein Transkript, wenn der Test auf einem anderen Bildschirm scheitert?
-- **Die Tests mit Armor** (`c7089f6`): Was nimmt `ArmoredInputStream` von 1.86 sonst an, etwa Kopfzeilen, Text vor
-  dem Armor oder zwei Blöcke hintereinander, und endet jedes davon als `SIGNATURE`?
+- **Der Rest hinter der Signatur** (`8097c08`): Liest `PGPUtil.getDecoderStream` oder der Parser einen
+  Teil des Rests in einen eigenen Puffer, sodass `onlyWhitespaceRemains` ihn nicht mehr sieht, etwa bei einer binären
+  Signatur, auf die Bytes folgen, die kein Paket sind?
+- **Die unlesbaren Pfade** (`1c7d629`): Die Prüfung meldet jetzt jeden Pfad im Git-Index, den der Baum
+  nicht liefert, nicht nur Skripte. Stört das in einem Arbeitsbaum mit `sparse-checkout` oder mitten in einer
+  Änderung, die eine Datei gelöscht, aber noch nicht aus dem Index genommen hat?
+- **Das „v“ vor einer Version** (`d99ff67`): Hält das Muster jetzt etwas für die Version eines Namens aus
+  dem Versionskatalog, das keine ist?
+- **Die Meldung von `ChoiceAccessibilityTest`** (`17bc156`): Zeigt ein Knoten den Inhalt eines Feldes, ohne
+  selbst bearbeitbar zu sein, etwa eine Vorschau oder ein Zähler? Und reichen 60 Zeichen je Text, um die Ursache von
+  [Punkt 54](DEFECTS.md) zu erkennen?
 - **Die Testlücken des Code-Reviewers der Runde 21:** Kein Selbsttest hält die Schlusszeile ohne Git-Index fest, und
   keiner zeigt, dass die neuen Formen gegen Zeilennummern außerhalb von `docs/` durchgehen.
 - **Der Test der gescheiterten Umbenennung der Metadaten** (`dc9e6dd`) setzt voraus, dass `rename(2)` eine

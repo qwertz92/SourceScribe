@@ -1,6 +1,6 @@
 # Bekannte Probleme und offene Punkte
 
-**Stand:** 14. September 2026, nach einundzwanzig Runden adversarischer Reviews. Diese Datei ist für den
+**Stand:** 14. September 2026, nach zweiundzwanzig Runden adversarischer Reviews. Diese Datei ist für den
 nächsten Agenten gedacht und listet, was **nicht** vollständig erledigt ist. Ein geschlossener Punkt
 behält seine Nummer und einen kurzen Vermerk, damit Verweise aus anderen Dokumenten gültig bleiben. Was hier nicht steht, ist entweder erledigt oder in
 [STATUS.md](STATUS.md) beschrieben.
@@ -451,7 +451,7 @@ Gewinn und deshalb nicht gemacht.
 
 ### 28. Was `tools/check-repository.py` weiterhin nicht liest (niedrig)
 
-- **Stelle:** `_read_text` und `_check_actions` in `tools/check-repository.py`.
+- **Stelle:** `_read_text`, `_check_actions` und `_check_notice_versions` in `tools/check-repository.py`.
 - **Voraussetzung:** Je nach Fall: eine UTF-16- oder UTF-32-Datei **ohne** Byte-Reihenfolge-Markierung,
   eine Textdatei über einem Mebibyte, oder eine noch nicht versionierte Datei unter `.github/workflows/`.
 - **Erwartet gegen tatsächlich:** Drei Reste, nachdem Runde 13 UTF-16 und Runde 14 UTF-32 **mit**
@@ -476,6 +476,13 @@ Gewinn und deshalb nicht gemacht.
   Richtung — mehr prüfen, nicht weniger — ist bei der Actions-Prüfung die sichere. Gefunden vom lesenden
   Reviewer in Runde 13 und in Runde 14 erneut, beide Male durch Ausführen der Funktionen außerhalb des
   Repositorys gegen selbstgebaute Dateien.
+- **Was Runde 22 dazu nachgetragen hat:** `_check_notice_versions` verbindet einen Namen aus dem Versionskatalog nur
+  mit einer Version, die ihm in derselben Zeile folgt, seit Runde 22 mit oder ohne „v“ davor. Eine Version in einer
+  eigenen Tabellenspalte und ein Name, den ein Lizenzhinweis anders schreibt als der Versionskatalog, etwa
+  „Bouncy Castle PG“ statt `bcpg`, bleiben unerkannt. Heute steht in der Tabelle von `THIRD_PARTY_NOTICES.md` keine
+  Version eines Namens aus dem Versionskatalog in einer eigenen Spalte; die Zeile zu WebP trennt Name und Version,
+  und WebP steht nicht im Katalog. Gefunden vom Code-Reviewer der Runde 22, mit der Funktion gegen selbstgebaute
+  Hinweise.
 
 ### 29. Die Preisseite von OpenAI nennt `whisper-1` nicht (niedrig)
 
@@ -886,23 +893,28 @@ Kostenzeile urteilen über die Konfiguration, die Start anlegt. Ein vor Runde 17
   `aSlotRepairWhoseMetadataCannotFollowFailsWithStorageAndLeavesTheEngineRepaired` hält ihn fest. Gemeldet vom
   Invarianten-Reviewer der Runde 20.
 
-### 54. `ChoiceAccessibilityTest` scheitert in der CI und sonst nirgends (mittel, Ursache unbekannt)
+### 54. `ChoiceAccessibilityTest` scheitert in der CI, solange die App noch startet (mittel)
 
 - **Stelle:** `appLanguageChoiceExposesButtonSemanticsAndOpensItsDialog` in
   `app/src/androidTest/java/app/sourcescribe/ChoiceAccessibilityTest.kt`, im Geräteschritt von
   `.github/workflows/android.yml`.
 - **Was geschieht:** Der Test wartet 25 Sekunden vergeblich auf ein anklickbares, aktiviertes Element mit dem Label
   der App-Sprache und dem Wert „Deutsch“ oder „English“: am 10. September in Run 34544393441, am 14. September in den
-  Runs 34838928729 und 34841018134. Der Geräteschritt ruft die Tests von `app` vor denen von `extractor` auf, und
-  nach dem Fehlschlag laufen die von `extractor` in der CI nicht.
+  Runs 34838928729, 34841018134 und 34855355701. Bestanden hat er in der CI am 14. September in Run 34845673702. Der
+  Geräteschritt ruft die Tests von `app` vor denen von `extractor` auf, und nach dem Fehlschlag laufen die von
+  `extractor` in der CI nicht.
+- **Was die Meldung zeigt:** Run 34855355701 lief mit der Meldung aus `20ca738`. Das Element stand auf der Seite,
+  anklickbar, sichtbar und mit dem Wert „English“, aber mit `enabled=false`. `SettingsScreen` übergibt der Sprachwahl
+  `enabled = !state.busy`, und `Choice` reicht das an seine `Surface` weiter. `busy` setzt `MainViewModel`, solange
+  eine exklusive Aktion läuft, beim Start `coordinator.recover()`, das Laden der Zugangsdaten und `refreshEngines()`.
+  Dieses ruft `EngineUpdateManager.installations()` auf, das die gebündelte Engine kopiert, verifiziert und gegen die
+  Laufzeit prüft, solange der Manager sie nicht zwischengespeichert hat. Die App startete also noch. Welcher der
+  Schritte in der CI so lange brauchte, zeigt das Log nicht.
 - **Was nicht die Ursache ist:** die Anzeige allein. Auf `emulator-5556` besteht der Test mit 1080 × 2424 Pixeln bei
   420 dpi und mit den 320 × 640 Pixeln bei 160 dpi, die das Log des Emulators der CI nennt.
-- **Vermutung, unbestätigt:** `MainViewModel` sperrt beim Start die Bedienung, während es die Wiederherstellung, die
-  Zugangsdaten und die Engines prüft, und das Auswahlfeld der Sprache ist in dieser Zeit deaktiviert. Auf einem frisch
-  installierten Emulator richtet die Prüfung der Engines erst die gebündelte Engine ein; auf `emulator-5556` liegt sie
-  schon. Das könnte in der CI länger dauern als die Wartezeit.
-- **Was zum Schließen fehlt:** ein CI-Lauf mit der Meldung aus `20ca738`, die zeigt, ob das Element fehlte,
-  deaktiviert war oder einen anderen Wert zeigte, und danach die Behebung der Ursache.
+- **Was zum Schließen fehlt:** Der Test prüft die Bedienung der Sprachwahl, nicht, wie schnell die App startet. Er
+  muss warten, bis die App mit dem Start fertig ist, mit einer eigenen Grenze und Meldung dafür, und so in der CI
+  bestehen. Seit Runde 22 lässt die Meldung aus, was ein Feld hält, und kürzt jeden Text nach 60 Zeichen.
 
 ### 55. Bouncy Castle 1.86 lief auf keiner Android-Version vor API 37 (niedrig, unbestätigt)
 
@@ -916,6 +928,19 @@ Kostenzeile urteilen über die Konfiguration, die Start anlegt. Ein vor Runde 17
   scheiterte (STATUS, Runde 21).
 - **Was zum Schließen fehlt:** die Suite des Moduls `extractor` mit einem signierten Update auf einem Emulator mit
   API 29.
+
+### 56. Scheitert nach einem Prüffehler auch das Löschen der Prüfansicht, geht die erste Meldung verloren (niedrig, unbestätigt)
+
+- **Stelle:** der `finally`-Block von `inspectArchive` in `core/src/main/kotlin/app/sourcescribe/core/EngineVerifier.kt`.
+- **Voraussetzung:** Die Prüfung eines Archivs scheitert, nachdem `inspectArchive` seine Prüfansicht
+  `.engine-inspect-*.zip` neben dem Archiv angelegt hat, und das Löschen dieser Ansicht scheitert ebenfalls.
+- **Erwartet gegen tatsächlich:** Erwartet ist die Meldung des ersten Fehlers, etwa zu einem zu großen Eintrag. Der
+  `finally`-Block wirft beim gescheiterten Löschen eine eigene `EngineVerificationException`, und eine Ausnahme aus
+  einem `finally` ersetzt die, die gerade durchläuft. Es bliebe „temporary inspection view could not be removed“.
+  Abgelehnt wird das Update in beiden Fällen; verloren ginge nur die Diagnose.
+- **Warum unbestätigt:** Ein Test müsste das Löschen genau zwischen Anlegen und Aufräumen scheitern lassen, und dafür
+  hat `EngineVerifier` keine Stelle. Dass die Ansicht nach einem Fehlschlag verschwindet, hält seit Runde 22
+  `aFailedInspectionRemovesItsTemporaryView` fest. Gemeldet vom Code-Reviewer der Runde 22.
 
 ## Bewusste Entscheidungen, die wie Fehler aussehen
 

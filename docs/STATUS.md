@@ -1756,6 +1756,109 @@ den Geräteläufen hatte die Einstellungsdatei der App denselben SHA-256.
 Zahl aus einer Textsuche zählt Zeichenketten, und ein Reviewer, der sie mit derselben Suche nachprüft, bestätigt den
 Fehler. Und ein Versionswechsel ändert mehr als den Katalog: Die Lizenzhinweise nannten die Version auch.
 
+### Runde 22
+
+Gelesen haben die acht Commits der Runde 21 ein Code- und ein Invarianten-Reviewer, die Doku-Commits `eb4eb1d` und
+`7d9ce41` ein Konsistenzreviewer, alle nur lesend auf einem Export von `7d9ce41`. Alle drei liefen als
+`claude-sonnet-5`, abgelesen an den Antworten in ihren Transkripten. Keiner meldete einen kritischen oder hohen Fund.
+Der Code-Reviewer meldete zwei mittlere und drei niedrige, der Invarianten-Reviewer einen mittleren und einen
+niedrigen; beide mittleren betreffen dieselbe Stelle. Der Konsistenzreviewer fand nichts und nannte zwei Aussagen,
+die er nicht prüfen konnte.
+
+**Hinter einer Signatur in ASCII-Armor blieb ein zweiter Block ungelesen.** Code-Reviewer, mittel. `EngineVerifier`
+verlangt genau eine abgetrennte Signatur und prüfte dazu, dass der Parser nach der ersten Signaturliste nichts mehr
+liefert. Für Bouncy Castle 1.86 endet Armor aber an seiner Fußzeile: Hing hinter der offiziellen Signatur ein zweiter
+Block oder eine Zeile Text, lieferte der Parser nichts davon, und die Datei verifizierte wie die Signatur allein. Eine
+falsche Signatur ließ sich so nicht durchbringen, geprüft wurde immer der erste Block. Jetzt darf hinter dem, was der
+Parser gelesen hat, nur Leerraum stehen. `onlyWhitespaceMayFollowAnArmoredSignature` verlangt die Ablehnung für einen
+zweiten Block und für eine Zeile Text und mit nachgestelltem Leerraum dasselbe Ergebnis wie ohne
+(`8097c08`). Text vor dem Armor, zusätzliche Kopfzeilen und Leerzeilen im Rumpf nimmt Bouncy Castle an,
+und die Signatur verifiziert dann wie sonst; das prüfte der Reviewer ohne Befund.
+
+**Die Meldung von `ChoiceAccessibilityTest` gab jeden Text des Fensters weiter.** Code- und Invarianten-Reviewer,
+beide mittel. Bei einer Zeitüberschreitung nannte der Test seit `20ca738` bis zu 24 Texte des aktiven Fensters,
+ungekürzt, und sammelte sie, ohne die Zahl der besuchten Knoten zu begrenzen. Die CI schreibt diese Meldung in ihr
+öffentliches Log. Der Invarianten-Reviewer las im Quelltext von Compose auf GitHub, ein Passwortfeld gebe seinen
+Inhalt ungemaskt an die Accessibility weiter, sodass ein getippter Schlüssel ins Log gelangen könnte; eine Fassung
+nannte er nicht. Für die Fassung, die die App bündelt, trifft das nicht zu: Auf `emulator-5556` erschien Text, der in
+das Schlüsselfeld der Einstellungen getippt wurde, im Dump von `uiautomator` nur als Punkte, mit `password=true`.
+Einen Weg, auf dem die Suite das Feld vor diesem Test füllt, fand keiner der beiden. Die Meldung verlässt sich
+trotzdem nicht auf die Maskierung: Sie lässt aus, was ein bearbeitbarer oder ein Passwortknoten hält, kürzt jeden
+anderen Text nach 60 Zeichen, weil ein langer Text Teil eines Transkripts sein kann, und besucht höchstens 512 Knoten.
+Ein neuer Test setzt über die Accessibility einen Testtext in das Quellfeld der Startseite, das nichts maskiert,
+wartet, bis der Text im Baum steht, und verlangt, dass die Meldung ihn nicht nennt und keinen Text über 60 Zeichen
+enthält (`17bc156`). Im CI-Lauf 34855355701 auf dem Commit griff die Kürzung: Der Satz der Einstellungen
+über Telemetrie und Schlüssel endete in der Meldung nach 60 Zeichen.
+
+**Dass die Prüfansicht nach einem Fehlschlag verschwindet, hielt kein Test fest.** Code-Reviewer, niedrig.
+`inspectArchive` liest ein Zipapp über eine Prüfansicht neben ihm und löscht sie in einem `finally`-Block; geprüft
+war das nur nach erfolgreichen Prüfungen. `aFailedInspectionRemovesItsTemporaryView` lässt eine Prüfung scheitern,
+nachdem die Ansicht angelegt ist, und verlangt, dass danach nur das Archiv im Verzeichnis liegt
+(`3863da4`). Offen bleibt der andere Teil des Funds: Scheitert zusätzlich das Löschen, ersetzt dessen
+Meldung die erste ([Punkt 56](DEFECTS.md)).
+
+**Ein Pfad, den der Git-Index führt und der Baum nicht liefert, fiel still aus der Prüfung der Skripte.**
+Code-Reviewer, niedrig. `_check_executable_scripts` übersprang einen Pfad, den es nicht lesen konnte, etwa eine
+gelöschte Datei oder eine mit `skip-worktree`, und die Schlusszeile sah aus wie ein vollständiger Lauf. Ob ein solcher
+Pfad ein Skript ist, steht in seiner ersten Zeile, die sich nicht lesen lässt. Jetzt meldet die Prüfung jeden solchen
+Pfad als unlesbar, und der Selbsttest löscht ein Skript, nachdem er es in den Index aufgenommen hat
+(`1c7d629`).
+
+**Die Versionsprüfung der Lizenzhinweise übersah drei Schreibweisen.** Code-Reviewer, niedrig. Eine Version mit „v“
+davor erkennt sie jetzt, und der Selbsttest enthält eine solche Zeile (`d99ff67`). Eine Version in einer
+eigenen Tabellenspalte und einen Namen, den der Hinweis anders schreibt als der Versionskatalog, erkennt sie weiter
+nicht; beides steht unter [Punkt 28](DEFECTS.md).
+
+**Die Prüfsummen von DocumentFile galten weiter.** Invarianten-Reviewer, niedrig. `812c4dc` entfernte die
+Abhängigkeit, und `gradle/verification-metadata.xml` führte die Prüfsummen ihrer Fassung 1.1.0 weiter. Sie sind
+entfernt, und der ganze Build-Schritt der CI lief lokal ohne sie durch (`391ca8b`). In den dex-Dateien der Debug-, Test- und Release-APK von `app` und der Test-APK von `extractor`, gebaut mit allen sechs Korrekturen, steht keine Zeichenkette mit `documentfile`; `androidx` steht in jeder, der Scan las also ihre Zeichenketten.
+
+**`ChoiceAccessibilityTest` bestand in der CI einmal und scheiterte dann wieder, diesmal mit einer Meldung, die den
+Grund zeigt.** Eigener Fund. Run 34845673702 auf `7d9ce41` lief am 14. September durch den Geräteschritt, samt den
+Tests von `extractor`. Seit dem letzten Fehlschlag auf `eb4eb1d` hatten sich nur die Meldung des Tests, Tests in
+`core`, `tools/check-repository.py` und der Lizenzhinweis unter den Assets der App geändert. Die Läufe auf `20ca738`
+und `035d1e8` brach die CI ab, weil ein späterer Push sie ersetzte. Run 34855355701 auf `17bc156` scheiterte wieder
+an diesem Test, jetzt mit der Meldung aus `20ca738`: Die Sprachwahl stand auf der Seite, anklickbar, sichtbar und mit
+dem Wert „English“, aber mit `enabled=false`. Deaktiviert wird sie in `SettingsScreen` allein über `state.busy`, und
+`busy` gilt, solange `MainViewModel` eine exklusive Aktion ausführt, beim Start die Wiederherstellung, das Laden der
+Zugangsdaten und die Prüfung der Engines. Die App war also die ganze Wartezeit über mit ihrem Start beschäftigt;
+welcher Schritt so lange brauchte, zeigt das Log nicht ([Punkt 54](DEFECTS.md)).
+
+**In Dateien umgeleitete Ausgaben von `wsl.exe` waren an ihrem Anfang überschrieben.** Eigener Fund. Dem
+Signatur-Probelauf der Preview am Stand `7d9ce41` fehlten seine ersten zwei Zeilen, und an ihrer Stelle stand die
+Meldung von `keytool` auf stderr, auf das Byte so lang wie die zwei Zeilen. Zwei Versuche zeigten den Grund: Leitet
+Git Bash die Ausgabe von `wsl.exe` in eine Datei, schreibt es stdout und stderr von getrennten Positionen aus, und
+was stderr schreibt, überschreibt, was derselbe Aufruf zuvor auf stdout schrieb. Durch eine Pipe bleibt die Ausgabe
+vollständig; die Skripte der Release-Gates leiten jetzt so um. Betroffen sein können die Logs der Gradle-Läufe
+aller Runden an ihrem Anfang. Die Testzahlen der Gates stammen aus den JUnit-Berichten und den Ausgaben von
+`am instrument`, die über `adb.exe` und eine Pipe kamen, nicht aus diesen Logs.
+
+**Die zwei Aussagen, die der Konsistenzreviewer nicht prüfen konnte.** Dass keine dex-Datei der Release-APK eine
+Klasse unter `androidx/documentfile` enthält, zeigt für diesen Stand der Scan oben. Dass im Lint-Cache Dateien vom
+7. und 8. September lagen, lässt sich nicht mehr nachlesen: Die Build-Skripte der Runden 20 bis 22 löschten diese
+Verzeichnisse vor dem Lint, ohne ihre Daten aufzuzeichnen. Die Aussage stützt sich allein auf die Commit-Nachricht
+von `d994c23`.
+
+**Gegenprobe der Runde 22.**
+Zurückgenommen, was die Korrekturen festhalten, jeweils auf dem Baum mit allen sechs; kein Build lief neben einem
+Gerätelauf.
+
+- `EngineVerifier` prüft einen leeren Strom statt des Rests hinter dem Armor: Von den 15 Tests von `EngineVerifierTest` fiel genau `onlyWhitespaceMayFollowAnArmoredSignature`. Die Datei mit dem zweiten Block kam durch die Prüfung der Signatur und scheiterte erst am fehlenden Artefakt, mit `HASH` statt `SIGNATURE`.
+- `inspectArchive` löscht seine Prüfansicht nie: Von den 15 Tests fielen genau die vier, die danach ihr Verzeichnis ansehen, `aFailedInspectionRemovesItsTemporaryView` und die drei, die eine Kopie des Fixtures verifizieren, jeder mit der liegengebliebenen Prüfansicht in der Meldung.
+- `_check_executable_scripts` überspringt einen unlesbaren Pfad wieder: Der Selbsttest scheitert an der Zusicherung, dass genau `tools/gone.sh` als unlesbar gemeldet wird.
+- `_check_notice_versions` nimmt kein „v“ vor der Version an: Der Selbsttest scheitert, weil der Befund zur dritten Zeile des selbstgebauten Hinweises fehlt.
+- Die Meldung von `ChoiceAccessibilityTest` behält, was ein bearbeitbarer Knoten hält: Der neue Test scheiterte mit dem Testtext in seiner Meldung, und der Test der Sprachwahl bestand.
+- Die Meldung kürzt keinen Text: Der neue Test scheiterte an der Länge, seine Meldung nannte die zwei langen Texte der Startseite ganz. Der Test der Sprachwahl bestand.
+
+**Gates der Runde 22.**
+Runde 22 ändert `EngineVerifier` und seine Tests in `core`, einen Test in `app`, `tools/check-repository.py`, `gradle/verification-metadata.xml` und die Doku. Gelaufen sind `tools/check-repository.py` mit Selbsttest und der ganze Build-Schritt der CI lokal mit allen sechs Korrekturen: 186 JVM-Tests von `core` ohne Fehler, die APKs von `app` und die Test-APK von `extractor`, die vier Lintberichte ohne Befund. Auf `emulator-5556` bestanden beide Tests von `ChoiceAccessibilityTest` vor und nach ihren Gegenproben. Davor scheiterte dort die Installation der App an vollem Speicher, bevor ein Test lief; nach dem Deinstallieren beider Testpakete stieg der freie Platz von 555 MB auf 889 MB. Jede Korrektur lief vor ihrem Commit auf einem Baum, den das Gate als HEAD plus genau die sechs Korrekturen bestätigte, und die Fassung von `tools/check-repository.py` in jedem Commit, der sie ändert, bestand ihren Selbsttest, bevor der Commit entstand. Vor und nach den Geräteläufen hatte die Einstellungsdatei der App denselben SHA-256. Auf `17bc156`, dem letzten dieser Commits, liefen danach die Release-Gates der Preview 0.2.0 lokal durch: der Build, die statische Releaseprüfung, beide Suiten samt den vier Prozessstufen auf `emulator-5556` und der Signatur-Probelauf. Der CI-Lauf auf demselben Commit scheiterte im Geräteschritt, siehe den eigenen Fund zu `ChoiceAccessibilityTest` oben; gebaut wird die Preview deshalb erst auf dem letzten Commit der Korrekturen der Runde 23.
+
+**Die Schleife ist nicht konvergiert.** Zweiundzwanzig Runden, keine davon leer. Runde 22 fügt zwei Dinge hinzu. Eine
+Zusicherung über die Form einer Eingabe gilt nur für die Schicht, die sie liest: „genau eine Signatur“ prüfte, was der
+Parser lieferte, und hinter der Fußzeile lieferte er nichts. Und ein Fund über eine Bibliothek, am Quelltext gezeigt,
+kann für die gebündelte Fassung falsch sein; eine Korrektur, die sich trotzdem nicht auf die Bibliothek verlässt,
+braucht einen Test an einem Fall, den die Bibliothek nicht schon abfängt.
+
 ## UI-Feedback umgesetzt
 
 Auswahlfelder haben abgestimmte Label-/Wertabstände und reservieren auch bei großer
