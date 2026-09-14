@@ -114,6 +114,46 @@ jobs:
           emulator_pid=$!
           cleanup() {
             result=$?
+            # Counted on every outcome: a green run in which part of the suite was skipped has to say so.
+            timeout 30 python3 - <<'PY_SUMMARY' || true
+          from pathlib import Path
+          import os
+          import xml.etree.ElementTree as ET
+          lines = []
+          for module in ("app", "extractor"):
+              counts = {"tests": 0, "failures": 0, "errors": 0, "skipped": 0}
+              suites = 0
+              for path in sorted((Path(module) / "build/outputs/androidTest-results").rglob("*.xml")):
+                  try:
+                      root = ET.parse(path).getroot()
+                  except ET.ParseError as error:
+                      lines.append(f"{module}: unreadable report {path.name}: {error}")
+                      continue
+                  for suite in ([root] if root.tag == "testsuite" else list(root.iter("testsuite"))):
+                      suites += 1
+                      cases = list(suite.iter("testcase"))
+                      fallback = {
+                          "tests": len(cases),
+                          "failures": sum(1 for case in cases if case.find("failure") is not None),
+                          "errors": sum(1 for case in cases if case.find("error") is not None),
+                          "skipped": sum(1 for case in cases if case.find("skipped") is not None),
+                      }
+                      for key in counts:
+                          counts[key] += int(suite.get(key, fallback[key]))
+              if suites == 0:
+                  lines.append(f"{module}: no test report found")
+                  continue
+              passed = counts["tests"] - counts["failures"] - counts["errors"] - counts["skipped"]
+              lines.append(
+                  f"{module}: {counts['tests']} tests, {passed} passed, {counts['skipped']} skipped, "
+                  f"{counts['failures']} failed, {counts['errors']} errors"
+              )
+          print("\n".join(lines))
+          summary = os.environ.get("GITHUB_STEP_SUMMARY")
+          if summary:
+              with open(summary, "a", encoding="utf-8") as handle:
+                  handle.write("### Instrumentation tests\n\n" + "".join(f"- {line}\n" for line in lines))
+          PY_SUMMARY
             if [[ "$result" -ne 0 ]]; then
               tail -n 160 emulator.log || true
               timeout 15 adb devices -l || true
