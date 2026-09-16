@@ -3,6 +3,7 @@ package app.sourcescribe.core
 import app.sourcescribe.core.providers.AssemblyAiAdapter
 import app.sourcescribe.core.providers.GroqAdapter
 import app.sourcescribe.core.providers.OpenAiAdapter
+import app.sourcescribe.core.providers.ReportedModel
 import app.sourcescribe.core.providers.SyncProviderSupport
 import java.io.File
 import org.junit.Assert.assertEquals
@@ -183,6 +184,10 @@ class StatedNumbersTest {
         // at once; the 24 hours come from the fix order for defect 42, and no source outside this program states
         // such a figure.
         assertEquals(24L * 60L * 60L * 1_000L, ShareCache.MAX_AGE_MS)
+
+        // The longest model name a provider's answer may report and still have it kept, counted as `String.length`
+        // counts. The AssemblyAI adapter and the parser for OpenAI and Groq answers both hold to it (defect 20).
+        assertEquals(128, ReportedModel.MAX_LENGTH)
     }
 
     /**
@@ -476,6 +481,7 @@ class StatedNumbersTest {
             "JobLimits.MAX_AUDIO_SECONDS", "JobLimits.MAX_AUDIO_MINUTES",
             "OpenAiAdapter.MAX_UPLOAD_BYTES", "OpenAiAdapter.PRICE_GPT_TRANSCRIBE_MICRO_USD_PER_HOUR",
             "OpenAiAdapter.PRICE_WHISPER_MICRO_USD_PER_HOUR", "OpenAiAdapter.DIARIZATION_AUTO_CHUNKING_MS",
+            "ReportedModel.MAX_LENGTH",
             "ShareCache.MAX_AGE_MS",
             "SyncTranscriptParser.MAX_PROMPT_BYTES",
             "TranscriptExporter.SHORT_ID_BYTES",

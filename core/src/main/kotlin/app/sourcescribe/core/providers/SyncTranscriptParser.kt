@@ -452,7 +452,7 @@ object SyncTranscriptParser {
     }
 
     /**
-     * The model the provider says it used, with the same limit as the AssemblyAI adapter, which is the only
+     * The model the provider says it used, held to [ReportedModel] like the AssemblyAI adapter, which is the only
      * other place that reads this field. Refused in the same order as well: a value that is present but
      * names nothing is reported as malformed even when it is also over-long, because the reason a reader is
      * given has to be the reason the value was actually refused. A key that is absent says nothing and is
@@ -462,11 +462,11 @@ object SyncTranscriptParser {
         if (element == null || element is JsonNull) return null
         val value = string(element)?.takeIf { it.isNotBlank() }
         if (value == null) {
-            warnings += "REPORTED_MODEL_MALFORMED"
+            warnings += ReportedModel.MALFORMED
             return null
         }
-        if (value.length > MAX_REPORTED_MODEL_LENGTH) {
-            warnings += "REPORTED_MODEL_TOO_LONG"
+        if (value.length > ReportedModel.MAX_LENGTH) {
+            warnings += ReportedModel.TOO_LONG
             return null
         }
         return value
@@ -496,5 +496,4 @@ object SyncTranscriptParser {
     private fun invalidResponse(): Nothing = throw ProviderError(ProviderErrorCode.INVALID_RESPONSE)
 
     private const val MAX_REPORTED_LANGUAGES = 16
-    private const val MAX_REPORTED_MODEL_LENGTH = 128
 }

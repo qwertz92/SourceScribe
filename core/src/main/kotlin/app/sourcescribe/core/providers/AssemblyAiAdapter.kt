@@ -560,10 +560,10 @@ class AssemblyAiAdapter(private val http: ProviderHttp = ProviderHttp()) : Provi
             objectValue,
             "speech_model_used",
             warnings,
-            WARNING_REPORTED_MODEL_MALFORMED,
+            ReportedModel.MALFORMED,
         ) ?: return null
-        if (reported.length > MAX_REPORTED_MODEL_LENGTH) {
-            warnings += WARNING_REPORTED_MODEL_TOO_LONG
+        if (reported.length > ReportedModel.MAX_LENGTH) {
+            warnings += ReportedModel.TOO_LONG
             return null
         }
         return reported
@@ -683,9 +683,6 @@ class AssemblyAiAdapter(private val http: ProviderHttp = ProviderHttp()) : Provi
         private const val MILLIS_PER_SECOND = 1000L
         private const val MILLIS_PER_HOUR = 3_600_000L
         private const val MAX_RESPONSE_BYTES = 16 * 1024 * 1024
-        // Deliberately the same bound the OpenAI and Groq parser applies to the model it reports, so
-        // one answer cannot be shown with a name the other would have refused.
-        private const val MAX_REPORTED_MODEL_LENGTH = 128
         private const val WARNING_WORD_TIMESTAMPS_MISSING = "WORD_TIMESTAMPS_MISSING"
         private const val WARNING_WORD_TIMESTAMPS_MALFORMED = "WORD_TIMESTAMPS_MALFORMED"
         private const val WARNING_WORD_TIMESTAMPS_OUT_OF_RANGE = "WORD_TIMESTAMPS_OUT_OF_RANGE"
@@ -695,8 +692,6 @@ class AssemblyAiAdapter(private val http: ProviderHttp = ProviderHttp()) : Provi
         private const val WARNING_DIARIZATION_SPEAKER_MISSING = "DIARIZATION_SPEAKER_MISSING"
         private const val WARNING_SEGMENT_TIMESTAMPS_MISSING = "SEGMENT_TIMESTAMPS_MISSING"
         private const val WARNING_REPORTED_LANGUAGES_MALFORMED = "REPORTED_LANGUAGES_MALFORMED"
-        private const val WARNING_REPORTED_MODEL_MALFORMED = "REPORTED_MODEL_MALFORMED"
-        private const val WARNING_REPORTED_MODEL_TOO_LONG = "REPORTED_MODEL_TOO_LONG"
         private val SUPPORTED_MODELS = setOf(MODEL_U35, MODEL_U2)
         private val UUID_PATTERN = Regex("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
         private val LANGUAGE_PATTERN = Regex("^[a-z]{2,3}(-[A-Z]{2})?$")

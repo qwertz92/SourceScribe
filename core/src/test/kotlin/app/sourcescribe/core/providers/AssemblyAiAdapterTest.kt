@@ -673,26 +673,29 @@ class AssemblyAiAdapterTest {
             return transcript.reportedModel to transcript.warnings
         }
 
+        // The one bound both readers of this field apply; SyncProviderTest holds the other reader to it (defect 20).
+        val bound = ReportedModel.MAX_LENGTH
+
         // The names AssemblyAI actually reports stay untouched, including one right at the bound.
         assertEquals("universal-2", parsed("\"universal-2\"").first)
-        assertEquals("x".repeat(128), parsed("\"" + "x".repeat(128) + "\"").first)
+        assertEquals("x".repeat(bound), parsed("\"" + "x".repeat(bound) + "\"").first)
 
         // The bound counts characters and not the bytes they take. An ASCII fixture cannot tell those apart,
         // so a switch to bytes would pass here unnoticed while breaking the agreement with the only other
         // parser that reads this field, which measures the same way against the same number.
-        assertEquals("ä".repeat(128), parsed("\"" + "ä".repeat(128) + "\"").first)
-        val longer = parsed("\"" + "ä".repeat(129) + "\"")
+        assertEquals("ä".repeat(bound), parsed("\"" + "ä".repeat(bound) + "\"").first)
+        val longer = parsed("\"" + "ä".repeat(bound + 1) + "\"")
         assertEquals(null, longer.first)
         assertTrue(longer.second.toString(), longer.second.contains("REPORTED_MODEL_TOO_LONG"))
 
         // And it counts the units a Kotlin length counts, not the characters a reader would count. Each of
-        // these is one character and two units, so sixty-five of them are over a bound of 128 units and far
-        // under one of 128 characters — the only shape that tells those two apart.
-        assertEquals(null, parsed("\"" + "\uD83D\uDE00".repeat(65) + "\"").first)
+        // these is one character and two units, so one more than half the bound of them is over the bound in
+        // units and far under it in characters — the only shape that tells those two apart.
+        assertEquals(null, parsed("\"" + "\uD83D\uDE00".repeat(bound / 2 + 1) + "\"").first)
 
         // One character more is refused loudly. It is not shortened: a cut name would be a value nobody
         // reported, and this string is shown to a reader as the model that produced the transcript.
-        val long = parsed("\"" + "x".repeat(129) + "\"")
+        val long = parsed("\"" + "x".repeat(bound + 1) + "\"")
         assertNull(long.first)
         assertTrue(long.second.toString(), "REPORTED_MODEL_TOO_LONG" in long.second)
         assertFalse(long.second.toString(), "REPORTED_MODEL_MALFORMED" in long.second)

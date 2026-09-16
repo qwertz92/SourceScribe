@@ -332,16 +332,19 @@ class SyncProviderTest {
             ),
         ) as SubmissionResult.Direct
 
-        val result = parsed("x".repeat(129))
+        // The one bound both readers of this field apply; AssemblyAiAdapterTest holds the other reader to it
+        // (defect 20).
+        val bound = ReportedModel.MAX_LENGTH
+        val result = parsed("x".repeat(bound + 1))
         assertNull(result.transcript.reportedModel)
         assertTrue(result.transcript.warnings.contains("REPORTED_MODEL_TOO_LONG"))
 
         // The bound counts characters, and the name right at it is kept. Both halves were missing here
         // while the matching test for the other parser had them, so the two read the same field against
         // the same number with only one of them saying which number and in what unit.
-        assertEquals("x".repeat(128), parsed("x".repeat(128)).transcript.reportedModel)
-        assertEquals("ä".repeat(128), parsed("ä".repeat(128)).transcript.reportedModel)
-        assertNull(parsed("ä".repeat(129)).transcript.reportedModel)
+        assertEquals("x".repeat(bound), parsed("x".repeat(bound)).transcript.reportedModel)
+        assertEquals("ä".repeat(bound), parsed("ä".repeat(bound)).transcript.reportedModel)
+        assertNull(parsed("ä".repeat(bound + 1)).transcript.reportedModel)
     }
 
     @Test
