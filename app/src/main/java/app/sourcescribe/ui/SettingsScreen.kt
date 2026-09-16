@@ -301,17 +301,34 @@ internal fun SettingsScreen(
             SectionTitle(R.string.engines, HelpTopic.ENGINES, openHelp)
             Text(stringResource(R.string.engine_help), style = MaterialTheme.typography.bodySmall)
             if (state.installations.isEmpty()) {
-                // The list stays empty until the engine is ready. This line stands in for its first entry, in the style
-                // and padding of one, so that entry does not push the buttons below down when it arrives.
-                ReservedText(
-                    if (state.preparingEngine) stringResource(R.string.engine_preparing) else "",
-                    listOf(stringResource(R.string.engine_preparing)),
-                    MaterialTheme.typography.bodyLarge,
-                    Modifier.padding(vertical = 8.dp),
-                )
+                // The list stays empty until the engine is ready. These two lines stand in for its first entry, in
+                // the styles and padding of one, so that entry does not push the buttons below down when it arrives.
+                Column(Modifier.padding(vertical = 8.dp)) {
+                    ReservedText(
+                        if (state.preparingEngine) stringResource(R.string.engine_preparing) else "",
+                        listOf(stringResource(R.string.engine_preparing)),
+                        MaterialTheme.typography.bodyLarge,
+                    )
+                    ReservedText("", listOf(stringResource(R.string.engine_row_active)),
+                        MaterialTheme.typography.bodySmall)
+                }
             }
-            state.installations.forEach {
-                Text("yt-dlp ${it.version} · EJS ${it.ejsVersion} · ${channelName(it.channel)}", Modifier.padding(vertical = 8.dp))
+            // Which installation the app is using, which ones it checked, and why a reader's own choice is no
+            // longer in force (ADR 0012, amended 16 September 2026). Before 0.4.0 every entry read the same, so a
+            // downloaded engine replaced after an app update looked exactly like the one actually running.
+            state.installations.forEach { installation ->
+                Column(Modifier.padding(vertical = 8.dp)) {
+                    Text("yt-dlp ${installation.version} · EJS ${installation.ejsVersion} · ${channelName(installation.channel)}")
+                    Text(
+                        engineRowState(installation, state.activeEngineId),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (installation.healthy) {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        } else {
+                            MaterialTheme.colorScheme.error
+                        },
+                    )
+                }
             }
             Row {
                 TextButton({ model.checkEngine(EngineChannel.STABLE) }, enabled = !state.busy) {

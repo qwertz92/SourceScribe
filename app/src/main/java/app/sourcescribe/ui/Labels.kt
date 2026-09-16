@@ -29,6 +29,8 @@ import app.sourcescribe.core.TranscriptWarnings
 import app.sourcescribe.core.Translation
 import app.sourcescribe.core.WarningGroup
 import app.sourcescribe.extractor.EngineChannel
+import app.sourcescribe.extractor.EngineHealthLoss
+import app.sourcescribe.extractor.EngineInstallation
 import androidx.compose.ui.text.intl.Locale as ComposeLocale
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -49,6 +51,29 @@ internal fun providerName(value: Provider): String = when (value) {
 
 @Composable internal fun channelName(value: EngineChannel) =
     stringResource(if (value == EngineChannel.STABLE) R.string.channel_stable else R.string.channel_nightly)
+
+/**
+ * What the engine list says under one installation: whether the app is using it, whether it passed its check, and
+ * why it stopped counting when it did not (ADR 0012, amended 16 September 2026).
+ *
+ * [activeId] is what `EngineUpdateManager.active()` answers, not the pointer the reader last set: an installation
+ * that lost its health is no longer active even though the state still names it.
+ */
+@Composable
+internal fun engineRowState(installation: EngineInstallation, activeId: String?): String {
+    val state = stringResource(
+        when {
+            !installation.healthy -> when (installation.healthLoss) {
+                EngineHealthLoss.RUNTIME_MISMATCH -> R.string.engine_row_replaced_runtime
+                EngineHealthLoss.PROBE_FAILED -> R.string.engine_row_replaced_probe
+                null -> R.string.engine_row_unchecked
+            }
+            installation.id == activeId -> R.string.engine_row_active
+            else -> R.string.engine_row_ready
+        },
+    )
+    return if (installation.bundled) state + " · " + stringResource(R.string.engine_row_bundled) else state
+}
 
 @Composable internal fun formatName(value: ExportFormat) = stringResource(when (value) {
     ExportFormat.MARKDOWN -> R.string.format_markdown

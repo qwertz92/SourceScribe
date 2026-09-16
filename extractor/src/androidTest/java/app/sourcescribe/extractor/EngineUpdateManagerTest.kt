@@ -696,7 +696,68 @@ class EngineUpdateManagerTest {
             assertEquals(bundled.id, restarted.active().id)
             assertEquals(1, checks.verifications.get())
             assertEquals(listOf(bundled.id, activated.id), checks.probedIds())
+            // Why it stopped being the reader's engine, so the engine list in the settings can say it (ADR 0012,
+            // amended 16 September 2026). The runtime of this build reported another version for it.
+            val replaced = restarted.installations().single { it.id == activated.id }
+            assertEquals(false, replaced.healthy)
+            assertEquals(EngineHealthLoss.RUNTIME_MISMATCH, replaced.healthLoss)
             // Checked once for this build: the start after it trusts the result.
+            val later = StartupChecks()
+            assertEquals(bundled.id, later.newManager(harness).active().id)
+            assertEquals(0, later.verifications.get())
+            assertEquals(emptyList<String>(), later.probedIds())
+        }
+    }
+
+    @Test
+    fun anActivatedEngineWhoseProbeOnlyTimesOutKeepsItsPlaceAndIsProbedAgainNextStart() = runBlocking {
+        // ADR 0012, amended 16 September 2026. Until then `verifyRuntimeCompatibility` turned every
+        // `NativeRuntimeException` into `PROBE_FAILED`, a timeout included, so the first start of a new app build
+        // on a slow or busy device took a working engine the reader had activated away from them, and every attempt
+        // pinned to it stopped with `ENGINE_NOT_AVAILABLE`. A timeout is the absence of an answer: nothing is
+        // concluded from it, nothing is written down, and the next start asks again.
+        withIsolatedManager { harness ->
+            val bundled = harness.manager.bundled()
+            val activated = createScriptedCandidate(harness, "never run")
+            writeState(harness, active = activated, previous = bundled, candidate = activated)
+            writeMarkerOfThePreviousBuild(harness, bundled)
+            val checks = StartupChecks(timesOut = setOf(activated.id))
+
+            val restarted = checks.newManager(harness)
+
+            assertEquals(activated.id, restarted.active().id)
+            assertEquals(listOf(bundled.id, activated.id), checks.probedIds())
+            val unchanged = restarted.installations().single { it.id == activated.id }
+            assertEquals(true, unchanged.healthy)
+            assertNull(unchanged.healthLoss)
+            // No verdict, so no marker: the next start runs the whole check again rather than trusting a
+            // conclusion nobody reached.
+            val later = StartupChecks()
+            assertEquals(activated.id, later.newManager(harness).active().id)
+            assertEquals(1, later.verifications.get())
+            assertEquals(listOf(bundled.id, activated.id), later.probedIds())
+        }
+    }
+
+    @Test
+    fun anActivatedEngineWhoseProbeFailsOutrightIsReplacedWithTheReasonRecorded() = runBlocking {
+        // The other half of the amended decision: a probe that answers, and answers badly, is a verdict. The engine
+        // stops being healthy, `active()` falls back to the bundled one, and the reason is kept so the engine list
+        // can say why the reader's choice is no longer in force.
+        withIsolatedManager { harness ->
+            val bundled = harness.manager.bundled()
+            val activated = createScriptedCandidate(harness, "never run")
+            writeState(harness, active = activated, previous = bundled, candidate = activated)
+            writeMarkerOfThePreviousBuild(harness, bundled)
+            val checks = StartupChecks(failsOutright = setOf(activated.id))
+
+            val restarted = checks.newManager(harness)
+
+            assertEquals(bundled.id, restarted.active().id)
+            val replaced = restarted.installations().single { it.id == activated.id }
+            assertEquals(false, replaced.healthy)
+            assertEquals(EngineHealthLoss.PROBE_FAILED, replaced.healthLoss)
+            // A verdict was reached, so this build is done checking.
             val later = StartupChecks()
             assertEquals(bundled.id, later.newManager(harness).active().id)
             assertEquals(0, later.verifications.get())
@@ -735,8 +796,17 @@ class EngineUpdateManagerTest {
     private fun newManager(harness: Harness, calls: Call.Factory, references: EngineReferences): EngineUpdateManager =
         EngineUpdateManager(harness.storage, NativeRuntime(harness.storage), calls, ::writeBytes) { references }
 
-    /** Counts what a start of the manager verifies, and still verifies it for real. */
-    private inner class StartupChecks {
+    /**
+     * Counts what a start of the manager verifies, and still verifies it for real.
+     *
+     * [timesOut] and [failsOutright] name slots whose runtime self-test answers with a `NativeRuntimeException`
+     * instead of versions: a timeout, which says nothing, and a failure to start, which is a verdict. Everything
+     * else runs against the real runtime as before.
+     */
+    private inner class StartupChecks(
+        private val timesOut: Set<String> = emptySet(),
+        private val failsOutright: Set<String> = emptySet(),
+    ) {
         val verifications = AtomicInteger()
         private val probed = CopyOnWriteArrayList<String>()
 
@@ -755,9 +825,16 @@ class EngineUpdateManagerTest {
                     EngineVerifier.verify(artifact, checksums, signature)
                 },
                 probeRuntime = { engine ->
-                    probed += engine.parentFile?.name.orEmpty()
-                    runtime.initialize()
-                    runtime.versions(engine)
+                    val slot = engine.parentFile?.name.orEmpty()
+                    probed += slot
+                    when (slot) {
+                        in timesOut -> throw NativeRuntimeException(RuntimeFailureCode.TIMED_OUT)
+                        in failsOutright -> throw NativeRuntimeException(RuntimeFailureCode.START_FAILED)
+                        else -> {
+                            runtime.initialize()
+                            runtime.versions(engine)
+                        }
+                    }
                 },
             )
         }

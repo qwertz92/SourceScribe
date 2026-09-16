@@ -85,6 +85,12 @@ data class ScreenState(
     val documentName: String? = null,
     val credentials: List<CredentialInfo> = emptyList(),
     val installations: List<EngineInstallation> = emptyList(),
+    /**
+     * The installation the app is actually using, which is not always the one the reader activated: an engine
+     * whose self-test this app build contradicted stops being healthy and the bundled one takes over (ADR 0012).
+     * Null while the engine is still being prepared and the list is empty.
+     */
+    val activeEngineId: String? = null,
     /** The installation a rollback would activate, while the confirmation that names it is open. */
     val rollbackTarget: EngineInstallation? = null,
     val update: AvailableEngine? = null,
@@ -462,7 +468,16 @@ class MainViewModel @Inject constructor(
         mutable.update { it.copy(message = "ENGINE_ACTIVE") }
     }
 
-    private suspend fun refreshEngines() { val installed = engines.installations(); mutable.update { it.copy(installations = installed) } }
+    /**
+     * The engine list and, beside it, the installation the app is actually using. `active()` is asked rather than
+     * the recorded pointer, because that is the function the rest of the app binds new work to: it answers the
+     * bundled engine whenever the activated one is not healthy.
+     */
+    private suspend fun refreshEngines() {
+        val installed = engines.installations()
+        val active = engines.active().id
+        mutable.update { it.copy(installations = installed, activeEngineId = active) }
+    }
 
     private fun refreshCredentials() { mutable.update { it.copy(credentials = credentialStore.list()) } }
 

@@ -92,6 +92,20 @@ data class AvailableEngine(
     internal val signatureUrl: String = "",
 )
 
+/**
+ * Why an installation the reader had activated stopped being healthy, kept so the engine list in the settings can
+ * say why the app is no longer using it (ADR 0012, amended 16 September 2026).
+ *
+ * Only a verdict is recorded. A self-test that timed out answers nothing and writes nothing here.
+ */
+enum class EngineHealthLoss {
+    /** The runtime of this app build reported other versions for it than the ones recorded with it. */
+    RUNTIME_MISMATCH,
+
+    /** The runtime could not run it at all. */
+    PROBE_FAILED,
+}
+
 /** An immutable engine slot. The file returned by [EngineUpdateManager.file] never moves. */
 data class EngineInstallation(
     val id: String,
@@ -102,6 +116,8 @@ data class EngineInstallation(
     val sha256: String,
     val healthy: Boolean,
     val bundled: Boolean,
+    /** Set only together with `healthy = false`, and cleared again as soon as a check confirms the engine. */
+    val healthLoss: EngineHealthLoss? = null,
 )
 
 /**
@@ -265,6 +281,7 @@ class EngineUpdateManager internal constructor(
             val healthy = installation.copy(
                 healthy = true,
                 bundled = loaded.installations[installation.id]?.bundled == true || installation.bundled,
+                healthLoss = null,
             )
             loaded.installations[healthy.id] = healthy
             loaded.healthyIds += healthy.id
@@ -438,7 +455,8 @@ class EngineUpdateManager internal constructor(
                 saveStateLocked(state)
             }
             verifyRuntimeCompatibility(installation)
-            val healthy = (existing ?: installation).copy(healthy = true, bundled = true)
+            // healthLoss is a verdict of an earlier build's runtime; this build's runtime has just confirmed it.
+            val healthy = (existing ?: installation).copy(healthy = true, bundled = true, healthLoss = null)
             state.installations[healthy.id] = healthy
             state.healthyIds += healthy.id
             val current = state.activeId?.let { state.installations[it] }
@@ -452,9 +470,11 @@ class EngineUpdateManager internal constructor(
             }
             saveStateLocked(state)
             // Before the cache and the marker, so a start that fails in it runs the whole check again next time.
-            recheckActiveLocked(state, healthy)
+            val concluded = recheckActiveLocked(state, healthy)
             bundledCache = healthy
-            if (identity != null && identity.resourceSha256 == healthy.id) writeMarker(identity)
+            // A marker says this build is done checking. It is written only once the activated engine got a verdict:
+            // a probe that merely timed out reached none, so the next start asks again (ADR 0012, amended 2026-09-16).
+            if (concluded && identity != null && identity.resourceSha256 == healthy.id) writeMarker(identity)
             healthy
         } finally {
             deleteOwnedTree(staging)
@@ -463,19 +483,39 @@ class EngineUpdateManager internal constructor(
 
     /**
      * Runs the runtime self-test with the active installation when that is not [bundled], typically a downloaded engine
-     * activated under an earlier app build, whose runtime may differ from this one (ADR 0012, defect 47). An
-     * installation the runtime does not confirm stops being healthy, and [active] falls back to the bundled engine.
-     * A probe that timed out counts as not confirmed, as it does when an engine is staged.
+     * activated under an earlier app build, whose runtime may differ from this one (ADR 0012, defect 47).
+     *
+     * An installation the runtime **contradicts** stops being healthy, with the reason kept in
+     * [EngineInstallation.healthLoss], and [active] falls back to the bundled engine. A probe that only timed out
+     * contradicts nothing: the engine stays the reader's, no reason is written, and this answers false so the caller
+     * writes no marker and the next start asks again. Until 16 September 2026 a timeout counted as a failure, which
+     * took a working engine away from a reader on a slow or busy device and stranded every attempt pinned to it.
+     *
+     * @return true when the active engine got a verdict - confirmed, contradicted, or not applicable because the
+     *   bundled engine is the active one.
      */
-    private suspend fun recheckActiveLocked(state: ManagerState, bundled: EngineInstallation) {
-        val active = state.activeId?.takeIf { it != bundled.id }?.let { healthySlot(state, it) } ?: return
-        try {
+    private suspend fun recheckActiveLocked(state: ManagerState, bundled: EngineInstallation): Boolean {
+        val active = state.activeId?.takeIf { it != bundled.id }?.let { healthySlot(state, it) } ?: return true
+        val loss = try {
             verifyRuntimeCompatibility(active)
-        } catch (_: EngineUpdateException) {
-            state.installations[active.id] = active.copy(healthy = false)
+            null
+        } catch (failure: EngineUpdateException) {
+            when (failure.code) {
+                EngineUpdateCode.UNCERTAIN_PROBE -> return false
+                EngineUpdateCode.REQUIRES_APP_UPDATE -> EngineHealthLoss.RUNTIME_MISMATCH
+                else -> EngineHealthLoss.PROBE_FAILED
+            }
+        }
+        if (loss != null) {
+            state.installations[active.id] = active.copy(healthy = false, healthLoss = loss)
             state.healthyIds.remove(active.id)
             saveStateLocked(state)
+        } else if (active.healthLoss != null) {
+            // It answered for this build's runtime, so an earlier build's verdict has nothing left to say.
+            state.installations[active.id] = active.copy(healthLoss = null)
+            saveStateLocked(state)
         }
+        return true
     }
 
     /**
@@ -533,11 +573,24 @@ class EngineUpdateManager internal constructor(
         }
     }
 
+    /**
+     * Asks the runtime of this app build which versions an installation reports, and holds it to the ones recorded
+     * with it.
+     *
+     * A timeout is told apart from a failure, exactly as [activate] already tells them apart for its own yt-dlp
+     * probe: a runtime that never answered has said nothing about the engine, so this raises `UNCERTAIN_PROBE`
+     * rather than the `PROBE_FAILED` it raised for every `NativeRuntimeException` until 16 September 2026.
+     */
     private suspend fun verifyRuntimeCompatibility(installation: EngineInstallation) {
         val versions = try {
             probeRuntime(file(installation))
         } catch (failure: NativeRuntimeException) {
-            throw EngineUpdateException(EngineUpdateCode.PROBE_FAILED).also { it.initCause(failure) }
+            val code = if (failure.code == RuntimeFailureCode.TIMED_OUT) {
+                EngineUpdateCode.UNCERTAIN_PROBE
+            } else {
+                EngineUpdateCode.PROBE_FAILED
+            }
+            throw EngineUpdateException(code).also { it.initCause(failure) }
         }
         if (versions["yt-dlp"] != installation.version || versions["ejs"] != installation.ejsVersion) {
             throw EngineUpdateException(EngineUpdateCode.REQUIRES_APP_UPDATE)
@@ -833,9 +886,12 @@ class EngineUpdateManager internal constructor(
             val sha = item.optString("sha256", "")
             if (!VALUE_PATTERN.matches(version) || !VALUE_PATTERN.matches(ejs) || !HASH_PATTERN.matches(sha)) continue
             val channel = runCatching { EngineChannel.valueOf(item.optString("channel")) }.getOrNull() ?: continue
+            // An unknown name is no reason at all; a state an older build wrote carries none and reads as null.
+            val loss = optionalString(item, "healthLoss")
+                ?.let { name -> EngineHealthLoss.entries.firstOrNull { it.name == name } }
             state.installations[id] = EngineInstallation(
                 id, version, ejs, channel, optionalString(item, "gitHead"), sha,
-                item.optBoolean("healthy", false), item.optBoolean("bundled", false),
+                item.optBoolean("healthy", false), item.optBoolean("bundled", false), loss,
             )
         }
         val healthy = root.optJSONArray("healthy") ?: JSONArray()
@@ -868,7 +924,8 @@ class EngineUpdateManager internal constructor(
                 .put("sha256", installation.sha256)
                 .put("healthy", installation.healthy)
                 .put("bundled", installation.bundled)
-                .apply { installation.gitHead?.let { put("gitHead", it) } })
+                .apply { installation.gitHead?.let { put("gitHead", it) } }
+                .apply { installation.healthLoss?.let { put("healthLoss", it.name) } })
         }
         val healthy = JSONArray()
         state.healthyIds.filter { state.installations.containsKey(it) }.forEach(healthy::put)

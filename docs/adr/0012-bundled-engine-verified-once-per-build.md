@@ -97,3 +97,72 @@ A downloaded engine the user activated, in turn, was never checked again against
   engine active; the start after that checks nothing.
 - `ViewModelStateTest.startUpWorkLeavesTheSettingsAndKeysUsable`: while the start checks the engine, nothing holds the
   screen busy, and saving a key succeeds.
+
+## Amended 2026-09-16 — a probe that only timed out concludes nothing
+
+Status: implemented for release 0.4.0. Decision 3 above and the paragraph of "Consequences" that accepted a timed-out
+probe as a failure are replaced by what follows; everything else in this document stands as written.
+
+### What the review of 16 September found
+
+`recheckActiveLocked` probed the activated engine through `verifyRuntimeCompatibility`, and that function had one
+catch clause for every `NativeRuntimeException`, `RuntimeFailureCode.TIMED_OUT` included, which it turned into
+`PROBE_FAILED`. The interactive `activate` path already told the two apart for its own yt-dlp probe: a timeout there
+raises `UNCERTAIN_PROBE`, because a runtime that never answered has said nothing about the engine. The first start of
+a new app build did not. So on a slow or busy device, one probe that ran into its timeout was enough to take an
+engine the reader had chosen away from them for good: the installation stopped being healthy, `active()` fell back to
+the bundled engine, and every unfinished attempt pinned to the old engine stopped with `ENGINE_NOT_AVAILABLE` -
+`SttStep.pinnedEngine` accepts only a healthy installation. There was no retry and no message of its own.
+
+### Decision
+
+1. **A probe that answers is a verdict; a probe that times out is not.** `verifyRuntimeCompatibility` raises
+   `UNCERTAIN_PROBE` for `TIMED_OUT` and `PROBE_FAILED` for every other `NativeRuntimeException`, which is the
+   distinction `activate` already made. `REQUIRES_APP_UPDATE` for reported versions that do not match is unchanged.
+2. **A verdict against the activated engine replaces it, as before.** The installation stops being healthy,
+   `active()` falls back to the bundled engine, and `EngineInstallation.healthLoss` records which verdict it was:
+   `RUNTIME_MISMATCH` when this build's runtime reported other versions for it, `PROBE_FAILED` when the runtime could
+   not run it at all. The field is persisted in `engines/state.json` and cleared again the moment a check confirms
+   the engine.
+3. **An uncertain probe changes nothing.** The engine stays active and healthy, no reason is written, and
+   `recheckActiveLocked` answers that it reached no verdict. `ensureBundledLocked` then writes **no** marker, so the
+   next start runs the full check again and probes the engine once more. This extends decision 4 above: a start whose
+   check of the activated engine reaches no verdict costs the next start its full check, and nothing else.
+4. **The engine list in the settings says which installation is which.** Under every entry it now names whether the
+   app is using it, whether it was checked, whether it came with the app, and, for a replaced one, which of the two
+   verdicts it was. Until 0.4.0 all entries read alike, so a replaced engine looked exactly like the running one.
+5. **An attempt still pinned to a replaced engine is the job actions dialog's business, not this manager's.** The
+   dialog recommends a new run, which binds to `active()`; the manager never rebinds an existing attempt. See item 15
+   of the 0.4.0 plan and `JobActions`.
+
+### Why the update-trust invariants still hold
+
+- Nothing is trusted that was not verified. An uncertain probe leaves the state exactly as it was: the engine was
+  healthy because an earlier full check verified its signature and ran its self-test, and it stays healthy on that
+  same evidence. No check is skipped - the opposite, the next start runs one more.
+- A marker is still only ever written after a completed check. The new condition makes it harder to write, never
+  easier: the marker now also requires that the activated engine got an answer.
+- The new field is a label on an installation that is already not healthy. It grants nothing, and `active()`,
+  `pinnedEngine` and `rollbackTargetLocked` keep reading `healthy` and `healthyIds` as before. A `healthLoss` value
+  a state file does not name, or names with an unknown word, reads as null.
+
+### Consequences
+
+- A working engine on a slow device is no longer lost to one timeout. The cost is that such a device runs the full
+  check on every start until a probe answers - seconds of CPU per start, which is what release 0.2.0 did on every
+  start for the bundled engine as well.
+- A runtime that hangs forever would mean a full check on every start forever. The probe is bounded by
+  `NativeRuntime`'s own timeout, so each start pays that bound once and nothing waits indefinitely.
+- `engines/state.json` gains one optional key per installation. A file an older build wrote reads unchanged, and an
+  older build reading a newer file ignores the key, since `parseState` reads named keys only.
+
+### Tests
+
+- `EngineUpdateManagerTest.anActivatedEngineWhoseProbeOnlyTimesOutKeepsItsPlaceAndIsProbedAgainNextStart`: with a
+  `probeRuntime` that raises `TIMED_OUT` for the activated engine, the engine stays active and healthy, no reason is
+  recorded, and the following start verifies and probes both engines again.
+- `EngineUpdateManagerTest.anActivatedEngineWhoseProbeFailsOutrightIsReplacedWithTheReasonRecorded`: with a
+  `probeRuntime` that raises `START_FAILED`, the bundled engine becomes active, the installation carries
+  `PROBE_FAILED`, and the start after it checks nothing.
+- `EngineUpdateManagerTest.anotherAppBuildChecksTheBundledEngineAgainAndTheActivatedOneAgainstItsRuntime`, extended:
+  a version the runtime does not confirm now also records `RUNTIME_MISMATCH`.

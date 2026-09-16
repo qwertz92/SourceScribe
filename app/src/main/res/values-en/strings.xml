@@ -82,6 +82,12 @@
     <string name="engine_probe">Public YouTube source for the functional test</string>
     <string name="engine_help">The engine is yt-dlp, the program the app uses to read YouTube pages and download captions and audio. yt-dlp and EJS are signature-verified together. Python, the JavaScript runtime, and FFmpeg require an APK update. Running jobs keep their engine.</string>
     <string name="engine_preparing">Preparing YouTube support …</string>
+    <string name="engine_row_active">In use</string>
+    <string name="engine_row_ready">Checked, not in use</string>
+    <string name="engine_row_unchecked">Not checked</string>
+    <string name="engine_row_bundled">supplied with the app</string>
+    <string name="engine_row_replaced_runtime">Replaced: it reports other versions than this app version’s runtime expects for it. The component supplied with the app took over.</string>
+    <string name="engine_row_replaced_probe">Replaced: this app version’s runtime could not run it. The component supplied with the app took over.</string>
     <string name="engine_current">No new update found</string>
     <string name="engine_active">Engine activated</string>
     <string name="jobs_created">Jobs saved to history</string>

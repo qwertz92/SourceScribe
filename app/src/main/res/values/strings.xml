@@ -84,6 +84,12 @@
     <string name="engine_probe">Öffentliche YouTube-Quelle für den Funktionstest</string>
     <string name="engine_help">Die Engine ist yt-dlp, das Programm, mit dem die App YouTube-Seiten liest und Untertitel und Audio herunterlädt. yt-dlp und EJS werden gemeinsam signiert geprüft. Python, JavaScript-Runtime und FFmpeg benötigen ein APK-Update. Laufende Aufträge behalten ihre Engine.</string>
     <string name="engine_preparing">YouTube-Unterstützung wird vorbereitet …</string>
+    <string name="engine_row_active">In Verwendung</string>
+    <string name="engine_row_ready">Geprüft, nicht in Verwendung</string>
+    <string name="engine_row_unchecked">Nicht geprüft</string>
+    <string name="engine_row_bundled">mit der App geliefert</string>
+    <string name="engine_row_replaced_runtime">Ersetzt: Sie meldet andere Versionen, als die Laufzeit dieser App-Version für sie erwartet. Die mit der App gelieferte Komponente hat übernommen.</string>
+    <string name="engine_row_replaced_probe">Ersetzt: Die Laufzeit dieser App-Version konnte sie nicht ausführen. Die mit der App gelieferte Komponente hat übernommen.</string>
     <string name="engine_current">Kein neues Update ermittelt</string>
     <string name="engine_active">Engine aktiviert</string>
     <string name="jobs_created">Aufträge im Verlauf gespeichert</string>
