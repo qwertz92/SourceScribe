@@ -106,13 +106,19 @@ object EngineVerifier {
         return VerifiedEngine(finalHash, metadata.version, metadata.ejsVersion, metadata.channel, metadata.gitHead)
     }
 
-    /** Internal seam for hostile archive tests which deliberately bypass signature responsibility. */
-    internal fun inspectArchive(artifact: File): EngineArchiveMetadata {
+    /**
+     * Internal seam for hostile archive tests which deliberately bypass signature responsibility. [removeView] deletes
+     * the temporary inspection view; only a test replaces it, to make that deletion fail.
+     */
+    internal fun inspectArchive(artifact: File, removeView: (File) -> Boolean = File::delete): EngineArchiveMetadata {
         val bytes = readArchiveBytes(artifact)
         val prefixBytes = inspectCentralDirectory(bytes)
         // Android ZipFile rejects Python zipapps with a shebang. Inspect a temporary
         // ZIP view; the signed original remains the only persisted/executed artifact.
         var inspectionFile = artifact
+        // What the inspection ended with, if it failed. Removing the view must not replace it: an exception thrown
+        // from finally discards the one in flight (defect 56).
+        var inFlight: Throwable? = null
         try {
             if (prefixBytes != 0) {
                 val prefix = "#!/usr/bin/env python3\n".toByteArray(StandardCharsets.US_ASCII)
@@ -187,22 +193,36 @@ object EngineVerifier {
                 return parseMetadata(metadataBytes)
             }
         } catch (failure: EngineVerificationException) {
+            inFlight = failure
             throw failure
         } catch (failure: IOException) {
-            fail(EngineVerificationCode.ARCHIVE, "archive could not be inspected", failure)
+            throw EngineVerificationException(EngineVerificationCode.ARCHIVE, "archive could not be inspected", failure)
+                .also { inFlight = it }
         } catch (failure: SecurityException) {
-            fail(EngineVerificationCode.ARCHIVE, "archive could not be inspected", failure)
+            throw EngineVerificationException(EngineVerificationCode.ARCHIVE, "archive could not be inspected", failure)
+                .also { inFlight = it }
+        } catch (failure: Throwable) {
+            inFlight = failure
+            throw failure
         } finally {
-            if (inspectionFile != artifact) {
-                try {
-                    if (inspectionFile.exists() && !inspectionFile.delete()) {
-                        fail(EngineVerificationCode.ARCHIVE, "temporary inspection view could not be removed")
-                    }
-                } catch (failure: SecurityException) {
-                    fail(EngineVerificationCode.ARCHIVE, "temporary inspection view cleanup denied", failure)
-                }
-            }
+            if (inspectionFile != artifact) removeInspectionView(inspectionFile, removeView, inFlight)
         }
+    }
+
+    /**
+     * Deletes the temporary inspection [view]. A view that stays is a failure of its own: it is thrown when the
+     * inspection succeeded, and travels as a suppressed exception with [inFlight] when the inspection had already
+     * failed, so the reason an archive was refused is the reason reported.
+     */
+    private fun removeInspectionView(view: File, removeView: (File) -> Boolean, inFlight: Throwable?) {
+        val cleanup = try {
+            if (!view.exists() || removeView(view)) return
+            EngineVerificationException(EngineVerificationCode.ARCHIVE, "temporary inspection view could not be removed")
+        } catch (failure: SecurityException) {
+            EngineVerificationException(EngineVerificationCode.ARCHIVE, "temporary inspection view cleanup denied", failure)
+        }
+        if (inFlight == null) throw cleanup
+        inFlight.addSuppressed(cleanup)
     }
 
     private fun verifyDetachedSignature(payload: ByteArray, encodedSignature: ByteArray) {

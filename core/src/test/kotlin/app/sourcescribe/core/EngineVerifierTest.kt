@@ -192,6 +192,28 @@ class EngineVerifierTest {
     }
 
     @Test
+    fun aFailedInspectionKeepsItsOwnReasonWhenItsViewCannotBeRemoved() {
+        // Defect 56. The cleanup in the finally block threw an exception of its own when the view could not be
+        // deleted, and an exception thrown from finally replaces the one in flight: the archive was still refused,
+        // but for "temporary inspection view could not be removed" instead of the reason it was refused for.
+        val directory = Files.createTempDirectory("sourcescribe-inspection-").toFile()
+        try {
+            val made = zipFile(VERSION_PATH to versionSource())
+            val archive = made.copyTo(File(directory, "engine.zip"))
+            assertTrue(made.delete())
+            val failure = assertThrows(EngineVerificationException::class.java) {
+                EngineVerifier.inspectArchive(archive) { false }
+            }
+            assertEquals(EngineVerificationCode.REQUIRES_APP_UPDATE, failure.code)
+            // The failed cleanup is not dropped either; it travels with the reason.
+            val cleanup = failure.suppressed.single() as EngineVerificationException
+            assertEquals(EngineVerificationCode.ARCHIVE, cleanup.code)
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
     fun unsupportedChannelAndUnsafePathAreRejected() {
         val badChannel = zipFile(
             VERSION_PATH to String(versionSource(), Charsets.UTF_8).replace("'stable'", "'master'").toByteArray(),
