@@ -165,6 +165,8 @@
     <string name="no_remote_handle">No undeleted AssemblyAI job ID is available.</string>
     <string name="provider_elapsed">Provider is processing · %1$s since job started</string>
     <string name="processed_bytes">Processed: %1$s</string>
+    <string name="transfer_of_total">%1$d%% · %2$s of %3$s</string>
+    <string name="transfer_rate">%1$s · %2$s/s</string>
     <string name="provenance_details">Source and model details</string>
     <string name="model_requested">Requested model: %1$s</string>
     <string name="model_reported">Model reported by provider: %1$s</string>

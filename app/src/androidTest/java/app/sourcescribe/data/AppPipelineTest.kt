@@ -153,6 +153,28 @@ class AppPipelineTest {
         assertEquals(0, providerRequests())
     }
 
+    /**
+     * Progress is written often and from inside a running phase, so it has to be unable to do anything but
+     * move those two numbers, and only for the run that holds the attempt.
+     */
+    @Test
+    fun progressIsWrittenOnlyByTheRunHoldingTheAttemptAndMovesNothingElse() = withFixture {
+        val seeded = seedCaption(leaseOwner = "owner-a")
+
+        assertEquals(1, dao.recordProgress(seeded.caption.id, "owner-a", 1_234, 5_000))
+        val moved = requireNotNull(dao.attempt(seeded.caption.id))
+        assertEquals(1_234L, moved.processedBytes)
+        assertEquals(5_000L, moved.totalBytes)
+        // Everything else is as the seed left it: a progress write cannot move a phase or a checkpoint.
+        assertEquals(seeded.caption.copy(processedBytes = 1_234, totalBytes = 5_000), moved)
+
+        // A run that has lost the attempt writes nothing, and a total nobody knows is allowed to be absent.
+        assertEquals(0, dao.recordProgress(seeded.caption.id, "owner-b", 9_999, 9_999))
+        assertEquals(moved, requireNotNull(dao.attempt(seeded.caption.id)))
+        assertEquals(1, dao.recordProgress(seeded.caption.id, "owner-a", 2_468, null))
+        assertEquals(null, requireNotNull(dao.attempt(seeded.caption.id)).totalBytes)
+    }
+
     @Test
     fun bothKeepsCaptionArtifactWhileSttWaitsForMissingCredential() = withFixture {
         val seeded = seedBoth()

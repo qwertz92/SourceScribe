@@ -160,6 +160,11 @@ abstract class SourceScribeDao {
     @Query("SELECT * FROM artifacts WHERE id = :id") abstract suspend fun artifact(id: String): ArtifactRow?
     @Query("SELECT * FROM artifacts WHERE jobId = :jobId") abstract suspend fun artifacts(jobId: String): List<ArtifactRow>
     @Query("UPDATE artifacts SET displayName = :name WHERE id = :id") abstract suspend fun renameArtifact(id: String, name: String?): Int
+    // Progress of what the attempt is moving right now, written while a phase runs and therefore often. Only
+    // the holder of the lease may write it, so a report from a run that has already lost the attempt changes
+    // nothing, and it touches neither the phase nor the checkpoint: a progress write can never move a job.
+    @Query("UPDATE attempts SET processedBytes = :processed, totalBytes = :total WHERE id = :id AND leaseOwner = :owner")
+    abstract suspend fun recordProgress(id: String, owner: String, processed: Long, total: Long?): Int
     @Query("SELECT * FROM submissions WHERE attemptId = :attemptId ORDER BY chunkIndex") abstract suspend fun submissions(attemptId: String): List<SubmissionRow>
     @Query("SELECT submissions.* FROM submissions INNER JOIN attempts ON submissions.attemptId = attempts.id WHERE attempts.jobId = :jobId") abstract suspend fun submissionsForJob(jobId: String): List<SubmissionRow>
     @Query("SELECT * FROM exports WHERE artifactId = :artifactId ORDER BY createdAt DESC") abstract suspend fun exports(artifactId: String): List<ExportRow>

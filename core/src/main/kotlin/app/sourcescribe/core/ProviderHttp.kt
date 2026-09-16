@@ -5,15 +5,23 @@ import java.io.IOException
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.TimeUnit
+import kotlin.coroutines.AbstractCoroutineContextElement
+import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.resume
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.coroutines.resumeWithException
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.suspendCancellableCoroutine
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody
 import okhttp3.Response
+import okio.Buffer
+import okio.BufferedSink
+import okio.ForwardingSink
+import okio.buffer
 
 /**
  * Performs one request against an allow-listed provider origin.
@@ -36,7 +44,13 @@ class ProviderHttp(client: OkHttpClient = OkHttpClient()) {
         if (!request.url.isHttps || request.url.port != 443 || request.url.host !in ALLOWED_HOSTS) {
             throw ProviderError(ProviderErrorCode.INVALID_INPUT)
         }
-        val call = client.newCall(request)
+        // Counted only when the caller asked to be told. The body is the same body either way: the wrapper
+        // forwards every write unchanged and adds nothing to what is sent.
+        val progress = currentCoroutineContext()[UploadProgress]
+        val body = request.body
+        val counted = if (progress == null || body == null) request
+        else request.newBuilder().method(request.method, CountingBody(body, progress)).build()
+        val call = client.newCall(counted)
         return suspendCancellableCoroutine { continuation ->
             continuation.invokeOnCancellation { call.cancel() }
             call.enqueue(object : Callback {
@@ -118,6 +132,31 @@ class ProviderHttp(client: OkHttpClient = OkHttpClient()) {
         return ProviderError(code, retryAfter(response.header("Retry-After")), response.code)
     }
 
+    /** Forwards the body byte for byte and says how much of it has reached the socket. */
+    private class CountingBody(private val delegate: RequestBody, private val progress: UploadProgress) : RequestBody() {
+        override fun contentType() = delegate.contentType()
+
+        override fun contentLength() = delegate.contentLength()
+
+        override fun isOneShot() = delegate.isOneShot()
+
+        override fun isDuplex() = delegate.isDuplex()
+
+        override fun writeTo(sink: BufferedSink) {
+            val total = delegate.contentLength()
+            var written = 0L
+            val counting = object : ForwardingSink(sink) {
+                override fun write(source: Buffer, byteCount: Long) {
+                    super.write(source, byteCount)
+                    written += byteCount
+                    progress.onBytes(written, total)
+                }
+            }.buffer()
+            delegate.writeTo(counting)
+            counting.flush()
+        }
+    }
+
     companion object {
         private val ALLOWED_HOSTS = setOf("api.groq.com", "api.openai.com", "api.assemblyai.com", "api.eu.assemblyai.com")
         private const val MAX_RESPONSE_BYTES = 16 * 1024 * 1024
@@ -130,4 +169,18 @@ class ProviderHttp(client: OkHttpClient = OkHttpClient()) {
             } catch (_: Exception) { null }
         }
     }
+}
+
+/**
+ * How much of the current request's body has been written, for a caller that shows upload progress.
+ *
+ * It travels in the coroutine context rather than in [ProviderHttp.perform]'s parameters because the request
+ * is built by the provider adapter: every adapter would otherwise have to carry a progress argument through a
+ * concern none of them has. [onBytes] is called from the thread OkHttp writes the body on, once per written
+ * block, so it has to be cheap and safe to call from another thread; a caller that writes anywhere expensive
+ * hands the number on rather than doing the work there. [total] is -1 for a body of unknown length.
+ */
+class UploadProgress(val onBytes: (written: Long, total: Long) -> Unit) :
+    AbstractCoroutineContextElement(UploadProgress) {
+    companion object Key : CoroutineContext.Key<UploadProgress>
 }

@@ -166,7 +166,9 @@
     <string name="remote_delete_confirmed">AssemblyAI hat die Datenlöschung bestätigt. Dies bestätigt keine Kostenerstattung.</string>
     <string name="no_remote_handle">Keine noch nicht gelöschte AssemblyAI-Auftrags-ID vorhanden.</string>
     <string name="provider_elapsed">Provider verarbeitet · seit Auftragsstart %1$s</string>
-    <string name="processed_bytes">Aufbereitet: %1$s</string>
+    <string name="processed_bytes">Verarbeitet: %1$s</string>
+    <string name="transfer_of_total">%1$d %% · %2$s von %3$s</string>
+    <string name="transfer_rate">%1$s · %2$s/s</string>
     <string name="provenance_details">Herkunft und Modellangaben</string>
     <string name="model_requested">Angefordertes Modell: %1$s</string>
     <string name="model_reported">Vom Anbieter gemeldetes Modell: %1$s</string>

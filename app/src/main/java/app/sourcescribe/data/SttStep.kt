@@ -34,6 +34,7 @@ import app.sourcescribe.core.TranscriptScope
 import app.sourcescribe.core.TrackSelection
 import app.sourcescribe.core.TranscriptionRequest
 import app.sourcescribe.core.Translation
+import app.sourcescribe.core.UploadProgress
 import app.sourcescribe.core.confirmedComplete
 import app.sourcescribe.core.parseBounded
 import app.sourcescribe.core.retryDelayMillis
@@ -56,13 +57,18 @@ import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 import java.util.Locale
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.Serializable
@@ -518,6 +524,11 @@ class SttStep @Inject constructor(
         val selected = TrackSelection.audio(refreshed, audio.id)
             ?: return waitForUser(row, owner, "AUDIO_TRACK_CHANGED")
         if (selected.id != audio.id) return waitForUser(row, owner, "AUDIO_TRACK_CHANGED")
+        // What the job card counts up while the download runs. The total is the size the rendition states,
+        // and only where the extractor measured it: `bytesEstimated` means yt-dlp derived the number from
+        // the bitrate, and a percentage of a guess is a percentage this app will not show.
+        val expectedBytes = selected.bytes?.takeIf { !selected.bytesEstimated }
+        dao.recordProgress(row.id, owner, 0, expectedBytes)
         val downloaded = withTimeout(DOWNLOAD_TIMEOUT_MS) {
             ensureFence(row, owner)
             currentCoroutineContext().ensureActive()
@@ -527,6 +538,7 @@ class SttStep @Inject constructor(
                 directory = directory,
                 maxBytes = minOf(MAX_SOURCE_AUDIO_BYTES, maxDownloadBytes),
                 engine = engines.file(installation),
+                onProgress = { bytes -> dao.recordProgress(row.id, owner, bytes, expectedBytes) },
             )
         }
         val canonicalDownloaded = downloaded.canonicalFile
@@ -774,12 +786,54 @@ class SttStep @Inject constructor(
             ensureFence(row, owner)
             currentCoroutineContext().ensureActive()
             withTimeout(SUBMIT_TIMEOUT_MS) {
-                valid.adapter.submit(request, key, AtomicResponseSpool(responsePath(row.id, submission.id)))
+                countingUpload(row, owner, checkpoint, chunk) {
+                    valid.adapter.submit(request, key, AtomicResponseSpool(responsePath(row.id, submission.id)))
+                }
             }
         } catch (failure: ProviderError) {
             return handleSubmitError(row, owner, config, sending, failure)
         }
         return saveSubmissionResult(row, owner, config, checkpoint, valid.adapter, sending, result)
+    }
+
+    /**
+     * Runs [send] while the attempt records how much of the submission has left the device.
+     *
+     * The chunks before this one are at the provider already, so the number is their bytes plus what this
+     * one has written, against the bytes of every chunk: one count for the whole submission instead of one
+     * that starts at zero again for every ten-minute piece. The report itself arrives on the thread OkHttp
+     * writes the body on, which may not touch the database, so it only moves a value in memory that a
+     * coroutine of this step writes on, once a second. The last write happens whatever the outcome — a
+     * failed upload leaves the number where the bytes actually stopped, not where the last tick left it.
+     */
+    private suspend fun <T> countingUpload(
+        row: AttemptRow,
+        owner: String,
+        checkpoint: SttCheckpoint,
+        chunk: PreparedChunk,
+        send: suspend () -> T,
+    ): T = coroutineScope {
+        val done = checkpoint.prepared.filter { it.index < chunk.index }.sumOf { it.bytes }
+        val total = checkpoint.prepared.sumOf { it.bytes }
+        val sent = AtomicLong(done)
+        dao.recordProgress(row.id, owner, done, total)
+        val reporter = launch {
+            var written = done
+            while (isActive) {
+                delay(PROGRESS_INTERVAL_MS)
+                val now = sent.get()
+                if (now != written) {
+                    written = now
+                    dao.recordProgress(row.id, owner, written, total)
+                }
+            }
+        }
+        try {
+            withContext(UploadProgress { written, _ -> sent.set(done + written) }) { send() }
+        } finally {
+            reporter.cancel()
+            withContext(NonCancellable) { dao.recordProgress(row.id, owner, sent.get(), total) }
+        }
     }
 
     private suspend fun replaySending(
@@ -2152,6 +2206,9 @@ class SttStep @Inject constructor(
 
     companion object {
         const val MAX_CHUNK_DURATION_MS = 600_000L
+        /** How often a running transfer writes its progress: once a second, as the plan for 0.4.0 asks. */
+        const val PROGRESS_INTERVAL_MS = 1_000L
+
         const val MAX_AUDIO_SECONDS = JobLimits.MAX_AUDIO_SECONDS
         const val MAX_AUDIO_DURATION_MS = MAX_AUDIO_SECONDS * 1000L
         const val MAX_CHUNK_BYTES = 24_000_000L

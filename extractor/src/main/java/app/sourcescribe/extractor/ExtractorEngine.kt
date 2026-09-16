@@ -108,7 +108,22 @@ class ExtractorEngine(private val runtime: NativeRuntime) {
         return true
     }
 
-    suspend fun downloadAudio(source: Source, formatId: String, directory: File, maxBytes: Long, engine: File? = null): File {
+    /**
+     * Downloads one audio rendition into [directory], reporting the bytes on disk while it runs.
+     *
+     * [onProgress] is called with the size of the partial file, at most once a second and once more when the
+     * download has ended, from the loop that is watching that file anyway for the size and storage limits.
+     * It is what a caller shows as progress: the number is observed, never derived from a rate or a guess,
+     * and yt-dlp's own progress output is not parsed for it.
+     */
+    suspend fun downloadAudio(
+        source: Source,
+        formatId: String,
+        directory: File,
+        maxBytes: Long,
+        engine: File? = null,
+        onProgress: (suspend (Long) -> Unit)? = null,
+    ): File {
         require(Regex("[A-Za-z0-9_.-]{1,80}").matches(formatId))
         require(maxBytes in 1..(2L * 1024 * 1024 * 1024))
         val refreshed = resolve(source, engine)
@@ -126,13 +141,21 @@ class ExtractorEngine(private val runtime: NativeRuntime) {
                         "--print", "after_move:SS_SOURCE_ID=%(id)s", "--", requireNotNull(source.canonicalUrl),
                     ), timeoutSeconds = 480, engine = engine)
                 }
+                var reportedAt = 0L
                 while (!download.isCompleted) {
-                    if (output.length() > maxBytes || physicalFreeBytes(directory) < 8L * 1024 * 1024) {
+                    val bytes = output.length()
+                    if (bytes > maxBytes || physicalFreeBytes(directory) < 8L * 1024 * 1024) {
                         download.cancel()
                         throw ExtractionException(ExtractionFailure.STORAGE)
                     }
+                    val now = System.currentTimeMillis()
+                    if (onProgress != null && now - reportedAt >= PROGRESS_INTERVAL_MS) {
+                        reportedAt = now
+                        onProgress(bytes)
+                    }
                     delay(100)
                 }
+                onProgress?.invoke(output.length())
                 download.await()
             }
         } catch (failure: Exception) {
@@ -168,7 +191,12 @@ class ExtractorEngine(private val runtime: NativeRuntime) {
         throw ExtractionException(failure)
     }
 
-    private companion object { const val MAX_CAPTION_BYTES = 4 * 1024 * 1024 }
+    private companion object {
+        const val MAX_CAPTION_BYTES = 4 * 1024 * 1024
+
+        /** How often a download reports its size: once a second, the rate the job card is refreshed at. */
+        const val PROGRESS_INTERVAL_MS = 1_000L
+    }
 }
 
 /** A minimal, exact track recipe. No webpage_url: yt-dlp would otherwise re-extract on error. */

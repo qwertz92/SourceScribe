@@ -211,6 +211,9 @@ internal fun HistoryScreen(
 private const val LONGEST_ELAPSED = "000:00:00"
 private const val LONGEST_BYTE_SIZE = "0000.0 GB"
 
+/** Below this the two counts are too close together in time for their difference to be a rate. */
+private const val MIN_RATE_INTERVAL_MS = 250L
+
 @Composable
 private fun JobCard(
     job: JobRow,
@@ -282,11 +285,20 @@ private fun JobCard(
                             style = MaterialTheme.typography.bodySmall)
                         // In the units the rest of this app uses for a download — `byteSize`, which is
                         // what an audio track's size is shown in two screens away — rather than a raw digit
-                        // count that grew a character at a time and had no reserved height either.
-                        if (attempt.processedBytes > 0) ReservedText(
-                            stringResource(R.string.processed_bytes, byteSize(attempt.processedBytes)),
-                            listOf(stringResource(R.string.processed_bytes, LONGEST_BYTE_SIZE)),
-                            MaterialTheme.typography.bodySmall)
+                        // count that grew a character at a time and had no reserved height either. With a
+                        // percentage and a rate while the bytes are moving, so a wait can be judged; both
+                        // only where they are real, see `transferRate` and `totalBytes`.
+                        val rate = transferRate(attempt.id, attempt.phase, attempt.processedBytes)
+                        if (attempt.processedBytes > 0) {
+                            val total = attempt.totalBytes?.takeIf { it > 0 && attempt.processedBytes <= it }
+                            val moved = if (total == null) stringResource(R.string.processed_bytes, byteSize(attempt.processedBytes))
+                            else stringResource(R.string.transfer_of_total,
+                                percentOf(attempt.processedBytes, total), byteSize(attempt.processedBytes), byteSize(total))
+                            ReservedText(
+                                if (rate == null) moved else stringResource(R.string.transfer_rate, moved, byteSize(rate)),
+                                progressAlternatives(),
+                                MaterialTheme.typography.bodySmall)
+                        }
                         attempt.error?.let { AttemptError(it, openHelp) }
                     }
                     val artifactIds = jobArtifacts.map { it.id }.toSet()
@@ -334,6 +346,45 @@ private fun AttemptError(code: String, openHelp: (HelpTopic) -> Unit) {
             else -> Unit
         }
     }
+}
+
+/** The share of [total] that [processed] is, as whole percent, never past a hundred. */
+internal fun percentOf(processed: Long, total: Long): Int =
+    if (total <= 0) 0 else ((processed * 100) / total).coerceIn(0, 100).toInt()
+
+/**
+ * The observed transfer rate of one attempt in bytes per second, or null until there is something to observe.
+ *
+ * Measured, not derived: two byte counts the database delivered and the time between them. The pipeline
+ * writes a count about once a second while it moves bytes, so the first rate appears a second in and then
+ * follows what is really happening — a number nobody has to stand behind as a forecast. A new attempt or a
+ * new phase starts over, because the speed of a download says nothing about the upload that follows it.
+ */
+@Composable
+private fun transferRate(attemptId: String, phase: Phase, bytes: Long): Long? {
+    var previous by remember(attemptId, phase) { mutableStateOf<Pair<Long, Long>?>(null) }
+    var rate by remember(attemptId, phase) { mutableStateOf<Long?>(null) }
+    LaunchedEffect(attemptId, phase, bytes) {
+        val now = System.currentTimeMillis()
+        previous?.let { (measuredAt, measuredBytes) ->
+            val elapsed = now - measuredAt
+            if (bytes > measuredBytes && elapsed >= MIN_RATE_INTERVAL_MS) {
+                rate = (bytes - measuredBytes) * 1000L / elapsed
+            }
+        }
+        previous = now to bytes
+    }
+    return rate
+}
+
+/** The heights the progress line reserves: every shape it can take, at its widest. */
+@Composable
+private fun progressAlternatives(): List<String> {
+    val plain = stringResource(R.string.processed_bytes, LONGEST_BYTE_SIZE)
+    val ofTotal = stringResource(R.string.transfer_of_total, 100, LONGEST_BYTE_SIZE, LONGEST_BYTE_SIZE)
+    return listOf(plain, ofTotal,
+        stringResource(R.string.transfer_rate, plain, LONGEST_BYTE_SIZE),
+        stringResource(R.string.transfer_rate, ofTotal, LONGEST_BYTE_SIZE))
 }
 
 /**

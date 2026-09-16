@@ -60,7 +60,15 @@ class ExtractionChainTest {
         val track = requireNotNull(resolved.audio.firstOrNull()) { "NO_AUDIO_ON_CONFIGURED_SOURCE" }
         val directory = File(context.cacheDir, "extraction-chain-${UUID.randomUUID()}").also { check(it.mkdirs()) }
         try {
-            val audio = engine.downloadAudio(resolved.source, track.id, directory, 16L * 1024 * 1024, installation)
+            // The numbers a job card counts up with. Collected from the real download because that is the
+            // only place they come from: the size of the partial file while yt-dlp writes it.
+            val reported = mutableListOf<Long>()
+            val audio = engine.downloadAudio(resolved.source, track.id, directory, 16L * 1024 * 1024, installation) {
+                reported += it
+            }
+            assertTrue("no download progress reported", reported.isNotEmpty())
+            assertEquals(reported.sorted(), reported)
+            assertEquals(audio.length(), reported.last())
             val preparation = AudioPreparation(runtime)
             val probed = preparation.probe(audio)
             assertTrue(probed.durationMs > 0)
@@ -69,6 +77,7 @@ class ExtractionChainTest {
                 putString("audio.sourceId", requested.id)
                 putString("audio.trackId", track.id)
                 putLong("audio.bytes", audio.length())
+                putInt("audio.progressReports", reported.size)
                 putLong("audio.durationMs", probed.durationMs)
                 putLong("prepared.bytes", chunk.file.length())
                 putString("prepared.sha256", chunk.sha256)

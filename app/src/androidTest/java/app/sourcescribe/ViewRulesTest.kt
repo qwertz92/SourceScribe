@@ -155,6 +155,21 @@ class ViewRulesTest {
     }
 
     @Test
+    fun aPercentageIsOnlyEverTheShareOfATotalTheAppReallyKnows() {
+        assertEquals(0, app.sourcescribe.ui.percentOf(0, 100))
+        assertEquals(33, app.sourcescribe.ui.percentOf(1, 3))
+        assertEquals(100, app.sourcescribe.ui.percentOf(100, 100))
+        // A number nobody can act on is not shown as a hundred and one percent, and a total of nothing is
+        // not a division: both answer zero, and the line above the bar says what it is counting.
+        assertEquals(100, app.sourcescribe.ui.percentOf(200, 100))
+        assertEquals(0, app.sourcescribe.ui.percentOf(5, 0))
+        assertEquals(0, app.sourcescribe.ui.percentOf(5, -1))
+        // Two gigabytes times a hundred leaves an Int behind; the arithmetic stays in Long until the end.
+        assertEquals(50, app.sourcescribe.ui.percentOf(1_000_000_000L, 2_000_000_000L))
+        assertEquals(1, app.sourcescribe.ui.percentOf(21_474_837L, 2_000_000_000L))
+    }
+
+    @Test
     fun damagedStoredConfigurationHasNoFallbackProviderOrDefaults() {
         for (raw in listOf("", "{", "{\"mode\":\"BROKEN\"}", "{\"provider\":\"UNKNOWN\"}")) {
             assertNull(app.sourcescribe.data.decodeStoredJobConfig(raw))
