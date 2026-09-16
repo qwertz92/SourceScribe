@@ -645,15 +645,15 @@ class SttStep @Inject constructor(
                 )
             }
             val expectedFile = File(directory, "audio-${window.index}.mp3")
-            if (result.offsetMs != window.offsetMs ||
-                regularPrivateFile(result.file, directory)?.path != expectedFile.canonicalFile.path ||
-                result.durationMs !in 1..MAX_CHUNK_DURATION_MS ||
-                result.mimeType != AUDIO_MIME_TYPE ||
-                kotlin.math.abs(result.durationMs - window.durationMs) > PREPARED_DURATION_TOLERANCE_MS
+            if (regularPrivateFile(result.file, directory)?.path != expectedFile.canonicalFile.path ||
+                !encodedChunkFitsWindow(window, result.offsetMs, result.durationMs, result.mimeType)
             ) return waitForUser(row, owner, "PREPARED_AUDIO_INVALID")
+            // The chunk keeps the planned media interval, not the length of the encoded file: the two differ
+            // by the encoder's surplus described at `encodedChunkFitsWindow`, and the intervals have to keep
+            // tiling the source exactly, or `NORMALIZE` reports a gap for audio that is all there.
             PreparedChunk(window.index,
-                result.offsetMs,
-                result.durationMs,
+                window.offsetMs,
+                window.durationMs,
                 result.file.length(),
                 result.sha256,
                 result.mimeType)
@@ -1824,12 +1824,8 @@ class SttStep @Inject constructor(
             throw SerializationException("incomplete prepared chunks")
         }
         checkpoint.prepared.forEach { prepared ->
-            val window = windows[prepared.index]
-            val durationDelta = prepared.durationMs - window.durationMs
-            if (prepared.offsetMs != window.offsetMs || durationDelta !in -PREPARED_DURATION_TOLERANCE_MS..PREPARED_DURATION_TOLERANCE_MS ||
-                prepared.durationMs !in 1..MAX_CHUNK_DURATION_MS ||
-                prepared.bytes !in 1..MAX_CHUNK_BYTES || !SHA256_PATTERN.matches(prepared.sha256) ||
-                prepared.mimeType != AUDIO_MIME_TYPE
+            if (!encodedChunkFitsWindow(windows[prepared.index], prepared.offsetMs, prepared.durationMs, prepared.mimeType) ||
+                prepared.bytes !in 1..MAX_CHUNK_BYTES || !SHA256_PATTERN.matches(prepared.sha256)
             ) {
                 throw SerializationException("invalid prepared chunk")
             }
@@ -2162,6 +2158,29 @@ class SttStep @Inject constructor(
         const val MIN_REMOTE_RETRY_SECONDS = 30L
         const val MIN_FINAL_CHUNK_DURATION_MS = 160L
         private const val PREPARED_DURATION_TOLERANCE_MS = 250L
+
+        /**
+         * Whether an encoded chunk covers exactly the window it was cut for.
+         *
+         * The MP3 the bundled encoder writes is a whole number of frames long and carries the encoder's own
+         * delay, so it always runs past the interval it was asked for: 84 ms for a 600 s window and 96 ms
+         * for a short one, measured on the API 37 emulator with the bundled ffmpeg 7.1.1, and the same for a
+         * WAV, an Opus/WebM and an MP3 source. `chunkPlan` makes every window but the last exactly
+         * [MAX_CHUNK_DURATION_MS] long, so a measured length bounded by that maximum alone rejected the
+         * first chunk of every source longer than one window — the `PREPARED_AUDIO_INVALID` of preview
+         * 0.2.0. The surplus is bounded by the tolerance instead, and the chunk that gets stored keeps the
+         * planned interval rather than the encoded length.
+         */
+        private fun encodedChunkFitsWindow(
+            window: ChunkWindow,
+            offsetMs: Long,
+            durationMs: Long,
+            mimeType: String,
+        ): Boolean =
+            offsetMs == window.offsetMs &&
+                mimeType == AUDIO_MIME_TYPE &&
+                durationMs in 1..(MAX_CHUNK_DURATION_MS + PREPARED_DURATION_TOLERANCE_MS) &&
+                kotlin.math.abs(durationMs - window.durationMs) <= PREPARED_DURATION_TOLERANCE_MS
 
         data class RawResponse(val index: Int, val bytes: ByteArray)
         data class RawPayload(val bytes: ByteArray, val extension: String)
