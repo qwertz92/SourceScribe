@@ -1,5 +1,6 @@
 package app.sourcescribe.ui
 
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.provider.DocumentsContract
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -37,6 +38,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.appcompat.app.AppCompatDelegate
@@ -45,6 +47,7 @@ import app.sourcescribe.MainViewModel
 import app.sourcescribe.R
 import app.sourcescribe.ScreenState
 import app.sourcescribe.core.AppSettings
+import app.sourcescribe.core.ExportFormat
 import app.sourcescribe.core.JobConfig
 import app.sourcescribe.core.Provider
 import app.sourcescribe.core.Region
@@ -93,6 +96,24 @@ internal fun SettingsScreen(
                     Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
                 change(config.copy(exportTreeUri = uri.toString()))
                 model.changeSettings { it.copy(defaults = it.defaults.copy(exportTreeUri = uri.toString())) }
+            } catch (_: SecurityException) { model.exportPermissionError() }
+        }
+    }
+    // Item 14: a folder for one format alone. Which format the picker was opened for is held here, because
+    // the system's own result carries only the folder.
+    var folderFor by rememberSaveable { mutableStateOf<ExportFormat?>(null) }
+    val formatFolder = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        val format = folderFor
+        folderFor = null
+        if (uri != null && format != null) {
+            try {
+                context.contentResolver.takePersistableUriPermission(uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+                change(config.copy(exportTreeUris = config.exportTreeUris + (format to uri.toString())))
+                model.changeSettings {
+                    it.copy(defaults = it.defaults.copy(
+                        exportTreeUris = it.defaults.exportTreeUris + (format to uri.toString())))
+                }
             } catch (_: SecurityException) { model.exportPermissionError() }
         }
     }
@@ -223,6 +244,39 @@ internal fun SettingsScreen(
                         change(config.copy(exportTreeUri = null))
                         model.changeSettings { it.copy(defaults = it.defaults.copy(exportTreeUri = null)) }
                     }) { Text(stringResource(R.string.export_tree_clear)) }
+                    if (tree != null) TextButton({
+                        if (!openFolder(context, tree)) model.notice("NO_FOLDER_APP")
+                    }) { Text(stringResource(R.string.open_folder)) }
+                }
+            }
+        }
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(R.string.export_tree_per_format), style = MaterialTheme.typography.titleSmall)
+                Text(stringResource(R.string.export_tree_per_format_help), style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                ExportFormat.entries.forEach { format ->
+                    val own = config.exportTreeUris[format]
+                    val ownLabel by produceState(own, own) {
+                        value = own?.let { uri -> withContext(Dispatchers.IO) { folderLabel(context, uri) } }
+                    }
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(formatName(format), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                        Text(ownLabel ?: stringResource(R.string.export_tree_default_used),
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            TextButton({ folderFor = format; formatFolder.launch(null) }) {
+                                Text(stringResource(R.string.export_tree_change))
+                            }
+                            TextButton({
+                                change(config.copy(exportTreeUris = config.exportTreeUris - format))
+                                model.changeSettings {
+                                    it.copy(defaults = it.defaults.copy(exportTreeUris = it.defaults.exportTreeUris - format))
+                                }
+                            }, enabled = own != null) { Text(stringResource(R.string.export_tree_clear)) }
+                        }
+                    }
                 }
             }
         }
@@ -283,6 +337,30 @@ internal fun SettingsScreen(
             model.rollback(target.id)
         }
     }
+}
+
+/**
+ * Opens an export folder in whatever app on this device shows folders, and answers false when there is none.
+ *
+ * A tree URI is the app's own grant and not a path any file manager can be handed; what a viewer understands
+ * is the document URI of the folder that tree stands for, with the directory MIME type on it. Android has no
+ * rule that such an app is installed, so the caller says so rather than letting the tap do nothing.
+ */
+internal fun openFolder(context: android.content.Context, treeUri: String): Boolean = try {
+    val tree = treeUri.toUri()
+    val folder = DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
+    context.startActivity(
+        Intent(Intent.ACTION_VIEW)
+            .setDataAndType(folder, DocumentsContract.Document.MIME_TYPE_DIR)
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK),
+    )
+    true
+} catch (_: ActivityNotFoundException) {
+    false
+} catch (_: IllegalArgumentException) {
+    false
+} catch (_: SecurityException) {
+    false
 }
 
 /** The folder a reader recognises, falling back to the storage identifier when no display name is readable. */
