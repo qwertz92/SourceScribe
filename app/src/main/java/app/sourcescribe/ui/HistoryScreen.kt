@@ -247,6 +247,12 @@ private const val LONGEST_BYTE_SIZE = "0000.0 GB"
 /** Below this the two counts are too close together in time for their difference to be a rate. */
 private const val MIN_RATE_INTERVAL_MS = 250L
 
+/**
+ * The horizontal content padding Material 3 gives a text button, which is what its label is inset by.
+ * `ButtonDefaults.TextButtonContentPadding` is a `PaddingValues` and offers no start value on its own.
+ */
+private val TEXT_BUTTON_INSET = 12.dp
+
 @Composable
 private fun JobCard(
     job: JobRow,
@@ -547,7 +553,10 @@ internal fun JobActionsContent(
                         Text(stringResource(actionLabel(action)), Modifier.fillMaxWidth(),
                             fontWeight = if (action == JobAction.DELETE_JOB) FontWeight.SemiBold else null)
                     }
-                    Text(stringResource(actionExplanation(action)), style = MaterialTheme.typography.bodySmall,
+                    // A text button insets its label by `TEXT_BUTTON_INSET`; the line belongs to that label, so it
+                    // starts where the label starts instead of at the column's own edge.
+                    Text(stringResource(actionExplanation(action)), Modifier.padding(start = TEXT_BUTTON_INSET),
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
