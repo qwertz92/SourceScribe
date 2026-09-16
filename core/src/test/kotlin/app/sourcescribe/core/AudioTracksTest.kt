@@ -81,7 +81,7 @@ class AudioTracksTest {
             track("249", bitrateKbps = 8, codec = "opus"),
             track("140", bitrateKbps = 128, codec = "mp4a.40.2"),
         ))?.id)
-        // A dynamic-range-compressed copy is skipped even when it is the best Opus on offer.
+        // A dynamic-range-compressed copy loses to a plain one even when it is the better Opus on offer.
         assertEquals("250", AudioTracks.automatic(listOf(
             track("251-drc", bitrateKbps = 160, codec = "opus", drc = true),
             track("250", bitrateKbps = 96, codec = "opus"),
