@@ -62,9 +62,12 @@ import app.sourcescribe.data.JobAction
 import app.sourcescribe.data.JobActions
 import app.sourcescribe.data.JobRow
 import app.sourcescribe.data.JobSituation
+import app.sourcescribe.data.JobWaits
+import app.sourcescribe.data.QueueReason
 import app.sourcescribe.data.SourceRow
 import app.sourcescribe.data.SttStep
 import app.sourcescribe.data.decodeStoredJobConfig
+import app.sourcescribe.data.decodeStoredSourceKind
 import java.text.DateFormat
 import java.util.Date
 import kotlinx.coroutines.delay
@@ -122,6 +125,9 @@ internal fun HistoryScreen(
         while (jobs.any { it.state == ExecutionState.WAITING_REMOTE }) { delay(1000); now = System.currentTimeMillis() }
     }
     val sourceNames = remember(sources) { sources.associate { it.id to it.title } }
+    // Whether a source is a downloaded video or a file already on the device decides whether resolving it
+    // needs the network at all, which is what a queued job's own line is allowed to claim.
+    val sourceKinds = remember(sources) { sources.associate { it.id to decodeStoredSourceKind(it.snapshot) } }
     // The date has to be searchable in the form the card shows it; the raw millisecond count matches nothing a reader types.
     val dateFormat = remember { DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT) }
     val visible = jobs.filter { job ->
@@ -161,6 +167,7 @@ internal fun HistoryScreen(
             JobCard(
                 job = job,
                 title = sourceNames[job.sourceId] ?: job.sourceId,
+                sourceKind = sourceKinds[job.sourceId],
                 open = job.id in expanded,
                 toggle = { expanded = if (job.id in expanded) expanded - job.id else expanded + job.id },
                 attempts = attempts.filter { it.jobId == job.id },
@@ -257,6 +264,7 @@ private val TEXT_BUTTON_INSET = 12.dp
 private fun JobCard(
     job: JobRow,
     title: String,
+    sourceKind: SourceKind?,
     open: Boolean,
     toggle: () -> Unit,
     attempts: List<AttemptRow>,
@@ -285,7 +293,7 @@ private fun JobCard(
                                 ?: stringResource(R.string.mode_captions_only).takeIf { savedConfig?.mode == AcquisitionMode.CAPTIONS_ONLY },
                         ).joinToString(" · "), style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        StatusRow(job, savedConfig)
+                        StatusRow(job, savedConfig, attempts, sourceKind)
                     }
                     Icon(painterResource(R.drawable.ic_expand_more),
                         contentDescription = stringResource(if (open) R.string.collapse_entry else R.string.expand_entry),
@@ -426,19 +434,8 @@ private fun progressAlternatives(): List<String> {
         stringResource(R.string.transfer_rate, ofTotal, LONGEST_BYTE_SIZE))
 }
 
-/**
- * True while this job is one WorkManager holds back for the connection the reader asked for.
- *
- * A job limited to unmetered connections is enqueued with `NetworkType.UNMETERED`, and WorkManager runs it
- * once that constraint is met - by itself, whether or not the app is open. Nothing on the screen said so
- * until 0.4.0: a job that would not start for hours read "result pending", the same as one about to run.
- * Only a queued job waits; a running one has already passed the constraint, and a finished one is done.
- */
-internal fun waitsForUnmeteredConnection(state: ExecutionState, config: JobConfig?): Boolean =
-    state == ExecutionState.QUEUED && config?.networkPolicy == NetworkPolicy.UNMETERED
-
 @Composable
-private fun StatusRow(job: JobRow, config: JobConfig?) {
+private fun StatusRow(job: JobRow, config: JobConfig?, attempts: List<AttemptRow>, sourceKind: SourceKind?) {
     val colors = MaterialTheme.colorScheme
     val (container, content) = when {
         job.outcome in setOf(Outcome.SUCCESS, Outcome.SUCCESS_WITH_WARNINGS) -> colors.secondaryContainer to colors.onSecondaryContainer
@@ -447,18 +444,28 @@ private fun StatusRow(job: JobRow, config: JobConfig?) {
             colors.errorContainer to colors.onErrorContainer
         else -> colors.surfaceVariant to colors.onSurfaceVariant
     }
-    val waitingForUnmetered = waitsForUnmeteredConnection(job.state, config)
+    // Why this job has not started, decided in the data layer from the rows alone - see `JobWaits`. The
+    // screen only chooses the words, so the one claim it makes about the device's connection is the claim
+    // `JobCoordinator.enqueue` really wrote into the work request.
+    val reason = remember(job.state, config, attempts, sourceKind) {
+        JobWaits.reason(job.state, config, attempts, sourceKind)
+    }
     val outcome = stringResource(outcomeLabel(job.outcome))
-    val waiting = stringResource(R.string.waiting_unmetered)
+    val unmetered = stringResource(R.string.waiting_unmetered)
+    val otherJob = stringResource(R.string.waiting_other_job)
     // The chip's width follows its word, and its word changes while the list is open, so the outcome
-    // goes underneath instead of beside it and nothing moves sideways when a job progresses. The waiting
-    // sentence replaces the outcome rather than adding a line, and the two reserve the height of the
-    // taller one, so a job that leaves the queue moves nothing under it either.
+    // goes underneath instead of beside it and nothing moves sideways when a job progresses. A waiting
+    // sentence replaces the outcome rather than adding a line, and all three reserve the height of the
+    // tallest, so a job that leaves the queue moves nothing under it either.
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         StatusChip(stringResource(stateChipLabel(job.state)), container, content)
         ReservedText(
-            if (waitingForUnmetered) waiting else outcome,
-            listOf(outcome, waiting),
+            when (reason) {
+                QueueReason.UNMETERED_CONNECTION -> unmetered
+                QueueReason.ANOTHER_JOB -> otherJob
+                QueueReason.UNSTATED -> outcome
+            },
+            listOf(outcome, unmetered, otherJob),
             MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

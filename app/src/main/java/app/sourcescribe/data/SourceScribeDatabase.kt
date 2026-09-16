@@ -29,6 +29,19 @@ internal fun decodeStoredJobConfig(raw: String): app.sourcescribe.core.JobConfig
     null
 }
 
+/**
+ * What kind of source a stored snapshot describes, or null when it cannot be read.
+ *
+ * `JobCoordinator.enqueue` reads the same record to decide whether a phase needs the network at all - an
+ * imported file needs none even to resolve - and treats a snapshot it cannot read as one that does.
+ * [app.sourcescribe.data.JobWaits.needsNetwork] takes the same null the same way.
+ */
+internal fun decodeStoredSourceKind(raw: String): app.sourcescribe.core.SourceKind? = try {
+    kotlinx.serialization.json.Json.decodeFromString<app.sourcescribe.core.Source>(raw).kind
+} catch (_: IllegalArgumentException) {
+    null
+}
+
 @Entity(tableName = "sources")
 data class SourceRow(@PrimaryKey val id: String, val snapshot: String, val title: String, val importedPath: String? = null)
 

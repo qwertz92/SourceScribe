@@ -4,7 +4,10 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.sourcescribe.core.*
 import app.sourcescribe.core.providers.AssemblyAiAdapter
 import app.sourcescribe.core.providers.GroqAdapter
+import app.sourcescribe.data.AttemptRow
 import app.sourcescribe.data.CredentialInfo
+import app.sourcescribe.data.JobWaits
+import app.sourcescribe.data.QueueReason
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
@@ -144,15 +147,89 @@ class ViewRulesTest {
         // use any connection is not waiting for one.
         val unmetered = JobConfig(networkPolicy = NetworkPolicy.UNMETERED)
         for (state in ExecutionState.entries) {
-            assertEquals("$state on unmetered only", state == ExecutionState.QUEUED,
-                app.sourcescribe.ui.waitsForUnmeteredConnection(state, unmetered))
-            assertEquals("$state on any connection", false,
-                app.sourcescribe.ui.waitsForUnmeteredConnection(state, JobConfig()))
+            val attempts = listOf(queuedAttempt(Branch.STT, Phase.DOWNLOAD_AUDIO).copy(state = state))
+            assertEquals("$state on unmetered only",
+                if (state == ExecutionState.QUEUED) QueueReason.UNMETERED_CONNECTION else QueueReason.UNSTATED,
+                JobWaits.reason(state, unmetered, attempts, SourceKind.YOUTUBE))
+            assertEquals("$state on any connection", QueueReason.UNSTATED,
+                JobWaits.reason(state, JobConfig(), attempts, SourceKind.YOUTUBE))
             // A stored configuration the app cannot read says nothing about the network either.
-            assertEquals("$state without a configuration", false,
-                app.sourcescribe.ui.waitsForUnmeteredConnection(state, null))
+            assertEquals("$state without a configuration", QueueReason.UNSTATED,
+                JobWaits.reason(state, null, attempts, SourceKind.YOUTUBE))
         }
     }
+
+    @Test
+    fun theUnmeteredSentenceAppearsOnlyForThePhasesThatAreReallyHeldByTheConstraint() {
+        // Round 25, finding 1. The sentence was written for every queued job whose policy was UNMETERED, and
+        // two ordinary ways into QUEUED have nothing to do with the connection: a phase `JobCoordinator.enqueue`
+        // constrains to NOT_REQUIRED, and an attempt `SttStep` requeued because another job holds the audio or
+        // the provider lock. Both read as "waiting for an unmetered connection" while the device was on Wi-Fi.
+        val unmetered = JobConfig(networkPolicy = NetworkPolicy.UNMETERED)
+        // What the coordinator enqueues under a network constraint, phase by phase, for each branch and for
+        // both kinds of source. Written out rather than derived, so a change to `enqueue` has to be repeated
+        // here deliberately instead of agreeing with itself.
+        val constrained = mapOf(
+            Triple(Branch.CAPTIONS, SourceKind.YOUTUBE, "captions") to
+                Phase.entries - Phase.PERSIST,
+            Triple(Branch.STT, SourceKind.YOUTUBE, "a downloaded source") to
+                listOf(Phase.RESOLVE, Phase.DOWNLOAD_AUDIO, Phase.UPLOAD, Phase.SUBMIT, Phase.RETRIEVE),
+            // An imported file is already on the device, so even resolving it needs nothing.
+            Triple(Branch.STT, SourceKind.LOCAL_AUDIO, "an imported file") to
+                listOf(Phase.DOWNLOAD_AUDIO, Phase.UPLOAD, Phase.SUBMIT, Phase.RETRIEVE),
+        )
+        for ((key, networkPhases) in constrained) {
+            val (branch, kind, name) = key
+            for (phase in Phase.entries) {
+                val attempts = listOf(queuedAttempt(branch, phase))
+                assertEquals("$name in $phase",
+                    if (phase in networkPhases) QueueReason.UNMETERED_CONNECTION else QueueReason.UNSTATED,
+                    JobWaits.reason(ExecutionState.QUEUED, unmetered, attempts, kind))
+                assertEquals("$name in $phase needs the network at all", phase in networkPhases,
+                    JobWaits.needsNetwork(branch, phase, kind))
+
+                // The two local waits, in the phase each one is really raised in: `SttStep.prepare` claims the
+                // audio lock in PREPARE_AUDIO, which needs no network anyway, and `SttStep.submit` claims the
+                // provider lock in SUBMIT, which is constrained — so only the error tells the two apart there.
+                for (code in listOf("AUDIO_RESOURCE_BUSY", "PROVIDER_RESOURCE_BUSY")) {
+                    assertEquals("$name in $phase, queued on $code", QueueReason.ANOTHER_JOB,
+                        JobWaits.reason(ExecutionState.QUEUED, unmetered,
+                            listOf(queuedAttempt(branch, phase).copy(error = code, nextAt = 30_000L)), kind))
+                }
+                // Any other code a queued attempt carries is a retry delay it wrote itself; the connection is
+                // not what it is waiting for either, and the card keeps that code's own sentence.
+                assertEquals("$name in $phase, queued after an interrupted run", QueueReason.UNSTATED,
+                    JobWaits.reason(ExecutionState.QUEUED, unmetered,
+                        listOf(queuedAttempt(branch, phase).copy(error = "INTERRUPTED", nextAt = 30_000L)), kind))
+            }
+        }
+
+        // Only the newest attempt of a branch counts, the set `JobCoordinator.summarize` reads for the job's
+        // own state: a superseded attempt keeps the error it failed with and would otherwise decide the line.
+        val superseded = queuedAttempt(Branch.STT, Phase.DOWNLOAD_AUDIO)
+            .copy(id = "old", number = 1, error = "AUDIO_RESOURCE_BUSY")
+        val current = queuedAttempt(Branch.STT, Phase.DOWNLOAD_AUDIO).copy(id = "new", number = 2)
+        assertEquals(QueueReason.UNMETERED_CONNECTION,
+            JobWaits.reason(ExecutionState.QUEUED, unmetered, listOf(superseded, current), SourceKind.YOUTUBE))
+        // A branch that is not queued at all — finished, or waiting on the reader — says nothing about a wait.
+        assertEquals(QueueReason.UNSTATED, JobWaits.reason(ExecutionState.QUEUED, unmetered,
+            listOf(current.copy(state = ExecutionState.FINISHED)), SourceKind.YOUTUBE))
+        // And a job whose rows have not been read yet claims nothing rather than the sentence it used to show.
+        assertEquals(QueueReason.UNSTATED,
+            JobWaits.reason(ExecutionState.QUEUED, unmetered, emptyList(), SourceKind.YOUTUBE))
+
+        // Two branches, two waits: the connection is the one of them the reader can do something about.
+        val locked = queuedAttempt(Branch.CAPTIONS, Phase.FETCH_CAPTIONS).copy(error = "PROVIDER_RESOURCE_BUSY")
+        assertEquals(QueueReason.UNMETERED_CONNECTION,
+            JobWaits.reason(ExecutionState.QUEUED, unmetered, listOf(locked, current), SourceKind.YOUTUBE))
+        assertEquals(QueueReason.ANOTHER_JOB, JobWaits.reason(ExecutionState.QUEUED, unmetered,
+            listOf(locked, current.copy(phase = Phase.PREPARE_AUDIO)), SourceKind.YOUTUBE))
+    }
+
+    private fun queuedAttempt(branch: Branch, phase: Phase) = AttemptRow(
+        id = "attempt-$branch-$phase", jobId = "job", branch = branch, number = 1, createdAt = 0L,
+        state = ExecutionState.QUEUED, phase = phase,
+    )
 
     @Test
     fun aPercentageIsOnlyEverTheShareOfATotalTheAppReallyKnows() {

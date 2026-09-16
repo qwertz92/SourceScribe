@@ -599,8 +599,9 @@ class JobCoordinator @Inject constructor(
 
     private suspend fun enqueue(row: AttemptRow, config: JobConfig, policy: ExistingWorkPolicy = ExistingWorkPolicy.KEEP) = schedulePersisted(row) {
         val source = dao.job(row.jobId)?.let { dao.source(it.sourceId) }?.let { json.decodeFromString<Source>(it.snapshot) }
-        val needsNetwork = row.branch == Branch.CAPTIONS && row.phase != Phase.PERSIST ||
-            row.branch == Branch.STT && (row.phase == Phase.RESOLVE && source?.kind != SourceKind.LOCAL_AUDIO || row.phase in setOf(Phase.DOWNLOAD_AUDIO, Phase.UPLOAD, Phase.SUBMIT, Phase.RETRIEVE))
+        // The same rule the history card reads, so what the screen says about a wait and what WorkManager
+        // really holds the work for cannot drift apart.
+        val needsNetwork = JobWaits.needsNetwork(row.branch, row.phase, source?.kind)
         val network = if (!needsNetwork) NetworkType.NOT_REQUIRED else if (config.networkPolicy == NetworkPolicy.UNMETERED) NetworkType.UNMETERED else NetworkType.CONNECTED
         val request = OneTimeWorkRequestBuilder<AcquisitionWorker>()
             .setInputData(workDataOf("attemptId" to row.id)).addTag("job:${row.jobId}")
