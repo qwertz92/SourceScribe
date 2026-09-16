@@ -33,8 +33,10 @@ internal fun decodeStoredJobConfig(raw: String): app.sourcescribe.core.JobConfig
  * What kind of source a stored snapshot describes, or null when it cannot be read.
  *
  * `JobCoordinator.enqueue` reads the same record to decide whether a phase needs the network at all - an
- * imported file needs none even to resolve - and treats a snapshot it cannot read as one that does.
- * [app.sourcescribe.data.JobWaits.needsNetwork] takes the same null the same way.
+ * imported file needs none even to resolve - and passes null for a job whose source row is gone; a snapshot
+ * that does not decode throws there instead. This function turns that case into null too, so the history
+ * card still renders the job, and [app.sourcescribe.data.JobWaits.needsNetwork] reads null as "needs the
+ * network" either way.
  */
 internal fun decodeStoredSourceKind(raw: String): app.sourcescribe.core.SourceKind? = try {
     kotlinx.serialization.json.Json.decodeFromString<app.sourcescribe.core.Source>(raw).kind
