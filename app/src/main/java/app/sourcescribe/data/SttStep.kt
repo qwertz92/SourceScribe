@@ -2182,6 +2182,28 @@ class SttStep @Inject constructor(
                 durationMs in 1..(MAX_CHUNK_DURATION_MS + PREPARED_DURATION_TOLERANCE_MS) &&
                 kotlin.math.abs(durationMs - window.durationMs) <= PREPARED_DURATION_TOLERANCE_MS
 
+        /**
+         * The audio rendition an attempt bound, read back out of its own checkpoint.
+         *
+         * History names the rendition a job used, and this is where that record already lives: the attempt
+         * wrote it when it resolved the source, so nothing has to resolve anything again to show it. The read
+         * is deliberately total — a checkpoint that says nothing about a rendition, one written by another
+         * version, and one that is not readable at all all answer null, because a job card must never fail
+         * over a detail line. Nothing here is a secret: the record holds the format id, codec, rate, size and
+         * language tag the extractor reported, never a media URL.
+         */
+        fun storedAudioTrack(checkpoint: String): AudioTrack? = try {
+            if (checkpoint.length > MAX_CHECKPOINT_BYTES) null
+            else LENIENT_JSON.decodeFromString<StoredAudio>(checkpoint).audio
+        } catch (_: Exception) {
+            null
+        }
+
+        @Serializable
+        private data class StoredAudio(val audio: AudioTrack? = null)
+
+        private val LENIENT_JSON = Json { ignoreUnknownKeys = true }
+
         data class RawResponse(val index: Int, val bytes: ByteArray)
         data class RawPayload(val bytes: ByteArray, val extension: String)
 

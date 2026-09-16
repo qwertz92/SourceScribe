@@ -172,4 +172,34 @@ class SttStepTest {
         assertNull(MainViewModel.estimatedCostMicrousd(universal2, 0L))
         assertNull(MainViewModel.estimatedCostMicrousd(universal2, SttStep.MAX_AUDIO_DURATION_MS + 1))
     }
+
+    /**
+     * History names the rendition an attempt actually bound, and reads it from what that attempt already
+     * stored rather than resolving the source again. A checkpoint that says nothing about a rendition, or
+     * that cannot be read at all, is answered with null instead of a guess.
+     */
+    @Test
+    fun theStoredRenditionIsReadBackFromTheAttemptWithoutResolvingAnything() {
+        val checkpoint = """
+            {"artifactId":"a2e6e9bb-9a1e-45d2-9a51-9b0f2a4a0a11","artifactCreatedAt":1,
+             "source":{"id":"youtube:BaW_jenozKc","kind":"YOUTUBE","videoId":"BaW_jenozKc"},
+             "audio":{"id":"251","sourceVideoId":"BaW_jenozKc","language":"en","name":null,
+                      "isOriginal":true,"evidence":"format","codec":"opus","container":"webm",
+                      "bitrateKbps":160,"bytes":5200000},
+             "unknownFutureField":42}
+        """.trimIndent()
+
+        val track = requireNotNull(SttStep.storedAudioTrack(checkpoint))
+        assertEquals("251", track.id)
+        assertEquals("opus", track.codec)
+        assertEquals("webm", track.container)
+        assertEquals(160, track.bitrateKbps)
+        assertEquals(5_200_000L, track.bytes)
+        assertEquals("en", track.language)
+
+        assertNull(SttStep.storedAudioTrack("{}"))
+        assertNull(SttStep.storedAudioTrack(""))
+        assertNull(SttStep.storedAudioTrack("not json at all"))
+        assertNull(SttStep.storedAudioTrack("{\"audio\":\"a string, not a record\"}"))
+    }
 }

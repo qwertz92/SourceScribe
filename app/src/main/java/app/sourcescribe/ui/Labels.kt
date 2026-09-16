@@ -9,7 +9,9 @@ import app.sourcescribe.R
 import app.sourcescribe.core.AcquisitionMode
 import app.sourcescribe.core.AudioRetention
 import app.sourcescribe.core.AudioSizeClass
+import app.sourcescribe.core.AudioTrack
 import app.sourcescribe.core.AudioTrackDescription
+import app.sourcescribe.core.AudioTracks
 import app.sourcescribe.core.Branch
 import app.sourcescribe.core.CaptionTrack
 import app.sourcescribe.core.ExecutionState
@@ -217,6 +219,17 @@ internal fun byteSize(bytes: Long): String {
     description.codecLabel ?: description.containerLabel ?: stringResource(R.string.unknown),
     trackSize(description),
 )
+
+/**
+ * The rendition a job bound, for the job card in history: codec and container, data rate, channels, the
+ * extractor's format id, the size as the extractor reported it, and the raw language tag. The size is never
+ * estimated here — a job names what it downloaded, and an estimate from a bitrate would be a different number.
+ */
+@Composable internal fun audioTrackSummary(track: AudioTrack): String {
+    val described = AudioTracks.describe(listOf(track), null).first()
+    return audioTrackDetail(described) + " · " + trackSize(described) + " · " +
+        (track.language?.takeIf { it.isNotBlank() } ?: stringResource(R.string.unknown))
+}
 
 @Composable internal fun captionTrackTitle(track: CaptionTrack): String =
     languageText(track.language) + " · " + (track.name ?: generationName(track.generation))

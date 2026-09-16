@@ -57,6 +57,7 @@ import app.sourcescribe.data.AttemptRow
 import app.sourcescribe.data.ExportRow
 import app.sourcescribe.data.JobRow
 import app.sourcescribe.data.SourceRow
+import app.sourcescribe.data.SttStep
 import app.sourcescribe.data.decodeStoredJobConfig
 import java.text.DateFormat
 import java.util.Date
@@ -273,6 +274,11 @@ private fun JobCard(
                         MaterialTheme.typography.bodySmall)
                     attempts.forEach { attempt ->
                         Text("${if (attempt.branch == Branch.CAPTIONS) stringResource(R.string.mode_captions_only) else stringResource(R.string.mode_stt_only)} · ${stringResource(phaseLabel(attempt.phase))}",
+                            style = MaterialTheme.typography.bodySmall)
+                        // Which rendition this attempt actually bound, from what it stored when it resolved
+                        // the source. Read once per stored checkpoint rather than on every recomposition.
+                        val boundTrack = remember(attempt.checkpoint) { SttStep.storedAudioTrack(attempt.checkpoint) }
+                        if (boundTrack != null) Text(stringResource(R.string.audio_track_value, audioTrackSummary(boundTrack)),
                             style = MaterialTheme.typography.bodySmall)
                         // In the units the rest of this app uses for a download — `byteSize`, which is
                         // what an audio track's size is shown in two screens away — rather than a raw digit
