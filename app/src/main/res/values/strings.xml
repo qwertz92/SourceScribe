@@ -336,6 +336,7 @@
     <string name="duration_minutes">%1$d min</string>
     <string name="audio_longer_than_limit">Das Audio ist länger als das Längenlimit, das für diesen Auftrag gespeichert wurde. Es wurde nichts an den Anbieter geschickt und nichts berechnet. Das gespeicherte Limit eines laufenden Auftrags wird bewusst nicht nachträglich verändert; eine neue Ausführung für dieselbe Quelle bekommt das aktuelle Limit.</string>
     <string name="source_length">Länge %1$s</string>
+    <string name="waiting_unmetered">Wartet auf eine ungetaktete Verbindung</string>
     <string name="audio_duration_unknown">Die Länge der Audiodatei konnte nicht bestimmt werden. Es wurde nichts an den Anbieter geschickt. Prüfe die Quelle erneut oder importiere die Datei neu.</string>
 
     <!-- Eingabe -->

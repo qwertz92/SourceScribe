@@ -243,7 +243,7 @@ private fun JobCard(
                                 ?: stringResource(R.string.mode_captions_only).takeIf { savedConfig?.mode == AcquisitionMode.CAPTIONS_ONLY },
                         ).joinToString(" · "), style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        StatusRow(job)
+                        StatusRow(job, savedConfig)
                     }
                     Icon(painterResource(R.drawable.ic_expand_more),
                         contentDescription = stringResource(if (open) R.string.collapse_entry else R.string.expand_entry),
@@ -336,8 +336,19 @@ private fun AttemptError(code: String, openHelp: (HelpTopic) -> Unit) {
     }
 }
 
+/**
+ * True while this job is one WorkManager holds back for the connection the reader asked for.
+ *
+ * A job limited to unmetered connections is enqueued with `NetworkType.UNMETERED`, and WorkManager runs it
+ * once that constraint is met - by itself, whether or not the app is open. Nothing on the screen said so
+ * until 0.4.0: a job that would not start for hours read "result pending", the same as one about to run.
+ * Only a queued job waits; a running one has already passed the constraint, and a finished one is done.
+ */
+internal fun waitsForUnmeteredConnection(state: ExecutionState, config: JobConfig?): Boolean =
+    state == ExecutionState.QUEUED && config?.networkPolicy == NetworkPolicy.UNMETERED
+
 @Composable
-private fun StatusRow(job: JobRow) {
+private fun StatusRow(job: JobRow, config: JobConfig?) {
     val colors = MaterialTheme.colorScheme
     val (container, content) = when {
         job.outcome in setOf(Outcome.SUCCESS, Outcome.SUCCESS_WITH_WARNINGS) -> colors.secondaryContainer to colors.onSecondaryContainer
@@ -346,12 +357,21 @@ private fun StatusRow(job: JobRow) {
             colors.errorContainer to colors.onErrorContainer
         else -> colors.surfaceVariant to colors.onSurfaceVariant
     }
+    val waitingForUnmetered = waitsForUnmeteredConnection(job.state, config)
+    val outcome = stringResource(outcomeLabel(job.outcome))
+    val waiting = stringResource(R.string.waiting_unmetered)
     // The chip's width follows its word, and its word changes while the list is open, so the outcome
-    // goes underneath instead of beside it and nothing moves sideways when a job progresses.
+    // goes underneath instead of beside it and nothing moves sideways when a job progresses. The waiting
+    // sentence replaces the outcome rather than adding a line, and the two reserve the height of the
+    // taller one, so a job that leaves the queue moves nothing under it either.
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         StatusChip(stringResource(stateChipLabel(job.state)), container, content)
-        Text(stringResource(outcomeLabel(job.outcome)), style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        ReservedText(
+            if (waitingForUnmetered) waiting else outcome,
+            listOf(outcome, waiting),
+            MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

@@ -334,6 +334,7 @@
     <string name="duration_minutes">%1$d min</string>
     <string name="audio_longer_than_limit">The audio is longer than the length limit stored for this job. Nothing was sent to the provider and nothing was billed. The stored limit of a running job is deliberately not changed afterwards; a new run for the same source carries the current limit.</string>
     <string name="source_length">Length %1$s</string>
+    <string name="waiting_unmetered">Waiting for an unmetered connection</string>
     <string name="audio_duration_unknown">The length of the audio file could not be determined. Nothing was sent to the provider. Check the source again or import the file anew.</string>
 
     <!-- Input -->

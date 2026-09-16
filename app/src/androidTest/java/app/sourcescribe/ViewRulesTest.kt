@@ -137,6 +137,24 @@ class ViewRulesTest {
     }
 
     @Test
+    fun onlyAQueuedJobLimitedToUnmeteredConnectionsSaysWhatItIsWaitingFor() {
+        // The history line for a queued job read "result pending" whatever the job was waiting for, so a job
+        // WorkManager holds until Wi-Fi returns looked exactly like one about to run. Only that combination
+        // waits: a running job has already passed the constraint, a finished one is done, and a job that may
+        // use any connection is not waiting for one.
+        val unmetered = JobConfig(networkPolicy = NetworkPolicy.UNMETERED)
+        for (state in ExecutionState.entries) {
+            assertEquals("$state on unmetered only", state == ExecutionState.QUEUED,
+                app.sourcescribe.ui.waitsForUnmeteredConnection(state, unmetered))
+            assertEquals("$state on any connection", false,
+                app.sourcescribe.ui.waitsForUnmeteredConnection(state, JobConfig()))
+            // A stored configuration the app cannot read says nothing about the network either.
+            assertEquals("$state without a configuration", false,
+                app.sourcescribe.ui.waitsForUnmeteredConnection(state, null))
+        }
+    }
+
+    @Test
     fun damagedStoredConfigurationHasNoFallbackProviderOrDefaults() {
         for (raw in listOf("", "{", "{\"mode\":\"BROKEN\"}", "{\"provider\":\"UNKNOWN\"}")) {
             assertNull(app.sourcescribe.data.decodeStoredJobConfig(raw))

@@ -6,9 +6,12 @@ import android.content.ContextWrapper
 import androidx.room.Room
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.work.Constraints
 import androidx.work.Data
+import androidx.work.NetworkType
 import androidx.work.WorkManager
 import androidx.work.impl.WorkManagerImpl
+import androidx.work.impl.model.WorkSpec
 import androidx.work.testing.WorkManagerTestInitHelper
 import app.sourcescribe.core.AcquisitionMode
 import app.sourcescribe.core.ArtifactFiles
@@ -20,6 +23,7 @@ import app.sourcescribe.core.ExportState
 import app.sourcescribe.core.ExecutionState
 import app.sourcescribe.core.Generation
 import app.sourcescribe.core.JobConfig
+import app.sourcescribe.core.NetworkPolicy
 import app.sourcescribe.core.Origin
 import app.sourcescribe.core.Outcome
 import app.sourcescribe.core.Phase
@@ -121,6 +125,31 @@ class AppPipelineTest {
 
         assertFalse(coordinator.run(seeded.caption.id))
         assertAttemptOnly(persistedWorkInput("exports:${seeded.caption.id}"))
+        assertEquals(0, providerRequests())
+    }
+
+    /**
+     * "Unmetered connections only" has to reach WorkManager as a constraint, because that is the only thing
+     * that makes the job wait for Wi-Fi and start on its own once it is back, app running or not. Read from
+     * the WorkSpec WorkManager persisted rather than from the request the coordinator built.
+     */
+    @Test
+    fun aJobLimitedToUnmeteredConnectionsCarriesThatConstraintIntoWorkManager() = withFixture {
+        val unmetered = seedCaption(config = captionConfig().copy(networkPolicy = NetworkPolicy.UNMETERED))
+        dao.updateAttempt(requireNotNull(dao.attempt(unmetered.caption.id)).copy(phase = Phase.FETCH_CAPTIONS))
+        coordinator.scheduleNext(unmetered.caption.id)
+        assertEquals(NetworkType.UNMETERED, persistedConstraints("attempt:${unmetered.caption.id}").requiredNetworkType)
+
+        val anyConnection = seedCaption(config = captionConfig().copy(networkPolicy = NetworkPolicy.ANY))
+        dao.updateAttempt(requireNotNull(dao.attempt(anyConnection.caption.id)).copy(phase = Phase.FETCH_CAPTIONS))
+        coordinator.scheduleNext(anyConnection.caption.id)
+        assertEquals(NetworkType.CONNECTED, persistedConstraints("attempt:${anyConnection.caption.id}").requiredNetworkType)
+
+        // A step that sends nothing waits for no connection at all, whatever the policy says: the seeded
+        // attempts above are in PERSIST, which writes the result that is already on the device.
+        val persisting = seedCaption(config = captionConfig().copy(networkPolicy = NetworkPolicy.UNMETERED))
+        coordinator.scheduleNext(persisting.caption.id)
+        assertEquals(NetworkType.NOT_REQUIRED, persistedConstraints("attempt:${persisting.caption.id}").requiredNetworkType)
         assertEquals(0, providerRequests())
     }
 
@@ -1839,14 +1868,21 @@ class AppPipelineTest {
         // WorkInfo 2.11.2 omits request input; this test-only library-group access reads the
         // WorkSpec that WorkManager actually persisted instead of inspecting the request builder.
         @SuppressLint("RestrictedApi")
-        fun persistedWorkInput(uniqueName: String): Data {
+        fun persistedWorkInput(uniqueName: String): Data = persistedWorkSpec(uniqueName).input
+
+        /** The constraints WorkManager actually persisted, not the ones the request builder was handed. */
+        @SuppressLint("RestrictedApi")
+        fun persistedConstraints(uniqueName: String): Constraints = persistedWorkSpec(uniqueName).constraints
+
+        @SuppressLint("RestrictedApi")
+        private fun persistedWorkSpec(uniqueName: String): WorkSpec {
             val info = workManager.getWorkInfosForUniqueWork(uniqueName)
                 .get(30, TimeUnit.SECONDS)
                 .single()
             val implementation = workManager as WorkManagerImpl
             return requireNotNull(
                 implementation.workDatabase.workSpecDao().getWorkSpec(info.id.toString()),
-            ).input
+            )
         }
 
         suspend fun prepareNativeRuntime() {
