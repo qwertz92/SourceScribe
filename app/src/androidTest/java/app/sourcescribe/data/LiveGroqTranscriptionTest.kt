@@ -207,12 +207,21 @@ class LiveGroqTranscriptionTest {
             assertTrue(transcript.segments.isNotEmpty())
             assertEquals(Origin.PROVIDER, transcript.provenance.origin)
             assertEquals(Provider.GROQ, transcript.provenance.provider)
-            assertEquals(GroqAdapter.DEFAULT_MODEL, transcript.provenance.requestedModel)
+            // The model the app asked for, written out rather than read back from the same constant the
+            // configuration above used, so a changed default is a failure here instead of a silent switch.
+            assertEquals("whisper-large-v3-turbo", transcript.provenance.requestedModel)
+            // The model the response named. Measured on 16 September 2026 against the real endpoint: Groq's
+            // `verbose_json` body carries `task`, `language`, `duration`, `text` and `segments` and **no**
+            // `model` field, so `reportedModel` is null and `artifact.providerModel` falls back to the
+            // requested model. Null is therefore the expected answer, not a defect. What must never happen is
+            // a present-but-empty claim: that would put a blank string where the UI promises the model that
+            // ran, and it would mean the parser invented a field the response did not carry.
+            val reportedModel = transcript.provenance.reportedModel
             assertTrue(
-                "the provider named no model: ${transcript.provenance.reportedModel}",
-                !transcript.provenance.reportedModel.isNullOrBlank(),
+                "the provider named an empty model: '$reportedModel'",
+                reportedModel == null || reportedModel.isNotBlank(),
             )
-            assertEquals(transcript.provenance.reportedModel ?: transcript.provenance.requestedModel, artifact.providerModel)
+            assertEquals(reportedModel ?: transcript.provenance.requestedModel, artifact.providerModel)
             assertEquals(track.id, transcript.provenance.sourceAudioTrack?.id)
 
             // Language: the app promises to say where a language claim comes from and to keep only what the
