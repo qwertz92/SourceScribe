@@ -154,6 +154,13 @@ internal fun Toggle(
     checked: Boolean,
     enabled: Boolean = true,
     supporting: String? = null,
+    /**
+     * The other sentences this switch's supporting line can carry. Where it is not empty the line keeps the
+     * height of the tallest of them even while it says nothing, so a note that comes and goes with the chosen
+     * provider never moves the switches under it. Empty means the line is drawn only when there is one, which
+     * is right for a caption that never changes.
+     */
+    supportingReserve: List<String> = emptyList(),
     info: HelpTopic? = null,
     openHelp: (HelpTopic) -> Unit = {},
     change: (Boolean) -> Unit,
@@ -167,7 +174,10 @@ internal fun Toggle(
             if (info != null) InfoButton(info, openHelp)
             Switch(checked, null, enabled = enabled)
         }
-        if (supporting != null) Text(supporting, Modifier.padding(horizontal = 4.dp),
+        if (supportingReserve.isNotEmpty()) ReservedText(supporting.orEmpty(), supportingReserve,
+            MaterialTheme.typography.bodySmall, Modifier.padding(horizontal = 4.dp),
+            MaterialTheme.colorScheme.onSurfaceVariant)
+        else if (supporting != null) Text(supporting, Modifier.padding(horizontal = 4.dp),
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
