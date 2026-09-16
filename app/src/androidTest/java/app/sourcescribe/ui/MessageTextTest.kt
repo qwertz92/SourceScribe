@@ -55,6 +55,8 @@ class MessageTextTest {
                     "JOBS_CREATED", "EXPORT_PERMISSION_REQUIRED", "CLIPBOARD_EMPTY", "REMOTE_DELETE_CONFIRMED",
                     "FILE_NAME_SAVED", "DEFAULTS_SAVED", "PRESET_SAVED", "KEY_SAVED", "ENGINE_CURRENT", "ENGINE_ACTIVE",
                     "ACTION_BUSY", "CLEANUP_FAILED", "LOCAL_PROCESSING_FAILED",
+                    // Round 25: the saved keyterm sets and the offer to open an export folder.
+                    "KEYTERM_SET_SAVED", "KEYTERM_SET_REFUSED", "NO_FOLDER_APP",
                 ),
             )
             // What the preview and a start refuse: MainViewModel.previewError and configError.

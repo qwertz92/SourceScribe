@@ -90,6 +90,12 @@ data class ScreenState(
     val update: AvailableEngine? = null,
     val shareUri: String? = null,
     val shareMime: String = "text/markdown",
+    /**
+     * The folder the export that [message] reports was written into, while that message stands. The screen
+     * offers to open it beside the message, which is the moment a reader wants to look at the file. Null
+     * whenever the message is about something else or the export did not reach a folder.
+     */
+    val exportedFolder: String? = null,
     val information: String? = null,
     val informationShareable: Boolean = false,
 )
@@ -270,18 +276,21 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    fun dismissMessage() { mutable.update { it.copy(message = null) } }
-    fun exportPermissionError() { mutable.update { it.copy(message = "EXPORT_PERMISSION_REQUIRED") } }
+    fun dismissMessage() { mutable.update { it.copy(message = null, exportedFolder = null) } }
+    fun exportPermissionError() { mutable.update { it.copy(message = "EXPORT_PERMISSION_REQUIRED", exportedFolder = null) } }
     /** Surfaces a local, non-exceptional outcome such as an empty clipboard. */
-    fun notice(code: String) { mutable.update { it.copy(message = code) } }
+    fun notice(code: String) { mutable.update { it.copy(message = code, exportedFolder = null) } }
     fun exportArtifact(id: String, format: ExportFormat, treeUri: String) = action {
         val result = coordinator.exportArtifact(id, format, treeUri)
-        mutable.update { it.copy(message = "EXPORT_${result.state.name}") }
+        mutable.update { it.copy(message = "EXPORT_${result.state.name}", exportedFolder = writtenFolder(result)) }
     }
     fun retryExport(id: String, treeUri: String) = action {
         val result = coordinator.retryExport(id, treeUri)
-        mutable.update { it.copy(message = "EXPORT_${result.state.name}") }
+        mutable.update { it.copy(message = "EXPORT_${result.state.name}", exportedFolder = writtenFolder(result)) }
     }
+    /** The folder an export actually reached, and nothing where it did not: an offer to open it must not lie. */
+    private fun writtenFolder(export: ExportRow): String? =
+        export.treeUri.takeIf { export.state == ExportState.EXPORTED && it.isNotBlank() }
     fun reconcileExports() = action { coordinator.reconcileExports() }
     fun shareArtifact(id: String) = action {
         val document = artifactFiles.read(id)
@@ -371,6 +380,27 @@ class MainViewModel @Inject constructor(
         mutable.update { it.copy(message = "PRESET_SAVED") }
     }
     fun deletePreset(name: String) = action { settingsStore.update { it.copy(presets = it.presets - name) } }
+
+    /**
+     * Stores [terms] under [name] so the next job on the same topic can pick them again (item 13).
+     *
+     * The decision is made inside the store's own update, on the settings as they are at that moment, rather
+     * than on a copy read a moment earlier: two saves in a row must not have the second one written against a
+     * list that no longer exists. `KeytermSets.saved` answers null for anything this app will not keep, and
+     * the reader is told that rather than shown a set that is not there.
+     */
+    fun saveKeytermSet(name: String, terms: List<String>) = action {
+        var refused = false
+        settingsStore.update { current ->
+            val updated = KeytermSets.saved(current.keytermSets, name, terms)
+            if (updated == null) { refused = true; current } else current.copy(keytermSets = updated)
+        }
+        mutable.update { it.copy(message = if (refused) "KEYTERM_SET_REFUSED" else "KEYTERM_SET_SAVED") }
+    }
+
+    fun deleteKeytermSet(name: String) = action {
+        settingsStore.update { it.copy(keytermSets = it.keytermSets - name.trim()) }
+    }
     fun changeSettings(change: (AppSettings) -> AppSettings) = action { settingsStore.update(change) }
     fun saveCredential(provider: Provider, region: Region, key: String) = action {
         val id = credentialStore.save(provider, region, key)
@@ -470,7 +500,8 @@ class MainViewModel @Inject constructor(
             mutable.update { it.copy(message = "ACTION_BUSY") }
             return
         }
-        if (exclusive) mutable.update { it.copy(busy = true, starting = starting, message = null) }
+        // The folder offer belongs to the message it was set with, so a new action drops it with that message.
+        if (exclusive) mutable.update { it.copy(busy = true, starting = starting, message = null, exportedFolder = null) }
         viewModelScope.launch {
             // An exclusive action waits for start-up recovery, which is short, so it never runs before it.
             try { withContext(Dispatchers.IO) { if (exclusive) { recovery.join(); cleanupAbandonedImports() }; block() } }
@@ -602,6 +633,19 @@ class MainViewModel @Inject constructor(
                     else -> null
                 }
             }
+        }
+
+        /**
+         * The model a job would run with at [provider], for the provider list on the new-source screen.
+         *
+         * For the provider that is selected that is the chosen model; for the others it is the one the app
+         * would set the moment their row is tapped, which is what `ConfigControls` does. A model stored for a
+         * provider but no longer offered — a configuration an older version wrote — is not claimed to be in
+         * use, because a run would not use it either.
+         */
+        fun modelInUse(config: JobConfig, provider: Provider): String {
+            val models = models(provider)
+            return config.model?.takeIf { config.provider == provider && it in models } ?: models.first()
         }
 
         fun models(provider: Provider): List<String> = when (provider) {

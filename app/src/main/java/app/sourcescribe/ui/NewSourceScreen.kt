@@ -2,8 +2,11 @@ package app.sourcescribe.ui
 
 import android.content.ClipboardManager
 import android.content.Context
+import androidx.annotation.StringRes
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -13,20 +16,22 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -38,6 +43,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -49,6 +56,18 @@ import app.sourcescribe.SourcePreview
 import app.sourcescribe.TypedSetting
 import app.sourcescribe.core.*
 import java.util.Locale
+
+/**
+ * Which set of sources is currently checked, or null while none is.
+ *
+ * The screen scrolls to the results once per check (item 10). What may not restart that scroll is a change to
+ * a track, an option or the provider: each of those rebuilds `state.previews` as a new list with new
+ * configurations in it, so anything that watched the list itself would scroll the reader back to the top
+ * every time they worked a control. The identity of the checked sources is what a check changes and an option
+ * does not.
+ */
+internal fun checkedSourcesKey(previews: List<SourcePreview>): String? =
+    previews.takeIf { it.isNotEmpty() }?.joinToString("|") { it.resolved.source.id }
 
 @Composable
 internal fun NewSourceScreen(
@@ -67,39 +86,53 @@ internal fun NewSourceScreen(
     onCancelPreview: () -> Unit,
     onImport: () -> Unit,
     onNotice: (String) -> Unit,
+    onSaveKeyterms: (String) -> Unit,
+    onDeleteKeyterms: (String) -> Unit,
 ) {
-    val context = LocalContext.current
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        item {
-            OutlinedTextField(input, setInput, Modifier.fillMaxWidth(), enabled = !state.starting,
-                label = { Text(stringResource(R.string.source_hint)) }, minLines = 2, maxLines = 5,
-                trailingIcon = {
-                    Row {
-                        if (input.isNotEmpty()) IconButton({ setInput("") }, enabled = !state.starting) {
-                            Icon(painterResource(R.drawable.ic_close), stringResource(R.string.clear_input), Modifier.size(20.dp))
-                        }
-                        IconButton({
-                            val pasted = clipboardText(context)
-                            if (pasted == null) onNotice("CLIPBOARD_EMPTY") else setInput(pasted)
-                        }, enabled = !state.starting) {
-                            Icon(painterResource(R.drawable.ic_paste), stringResource(R.string.paste_clipboard), Modifier.size(20.dp))
-                        }
-                    }
-                })
-            Text(stringResource(R.string.source_help), style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(top = 8.dp))
+    val listState = rememberLazyListState()
+    val checked = state.previews.isNotEmpty()
+    // Item 10: after a check the view goes to the top of the new content, where the source card now sits with
+    // the results directly under it. Once per check, and remembered across a visit to another page, so
+    // coming back to this screen does not throw away where the reader had scrolled to.
+    val sourcesKey = checkedSourcesKey(state.previews)
+    var scrolledFor by rememberSaveable { mutableStateOf<String?>(null) }
+    LaunchedEffect(sourcesKey) {
+        if (sourcesKey == null) scrolledFor = null
+        else if (sourcesKey != scrolledFor) {
+            listState.animateScrollToItem(0)
+            scrolledFor = sourcesKey
         }
-        if (settings.presets.isNotEmpty()) item {
-            Choice(stringResource(R.string.preset), stringResource(R.string.choose), settings.presets.keys.toList(), { it },
-                enabled = !state.starting, info = HelpTopic.PRESETS, openHelp = openHelp) { name ->
-                onPreset(settings.presets.getValue(name))
+    }
+    LazyColumn(Modifier.fillMaxSize(), state = listState, contentPadding = PaddingValues(20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        // Every item carries a key of its own. A LazyColumn without them holds its scroll position by index,
+        // so an item appearing above the viewport shifts everything under it.
+        if (!checked) {
+            item(key = "input") {
+                SourceLinkField(input, setInput, enabled = !state.starting, onNotice = onNotice)
+                Text(stringResource(R.string.source_help), style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 8.dp))
+            }
+            if (settings.presets.isNotEmpty()) item(key = "presets") {
+                Choice(stringResource(R.string.preset), stringResource(R.string.choose), settings.presets.keys.toList(), { it },
+                    enabled = !state.starting, info = HelpTopic.PRESETS, openHelp = openHelp) { name ->
+                    onPreset(settings.presets.getValue(name))
+                }
+            }
+        } else {
+            // The input has collapsed into the head of each preview card, which names the source and offers
+            // "Change"; the results follow inside the same card instead of below a second copy of the title.
+            item(key = "preview-title") { SectionTitle(R.string.preview, HelpTopic.WORKFLOW, openHelp) }
+            items(state.previews, key = { "preview-${it.resolved.source.id}" }) { preview ->
+                PreviewCard(preview, state, onTrack, openHelp, onCancelPreview)
             }
         }
-        item {
+        item(key = "config") {
             ConfigControls(config, change, type, state.draftEdits, state.credentials.map { Triple(it.id, it.provider, it.region) },
-                state.previews.any { it.resolved.source.kind == SourceKind.LOCAL_AUDIO }, openHelp, enabled = !state.starting)
+                state.previews.any { it.resolved.source.kind == SourceKind.LOCAL_AUDIO }, settings.keytermSets,
+                onSaveKeyterms, onDeleteKeyterms, openHelp, enabled = !state.starting)
         }
-        item {
+        if (!checked) item(key = "actions") {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 // As tall as the sentence while it is empty too, so the buttons stay where they are when it comes and goes.
                 ReservedText(
@@ -114,25 +147,51 @@ internal fun NewSourceScreen(
                     Text(stringResource(R.string.import_audio))
                 }
             }
-        }
-        if (state.previews.isNotEmpty()) {
-            item { SectionTitle(R.string.preview, HelpTopic.WORKFLOW, openHelp) }
-            items(state.previews, key = { it.resolved.source.id }) { preview ->
-                PreviewCard(preview, state, onTrack, openHelp)
-            }
-            item {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (state.previews.any { it.config.provider != null && AcquisitionPlanner.mayUseSpeechToText(it.config.mode) }) {
-                        Text(stringResource(R.string.upload_help), style = MaterialTheme.typography.bodySmall)
-                    }
-                    Button(onStart, Modifier.fillMaxWidth().heightIn(min = 52.dp), enabled = !state.busy && state.previews.all {
-                        MainViewModel.previewError(it, state.credentials) == null
-                    }) { Text(stringResource(R.string.start_jobs)) }
-                    TextButton(onCancelPreview, Modifier.fillMaxWidth(), enabled = !state.starting) { Text(stringResource(R.string.cancel)) }
+        } else item(key = "start") {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (state.previews.any { it.config.provider != null && AcquisitionPlanner.mayUseSpeechToText(it.config.mode) }) {
+                    Text(stringResource(R.string.upload_help), style = MaterialTheme.typography.bodySmall)
                 }
+                Button(onStart, Modifier.fillMaxWidth().heightIn(min = 52.dp), enabled = !state.busy && state.previews.all {
+                    MainViewModel.previewError(it, state.credentials) == null
+                }) { Text(stringResource(R.string.start_jobs)) }
+                TextButton(onCancelPreview, Modifier.fillMaxWidth(), enabled = !state.starting) { Text(stringResource(R.string.cancel)) }
             }
         }
     }
+}
+
+/**
+ * The field the source is typed or pasted into (item 11).
+ *
+ * Up to 0.3.0 it was `minLines = 2`, so an ordinary one-line link sat against the top edge of a box with an
+ * empty line under it. One line is the height it starts at now, the text sits in the middle of it as it does
+ * in every other field of this app, and it grows to five lines for shared text that really is that long —
+ * growth the reader's own typing causes and can see, rather than a permanent gap.
+ */
+@Composable
+internal fun SourceLinkField(
+    input: String,
+    setInput: (String) -> Unit,
+    enabled: Boolean,
+    onNotice: (String) -> Unit,
+) {
+    val context = LocalContext.current
+    OutlinedTextField(input, setInput, Modifier.fillMaxWidth(), enabled = enabled,
+        label = { Text(stringResource(R.string.source_hint)) }, minLines = 1, maxLines = 5,
+        trailingIcon = {
+            Row {
+                if (input.isNotEmpty()) IconButton({ setInput("") }, enabled = enabled) {
+                    Icon(painterResource(R.drawable.ic_close), stringResource(R.string.clear_input), Modifier.size(20.dp))
+                }
+                IconButton({
+                    val pasted = clipboardText(context)
+                    if (pasted == null) onNotice("CLIPBOARD_EMPTY") else setInput(pasted)
+                }, enabled = enabled) {
+                    Icon(painterResource(R.drawable.ic_paste), stringResource(R.string.paste_clipboard), Modifier.size(20.dp))
+                }
+            }
+        })
 }
 
 private fun clipboardText(context: Context): String? {
@@ -148,12 +207,21 @@ private fun PreviewCard(
     state: ScreenState,
     onTrack: (String, String?, String?) -> Unit,
     openHelp: (HelpTopic) -> Unit,
+    onChange: () -> Unit,
 ) {
     ElevatedCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             val source = preview.resolved.source
-            Text(source.title ?: source.fileName ?: source.videoId.orEmpty(), style = MaterialTheme.typography.titleMedium,
-                minLines = 2, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            // The head of this card is the collapsed input (item 10): what was checked, and the way back to
+            // the field it was typed into. "Change" drops every preview and shows the input again with its
+            // text, because all previews on this screen came out of that one text.
+            Row(verticalAlignment = Alignment.Top) {
+                Text(source.title ?: source.fileName ?: source.videoId.orEmpty(), Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleMedium, minLines = 2, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                TextButton(onChange, Modifier.heightIn(min = 48.dp), enabled = !state.starting) {
+                    Text(stringResource(R.string.source_change))
+                }
+            }
             Text(listOf(
                 source.channel ?: stringResource(R.string.unknown),
                 source.durationMs?.let(::duration) ?: stringResource(R.string.unknown),
@@ -302,6 +370,65 @@ private fun LengthLimitWarning(durationMs: Long, openHelp: (HelpTopic) -> Unit) 
     }
 }
 
+/**
+ * The speech-to-text providers as a list rather than a dropdown (item 7).
+ *
+ * A dropdown showed one name and hid the two facts that decide the choice: whether a key for that provider is
+ * stored at all, and which model it would run. Both now stand on every row, and the row that is selected is
+ * the one the job uses. Each row keeps a fixed height — the two lines under the name are reserved for the
+ * longest they can say — so selecting a provider moves nothing under the list.
+ */
+@Composable
+internal fun ProviderList(
+    config: JobConfig,
+    credentials: List<Triple<String, Provider, Region>>,
+    enabled: Boolean,
+    openHelp: (HelpTopic) -> Unit,
+    choose: (Provider) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(stringResource(R.string.provider), Modifier.weight(1f), style = MaterialTheme.typography.labelLarge)
+            InfoButton(HelpTopic.PROVIDERS, openHelp)
+        }
+        val keyStored = stringResource(R.string.provider_key_stored)
+        val keyMissing = stringResource(R.string.provider_key_missing)
+        Provider.entries.forEach { provider ->
+            val selected = config.provider == provider
+            val hasKey = credentials.any { it.second == provider }
+            Surface(
+                onClick = { choose(provider) },
+                modifier = Modifier.fillMaxWidth().semantics { role = Role.RadioButton },
+                shape = MaterialTheme.shapes.small,
+                enabled = enabled,
+                // An always-present border of the same width, only its colour changes: a border that appears
+                // with the selection would move the text inside the row by its own thickness.
+                border = BorderStroke(1.dp, if (selected) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.outlineVariant),
+                color = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface,
+                contentColor = if (!enabled) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                    else if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface,
+            ) {
+                Row(Modifier.padding(horizontal = 12.dp, vertical = 12.dp).heightIn(min = 48.dp),
+                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    RadioButton(selected, null, enabled = enabled)
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(providerName(provider), style = MaterialTheme.typography.titleMedium)
+                        ReservedText(if (hasKey) keyStored else keyMissing, listOf(keyStored, keyMissing),
+                            MaterialTheme.typography.bodySmall)
+                        val models = MainViewModel.models(provider)
+                        ReservedText(
+                            stringResource(R.string.provider_row_model, MainViewModel.modelInUse(config, provider)),
+                            models.map { stringResource(R.string.provider_row_model, it) },
+                            MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun ConfigControls(
     config: JobConfig,
@@ -310,18 +437,25 @@ private fun ConfigControls(
     edits: DraftEdits,
     credentials: List<Triple<String, Provider, Region>>,
     localAudio: Boolean,
+    keytermSets: Map<String, List<String>>,
+    saveKeyterms: (String) -> Unit,
+    deleteKeyterms: (String) -> Unit,
     openHelp: (HelpTopic) -> Unit,
     enabled: Boolean = true,
 ) {
     var advanced by rememberSaveable { mutableStateOf(false) }
+    val cap = MainViewModel.capabilities(config)
+    // Items 8 and 9 in one place: what an option can do in this job. An option nothing in the chosen mode
+    // reads is left out — the mode control is a few rows above and the group moves as a whole — and one the
+    // chosen provider cannot do stays visible with the reason written under it.
+    fun availability(option: ExpertOption) = ExpertOptions.availability(option, config, cap)
+    fun shown(option: ExpertOption) = availability(option) != OptionAvailability.POINTLESS_FOR_MODE
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         if (localAudio) Text(stringResource(R.string.local_stt_mode))
         else Choice(stringResource(R.string.mode), stringResource(modeLabel(config.mode)), AcquisitionMode.entries,
             { modeName(it) }, enabled = enabled, info = HelpTopic.MODES, openHelp = openHelp) { change(config.copy(mode = it)) }
         if (AcquisitionPlanner.mayUseSpeechToText(config.mode)) {
-            Choice(stringResource(R.string.provider), config.provider?.let(::providerName) ?: stringResource(R.string.no_provider),
-                Provider.entries, { providerName(it) }, enabled = enabled, info = HelpTopic.PROVIDERS, openHelp = openHelp,
-                placeholder = stringResource(R.string.no_provider)) { provider ->
+            ProviderList(config, credentials, enabled, openHelp) { provider ->
                 val key = credentials.firstOrNull { it.second == provider }
                 change(MainViewModel.modelDefaults(config.copy(provider = provider, credentialId = key?.first,
                     region = key?.third ?: Region.US), MainViewModel.models(provider).first()))
@@ -343,8 +477,8 @@ private fun ConfigControls(
         }
         TextButton({ advanced = !advanced }, enabled = enabled) { Text(stringResource(R.string.advanced)) }
         if (advanced) {
-            // These five only steer which caption track is read, so pure speech-to-text has no use for them.
-            if (AcquisitionPlanner.usesCaptions(config.mode)) {
+            // These five only steer which caption track is read, so a mode that reads none leaves them out.
+            if (shown(ExpertOption.ORIGINAL_LANGUAGE)) {
                 Toggle(R.string.original_language, config.preferOriginalLanguage, enabled) { change(config.copy(preferOriginalLanguage = it)) }
                 Toggle(R.string.uploader_captions, config.allowUploaderCaptions, enabled,
                     info = HelpTopic.CAPTION_TRACK, openHelp = openHelp) { change(config.copy(allowUploaderCaptions = it)) }
@@ -354,33 +488,43 @@ private fun ConfigControls(
                     type(TypedSetting.CAPTION_LANGUAGES) { it.copy(preferredLanguages = typed.split(',').map(String::trim).filter(String::isNotBlank)) }
                 }, enabled, label = { Text(stringResource(R.string.languages)) })
             }
-            if (AcquisitionPlanner.mayUseSpeechToText(config.mode)) {
-                val cap = MainViewModel.capabilities(config)
+            // Read in exactly one branch of `AcquisitionPlanner.plan`: captions first, a provider only if
+            // fetching them failed. In every other mode this switch did nothing at all (item 9).
+            if (shown(ExpertOption.FALLBACK_ON_CAPTION_ERROR)) {
                 Toggle(R.string.fallback_errors, config.fallbackOnCaptionError, enabled) { change(config.copy(fallbackOnCaptionError = it)) }
+            }
+            if (shown(ExpertOption.STT_LANGUAGE)) {
                 DraftTextField(edits.epoch(TypedSetting.STT_LANGUAGE), config.language.orEmpty(), { typed ->
                     type(TypedSetting.STT_LANGUAGE) { it.copy(language = typed.ifBlank { null }) }
                 }, enabled, label = { Text(stringResource(R.string.stt_language)) })
+            }
+            // The four options a provider decides, plus the keyterm sets that feed one of them. All four share
+            // one mode rule — a job that may reach a provider — so one of them stands for the group here.
+            if (shown(ExpertOption.DIARIZATION)) {
+                val notes = optionNotes()
                 // What the model cannot do stays operable while it is still set, because it was set for a model
                 // chosen before and the preview refuses the job as UNSUPPORTED_OPTION until it is gone. Enabled
-                // only by the capability, a switch that was on sat greyed out where it could not be turned off,
-                // and terms were hidden while they were the reason the job was refused.
-                Toggle(R.string.diarization, config.diarization, enabled && (cap?.diarization == true || config.diarization),
-                    info = HelpTopic.DIARIZATION, openHelp = openHelp) { change(config.copy(diarization = it)) }
-                Toggle(R.string.word_times, config.wordTimestamps, enabled && (cap?.wordTimestamps == true || config.wordTimestamps),
-                    info = HelpTopic.TIMESTAMPS, openHelp = openHelp) { change(config.copy(wordTimestamps = it)) }
-                Toggle(R.string.segment_times, config.segmentTimestamps,
-                    enabled && (cap?.segmentTimestamps == true || config.segmentTimestamps)) {
-                    change(config.copy(segmentTimestamps = it))
-                }
+                // only by the capability, a switch that was on sat greyed out where it could not be turned off.
+                OptionToggle(ExpertOption.DIARIZATION, R.string.diarization, config.diarization, config, cap, notes,
+                    enabled, HelpTopic.DIARIZATION, openHelp) { change(config.copy(diarization = it)) }
+                OptionToggle(ExpertOption.WORD_TIMESTAMPS, R.string.word_times, config.wordTimestamps, config, cap, notes,
+                    enabled, HelpTopic.TIMESTAMPS, openHelp) { change(config.copy(wordTimestamps = it)) }
+                OptionToggle(ExpertOption.SEGMENT_TIMESTAMPS, R.string.segment_times, config.segmentTimestamps, config, cap, notes,
+                    enabled, null, openHelp) { change(config.copy(segmentTimestamps = it)) }
                 // Always in its place, so choosing a model that takes no terms moves nothing below it.
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(stringResource(R.string.context_terms), Modifier.weight(1f),
                         style = MaterialTheme.typography.labelLarge)
                     InfoButton(HelpTopic.CONTEXT_TERMS, openHelp)
                 }
+                ReservedText(optionNote(ExpertOption.CONTEXT_TERMS, config, cap), notes,
+                    MaterialTheme.typography.bodySmall, Modifier.padding(horizontal = 4.dp),
+                    MaterialTheme.colorScheme.onSurfaceVariant)
+                val termsOperable = enabled && ExpertOptions.operable(ExpertOption.CONTEXT_TERMS, config, cap)
                 DraftTextField(edits.epoch(TypedSetting.CONTEXT_TERMS), config.contextTerms.joinToString("\n"), { typed ->
                     type(TypedSetting.CONTEXT_TERMS) { it.copy(contextTerms = ContextTerms.withoutBlanks(typed.lines())) }
-                }, enabled && (cap?.contextTerms == true || config.contextTerms.isNotEmpty()), minLines = 2, maxLines = 4)
+                }, termsOperable, minLines = 2, maxLines = 4)
+                KeytermSetControls(config, keytermSets, termsOperable, openHelp, change, saveKeyterms, deleteKeyterms)
             }
             Toggle(R.string.retain_raw, config.retainRaw, enabled, info = HelpTopic.RETENTION, openHelp = openHelp) {
                 change(config.copy(retainRaw = it))
@@ -388,25 +532,147 @@ private fun ConfigControls(
             Toggle(R.string.unmetered, config.networkPolicy == NetworkPolicy.UNMETERED, enabled) {
                 change(config.copy(networkPolicy = if (it) NetworkPolicy.UNMETERED else NetworkPolicy.ANY))
             }
-            Choice(stringResource(R.string.audio_retention), audioRetentionName(config.audioRetention), AudioRetention.entries,
-                { audioRetentionName(it) }, enabled = enabled, info = HelpTopic.RETENTION, openHelp = openHelp) {
-                change(config.copy(audioRetention = it))
+            // Nothing is downloaded in a caption-only job, so there is no downloaded audio to keep (item 9).
+            if (shown(ExpertOption.AUDIO_RETENTION)) {
+                Choice(stringResource(R.string.audio_retention), audioRetentionName(config.audioRetention), AudioRetention.entries,
+                    { audioRetentionName(it) }, enabled = enabled, info = HelpTopic.RETENTION, openHelp = openHelp) {
+                    change(config.copy(audioRetention = it))
+                }
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(stringResource(R.string.export_formats), Modifier.weight(1f))
                 InfoButton(HelpTopic.EXPORT_FORMATS, openHelp)
             }
-            ExportFormat.entries.forEach { format ->
-                Row(Modifier.fillMaxWidth().heightIn(min = 48.dp)
-                    .toggleable(value = format in config.exportFormats, enabled = enabled, role = Role.Checkbox) { checked ->
-                        val selection = if (checked) config.exportFormats + format else config.exportFormats - format
-                        if (selection.isNotEmpty()) change(config.copy(exportFormats = selection,
-                            retainRaw = config.retainRaw || ExportFormat.RAW in selection))
-                    }, verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(format in config.exportFormats, null, enabled = enabled)
-                    Text(formatName(format))
-                }
+            ExportFormatChips(config.exportFormats, enabled) { selection ->
+                change(config.copy(exportFormats = selection,
+                    retainRaw = config.retainRaw || ExportFormat.RAW in selection))
             }
+        }
+    }
+}
+
+/**
+ * Which formats an export writes, as chips (item 12).
+ *
+ * Six checkbox rows stood directly against each other, the label of one a few pixels under the box of the
+ * next. Chips give each format a gap and a shape of its own. A chip carries no leading tick and its border
+ * keeps the same width whether or not it is selected, so selecting one changes its colours and not its size:
+ * the points at which the row wraps, and with them the height of the whole block, do not move. The touch
+ * target stays at least 48 dp tall, the same as the rows it replaces.
+ *
+ * At least one format stays selected. Nothing else on this screen would say what an export with no format is
+ * meant to write, and the settings file refuses such a configuration outright.
+ */
+@Composable
+internal fun ExportFormatChips(
+    formats: Set<ExportFormat>,
+    enabled: Boolean,
+    change: (Set<ExportFormat>) -> Unit,
+) {
+    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        ExportFormat.entries.forEach { format ->
+            val selected = format in formats
+            FilterChip(
+                selected = selected,
+                onClick = {
+                    val selection = if (selected) formats - format else formats + format
+                    if (selection.isNotEmpty()) change(selection)
+                },
+                label = { Text(formatName(format)) },
+                modifier = Modifier.heightIn(min = 48.dp),
+                enabled = enabled,
+                border = BorderStroke(1.dp, if (selected) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.outlineVariant),
+            )
+        }
+    }
+}
+
+/** Every sentence an option note can be, so the line that holds one keeps its height while it changes. */
+@Composable
+private fun optionNotes(): List<String> =
+    Provider.entries.map { stringResource(R.string.option_unavailable, providerName(it)) } +
+        stringResource(R.string.option_needs_provider)
+
+/** Why this option cannot be used, or an empty string while it can. */
+@Composable
+private fun optionNote(option: ExpertOption, config: JobConfig, cap: ProviderCapabilities?): String =
+    when (ExpertOptions.availability(option, config, cap)) {
+        OptionAvailability.UNSUPPORTED_BY_PROVIDER -> stringResource(R.string.option_unavailable,
+            config.provider?.let(::providerName) ?: stringResource(R.string.unknown))
+        OptionAvailability.PROVIDER_NOT_CHOSEN -> stringResource(R.string.option_needs_provider)
+        else -> ""
+    }
+
+@Composable
+private fun OptionToggle(
+    option: ExpertOption,
+    @StringRes label: Int,
+    checked: Boolean,
+    config: JobConfig,
+    cap: ProviderCapabilities?,
+    notes: List<String>,
+    enabled: Boolean,
+    info: HelpTopic?,
+    openHelp: (HelpTopic) -> Unit,
+    change: (Boolean) -> Unit,
+) {
+    Toggle(
+        label = label,
+        checked = checked,
+        enabled = enabled && ExpertOptions.operable(option, config, cap),
+        supporting = optionNote(option, config, cap),
+        supportingReserve = notes,
+        info = info,
+        openHelp = openHelp,
+        change = change,
+    )
+}
+
+/**
+ * Keyterm lists saved under a name (item 13).
+ *
+ * The same field holds the name of the set being loaded and the name it would be saved under, because those
+ * are the same thing to a reader: pick "technical", change a term, save it back. Both buttons are always
+ * there and only their enabled state changes, so nothing moves while a name is typed.
+ */
+@Composable
+private fun KeytermSetControls(
+    config: JobConfig,
+    sets: Map<String, List<String>>,
+    enabled: Boolean,
+    openHelp: (HelpTopic) -> Unit,
+    change: (JobConfig) -> Unit,
+    save: (String) -> Unit,
+    delete: (String) -> Unit,
+) {
+    var name by rememberSaveable { mutableStateOf("") }
+    val names = remember(sets) { KeytermSets.names(sets) }
+    val none = stringResource(R.string.keyterm_set_none)
+    Choice(
+        label = stringResource(R.string.keyterm_sets),
+        selected = name.ifBlank { none },
+        options = names,
+        name = { it },
+        enabled = enabled && names.isNotEmpty(),
+        placeholder = none,
+        info = HelpTopic.CONTEXT_TERMS,
+        openHelp = openHelp,
+    ) { chosen ->
+        name = chosen
+        change(config.copy(contextTerms = sets[chosen].orEmpty()))
+    }
+    OutlinedTextField(name, { name = it.take(KeytermSets.MAX_NAME_LENGTH) }, Modifier.fillMaxWidth(),
+        enabled = enabled, singleLine = true, label = { Text(stringResource(R.string.keyterm_set_name)) })
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        TextButton({ save(name) }, Modifier.weight(1f).heightIn(min = 48.dp),
+            enabled = enabled && name.isNotBlank() && ContextTerms.charged(config.contextTerms)) {
+            Text(stringResource(R.string.keyterm_set_save))
+        }
+        TextButton({ delete(name); name = "" }, Modifier.weight(1f).heightIn(min = 48.dp),
+            enabled = enabled && name.trim() in sets) {
+            Text(stringResource(R.string.keyterm_set_delete))
         }
     }
 }
@@ -420,7 +686,7 @@ private fun ConfigControls(
  * own text, and every earlier version of these fields went wrong on that. Bound straight to the draft, a
  * field can be handed the older value, and the next key then lands after it. Holding the text and comparing
  * the draft that comes back against it, to follow a change made elsewhere — a preset, a job prepared again,
- * the button that raises the limit — cannot tell such a change from a late value of the field's own: the
+ * a saved keyterm set — cannot tell such a change from a late value of the field's own: the
  * list fields reset the text to a late list mid-word ("Kubernetes" came out as "Kuberes" on a device in
  * round 15), and the budget typed fast as `0.123456` read `0.134562` in round 16. Remembering the lists
  * handed on until they came back narrowed that, and could still leave a change from outside unshown when it

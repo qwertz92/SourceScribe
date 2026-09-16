@@ -486,4 +486,24 @@
     <string name="export_io_failure">The file could not be written to the destination folder. Save the export again, in another folder if needed.</string>
     <string name="export_invalid">The export could not be created with this format or destination folder. Choose another folder, or export another format from the result.</string>
     <string name="export_not_requested">Not exported</string>
+
+    <!-- Round 25: new-source screen -->
+    <string name="source_change">Change</string>
+    <string name="provider_key_stored">Key stored</string>
+    <string name="provider_key_missing">No key stored</string>
+    <string name="provider_row_model">Model: %1$s</string>
+    <string name="option_unavailable">Not available with %1$s</string>
+    <string name="option_needs_provider">Choose a provider first</string>
+    <string name="keyterm_sets">Saved keyterm sets</string>
+    <string name="keyterm_set_none">No set chosen</string>
+    <string name="keyterm_set_name">Name of the keyterm set</string>
+    <string name="keyterm_set_save">Save set</string>
+    <string name="keyterm_set_delete">Delete set</string>
+    <string name="keyterm_set_saved">Keyterm set saved.</string>
+    <string name="keyterm_set_refused">This keyterm set was not saved. The name has to be short and on one line, the list needs at least one term, and only a limited number of sets can be stored.</string>
+    <string name="export_tree_per_format">Folder per format</string>
+    <string name="export_tree_per_format_help">Without a folder of its own, a format is written into the default folder above.</string>
+    <string name="export_tree_default_used">Default folder</string>
+    <string name="open_folder">Open folder</string>
+    <string name="no_folder_app">No app on this device can show a folder. Open the folder in your file manager.</string>
 </resources>

@@ -264,6 +264,57 @@ class ViewRulesTest {
     }
 
     @Test
+    fun everyProviderRowNamesTheModelThatProviderWouldReallyRunWith() {
+        // Item 25/7. The provider list says "Model: …" on every row, including the two the job is not using.
+        // That claim has to be the model tapping the row would actually set, which is what `ConfigControls`
+        // does: the first model of that provider. For the row that is selected it is the chosen model.
+        val config = JobConfig(provider = Provider.GROQ, model = GroqAdapter.MODEL_V3)
+        assertEquals(GroqAdapter.MODEL_V3, MainViewModel.modelInUse(config, Provider.GROQ))
+        for (provider in Provider.entries - Provider.GROQ) {
+            assertEquals(MainViewModel.models(provider).first(), MainViewModel.modelInUse(config, provider))
+        }
+        // Nothing chosen at all, and a model stored for a provider that no longer offers it — a preset or a
+        // job an older version created. Neither is claimed to be in use, because a run would not use it.
+        for (provider in Provider.entries) {
+            assertEquals(MainViewModel.models(provider).first(), MainViewModel.modelInUse(JobConfig(), provider))
+            assertEquals(MainViewModel.models(provider).first(),
+                MainViewModel.modelInUse(JobConfig(provider = provider, model = "retired-model"), provider))
+        }
+    }
+
+    @Test
+    fun onlyACheckOfDifferentSourcesMovesTheViewToTheResults() {
+        // Item 25/10. The screen scrolls to the results once per check. Every change to a track, an option or
+        // the provider rebuilds the preview list with new configurations in it, and the key this scroll
+        // watches has to ignore all of that, or working a control would throw the reader back to the top.
+        val source = SourceResolver.youtube("https://www.youtube.com/watch?v=jNQXAC9IVRw").copy(durationMs = 19_000L)
+        val id = requireNotNull(source.videoId)
+        val audio = listOf(AudioTrack("251", id, "en", null, true, "fixture"),
+            AudioTrack("140", id, "en", null, true, "fixture"))
+        val resolved = ResolvedSource(source, emptyList(), audio, emptyMap())
+        val first = SourcePreview(resolved, JobConfig(audioTrackId = "251"), null)
+        val key = app.sourcescribe.ui.checkedSourcesKey(listOf(first))
+
+        assertNotEquals(null, key)
+        for (changed in listOf(
+            first.copy(config = first.config.copy(audioTrackId = "140")),
+            first.copy(config = first.config.copy(mode = AcquisitionMode.STT_ONLY, provider = Provider.GROQ)),
+            first.copy(config = first.config.copy(contextTerms = listOf("Kubernetes"))),
+            first.copy(previousJob = "an-earlier-job"),
+        )) {
+            assertEquals("a changed configuration must not count as a new check", key,
+                app.sourcescribe.ui.checkedSourcesKey(listOf(changed)))
+        }
+
+        // A different source, a second source beside it, and no source at all are each a different answer.
+        val other = SourceResolver.youtube("https://www.youtube.com/watch?v=dQw4w9WgXcQ").copy(durationMs = 19_000L)
+        val second = SourcePreview(ResolvedSource(other, emptyList(), emptyList(), emptyMap()), JobConfig(), null)
+        assertNotEquals(key, app.sourcescribe.ui.checkedSourcesKey(listOf(second)))
+        assertNotEquals(key, app.sourcescribe.ui.checkedSourcesKey(listOf(first, second)))
+        assertNull(app.sourcescribe.ui.checkedSourcesKey(emptyList()))
+    }
+
+    @Test
     fun aDraftChangeMovesTheEpochOfEveryTypedSettingItChangesButTheOneBeingTyped() {
         val before = JobConfig()
         for (setting in TypedSetting.entries) {

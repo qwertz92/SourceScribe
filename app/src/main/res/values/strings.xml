@@ -488,4 +488,24 @@
     <string name="export_io_failure">Die Datei ließ sich im Zielordner nicht schreiben. Speichere den Export erneut, bei Bedarf in einem anderen Ordner.</string>
     <string name="export_invalid">Der Export ließ sich mit diesem Format oder Zielordner nicht anlegen. Wähle einen anderen Ordner oder exportiere im Ergebnis ein anderes Format.</string>
     <string name="export_not_requested">Nicht exportiert</string>
+
+    <!-- Round 25: new-source screen -->
+    <string name="source_change">Andere Quelle</string>
+    <string name="provider_key_stored">Schlüssel gespeichert</string>
+    <string name="provider_key_missing">Kein Schlüssel gespeichert</string>
+    <string name="provider_row_model">Modell: %1$s</string>
+    <string name="option_unavailable">Mit %1$s nicht möglich</string>
+    <string name="option_needs_provider">Erst einen Anbieter wählen</string>
+    <string name="keyterm_sets">Gespeicherte Begriffslisten</string>
+    <string name="keyterm_set_none">Keine Liste gewählt</string>
+    <string name="keyterm_set_name">Name der Begriffsliste</string>
+    <string name="keyterm_set_save">Liste speichern</string>
+    <string name="keyterm_set_delete">Liste löschen</string>
+    <string name="keyterm_set_saved">Begriffsliste gespeichert.</string>
+    <string name="keyterm_set_refused">Diese Begriffsliste wurde nicht gespeichert. Der Name muss kurz und einzeilig sein, die Liste braucht mindestens einen Begriff, und es lassen sich nicht beliebig viele Listen speichern.</string>
+    <string name="export_tree_per_format">Ordner je Format</string>
+    <string name="export_tree_per_format_help">Ohne eigenen Ordner schreibt ein Format in den Standardordner oben.</string>
+    <string name="export_tree_default_used">Standardordner</string>
+    <string name="open_folder">Ordner öffnen</string>
+    <string name="no_folder_app">Auf diesem Gerät kann keine App einen Ordner anzeigen. Öffne den Ordner in deiner Dateiverwaltung.</string>
 </resources>

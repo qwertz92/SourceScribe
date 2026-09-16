@@ -115,7 +115,19 @@ private fun SourceScribeApp(incoming: String, shareSerial: Int, model: MainViewM
     val pageState = androidx.compose.runtime.saveable.rememberSaveableStateHolder()
     val snackbar = remember { SnackbarHostState() }
     val message = state.message?.let { messageText(it) }
-    LaunchedEffect(message) { if (message != null) { snackbar.showSnackbar(message); model.dismissMessage() } }
+    val openFolderLabel = stringResource(R.string.open_folder)
+    // An export the reader just asked for is followed by the one thing they want next: the folder it landed
+    // in. The offer rides on the message rather than on a button of its own, because it belongs to that one
+    // export and disappears with it. A device with no app for a folder says so instead of doing nothing.
+    LaunchedEffect(message, state.exportedFolder) {
+        if (message == null) return@LaunchedEffect
+        val folder = state.exportedFolder
+        val result = snackbar.showSnackbar(message, actionLabel = folder?.let { openFolderLabel })
+        model.dismissMessage()
+        if (result == SnackbarResult.ActionPerformed && folder != null && !openFolder(context, folder)) {
+            model.notice("NO_FOLDER_APP")
+        }
+    }
     val shareTitle = stringResource(R.string.share_file)
     LaunchedEffect(state.shareUri, shareTitle) {
         state.shareUri?.let { value ->
@@ -184,7 +196,9 @@ private fun SourceScribeApp(incoming: String, shareSerial: Int, model: MainViewM
                             model.startPreviews(); go(Page.HISTORY)
                         }, onCancelPreview = model::clearPreview,
                         onImport = { audioPicker.launch(arrayOf("audio/*", "video/mp4", "video/webm")) },
-                        onNotice = model::notice)
+                        onNotice = model::notice,
+                        onSaveKeyterms = { name -> model.saveKeytermSet(name, config.contextTerms) },
+                        onDeleteKeyterms = model::deleteKeytermSet)
                     Page.HISTORY -> HistoryScreen(jobs, sources, attempts, artifacts, exports, remoteDeletionJobIds, model,
                         !notificationsGranted, openHelp) { id -> model.prepareAgain(id, config); go(Page.NEW) }
                     Page.SETTINGS -> SettingsScreen(settings, config, state, jobs, change, model, openHelp)
