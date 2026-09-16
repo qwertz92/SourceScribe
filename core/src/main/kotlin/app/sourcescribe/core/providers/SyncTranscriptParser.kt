@@ -426,13 +426,22 @@ object SyncTranscriptParser {
         return true
     }
 
+    /**
+     * The languages the response names, as ISO-639-1 codes.
+     *
+     * A value is read through [LanguageNames], so a full English name counts as the observation it is: Groq's
+     * `verbose_json` writes `"language":"english"`, and before that was read every Groq transcript this app
+     * stored carried no language at all. A name that maps to a code counts once, exactly as the code would, so
+     * `MULTIPLE_LANGUAGES` and `LANGUAGE_LIMIT_REACHED` still count what the response really named.
+     */
     private fun responseLanguages(root: JsonObject, warnings: Warnings): Pair<List<String>, String?> {
         val values = LinkedHashSet<String>()
         var validObserved = 0
         fun add(value: String?) {
-            if (value != null && value.length == 2 && value.all { it in 'a'..'z' || it in 'A'..'Z' }) {
+            val code = value?.let(LanguageNames::codeFor)
+            if (code != null) {
                 validObserved++
-                if (values.size < MAX_REPORTED_LANGUAGES) values += value.lowercase(Locale.ROOT)
+                if (values.size < MAX_REPORTED_LANGUAGES) values += code
             }
         }
         fun addObserved(element: JsonElement?) {

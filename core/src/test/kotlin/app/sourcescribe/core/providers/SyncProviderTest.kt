@@ -322,6 +322,48 @@ class SyncProviderTest {
     }
 
     @Test
+    fun groqNamesItsLanguageInFullAndTheCodeIsReadFromThatName() {
+        // Item 17 of the 0.4.0 plan. The first real Groq run (16 September 2026, LiveGroqTranscriptionTest against
+        // the public 19-second video jNQXAC9IVRw) stored `language=NONE reportedLanguages=NONE` although the
+        // transcription itself succeeded: Groq's `verbose_json` body writes the language out as a word, and this
+        // parser kept a value only when it already was two letters. The body below is that shape - `task`,
+        // `language`, `duration`, `text`, `segments`, and no `model` field.
+        val body = """{"task":"transcribe","language":"english","duration":19.13,""" +
+            """"text":"All right, so here we are.",""" +
+            """"segments":[{"id":0,"seek":0,"start":0.0,"end":2.0,"text":" All right, so here we are.",""" +
+            """"tokens":[],"temperature":0.0,"avg_logprob":-0.31,"compression_ratio":1.2,"no_speech_prob":0.01}]}"""
+        val result = GroqAdapter().parseSavedResponse(
+            body.toByteArray(StandardCharsets.UTF_8),
+            request(Provider.GROQ, GroqAdapter.MODEL_TURBO, durationMs = 19_130),
+        ) as SubmissionResult.Direct
+
+        assertEquals("en", result.transcript.language)
+        assertEquals(listOf("en"), result.transcript.reportedLanguages)
+        // One observation, so nothing about several languages and nothing about a limit.
+        assertFalse(result.transcript.warnings.contains("MULTIPLE_LANGUAGES"))
+        assertFalse(result.transcript.warnings.contains("LANGUAGE_LIMIT_REACHED"))
+        assertTrue(result.transcript.technicallyComplete)
+    }
+
+    @Test
+    fun aLanguageNameIsReadOnlyWhenTheJvmItselfKnowsIt() {
+        // The table is the JVM's own ISO-639-1 list, read through the English display name of each code, so this
+        // program states no language table of its own. A code stays what it is; a value the list does not name is
+        // left alone rather than guessed at, and the parser then drops it as before.
+        assertEquals("en", LanguageNames.codeFor("english"))
+        assertEquals("en", LanguageNames.codeFor("English"))
+        assertEquals("de", LanguageNames.codeFor(" German "))
+        assertEquals("es", LanguageNames.codeFor("SPANISH"))
+        assertEquals("en", LanguageNames.codeFor("en"))
+        assertEquals("de", LanguageNames.codeFor("DE"))
+        assertNull(LanguageNames.codeFor("Klingon"))
+        assertNull(LanguageNames.codeFor(""))
+        assertNull(LanguageNames.codeFor("   "))
+        // A name the list knows must not be readable as one word of a longer value: the whole value counts.
+        assertNull(LanguageNames.codeFor("spoken english"))
+    }
+
+    @Test
     fun overlongReportedModelIsDiscardedWithExplicitUnknownProvenanceWarning() {
         fun parsed(model: String) = OpenAiAdapter().parseSavedResponse(
             "{\"text\":\"hello\",\"model\":\"$model\"}".toByteArray(StandardCharsets.UTF_8),
