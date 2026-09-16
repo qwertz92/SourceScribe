@@ -322,32 +322,7 @@ private fun JobCard(
                         stringResource(R.string.provider_elapsed, duration((now - job.createdAt).coerceAtLeast(0))),
                         listOf(stringResource(R.string.provider_elapsed, LONGEST_ELAPSED)),
                         MaterialTheme.typography.bodySmall)
-                    attempts.forEach { attempt ->
-                        Text("${if (attempt.branch == Branch.CAPTIONS) stringResource(R.string.mode_captions_only) else stringResource(R.string.mode_stt_only)} · ${stringResource(phaseLabel(attempt.phase))}",
-                            style = MaterialTheme.typography.bodySmall)
-                        // Which rendition this attempt actually bound, from what it stored when it resolved
-                        // the source. Read once per stored checkpoint rather than on every recomposition.
-                        val boundTrack = remember(attempt.checkpoint) { SttStep.storedAudioTrack(attempt.checkpoint) }
-                        if (boundTrack != null) Text(stringResource(R.string.audio_track_value, audioTrackSummary(boundTrack)),
-                            style = MaterialTheme.typography.bodySmall)
-                        // In the units the rest of this app uses for a download — `byteSize`, which is
-                        // what an audio track's size is shown in two screens away — rather than a raw digit
-                        // count that grew a character at a time and had no reserved height either. With a
-                        // percentage and a rate while the bytes are moving, so a wait can be judged; both
-                        // only where they are real, see `transferRate` and `totalBytes`.
-                        val rate = transferRate(attempt.id, attempt.phase, attempt.processedBytes)
-                        if (attempt.processedBytes > 0) {
-                            val total = attempt.totalBytes?.takeIf { it > 0 && attempt.processedBytes <= it }
-                            val moved = if (total == null) stringResource(R.string.processed_bytes, byteSize(attempt.processedBytes))
-                            else stringResource(R.string.transfer_of_total,
-                                percentOf(attempt.processedBytes, total), byteSize(attempt.processedBytes), byteSize(total))
-                            ReservedText(
-                                if (rate == null) moved else stringResource(R.string.transfer_rate, moved, byteSize(rate)),
-                                progressAlternatives(),
-                                MaterialTheme.typography.bodySmall)
-                        }
-                        attempt.error?.let { AttemptError(it, openHelp) }
-                    }
+                    attempts.forEach { attempt -> AttemptLines(attempt, openHelp) }
                     val artifactIds = jobArtifacts.map { it.id }.toSet()
                     exports.filter { it.artifactId in artifactIds }.forEach { row ->
                         val statusMessage = messageText("EXPORT_${row.state.name}")
@@ -378,6 +353,51 @@ private fun JobCard(
             }
         }
     }
+}
+
+/**
+ * What one attempt of an open job card says about itself: its branch and phase, the rendition it bound, how
+ * many bytes have moved, and the reason it stopped.
+ *
+ * A separate composable from [JobCard] because this is the part of the card whose lines come and go while it
+ * is open, and `JobCardLayoutTest` measures it without a view model.
+ */
+@Composable
+internal fun AttemptLines(attempt: AttemptRow, openHelp: (HelpTopic) -> Unit) {
+    Text("${if (attempt.branch == Branch.CAPTIONS) stringResource(R.string.mode_captions_only) else stringResource(R.string.mode_stt_only)} · ${stringResource(phaseLabel(attempt.phase))}",
+        style = MaterialTheme.typography.bodySmall)
+    // Which rendition this attempt actually bound, from what it stored when it resolved
+    // the source. Read once per stored checkpoint rather than on every recomposition.
+    //
+    // The line keeps its room while it has nothing to say. It is empty until the attempt has resolved the
+    // source and full from then on, and both happen while the card sits open in front of the reader, so
+    // showing it only when it is filled moved everything under it once per job.
+    val boundTrack = remember(attempt.checkpoint) { SttStep.storedAudioTrack(attempt.checkpoint) }
+    ReservedText(
+        if (boundTrack == null) "" else stringResource(R.string.audio_track_value, audioTrackSummary(boundTrack)),
+        listOf(boundTrackAlternative()),
+        MaterialTheme.typography.bodySmall)
+    // In the units the rest of this app uses for a download — `byteSize`, which is
+    // what an audio track's size is shown in two screens away — rather than a raw digit
+    // count that grew a character at a time and had no reserved height either. With a
+    // percentage and a rate while the bytes are moving, so a wait can be judged; both
+    // only where they are real, see `transferRate` and `totalBytes`.
+    //
+    // Reserved the same way and for the same reason: the line is there for the length of a download or an
+    // upload and gone before and after, which is three moves of everything beneath it per transfer.
+    val rate = transferRate(attempt.id, attempt.phase, attempt.processedBytes)
+    val total = attempt.totalBytes?.takeIf { it > 0 && attempt.processedBytes <= it }
+    val moved = when {
+        attempt.processedBytes <= 0 -> ""
+        total == null -> stringResource(R.string.processed_bytes, byteSize(attempt.processedBytes))
+        else -> stringResource(R.string.transfer_of_total,
+            percentOf(attempt.processedBytes, total), byteSize(attempt.processedBytes), byteSize(total))
+    }
+    ReservedText(
+        if (moved.isEmpty() || rate == null) moved else stringResource(R.string.transfer_rate, moved, byteSize(rate)),
+        progressAlternatives(),
+        MaterialTheme.typography.bodySmall)
+    attempt.error?.let { AttemptError(it, openHelp) }
 }
 
 /** A waiting job explains itself where it is; the length limit additionally links to why it cannot be raised. */
@@ -423,6 +443,25 @@ private fun transferRate(attemptId: String, phase: Phase, bytes: Long): Long? {
     }
     return rate
 }
+
+/**
+ * The height the bound-rendition line reserves: the shape [audioTrackSummary] gives an ordinary YouTube
+ * rendition, at its widest - codec, container, a four-digit data rate, channels, the format id with the
+ * longest suffix the extractor appends, the size, and a full language tag.
+ *
+ * Like [LONGEST_ELAPSED] it is not a ceiling on the value. `ReservedText` measures the real summary as well
+ * and gives it whatever room it needs, so an unusually long codec name or language tag costs the no-jump
+ * guarantee for that one card and never a word of the text.
+ */
+@Composable
+private fun boundTrackAlternative(): String = stringResource(R.string.audio_track_value, listOf(
+    "Opus", "WebM",
+    stringResource(R.string.audio_track_bitrate, numberText(9999)),
+    stringResource(R.string.audio_track_stereo),
+    stringResource(R.string.audio_track_format, "000-drc"),
+    LONGEST_BYTE_SIZE,
+    "xx-XXXX",
+).joinToString(" · "))
 
 /** The heights the progress line reserves: every shape it can take, at its widest. */
 @Composable
