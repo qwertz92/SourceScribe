@@ -2220,13 +2220,17 @@ class SttStep @Inject constructor(
          * Whether an encoded chunk covers exactly the window it was cut for.
          *
          * The MP3 the bundled encoder writes is a whole number of frames long and carries the encoder's own
-         * delay, so it always runs past the interval it was asked for: 84 ms for a 600 s window and 96 ms
-         * for a short one, measured on the API 37 emulator with the bundled ffmpeg 7.1.1, and the same for a
-         * WAV, an Opus/WebM and an MP3 source. `chunkPlan` makes every window but the last exactly
+         * delay, so it runs past the interval it was asked for: 84 ms for a 600 s window and 96 ms for a
+         * short one, measured on the API 37 emulator with the bundled ffmpeg 7.1.1, and the same for a
+         * WAV, an Opus/WebM and an MP3 source. The last window of a source is the exception: the encoder
+         * cannot write more audio than the source holds, so that chunk comes out a few milliseconds short
+         * (1,080 ms for a 1,092 ms window, same setup). `chunkPlan` makes every window but the last exactly
          * [MAX_CHUNK_DURATION_MS] long, so a measured length bounded by that maximum alone rejected the
          * first chunk of every source longer than one window — the `PREPARED_AUDIO_INVALID` of preview
-         * 0.2.0. The surplus is bounded by the tolerance instead, and the chunk that gets stored keeps the
-         * planned interval rather than the encoded length.
+         * 0.2.0. The difference is bounded by the tolerance instead, in both directions, and the chunk that
+         * gets stored keeps the planned interval rather than the encoded length: storing the encoded length
+         * would overlap the next chunk after a long window and leave a gap at the source's end after the
+         * last one, and either is `AUDIO_INTERVAL_GAP_OR_OVERLAP` in NORMALIZE.
          */
         private fun encodedChunkFitsWindow(
             window: ChunkWindow,
