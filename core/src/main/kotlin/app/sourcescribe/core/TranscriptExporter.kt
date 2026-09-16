@@ -360,6 +360,8 @@ object TranscriptExporter {
             MetadataField("Context terms", listValue(config.contextTerms)),
             MetadataField("Export formats", listValue(config.exportFormats.sortedBy { it.name })),
             MetadataField("Export tree URI", config.exportTreeUri),
+            // The default folder alone would misdescribe a job whose subtitles went somewhere else.
+            MetadataField("Export tree URI per format", mapValue(config.exportTreeUris.mapKeys { it.key.name })),
             MetadataField("Retain raw", config.retainRaw.toString()),
             MetadataField("Audio retention", config.audioRetention.name),
             MetadataField("Network policy", config.networkPolicy.name),

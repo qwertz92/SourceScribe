@@ -188,6 +188,16 @@ class StatedNumbersTest {
         // The longest model name a provider's answer may report and still have it kept, counted as `String.length`
         // counts. The AssemblyAI adapter and the parser for OpenAI and Groq answers both hold to it (defect 20).
         assertEquals(128, ReportedModel.MAX_LENGTH)
+
+        // How many named keyterm lists may be kept, and how large one may be. No provider states any of these:
+        // the two term figures are `SettingsStore.validateConfig`'s existing bounds on a job's own terms,
+        // repeated here so a saved set can always be loaded into a draft that file will still accept, and the
+        // other two are this program's own budget — 30 sets is what `AppSettings.presets` already allows, and
+        // 80 characters is the length a preset name may have.
+        assertEquals(30, KeytermSets.MAX_SETS)
+        assertEquals(80, KeytermSets.MAX_NAME_LENGTH)
+        assertEquals(1000, KeytermSets.MAX_TERMS)
+        assertEquals(500, KeytermSets.MAX_TERM_LENGTH)
     }
 
     /**
@@ -479,6 +489,8 @@ class StatedNumbersTest {
             "GroqAdapter.PRICE_TURBO_MICRO_USD_PER_HOUR", "GroqAdapter.MINIMUM_BILLED_SECONDS",
             "GroqAdapter.MIN_DURATION_MS",
             "JobLimits.MAX_AUDIO_SECONDS", "JobLimits.MAX_AUDIO_MINUTES",
+            "KeytermSets.MAX_SETS", "KeytermSets.MAX_NAME_LENGTH",
+            "KeytermSets.MAX_TERMS", "KeytermSets.MAX_TERM_LENGTH",
             "OpenAiAdapter.MAX_UPLOAD_BYTES", "OpenAiAdapter.PRICE_GPT_TRANSCRIBE_MICRO_USD_PER_HOUR",
             "OpenAiAdapter.PRICE_WHISPER_MICRO_USD_PER_HOUR", "OpenAiAdapter.DIARIZATION_AUTO_CHUNKING_MS",
             "ReportedModel.MAX_LENGTH",

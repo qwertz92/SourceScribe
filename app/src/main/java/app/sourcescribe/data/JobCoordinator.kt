@@ -510,7 +510,8 @@ class JobCoordinator @Inject constructor(
                 for (artifact in dao.artifacts(job.id).filter { it.attemptId == row.id }) {
                     for (format in config.exportFormats) {
                         if (dao.exports(artifact.id).none { it.format == format.name }) dao.insertExport(
-                            ExportRow(UUID.randomUUID().toString(), artifact.id, format.name, config.exportTreeUri.orEmpty(),
+                            ExportRow(UUID.randomUUID().toString(), artifact.id, format.name,
+                                ExportTargets.tree(config, format).orEmpty(),
                                 System.currentTimeMillis(), state = ExportState.FAILED, error = "EXPORT_SCHEDULING_FAILED"))
                     }
                 }
@@ -543,7 +544,8 @@ class JobCoordinator @Inject constructor(
         for (artifact in dao.artifacts(row.jobId).filter { it.attemptId == row.id }) {
             for (format in config.exportFormats) {
                 if (dao.exports(artifact.id).any { it.format == format.name }) continue
-                val tree = config.exportTreeUri
+                // The folder this format names, and the one default folder where it names none.
+                val tree = ExportTargets.tree(config, format)
                 if (tree == null) dao.insertExport(ExportRow(UUID.randomUUID().toString(), artifact.id,
                     format.name, "", System.currentTimeMillis(), state = ExportState.PERMISSION_REQUIRED, error = "PERMISSION_REQUIRED"))
                 else exports.export(artifact.id, format, tree)

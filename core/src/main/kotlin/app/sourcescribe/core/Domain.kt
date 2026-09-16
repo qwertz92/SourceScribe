@@ -101,7 +101,14 @@ data class JobConfig(
     val segmentTimestamps: Boolean = true,
     val contextTerms: List<String> = emptyList(),
     val exportFormats: Set<ExportFormat> = setOf(ExportFormat.MARKDOWN),
+    /** The one default folder every format is written into unless it names one of its own. */
     val exportTreeUri: String? = null,
+    /**
+     * A folder for one format alone, overriding [exportTreeUri] for it. Empty is the usual case; a
+     * configuration an older version wrote has no such field and decodes to it. Ask [ExportTargets.tree]
+     * rather than reading either field directly.
+     */
+    val exportTreeUris: Map<ExportFormat, String> = emptyMap(),
     val retainRaw: Boolean = false,
     val audioRetention: AudioRetention = AudioRetention.UNTIL_PERSISTED,
     val networkPolicy: NetworkPolicy = NetworkPolicy.ANY,
@@ -120,6 +127,8 @@ data class JobConfig(
 data class AppSettings(
     val defaults: JobConfig = JobConfig(),
     val presets: Map<String, JobConfig> = emptyMap(),
+    /** Keyterm lists saved under a name; see [KeytermSets], which holds every rule about them. */
+    val keytermSets: Map<String, List<String>> = emptyMap(),
     val parallelJobs: Int = 2,
     val storageLimitBytes: Long = 2L * 1024 * 1024 * 1024,
     val theme: String = "SYSTEM",

@@ -10,6 +10,7 @@ import androidx.datastore.preferences.preferencesDataStoreFile
 import app.sourcescribe.core.AppSettings
 import app.sourcescribe.core.JobConfig
 import app.sourcescribe.core.JobLimits
+import app.sourcescribe.core.KeytermSets
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -59,6 +60,12 @@ class SettingsStore @Inject constructor(@ApplicationContext context: Context) {
             validateConfig(config)
         }
         validateConfig(settings.defaults)
+        // The same bounds a job's own terms live under, so a saved set can always be loaded into a draft
+        // this file will then still accept. `KeytermSets.saved` is what produces them.
+        require(settings.keytermSets.size <= KeytermSets.MAX_SETS)
+        settings.keytermSets.forEach { (name, terms) ->
+            require(KeytermSets.saved(emptyMap(), name, terms) == mapOf(name to terms))
+        }
     }
 
     private fun validateConfig(config: JobConfig) {
@@ -67,6 +74,7 @@ class SettingsStore @Inject constructor(@ApplicationContext context: Context) {
         require(config.preferredLanguages.size <= 20 && config.preferredLanguages.all { it.matches(Regex("[A-Za-z0-9-]{1,35}")) })
         require(config.contextTerms.size <= 1000 && config.contextTerms.all { it.length <= 500 && it.none(Char::isISOControl) })
         require(config.exportTreeUri.let { it == null || it.startsWith("content://") })
+        require(config.exportTreeUris.values.all { it.startsWith("content://") })
         require(config.exportFormats.isNotEmpty())
     }
 }
