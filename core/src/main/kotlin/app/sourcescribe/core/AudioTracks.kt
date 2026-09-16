@@ -3,11 +3,18 @@ package app.sourcescribe.core
 /**
  * Turns extractor format ids such as `251` or `140-drc` into facts a reader can act on.
  *
- * The pipeline re-encodes every chosen rendition to mono 16 kHz MP3 at 64 kbit/s before any provider
- * sees it (see AudioPreparation), so a larger rendition adds download volume and time without adding
- * transcription detail. The recommendation therefore takes the smallest rendition of the wanted language,
- * with two exceptions that would cost transcription quality: a dynamic-range-compressed rendition loses
- * to a plain one, and a rendition below MINIMUM_USEFUL_KBPS loses to any normal one.
+ * The recommendation takes the rendition closest to what the source itself carries: Opus before AAC,
+ * and the highest rate within that codec. The pipeline re-encodes whatever is chosen to mono 16 kHz MP3
+ * at 64 kbit/s before any provider sees it (see AudioPreparation), and every re-encode starts from what
+ * the downloaded rendition still holds, so the losses of the smaller rendition stay in the result.
+ * Two renditions are avoided for the same reason: a dynamic-range-compressed copy, which is not what
+ * the source sounds like, and a rendition below MINIMUM_USEFUL_KBPS, which is a fallback rather than a
+ * normal speech stream. Both are only ordered last, never removed — where a video offers nothing else,
+ * one of them is still the pick, and the picker shows the size of every rendition so a metered
+ * connection can still be given the smaller one.
+ *
+ * Up to 0.3.0 the smallest usable rendition won instead, to save download volume; the owner decided
+ * for quality in 0.4.0.
  */
 enum class AudioSizeClass { SMALLEST, MEDIUM, LARGEST, UNKNOWN }
 
@@ -75,9 +82,9 @@ object AudioTracks {
     /**
      * The order the picker shows. The recommendation first, then the marked original, then the remaining
      * spoken languages, then narration of the picture, which is almost never what someone wants transcribed.
-     * Inside one language the same preference decides as for the recommendation, so the plain, smallest
-     * usable rendition leads. Languages themselves are ordered by their code rather than by their translated
-     * name, so the list reads the same whichever language the app itself is set to.
+     * Inside one language the same preference decides as for the recommendation, so the plain rendition with
+     * the best codec and rate leads. Languages themselves are ordered by their code rather than by their
+     * translated name, so the list reads the same whichever language the app itself is set to.
      */
     private val readingOrder = compareBy<AudioTrackDescription>(
         { if (it.recommended) 0 else 1 },
@@ -88,9 +95,10 @@ object AudioTracks {
         // no reserved value can be guaranteed not to appear in it.
         { if (normalizedLanguage(it.track.language) == null) 1 else 0 },
         { normalizedLanguage(it.track.language) ?: "" },
-        { if (it.dynamicRangeCompressed) 1 else 0 },
         { if (it.bitrateKbps?.let { rate -> rate < MINIMUM_USEFUL_KBPS } == true) 1 else 0 },
-        { it.bitrateKbps ?: Int.MAX_VALUE },
+        { if (it.dynamicRangeCompressed) 1 else 0 },
+        { codecRank(it.track.codec) },
+        { -(it.bitrateKbps ?: 0) },
         { it.track.id },
     )
 
@@ -116,17 +124,35 @@ object AudioTracks {
     }
 
     /**
-     * Smallest usable rendition first, plain before dynamic-range-compressed, then a stable id order.
+     * The best rendition first: a usable rate before a fallback one, a plain copy before a
+     * dynamic-range-compressed one, Opus before AAC before anything else, the highest rate within that
+     * codec, and the smaller file where two are otherwise equal, followed by a stable id order. The rate
+     * comes before the compression flag because a compressed copy at a normal rate still carries the
+     * speech, while a stream below [MINIMUM_USEFUL_KBPS] has already lost it.
+     *
      * Every key comes from the track record itself, so the same format list always yields the same pick
      * and a later re-resolve cannot silently rebind a running job to a different rendition.
      */
     private val preference = compareBy<AudioTrack>(
-        { it.dynamicRangeCompressed },
         { if (effectiveKbps(it)?.let { rate -> rate < MINIMUM_USEFUL_KBPS } == true) 1 else 0 },
-        { effectiveKbps(it) ?: Int.MAX_VALUE },
+        { it.dynamicRangeCompressed },
+        { codecRank(it.codec) },
+        { -(effectiveKbps(it) ?: 0) },
         { it.bytes ?: Long.MAX_VALUE },
         { it.id },
     )
+
+    /**
+     * How close a codec is to what the source carries, for speech that gets re-encoded afterwards: Opus
+     * first, then AAC, then any other named codec, then a rendition whose codec the extractor did not
+     * report — unknown is ranked last because nothing about it can be shown to the reader either.
+     */
+    private fun codecRank(codec: String?): Int = when (codecLabel(codec)) {
+        "Opus" -> 0
+        "AAC" -> 1
+        null -> 3
+        else -> 2
+    }
 
     /** kbit/s is 125 bytes per second; the remainder below a full second is kept instead of truncated away. */
     fun estimateBytes(kbps: Int, durationMs: Long): Long = kbps.toLong() * 125L * durationMs / 1000L

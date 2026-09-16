@@ -200,12 +200,23 @@ internal fun byteSize(bytes: Long): String {
 
 @Composable internal fun audioTrackOption(description: AudioTrackDescription): String {
     val head = if (description.recommended) {
-        stringResource(R.string.audio_track_recommended) + " · " + audioTrackTitle(description)
+        stringResource(R.string.audio_track_recommended) + " · " + audioTrackReason(description) + "\n" +
+            audioTrackTitle(description)
     } else {
         audioTrackTitle(description)
     }
     return head + "\n" + audioTrackDetail(description)
 }
+
+/**
+ * Why this rendition is the recommendation, in the order the rule decides it: the codec first, then that it
+ * is the best rate on offer, then the size — which is the one reason to overrule it on a metered connection.
+ */
+@Composable internal fun audioTrackReason(description: AudioTrackDescription): String = stringResource(
+    R.string.audio_track_recommended_reason,
+    description.codecLabel ?: description.containerLabel ?: stringResource(R.string.unknown),
+    trackSize(description),
+)
 
 @Composable internal fun captionTrackTitle(track: CaptionTrack): String =
     languageText(track.language) + " · " + (track.name ?: generationName(track.generation))

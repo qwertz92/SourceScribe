@@ -15,7 +15,8 @@ class AudioTracksTest {
         bytes: Long? = null,
         drc: Boolean = false,
         audioDescription: Boolean = false,
-    ) = AudioTrack(id, "BaW_jenozKc", language, null, isOriginal, "fixture",
+        codec: String? = null,
+    ) = AudioTrack(id, "BaW_jenozKc", language, null, isOriginal, "fixture", codec = codec,
         bitrateKbps = bitrateKbps, bytes = bytes, dynamicRangeCompressed = drc, audioDescription = audioDescription)
 
     @Test fun narrationOfThePictureIsNeverChosenWithoutTheReader() {
@@ -48,7 +49,7 @@ class AudioTracksTest {
     @Test fun severalSpokenLanguagesStayTheReadersDecision() {
         assertNull(AudioTracks.automatic(listOf(track("140", "de", bitrateKbps = 128), track("141", "en", bitrateKbps = 128))))
         // Regional variants of one language are the same content decision, so they do not need a question.
-        assertEquals("140", AudioTracks.automatic(listOf(track("140", "en-US", bitrateKbps = 96), track("141", "en-GB", bitrateKbps = 128)))?.id)
+        assertEquals("141", AudioTracks.automatic(listOf(track("140", "en-US", bitrateKbps = 96), track("141", "en-GB", bitrateKbps = 128)))?.id)
         // A marked original ends the question even when other languages exist.
         assertEquals("141", AudioTracks.automatic(listOf(track("140", "de", bitrateKbps = 96), track("141", "en", isOriginal = true, bitrateKbps = 128)))?.id)
     }
@@ -56,10 +57,45 @@ class AudioTracksTest {
     @Test fun theRecommendationAvoidsCompressionAndUnusablyLowRatesBeforeItSaves() {
         assertEquals("140", AudioTracks.automatic(listOf(track("139-drc", bitrateKbps = 48, drc = true), track("140", bitrateKbps = 256)))?.id)
         assertEquals("140", AudioTracks.automatic(listOf(track("249", bitrateKbps = 8), track("140", bitrateKbps = 256)))?.id)
-        assertEquals("249", AudioTracks.automatic(listOf(track("251", bitrateKbps = 160), track("249", bitrateKbps = 64)))?.id)
         // Same rendition list, same pick: a re-resolve must not rebind a running job to another track.
         val list = listOf(track("251", bitrateKbps = 160), track("250", bitrateKbps = 96), track("249", bitrateKbps = 64))
         assertEquals(AudioTracks.automatic(list)?.id, AudioTracks.automatic(list.reversed())?.id)
+    }
+
+    @Test fun theRecommendationTakesTheBestOpusRatherThanTheSmallestRendition() {
+        // The owner decided this for 0.4.0: Opus before AAC, and the highest rate within the codec, because
+        // that is the rendition closest to what the source itself carries. Up to 0.3.0 the smallest usable
+        // rendition won, which saved download volume on renditions that all end up re-encoded anyway.
+        assertEquals("251", AudioTracks.automatic(listOf(
+            track("251", bitrateKbps = 160, codec = "opus"),
+            track("250", bitrateKbps = 96, codec = "opus"),
+            track("249", bitrateKbps = 64, codec = "opus"),
+        ))?.id)
+        // The codec decides before the rate: a lower Opus still beats a higher AAC.
+        assertEquals("249", AudioTracks.automatic(listOf(
+            track("140", bitrateKbps = 128, codec = "mp4a.40.2"),
+            track("249", bitrateKbps = 64, codec = "opus"),
+        ))?.id)
+        // A rate below what speech needs is not "best quality" whatever its codec says.
+        assertEquals("140", AudioTracks.automatic(listOf(
+            track("249", bitrateKbps = 8, codec = "opus"),
+            track("140", bitrateKbps = 128, codec = "mp4a.40.2"),
+        ))?.id)
+        // A dynamic-range-compressed copy is skipped even when it is the best Opus on offer.
+        assertEquals("250", AudioTracks.automatic(listOf(
+            track("251-drc", bitrateKbps = 160, codec = "opus", drc = true),
+            track("250", bitrateKbps = 96, codec = "opus"),
+        ))?.id)
+        // Nothing but compressed copies: one of them is still the pick, rather than no audio at all.
+        assertEquals("251-drc", AudioTracks.automatic(listOf(
+            track("251-drc", bitrateKbps = 160, codec = "opus", drc = true),
+            track("250-drc", bitrateKbps = 96, codec = "opus", drc = true),
+        ))?.id)
+        // Equal codec and rate: the smaller file, so the pick stays the cheaper download.
+        assertEquals("251-small", AudioTracks.automatic(listOf(
+            track("251-large", bitrateKbps = 160, bytes = 9_000_000L, codec = "opus"),
+            track("251-small", bitrateKbps = 160, bytes = 5_200_000L, codec = "opus"),
+        ))?.id)
     }
 
     @Test fun sizesAreEstimatedWithoutInventingZeroOrLosingTheRemainder() {
@@ -91,10 +127,24 @@ class AudioTracksTest {
         val order = AudioTracks.describe(tracks, 600_000).map { it.track.id }
         // Recommendation, then the rest of the original language plain-before-compressed, then the dubs by
         // language code, then the narration track.
-        assertEquals(listOf("249-en", "251-en", "249-drc-en", "140-de", "140-hi", "140-ru", "140-desc"), order)
+        assertEquals(listOf("251-en", "249-en", "249-drc-en", "140-de", "140-hi", "140-ru", "140-desc"), order)
         assertTrue(AudioTracks.describe(tracks, 600_000).first().recommended)
         // Same list, same order: the picker must not reshuffle itself between two resolves.
         assertEquals(order, AudioTracks.describe(tracks.reversed(), 600_000).map { it.track.id })
+    }
+
+    @Test fun insideOneLanguageTheBestCodecAndRateLeadTheList() {
+        // The picker orders inside a language by the same rule that makes the recommendation, so the reader
+        // sees the reason for the pick in the list itself rather than having to compare the lines.
+        val tracks = listOf(
+            track("140", "en", isOriginal = true, bitrateKbps = 128, codec = "mp4a.40.2"),
+            track("249", "en", isOriginal = true, bitrateKbps = 64, codec = "opus"),
+            track("251", "en", isOriginal = true, bitrateKbps = 160, codec = "opus"),
+        )
+        val order = AudioTracks.describe(tracks, 600_000)
+        assertEquals(listOf("251", "249", "140"), order.map { it.track.id })
+        assertTrue(order.first().recommended)
+        assertEquals(order.map { it.track.id }, AudioTracks.describe(tracks.reversed(), 600_000).map { it.track.id })
     }
 
     @Test fun aMissingLanguageAndAnUnusableRateSortLastInsteadOfJumpingTheQueue() {
