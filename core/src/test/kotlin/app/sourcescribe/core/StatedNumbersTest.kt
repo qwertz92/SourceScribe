@@ -111,15 +111,15 @@ class StatedNumbersTest {
     }
 
     /**
-     * What this program promises its own reader, and where the same number is written a second time.
+     * What this program promises its own reader.
      *
-     * The duration ceiling is the one number here that a person is shown: two translated strings name six
-     * hundred minutes without reading it from anywhere. Until those strings are generated from this constant,
-     * the only thing joining them is this line and the comment beside it.
+     * The duration ceiling is the one number here that a person is shown. Since defect 23 the sentence that names
+     * it, `invalid_duration` in both languages, takes the minutes from [JobLimits.MAX_AUDIO_MINUTES] as an argument,
+     * so no translation states the figure on its own.
      */
     @Test fun whatThisProgramPromisesTheReader() {
         assertEquals(36_000L, JobLimits.MAX_AUDIO_SECONDS)
-        // Named as 600 minutes by `invalid_duration` in both `values/strings.xml` and `values-en/strings.xml`.
+        // Formatted into `invalid_duration` by `messageSpec("AUDIO_DURATION_LIMIT")` in the app.
         assertEquals(600L, JobLimits.MAX_AUDIO_MINUTES)
     }
 

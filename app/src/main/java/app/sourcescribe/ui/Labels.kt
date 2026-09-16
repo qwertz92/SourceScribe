@@ -15,6 +15,7 @@ import app.sourcescribe.core.CaptionTrack
 import app.sourcescribe.core.ExecutionState
 import app.sourcescribe.core.ExportFormat
 import app.sourcescribe.core.Generation
+import app.sourcescribe.core.JobLimits
 import app.sourcescribe.core.Origin
 import app.sourcescribe.core.Outcome
 import app.sourcescribe.core.Phase
@@ -265,6 +266,9 @@ internal sealed interface MessageSpec {
     /** Two sentences joined by a middle dot. */
     data class Joined(val first: Int, val second: Int) : MessageSpec
 
+    /** One sentence with a number in it that the app supplies, in the grammatical form that number takes. */
+    data class Counted(val plural: Int, val count: Int) : MessageSpec
+
     /** A message followed by a note of its own; see [rawSavedSpec]. */
     data class WithNote(val base: MessageSpec, val note: Int) : MessageSpec
 }
@@ -279,6 +283,7 @@ internal sealed interface MessageSpec {
     is MessageSpec.Text -> stringResource(spec.text)
     is MessageSpec.Step -> stepText(spec.code, spec.reason)
     is MessageSpec.Joined -> stringResource(spec.first) + " · " + stringResource(spec.second)
+    is MessageSpec.Counted -> pluralStringResource(spec.plural, spec.count, spec.count)
     is MessageSpec.WithNote -> messageText(spec.base) + " " + stringResource(spec.note)
 }
 
@@ -329,7 +334,7 @@ internal fun messageSpec(code: String): MessageSpec? = when (code) {
     "STORAGE_LIMIT", "AUDIO_IMPORT_STORAGE_LIMIT", "DEVICE_STORAGE_LOW" -> MessageSpec.Text(R.string.storage_full)
     "BUDGET_EXCEEDED" -> MessageSpec.Text(R.string.budget_exceeded)
     "BUDGET_INVALID" -> MessageSpec.Text(R.string.invalid_budget)
-    "AUDIO_DURATION_LIMIT" -> MessageSpec.Text(R.string.invalid_duration)
+    "AUDIO_DURATION_LIMIT" -> MessageSpec.Counted(R.plurals.invalid_duration, JobLimits.MAX_AUDIO_MINUTES.toInt())
     "AUDIO_LONGER_THAN_LIMIT", "SOURCE_LONGER_THAN_LIMIT" -> MessageSpec.Text(R.string.audio_longer_than_limit)
     "AUDIO_DURATION_UNKNOWN" -> MessageSpec.Text(R.string.audio_duration_unknown)
     "UNSUPPORTED_OPTION", "PROVIDER_UNSUPPORTED_OPTION", "RESPONSE_UNSUPPORTED_OPTION",

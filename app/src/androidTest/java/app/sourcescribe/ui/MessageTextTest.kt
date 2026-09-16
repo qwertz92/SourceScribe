@@ -1,7 +1,10 @@
 package app.sourcescribe.ui
 
+import android.content.res.Configuration
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import app.sourcescribe.MainViewModel
+import app.sourcescribe.R
 import app.sourcescribe.core.ArtifactFilesException
 import app.sourcescribe.core.CaptionParseException
 import app.sourcescribe.core.ExportState
@@ -12,7 +15,9 @@ import app.sourcescribe.data.StorageBudgetException
 import app.sourcescribe.extractor.AudioPreparationCode
 import app.sourcescribe.extractor.EngineUpdateCode
 import app.sourcescribe.extractor.ExtractionFailure
+import java.util.Locale
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -28,6 +33,19 @@ class MessageTextTest {
         assertEquals("Codes without a sentence of their own", emptyList<String>(), missing)
     }
 
+    @Test
+    fun theDurationLimitSentenceTakesItsNumberFromTheApp() {
+        // Defect 23. Both languages wrote "600" into the sentence, a number of their own beside JobLimits, so a changed
+        // limit would be enforced while the sentence still promised the old one. The sentence has to take the figure
+        // as an argument; 7 is a number the app never uses, so a sentence that states its own figure fails here.
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        for (tag in listOf("de", "en")) {
+            val configuration = Configuration(context.resources.configuration).apply { setLocale(Locale.forLanguageTag(tag)) }
+            val sentence = context.createConfigurationContext(configuration).resources
+                .getQuantityString(R.plurals.invalid_duration, 7, 7)
+            assertTrue("$tag: $sentence", " 7 " in sentence)
+        }
+    }
 
     private companion object {
         val SHOWN_CODES: Set<String> = buildSet {
