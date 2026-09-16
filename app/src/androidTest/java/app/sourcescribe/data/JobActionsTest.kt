@@ -102,6 +102,23 @@ class JobActionsTest {
         // gone and stop in exactly the same place.
         val partialWithNoEngine = partial.copy(errors = listOf("ENGINE_NOT_AVAILABLE"))
         assertEquals(JobAction.RETRY_ALL, JobActions.recommended(partialWithNoEngine))
+        // Round 25, finding 2: not recommending it was not enough. The dialog still listed "Fetch only what
+        // is missing" as a button, under the description "Take it when a result came back incomplete" — which
+        // is literally this job — and pressing it pinned the new attempt to the same missing component and
+        // reproduced the same stop. That is the loop `resumeIsOfferedOnlyWhereResumingWouldGetFurther` closes
+        // for RESUME, and it was open for this action.
+        assertFalse("A partial retry is a loop for this reason",
+            JobAction.RETRY_MISSING in JobActions.offered(partialWithNoEngine))
+        // Every other reason keeps it: the exclusion is about this one code, not about partial results.
+        assertTrue(JobAction.RETRY_MISSING in JobActions.offered(partial))
+        // Two branches, one of them stranded on the missing component: the whole job has to run again.
+        assertFalse(JobAction.RETRY_MISSING in JobActions.offered(
+            partial.copy(errors = listOf("PROVIDER_REMOTE_FAILED", "ENGINE_NOT_AVAILABLE"))))
+        // And the same code without a partial result keeps it: `retry(missingOnly = true)` reuses the old
+        // component only where it finds one, so with nothing to keep the new attempt binds the active
+        // component like any other. Excluding it there would take away a branch the reader can still fetch.
+        assertTrue(JobAction.RETRY_MISSING in JobActions.offered(
+            waitingFor("ENGINE_NOT_AVAILABLE").copy(outcome = Outcome.FAILED)))
 
         // Nothing missing and nothing wrong: no action is recommended, and the dialog says so.
         val finished = JobSituation(state = ExecutionState.FINISHED, outcome = Outcome.SUCCESS)

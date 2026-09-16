@@ -197,12 +197,13 @@ object JobActions {
      * Every action worth showing for this job, in the order the dialog lists them.
      *
      * An action is left out when it cannot change anything in this state. That is what the state allows, as
-     * before, plus one rule that is new in 0.4.0: [JobAction.RESUME] is offered only for reasons resuming can
-     * actually get past. `JobCoordinator.resume` requeues the attempt with everything it stored - the same
+     * before, plus two rules that are new in 0.4.0. [JobAction.RESUME] is offered only for reasons resuming can
+     * actually get past: `JobCoordinator.resume` requeues the attempt with everything it stored - the same
      * component, the same checkpoint, the same files - and writes only its state, retry counter, error and lease,
      * besides putting a submission the provider rejected for authentication back to prepared. So where the reason
      * is the attempt's own stored data, the same run reads the same data and stops in the same place; the button
-     * was a loop, not an option.
+     * was a loop, not an option. [JobAction.RETRY_MISSING] is left out for the one case where a partial retry
+     * would inherit exactly that - see [CARRIED_INTO_A_PARTIAL_RETRY].
      */
     fun offered(situation: JobSituation): List<JobAction> = buildList {
         if (situation.state !in OVER && !situation.cancelRequested) add(JobAction.CANCEL)
@@ -213,7 +214,17 @@ object JobActions {
             add(JobAction.RESUME)
         }
         if (situation.configReadable && situation.state != ExecutionState.RUNNING) {
-            if (situation.outcome !in SUCCESSFUL) add(JobAction.RETRY_MISSING)
+            // The same exclusion [demanded] applies, under the same condition and for the same reason:
+            // `JobCoordinator.retry(missingOnly = true)` reuses the previous attempt's component only where
+            // it finds a partial speech-to-text result, and for a job stopped because that component is gone
+            // the new attempt is then pinned to it again and stops in the same place. Recommending something
+            // else was not enough while the button was still there under the words "Take it when a result
+            // came back incomplete", which is exactly this job.
+            if (situation.outcome !in SUCCESSFUL &&
+                !(situation.incompleteResult && situation.errors.any { it in CARRIED_INTO_A_PARTIAL_RETRY })
+            ) {
+                add(JobAction.RETRY_MISSING)
+            }
             add(JobAction.RETRY_ALL)
         }
         // Never refused: it starts nothing and changes nothing about this job, it only fills the other screen.
