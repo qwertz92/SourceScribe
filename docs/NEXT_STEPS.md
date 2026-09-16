@@ -30,7 +30,10 @@ process-death stage (`-e sourcescribeProcessFixture true -e sourcescribeProcessS
 running more than one stage per invocation fails the others. The tests that need a live video
 (`EngineJobPinningTest`, `EngineUpdateManagerTest`'s real-release round trip, `ExtractionChainTest` and
 `NativeRuntimeTest`'s public-source probe) take `engineProbeSource` or `publicSourceUrl` and run before every
-release. `emulator-5556` is the agent device; `emulator-5554` belongs to the owner and agents do not touch it.
+release. `app`'s `LiveGroqTranscriptionTest` is the only test that spends money: with
+`-e sourcescribeLiveProvider groq -e liveProviderKey <key> -e publicSourceUrl <url of a clip of at most 30
+seconds>` it sends exactly one real request to Groq through the whole pipeline, and without all three
+arguments it skips with that sentence. `emulator-5556` is the agent device; `emulator-5554` belongs to the owner and agents do not touch it.
 Device tests run on Android 17 (API 37); on 14 September 2026 the owner decided that older Android versions get
 no separate run.
 
