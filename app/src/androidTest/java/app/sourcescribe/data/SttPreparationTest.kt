@@ -89,6 +89,69 @@ class SttPreparationTest {
         assertTrue(measured - windows[0].durationMs <= 250L)
     }
 
+    /**
+     * The other end of the same source: the last window of a multi-chunk plan, about a second long.
+     *
+     * The last window is the one case where the encoder comes out *shorter* than it was asked for rather than
+     * longer - it cannot write more audio than the source still holds, while a full window overshoots by the
+     * frames it rounds up to plus the encoder delay. Measured on the API 37 emulator with the bundled ffmpeg
+     * 7.1.1: a window of 1 092 ms produced 1 080 ms of MP3, 12 ms short.
+     *
+     * What this test is for is the tiling: the two stored intervals have to meet at 600 000 ms and the second
+     * has to end exactly at the source's own length, because `NORMALIZE` reads them back and reports
+     * `AUDIO_INTERVAL_GAP_OR_OVERLAP` for a transcript whose audio was all there. Storing the encoded length
+     * instead of the planned one leaves those 12 ms as a gap at the end of the source, and the first window
+     * cannot show that: its own surplus is absorbed by the next window's planned offset.
+     */
+    @Test
+    fun theShortLastWindowTilesExactlyToTheEndOfTheSource() = withFixture {
+        val seeded = seed(sourceSeconds = 601)
+
+        val probed = step.run(seeded.attempt, seeded.owner, seeded.config)
+        val durationMs = requireNotNull(checkpointOf(probed).durationMs)
+        val windows = SttStep.chunkPlan(durationMs)
+        assertEquals(2, windows.size)
+        assertTrue("the last window is not a short one: ${windows[1].durationMs}",
+            windows[1].durationMs < SttStep.MAX_CHUNK_DURATION_MS)
+
+        val firstChunk = step.run(probed, seeded.owner, seeded.config)
+        assertNull(firstChunk.error)
+        assertEquals(Phase.PREPARE_AUDIO, firstChunk.phase)
+
+        val lastChunk = step.run(firstChunk, seeded.owner, seeded.config)
+        assertNull(lastChunk.error)
+        assertEquals(Outcome.NONE, lastChunk.outcome)
+        // Every window is prepared, so the attempt moves on to submitting rather than preparing again.
+        assertEquals(Phase.SUBMIT, lastChunk.phase)
+
+        val chunks = checkpointOf(lastChunk).prepared.sortedBy { it.index }
+        assertEquals(listOf(0, 1), chunks.map { it.index })
+        // First the claim only the last window can make: the tiles end exactly where the source ends. The
+        // first window's own surplus never shows here, because the next window's offset is planned, not
+        // measured - which is why the existing test above cannot reach this.
+        assertEquals("the last tile does not end at the source's length",
+            durationMs, chunks[1].offsetMs + chunks[1].durationMs)
+        // Then that they meet rather than leaving a gap or overlapping, and that each is its planned window.
+        assertEquals(0L, chunks[0].offsetMs)
+        assertEquals(chunks[1].offsetMs, chunks[0].offsetMs + chunks[0].durationMs)
+        for ((index, window) in windows.withIndex()) {
+            assertEquals("window $index offset", window.offsetMs, chunks[index].offsetMs)
+            assertEquals("window $index duration", window.durationMs, chunks[index].durationMs)
+        }
+
+        // And the encoded file really is a different length from its window, so the case above is exercised
+        // rather than passing because the encoder happened to hit the planned length exactly.
+        val file = attemptFile(seeded.attempt.id, "audio-1.mp3")
+        assertEquals(file.length(), chunks[1].bytes)
+        val measured = AudioPreparation(runtime).probe(file).durationMs
+        assertTrue(
+            "encoder output $measured equals the short window ${windows[1].durationMs}, so nothing is tested",
+            measured != windows[1].durationMs,
+        )
+        assertTrue("encoder output $measured is outside the tolerance around ${windows[1].durationMs}",
+            kotlin.math.abs(measured - windows[1].durationMs) <= 250L)
+    }
+
     private fun withFixture(block: suspend PreparationFixture.() -> Unit) {
         val base = InstrumentationRegistry.getInstrumentation().targetContext
         val fixture = PreparationFixture(base)
