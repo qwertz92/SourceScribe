@@ -106,7 +106,13 @@ data class JobConfig(
     val audioRetention: AudioRetention = AudioRetention.UNTIL_PERSISTED,
     val networkPolicy: NetworkPolicy = NetworkPolicy.ANY,
     val uploadApproved: Boolean = false,
-    val maxAudioSeconds: Long = 3600,
+    /**
+     * The length limit this job was created under. Since 0.4.0 nobody types one: a job takes its length
+     * from the source and carries [JobLimits.MAX_AUDIO_SECONDS], which `configurationForStart` writes into
+     * every job it creates. A job created by an older version keeps the lower limit it was started with,
+     * because a configuration snapshot is never rewritten afterwards.
+     */
+    val maxAudioSeconds: Long = JobLimits.MAX_AUDIO_SECONDS,
     val maxCostMicrousd: Long? = null,
 )
 

@@ -314,6 +314,7 @@ internal sealed interface MessageSpec {
 internal fun messageSpec(code: String): MessageSpec? = when (code) {
     "NO_ACCEPTABLE_CAPTIONS" -> MessageSpec.Text(R.string.no_captions)
     "NO_AUDIO" -> MessageSpec.Text(R.string.no_audio)
+    "SOURCE_DURATION_UNKNOWN" -> MessageSpec.Text(R.string.source_duration_unknown)
     "CHOOSE_AUDIO_TRACK" -> MessageSpec.Text(R.string.audio_track_choose_language)
     "AUDIO_TRACK_CHANGED" -> MessageSpec.Text(R.string.audio_track_changed)
     "IMPORTED_AUDIO_NOT_FOUND" -> MessageSpec.Text(R.string.reimport_audio)

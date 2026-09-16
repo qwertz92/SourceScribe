@@ -18,7 +18,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ElevatedCard
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalTextStyle
@@ -119,7 +118,7 @@ internal fun NewSourceScreen(
         if (state.previews.isNotEmpty()) {
             item { SectionTitle(R.string.preview, HelpTopic.WORKFLOW, openHelp) }
             items(state.previews, key = { it.resolved.source.id }) { preview ->
-                PreviewCard(preview, state, change, onTrack, openHelp)
+                PreviewCard(preview, state, onTrack, openHelp)
             }
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -147,7 +146,6 @@ private fun clipboardText(context: Context): String? {
 private fun PreviewCard(
     preview: SourcePreview,
     state: ScreenState,
-    change: (JobConfig) -> Unit,
     onTrack: (String, String?, String?) -> Unit,
     openHelp: (HelpTopic) -> Unit,
 ) {
@@ -211,18 +209,23 @@ private fun PreviewCard(
                 // the minimum length Groq bills, so a budget chosen from what stood here could be refused
                 // by a check that had counted differently.
                 //
-                // Too long for this job to run at all, by either limit that can stop it. The rule is in
-                // `MainViewModel` and not written out here, for the same reason the sum above is: a screen
-                // that computes its own version of a rule the run enforces elsewhere is the defect this
-                // review loop has found more often than any other. Saying "price unknown" instead would be
-                // an untrue statement about the tariff rather than about the source; which of the two
-                // limits it is, and what to do about it, is what the line below says.
-                val tooLong = MainViewModel.sourceTooLong(source.durationMs, preview.config)
+                // Too long for this job to run at all. The rule is in `MainViewModel` and not written out
+                // here, for the same reason the sum above is: a screen that computes its own version of a
+                // rule the run enforces elsewhere is the defect this review loop has found more often than
+                // any other. Saying "price unknown" instead would be an untrue statement about the tariff
+                // rather than about the source; what it is about the source is what the line below says.
+                val tooLong = MainViewModel.sourceTooLong(source.durationMs)
                 // Priced as Start will create the job, which is also what the error line below judges. A term list
                 // stored with a blank entry has no price as it stands, and Start drops that entry.
                 val estimate = source.durationMs
                     ?.takeIf { !tooLong }
                     ?.let { MainViewModel.estimatedCostMicrousd(MainViewModel.configurationForStart(preview.config, state.credentials), it) }
+                // The length beside the price, because the two belong together and because it is now the
+                // source's own number rather than a limit anybody typed. Always shown, so it cannot move the
+                // line under it; for a source that states no length it says so, which is also why that source
+                // cannot start (`SOURCE_DURATION_UNKNOWN` below).
+                Text(stringResource(R.string.source_length, source.durationMs?.let(::duration)
+                    ?: stringResource(R.string.unknown)), style = MaterialTheme.typography.bodySmall)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     val priceDate = capability?.priceAsOf.orEmpty()
                     ReservedText(
@@ -230,9 +233,9 @@ private fun PreviewCard(
                             String.format(Locale.ROOT, "%.4f", estimate / 1_000_000.0), priceDate)
                         else if (tooLong) stringResource(R.string.cost_source_too_long)
                         else stringResource(R.string.price_unknown),
-                        // As tall as the tallest of the three at this width and font, whichever is shown. Raising
-                        // the limit on the button below swaps a sentence here for a price, and the rest of the
-                        // screen must not move while the reader is pressing it. Until round 16 a two-line cap did
+                        // As tall as the tallest of the three at this width and font, whichever is shown. Choosing
+                        // another provider or model swaps a sentence here for a price, and the rest of the screen
+                        // must not move while the reader is working the control. Until round 16 a two-line cap did
                         // that job, and round 16 measured what its comment called unmeasured: at font scale 2.0 on
                         // emulator-5556 the estimate lost its end to the ellipsis, in German the whole date.
                         listOf(stringResource(R.string.estimated_cost, "000.0000", priceDate.ifEmpty { "0000-00-00" }),
@@ -246,10 +249,7 @@ private fun PreviewCard(
             PreviewStatus(
                 MainViewModel.previewError(preview, state.credentials),
                 source.durationMs,
-                preview.config,
-                change,
                 openHelp,
-                enabled = !state.starting,
             )
         }
     }
@@ -259,8 +259,8 @@ private fun PreviewCard(
  * The line under a preview's settings: whether this source can start and, where it cannot, why.
  *
  * What it says switches while the reader works the controls above: a missing provider reads as one sentence, a
- * blank keyterm as another, a source longer than the limit as a warning with a button, and a source that can start
- * as a short sentence of its own. The line always keeps the height of the tallest of them, measured at this width
+ * blank keyterm as another, a source past the app's ceiling as a warning of its own, and a source that can start
+ * as a short sentence. The line always keeps the height of the tallest of them, measured at this width
  * and font scale, so the start button under the card stays where it is whatever the line says (defect 36). The cost
  * row's two-line cap would not do here: these texts were not kept short for a cap, and the longest runs past a
  * hundred characters in both languages.
@@ -269,49 +269,36 @@ private fun PreviewCard(
 internal fun PreviewStatus(
     error: String?,
     durationMs: Long?,
-    config: JobConfig,
-    change: (JobConfig) -> Unit,
     openHelp: (HelpTopic) -> Unit,
-    enabled: Boolean,
 ) {
     val ready = stringResource(R.string.preview_ready)
     val sentences = listOf(ready) + MainViewModel.PREVIEW_ERRORS_SHOWN_AS_TEXT.map { messageText(it) }
     // The warning only appears for a source of known length, and then with this source's numbers in it.
-    val warning = durationMs?.let { length -> @Composable { LengthLimitWarning(length, config, {}, {}, enabled = false) } }
+    val warning = durationMs?.let { length -> @Composable { LengthLimitWarning(length) {} } }
     val alternatives: List<@Composable () -> Unit> =
         sentences.map { sentence -> @Composable { Text(sentence) } } + listOfNotNull(warning)
     ReservedBox(alternatives) {
         when (error) {
             null -> Text(ready, color = MaterialTheme.colorScheme.primary)
-            "SOURCE_LONGER_THAN_LIMIT" -> LengthLimitWarning(requireNotNull(durationMs), config, change, openHelp, enabled)
+            "SOURCE_LONGER_THAN_LIMIT" -> LengthLimitWarning(requireNotNull(durationMs), openHelp)
             else -> Text(messageText(error), color = MaterialTheme.colorScheme.error)
         }
     }
 }
 
-/** Names both numbers and offers the only correct remedy: raising the limit before the job exists. */
+/**
+ * Names both numbers: how long this source runs and how much the app processes in one job.
+ *
+ * Up to 0.3.0 this warning carried a button that raised the typed length limit, because that limit was the
+ * usual reason a perfectly ordinary video was refused. There is no typed limit any more, so there is nothing
+ * to raise: what is left is the app's own ceiling, and a source past it cannot run as one job at all.
+ */
 @Composable
-private fun LengthLimitWarning(
-    durationMs: Long,
-    config: JobConfig,
-    change: (JobConfig) -> Unit,
-    openHelp: (HelpTopic) -> Unit,
-    enabled: Boolean,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(stringResource(R.string.source_longer_than_limit, duration(durationMs), limitDuration(config.maxAudioSeconds)),
-            color = MaterialTheme.colorScheme.error)
-        val suggestion = JobLimits.suggestedSeconds(durationMs)
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            if (suggestion != null) FilledTonalButton({ change(config.copy(maxAudioSeconds = suggestion)) },
-                Modifier.weight(1f), enabled = enabled) {
-                Text(stringResource(R.string.raise_limit, limitDuration(suggestion)))
-            } else {
-                Text(stringResource(R.string.source_beyond_ceiling, duration(durationMs), limitDuration(JobLimits.MAX_AUDIO_SECONDS)),
-                    Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
-            }
-            InfoButton(HelpTopic.LIMITS, openHelp)
-        }
+private fun LengthLimitWarning(durationMs: Long, openHelp: (HelpTopic) -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(stringResource(R.string.source_beyond_ceiling, duration(durationMs), limitDuration(JobLimits.MAX_AUDIO_SECONDS)),
+            Modifier.weight(1f), color = MaterialTheme.colorScheme.error)
+        InfoButton(HelpTopic.LIMITS, openHelp)
     }
 }
 
@@ -474,8 +461,12 @@ private fun DraftTextField(
 }
 
 /**
- * The length limit and the budget are the two settings that stop a job after it started, so they are
- * visible wherever speech-to-text is involved instead of hiding behind the advanced switch.
+ * The budget is the one setting that stops a job after it started, so it is visible wherever speech-to-text
+ * is involved instead of hiding behind the advanced switch.
+ *
+ * Up to 0.3.0 a typed length limit stood beside it, defaulting to sixty minutes. It stopped ordinary videos
+ * for a number the reader had never chosen, and the only correct answer to that warning was to raise it, so
+ * since 0.4.0 the job takes its length from the source and the app's own ceiling is the only limit left.
  */
 @Composable
 private fun LimitFields(
@@ -489,11 +480,6 @@ private fun LimitFields(
         Text(stringResource(R.string.limits), Modifier.weight(1f), style = MaterialTheme.typography.labelLarge)
         InfoButton(HelpTopic.LIMITS, openHelp)
     }
-    DraftTextField(edits.epoch(TypedSetting.AUDIO_LIMIT), (config.maxAudioSeconds / 60).toString(), { typed ->
-        type(TypedSetting.AUDIO_LIMIT) { it.copy(maxAudioSeconds = limitSeconds(typed) ?: 0) }
-    }, enabled, isError = config.maxAudioSeconds !in 1..JobLimits.MAX_AUDIO_SECONDS,
-        label = { Text(stringResource(R.string.duration_limit)) },
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
     DraftTextField(edits.epoch(TypedSetting.BUDGET),
         config.maxCostMicrousd?.toBigDecimal()?.movePointLeft(6)?.stripTrailingZeros()?.toPlainString().orEmpty(), { typed ->
             type(TypedSetting.BUDGET) { it.copy(maxCostMicrousd = budgetValue(typed)) }
@@ -501,10 +487,6 @@ private fun LimitFields(
         label = { Text(stringResource(R.string.cost_limit)) },
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
 }
-
-/** Minutes as typed to seconds, or null when the entry is not a limit this app accepts. */
-private fun limitSeconds(text: String): Long? =
-    text.trim().toLongOrNull()?.takeIf { it in 1..JobLimits.MAX_AUDIO_MINUTES }?.times(60)
 
 private fun budgetValue(text: String): Long? = if (text.isBlank()) null else runCatching {
     text.replace(',', '.').toBigDecimal().takeIf { it.signum() >= 0 }?.movePointRight(6)?.longValueExact() ?: -1L

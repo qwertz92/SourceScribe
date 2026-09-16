@@ -32,7 +32,6 @@
     <string name="retain_raw">Also keep raw data</string>
     <string name="unmetered">Unmetered connections only</string>
     <string name="upload_help">A locally cancelled job may continue at the provider. Costs are not automatically incurred again.</string>
-    <string name="duration_limit">Maximum audio duration in minutes</string>
     <string name="cost_limit">Budget in US dollars (blank: no local limit)</string>
     <string name="export_formats">Export formats</string>
     <string name="preview">Confirm source and selection</string>
@@ -137,7 +136,8 @@
         <item quantity="other">Enter a maximum audio duration between 1 and %1$d minutes.</item>
     </plurals>
     <string name="preview_ready">Ready to start</string>
-    <string name="source_beyond_ceiling">This source runs %1$s. SourceScribe processes at most %2$s in one go, so a higher limit will not help here.</string>
+    <string name="source_beyond_ceiling">This source runs %1$s. SourceScribe processes at most %2$s in one go, so it cannot be transcribed as one job.</string>
+    <string name="source_duration_unknown">The length of this source is unknown – for a running live stream, for instance, YouTube states none. Without a length there is no price to show and no job to start.</string>
     <string name="unsupported_options">The selected options are not supported by the model. Check the advanced settings.</string>
     <string name="context_term_blank">One keyterm is blank. The provider refuses the whole list — fill the entry in or remove it.</string>
     <string name="retry_missing">Retry missing branch</string>
@@ -332,9 +332,8 @@
     <string name="budget_none">no budget</string>
     <string name="duration_hours_minutes">%1$d h %2$d min</string>
     <string name="duration_minutes">%1$d min</string>
-    <string name="source_longer_than_limit">This video is %1$s long. Your length limit for the job is %2$s, so the transcription would stop before anything reaches the provider.</string>
-    <string name="raise_limit">Raise length limit to %1$s</string>
-    <string name="audio_longer_than_limit">The audio is longer than the length limit stored for this job. Nothing was sent to the provider and nothing was billed. The stored limit of a running job is deliberately not changed afterwards: choose Prepare again, raise the length limit there and start the run explicitly.</string>
+    <string name="audio_longer_than_limit">The audio is longer than the length limit stored for this job. Nothing was sent to the provider and nothing was billed. The stored limit of a running job is deliberately not changed afterwards; a new run for the same source carries the current limit.</string>
+    <string name="source_length">Length %1$s</string>
     <string name="audio_duration_unknown">The length of the audio file could not be determined. Nothing was sent to the provider. Check the source again or import the file anew.</string>
 
     <!-- Input -->

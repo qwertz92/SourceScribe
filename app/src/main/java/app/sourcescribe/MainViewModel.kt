@@ -29,10 +29,9 @@ data class SourcePreview(val resolved: ResolvedSource, val config: JobConfig, va
 
 /** The settings of the draft a reader types rather than picks, each in a text field of the new-source screen. */
 enum class TypedSetting {
-    AUDIO_LIMIT, BUDGET, CAPTION_LANGUAGES, STT_LANGUAGE, CONTEXT_TERMS;
+    BUDGET, CAPTION_LANGUAGES, STT_LANGUAGE, CONTEXT_TERMS;
 
     fun of(config: JobConfig): Any? = when (this) {
-        AUDIO_LIMIT -> config.maxAudioSeconds
         BUDGET -> config.maxCostMicrousd
         CAPTION_LANGUAGES -> config.preferredLanguages
         STT_LANGUAGE -> config.language
@@ -524,6 +523,11 @@ class MainViewModel @Inject constructor(
             uploadApproved = config.mode != AcquisitionMode.CAPTIONS_ONLY && config.model != null &&
                 credentials.any { it.id == config.credentialId && it.provider == config.provider && it.region == config.region },
             contextTerms = ContextTerms.withoutBlanks(config.contextTerms),
+            // The one place a length limit is written since 0.4.0, where the screen stopped asking for one:
+            // the app's own ceiling. A draft restored from stored defaults, from a preset or from a job an
+            // older version created can still carry a lower number, and with no field left to raise it that
+            // number would refuse a source with nothing on the screen to change about it.
+            maxAudioSeconds = JobLimits.MAX_AUDIO_SECONDS,
         )
 
         /**
@@ -535,13 +539,16 @@ class MainViewModel @Inject constructor(
          */
         val PREVIEW_ERRORS_SHOWN_AS_TEXT = listOf(
             "NO_ACCEPTABLE_CAPTIONS", "PROVIDER_REQUIRED", "CREDENTIAL_REQUIRED", "NO_AUDIO", "CHOOSE_AUDIO_TRACK",
-            // And the ones that come from `configError`. Not UPLOAD_APPROVAL_REQUIRED: the preview asks
+            // And the ones that come from `configError`. Not AUDIO_DURATION_LIMIT since 0.4.0: the preview
+            // asks `configError` about the configuration a start would create, and `configurationForStart`
+            // writes the app's own ceiling into it, so no draft can carry a length limit it would refuse.
+            // Not UPLOAD_APPROVAL_REQUIRED: the preview asks
             // `configError` only once a model and a key for the chosen provider and region are there, and exactly
             // then `configurationForStart` has set the approval, so that branch never answers the preview. Not
             // CONTEXT_TERM_BLANK either, since round 17: `configurationForStart` leaves blank terms out before
             // `configError` sees the list.
-            "AUDIO_DURATION_LIMIT", "BUDGET_INVALID", "PROVIDER_CAPABILITY_OR_CREDENTIAL_INVALID",
-            "UNSUPPORTED_OPTION", "PRICE_UNKNOWN",
+            "BUDGET_INVALID", "PROVIDER_CAPABILITY_OR_CREDENTIAL_INVALID",
+            "UNSUPPORTED_OPTION", "PRICE_UNKNOWN", "SOURCE_DURATION_UNKNOWN",
         )
 
         fun previewError(preview: SourcePreview, credentials: List<CredentialInfo>): String? {
@@ -561,8 +568,13 @@ class MainViewModel @Inject constructor(
                 TrackSelection.audio(preview.resolved, config.audioTrackId) == null) {
                 return if (preview.resolved.audio.isEmpty()) "NO_AUDIO" else "CHOOSE_AUDIO_TRACK"
             }
+            // The length decides two things a job cannot do without: what it will cost, and whether it fits
+            // into one run at all. Since 0.4.0 it comes from the source alone — yt-dlp's metadata for a video,
+            // ffprobe for an imported file — so a source that states none (a live stream, for instance) is
+            // refused here rather than at the point where the price would have to be invented.
+            if (sttPossible && preview.resolved.source.durationMs == null) return "SOURCE_DURATION_UNKNOWN"
             // The source length is already known here, so a doomed run is refused before it costs a download.
-            if (sttPossible && JobLimits.exceeds(preview.resolved.source.durationMs, config.maxAudioSeconds)) {
+            if (sttPossible && JobLimits.exceeds(preview.resolved.source.durationMs)) {
                 return "SOURCE_LONGER_THAN_LIMIT"
             }
             return null
@@ -628,22 +640,15 @@ class MainViewModel @Inject constructor(
         }
 
         /**
-         * True when this source is longer than the job could run, by either limit that stops it.
+         * True when this source is longer than a job may run. The cost row reads this so that it never
+         * prices a source the same screen refuses a line below.
          *
-         * Two limits can, and they are not the same number: the app's own ceiling, which no job may
-         * exceed, and the length limit this job carries, which the user sets. The cost row reads this so
-         * that it never prices a source the same screen refuses a line below — round 12 gave it the
-         * ceiling alone, and a two-hour source under a one-hour limit was shown a figure in dollars
-         * directly above the warning that the run would be refused before anything left the device.
-         *
-         * An unusable job limit is deliberately not judged here, the way `JobLimits.exceeds` does not
-         * judge it: `configError` refuses it as an invalid entry, and calling it a length problem would
-         * name the wrong cause. The ceiling still applies in that case.
+         * Until 0.3.0 two different numbers could stop a run — the app's ceiling and a length limit the
+         * reader typed — and getting that pair wrong was defect 5: round 12 consulted the ceiling alone, so
+         * a two-hour source under a one-hour limit was priced in dollars directly above the warning that
+         * the run would be refused. Since 0.4.0 there is only the ceiling, and a job takes its length from
+         * the source.
          */
-        fun sourceTooLong(durationMs: Long?, config: JobConfig): Boolean =
-            durationMs != null && (
-                durationMs > JobLimits.MAX_AUDIO_SECONDS * 1000L ||
-                    JobLimits.exceeds(durationMs, config.maxAudioSeconds)
-                )
+        fun sourceTooLong(durationMs: Long?): Boolean = JobLimits.exceeds(durationMs)
     }
 }

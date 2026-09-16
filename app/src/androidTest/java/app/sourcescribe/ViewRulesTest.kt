@@ -34,24 +34,50 @@ class ViewRulesTest {
     }
 
     @Test
-    fun aSourceLongerThanThisJobAllowsIsNotPriced() {
-        val config = JobConfig(mode = AcquisitionMode.STT_ONLY, provider = Provider.GROQ,
+    fun onlyTheAppsOwnCeilingStillStopsASourceFromBeingPriced() {
+        // Since 0.4.0 the typed length limit is gone and the ceiling is the only number left, so two hours
+        // — the length the old default of sixty minutes refused — is an ordinary source that gets a price.
+        assertEquals(false, MainViewModel.sourceTooLong(7_200_000L))
+        assertEquals(false, MainViewModel.sourceTooLong(JobLimits.MAX_AUDIO_SECONDS * 1000L))
+        assertTrue(MainViewModel.sourceTooLong(JobLimits.MAX_AUDIO_SECONDS * 1000L + 1))
+
+        // A source whose length nobody knows is not too long. It cannot start either, for another reason.
+        assertEquals(false, MainViewModel.sourceTooLong(null))
+    }
+
+    @Test
+    fun aStartedJobCarriesTheAppsCeilingWhateverTheDraftBroughtWithIt() {
+        // A draft can still carry a lower limit: stored defaults, a preset, or a job an older version
+        // created and that gets prepared again. There is no field left to raise it with, so a job that kept
+        // it would refuse a source with nothing on the screen to change about it.
+        val stale = JobConfig(mode = AcquisitionMode.STT_ONLY, provider = Provider.GROQ,
             model = GroqAdapter.MODEL_TURBO, maxAudioSeconds = 3_600L)
 
-        // Two hours under a one-hour limit: far inside the app's ten-hour ceiling, and still a source this
-        // job cannot run. Round 12 consulted the ceiling alone, so the cost row offered a figure in
-        // dollars for exactly this case while the warning below it said the run would be refused.
-        assertTrue(MainViewModel.sourceTooLong(7_200_000L, config))
-        assertEquals(false, MainViewModel.sourceTooLong(3_600_000L, config))
+        assertEquals(JobLimits.MAX_AUDIO_SECONDS,
+            MainViewModel.configurationForStart(stale, emptyList()).maxAudioSeconds)
+        assertEquals(JobLimits.MAX_AUDIO_SECONDS, JobConfig().maxAudioSeconds)
+        // And a source of two hours, which that stale limit refused, is startable again.
+        val source = SourceResolver.youtube("https://www.youtube.com/watch?v=jNQXAC9IVRw").copy(durationMs = 7_200_000L)
+        val id = requireNotNull(source.videoId)
+        val audio = listOf(AudioTrack("251", id, "en", null, true, "fixture", codec = "opus", bitrateKbps = 160))
+        val key = CredentialInfo("fixture-key", Provider.GROQ, Region.US)
+        val resolved = ResolvedSource(source, emptyList(), audio, emptyMap())
+        val config = stale.copy(credentialId = key.id, region = Region.US, audioTrackId = "251")
+        assertEquals(null, MainViewModel.previewError(SourcePreview(resolved, config, null), listOf(key)))
 
-        // An unusable job limit is not judged as a length problem — but the ceiling still is.
-        val unusableLimit = config.copy(maxAudioSeconds = 0L)
-        assertEquals(false, MainViewModel.sourceTooLong(7_200_000L, unusableLimit))
-        assertTrue(MainViewModel.sourceTooLong(JobLimits.MAX_AUDIO_SECONDS * 1000L + 1, unusableLimit))
-        assertEquals(false, MainViewModel.sourceTooLong(JobLimits.MAX_AUDIO_SECONDS * 1000L, unusableLimit))
-
-        // A source whose length nobody knows is not too long. It has no price either, for another reason.
-        assertEquals(false, MainViewModel.sourceTooLong(null, config))
+        // A source whose length the metadata never stated cannot start, and says which of the two it is.
+        assertEquals("SOURCE_DURATION_UNKNOWN", MainViewModel.previewError(
+            SourcePreview(ResolvedSource(source.copy(durationMs = null), emptyList(), audio, emptyMap()), config, null),
+            listOf(key),
+        ))
+        assertEquals("SOURCE_LONGER_THAN_LIMIT", MainViewModel.previewError(
+            SourcePreview(
+                ResolvedSource(source.copy(durationMs = JobLimits.MAX_AUDIO_SECONDS * 1000L + 1), emptyList(), audio, emptyMap()),
+                config,
+                null,
+            ),
+            listOf(key),
+        ))
     }
 
     @Test
@@ -132,7 +158,9 @@ class ViewRulesTest {
 
     @Test
     fun startRequiresAvailableCaptionsAndExplicitAmbiguousAudioChoice() {
-        val source = SourceResolver.youtube("https://www.youtube.com/watch?v=jNQXAC9IVRw")
+        // With a length, because since 0.4.0 a source without one cannot start for a reason of its own and
+        // the two refusals would be told apart by nothing. A resolve always states one for a finished video.
+        val source = SourceResolver.youtube("https://www.youtube.com/watch?v=jNQXAC9IVRw").copy(durationMs = 19_000L)
         val videoId = requireNotNull(source.videoId)
         val resolved = ResolvedSource(source, emptyList(), listOf(
             AudioTrack("a", videoId, "en", null, null, "fixture"),
@@ -174,7 +202,7 @@ class ViewRulesTest {
         val options = listOf<(JobConfig) -> JobConfig>(
             { it }, { it.copy(diarization = true) }, { it.copy(wordTimestamps = true) }, { it.copy(segmentTimestamps = true) },
             { it.copy(contextTerms = listOf("Kubernetes")) }, { it.copy(contextTerms = listOf("Kubernetes", "")) },
-            { it.copy(maxCostMicrousd = -1L) }, { it.copy(maxCostMicrousd = 1L) }, { it.copy(maxAudioSeconds = 0L) },
+            { it.copy(maxCostMicrousd = -1L) }, { it.copy(maxCostMicrousd = 1L) },
         )
         // Every mode, provider, model, region and source shape against each option, with and without a key.
         val seen = mutableSetOf<String>()
@@ -208,7 +236,6 @@ class ViewRulesTest {
         for (setting in TypedSetting.entries) {
             // Exhaustive, so a setting added later cannot pass here without a change of its own.
             val after = when (setting) {
-                TypedSetting.AUDIO_LIMIT -> before.copy(maxAudioSeconds = 120)
                 TypedSetting.BUDGET -> before.copy(maxCostMicrousd = 1)
                 TypedSetting.CAPTION_LANGUAGES -> before.copy(preferredLanguages = listOf("de"))
                 TypedSetting.STT_LANGUAGE -> before.copy(language = "de")

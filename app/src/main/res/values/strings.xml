@@ -34,7 +34,6 @@
     <string name="retain_raw">Originaldaten zusätzlich aufbewahren</string>
     <string name="unmetered">Nur ungetaktete Verbindungen</string>
     <string name="upload_help">Ein lokal abgebrochener Auftrag kann beim Anbieter weiterlaufen. Kosten werden nicht automatisch erneut ausgelöst.</string>
-    <string name="duration_limit">Maximale Audiodauer in Minuten</string>
     <string name="cost_limit">Budget in US-Dollar (leer: kein lokales Limit)</string>
     <string name="export_formats">Exportformate</string>
     <string name="preview">Quelle und Auswahl bestätigen</string>
@@ -139,7 +138,8 @@
         <item quantity="other">Bitte eine maximale Audiodauer zwischen 1 und %1$d Minuten eingeben.</item>
     </plurals>
     <string name="preview_ready">Bereit zum Start</string>
-    <string name="source_beyond_ceiling">Diese Quelle dauert %1$s. SourceScribe verarbeitet höchstens %2$s am Stück, deshalb hilft hier auch ein höheres Limit nicht.</string>
+    <string name="source_beyond_ceiling">Diese Quelle dauert %1$s. SourceScribe verarbeitet höchstens %2$s am Stück, sie lässt sich also nicht in einem Auftrag transkribieren.</string>
+    <string name="source_duration_unknown">Die Länge dieser Quelle ist unbekannt – bei einem laufenden Livestream etwa nennt YouTube keine. Ohne Länge lässt sich weder der Preis berechnen noch der Auftrag starten.</string>
     <string name="unsupported_options">Die gewählten Optionen passen nicht zum Modell. Bitte die erweiterten Einstellungen prüfen.</string>
     <string name="context_term_blank">Ein Fachbegriff ist leer. Der Anbieter lehnt die ganze Liste ab — Eintrag ausfüllen oder entfernen.</string>
     <string name="retry_missing">Fehlenden Zweig neu ausführen</string>
@@ -334,9 +334,8 @@
     <string name="budget_none">kein Budget</string>
     <string name="duration_hours_minutes">%1$d h %2$d min</string>
     <string name="duration_minutes">%1$d min</string>
-    <string name="source_longer_than_limit">Dieses Video ist %1$s lang. Dein Längenlimit für den Auftrag steht auf %2$s, deshalb würde die Transkription abbrechen, bevor etwas an den Anbieter geht.</string>
-    <string name="raise_limit">Längenlimit auf %1$s anheben</string>
-    <string name="audio_longer_than_limit">Das Audio ist länger als das Längenlimit, das für diesen Auftrag gespeichert wurde. Es wurde nichts an den Anbieter geschickt und nichts berechnet. Das gespeicherte Limit eines laufenden Auftrags wird bewusst nicht nachträglich verändert: Wähle „Neu vorbereiten“, hebe dort das Längenlimit an und starte die Ausführung erneut.</string>
+    <string name="audio_longer_than_limit">Das Audio ist länger als das Längenlimit, das für diesen Auftrag gespeichert wurde. Es wurde nichts an den Anbieter geschickt und nichts berechnet. Das gespeicherte Limit eines laufenden Auftrags wird bewusst nicht nachträglich verändert; eine neue Ausführung für dieselbe Quelle bekommt das aktuelle Limit.</string>
+    <string name="source_length">Länge %1$s</string>
     <string name="audio_duration_unknown">Die Länge der Audiodatei konnte nicht bestimmt werden. Es wurde nichts an den Anbieter geschickt. Prüfe die Quelle erneut oder importiere die Datei neu.</string>
 
     <!-- Eingabe -->

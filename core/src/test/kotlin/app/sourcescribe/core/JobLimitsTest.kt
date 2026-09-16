@@ -1,52 +1,31 @@
 package app.sourcescribe.core
 
-import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class JobLimitsTest {
-    @Test fun theSuggestedLimitAlwaysAdmitsTheSourceItWasSuggestedFor() {
-        // Every source the ceiling can still carry gets a limit that actually covers it. The 595-to-600
-        // minute band is the interesting one: the padding runs into the ceiling and must clamp, not give up.
+    @Test fun everySourceUpToTheCeilingIsAccepted() {
+        // Since 0.4.0 the ceiling is the only length limit, so a source of any length below it has to pass
+        // — including the lengths the old typed limit defaulted to, one hour and sixty minutes of it.
         for (minutes in 1..JobLimits.MAX_AUDIO_MINUTES) {
-            val durationMs = minutes * 60_000L
-            val suggestion = requireNotNull(JobLimits.suggestedSeconds(durationMs)) { "no limit for $minutes min" }
-            assertTrue("$minutes min", suggestion in 1..JobLimits.MAX_AUDIO_SECONDS)
-            assertFalse("$minutes min", JobLimits.exceeds(durationMs, suggestion))
+            assertFalse("$minutes min", JobLimits.exceeds(minutes * 60_000L))
         }
-    }
-
-    @Test fun aSourceThatEndsBetweenTwoMinutesStillFitsIntoWholeMinutes() {
-        assertEquals(5 * 60 + 60L, JobLimits.suggestedSeconds(1L))
-        assertFalse(JobLimits.exceeds(60_001L, requireNotNull(JobLimits.suggestedSeconds(60_001L))))
-        // Exactly on the ceiling the padding has nowhere to go, so the ceiling itself is the answer.
-        assertEquals(JobLimits.MAX_AUDIO_SECONDS, JobLimits.suggestedSeconds(JobLimits.MAX_AUDIO_SECONDS * 1000L))
-    }
-
-    @Test fun pastTheCeilingThereIsNoLimitToOfferAndTheAppSaysSoInstead() {
-        assertNull(JobLimits.suggestedSeconds(JobLimits.MAX_AUDIO_SECONDS * 1000L + 1L))
-        assertNull(JobLimits.suggestedSeconds(601 * 60_000L))
     }
 
     @Test fun theAnswersAtTheCeilingAreGivenAsNumbersAndNotAsTheConstant() {
         // Every other assertion in this file reaches the ceiling through the constant and therefore moves
         // with it: set to one hour, a tenth of what it is, all of them stay green while the app quietly
-        // stops accepting sources it offers to carry. These two name the edge outright, so a moved ceiling
+        // stops accepting sources it offers to carry. These name the edge outright, so a moved ceiling
         // changes an answer here. The ceiling itself is stated in `StatedNumbersTest`, beside the note that
         // two translated strings carry the same six hundred minutes without reading them from it.
-        assertEquals(36_000L, JobLimits.suggestedSeconds(36_000_000L))
-        assertNull(JobLimits.suggestedSeconds(36_000_001L))
+        assertFalse(JobLimits.exceeds(36_000_000L))
+        assertTrue(JobLimits.exceeds(36_000_001L))
     }
 
-    @Test fun anImpossibleLimitIsNotReportedAsALengthProblem() {
-        // 0 and anything above the ceiling are invalid entries; naming them a length problem would offer
-        // the wrong remedy, so the length check stays silent and the config check refuses them.
-        assertFalse(JobLimits.exceeds(60_000L, 0L))
-        assertFalse(JobLimits.exceeds(60_000L, JobLimits.MAX_AUDIO_SECONDS + 1))
-        assertFalse(JobLimits.exceeds(null, 600L))
-        assertTrue(JobLimits.exceeds(600_001L, 600L))
-        assertFalse(JobLimits.exceeds(600_000L, 600L))
+    @Test fun anUnknownLengthIsNotTooLong() {
+        // It cannot start either, but for a reason of its own: the preview refuses a source whose length
+        // nobody knows with SOURCE_DURATION_UNKNOWN, not as a source that is too long.
+        assertFalse(JobLimits.exceeds(null))
     }
 }
