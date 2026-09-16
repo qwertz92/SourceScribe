@@ -221,12 +221,12 @@
     <string name="reimport_audio">The required audio file is no longer available. Import the original file again before confirming a new run.</string>
     <string name="scheduling_failed">The job was saved but could not be scheduled. Select Resume to schedule it again.</string>
     <string name="action_busy">Another action is still running. Try this action again afterward.</string>
-    <string name="export_scheduling_failed">The result is saved internally. The export could not be scheduled; select Retry export.</string>
+    <string name="export_scheduling_failed">The result is saved internally. The export could not be scheduled; select “Save export again · select folder”.</string>
     <string name="choose_caption_help">Check the source again under New source and select a caption track. Resuming alone does not change the saved track selection.</string>
     <string name="missing_retry_data">The verified audio data or responses for this partial retry are missing or have changed. The previous result remains available. A full new run must be confirmed separately and may incur additional costs.</string>
     <string name="key_unavailable_help">The saved key is locked or corrupted. Unlock the device and try again. If the error persists, replace the key in Settings for the same provider and region, then explicitly resume the job.</string>
     <string name="key_storage_help">The key could not be stored or read securely. Check the available device storage and try again. Existing jobs retain their key reference.</string>
-    <string name="missing_retry_response_saved">A provider response already exists for a missing section. “Retry missing branch” is disabled so this response does not incur further costs. The existing partial result remains available.</string>
+    <string name="missing_retry_response_saved">A provider response already exists for a missing section. “Fetch only what is missing” is disabled so this response does not incur further costs. The existing partial result remains available.</string>
     <string name="job_config_invalid">The saved job settings are corrupted. This job will not resume automatically. Existing results and other jobs remain available.</string>
     <string name="artifact_file_missing">The internally stored result file is missing or was not saved completely. Other results remain available. No new transcription is requested automatically.</string>
     <string name="stt_configuration">STT configuration: %1$s</string>
@@ -489,7 +489,7 @@
     <string name="error_remote_response_mismatch">An answer from the provider did not belong to this submission and was not used. “Resume safely” asks for the result again without submitting anything new.</string>
     <string name="error_remote_timeout">The provider delivered no result within the time allowed, so the app no longer asks for it. Processing there may continue and incur costs. A new run submits again and may incur additional costs.</string>
     <string name="error_response_not_ready">A saved answer from the provider does not match this job’s sections or settings and is not used. Prepare the job again.</string>
-    <string name="error_no_transcript">No section produced usable text, so there is no result. “Retry missing branch” tries again and may incur costs again.</string>
+    <string name="error_no_transcript">No section produced usable text, so there is no result. “Run this job again” tries again and may incur costs again.</string>
     <string name="error_raw_too_large">The raw data is too large to keep as configured. Prepare the job again without “Also keep raw data”.</string>
     <string name="error_transcript_too_large">The transcript is too large to store on the device. This limit cannot be changed.</string>
     <string name="error_result_damaged">A saved intermediate or final result is incomplete, damaged, or does not belong to this job. It is not used as a result. Prepare the job again.</string>
