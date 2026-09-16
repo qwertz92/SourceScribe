@@ -3,6 +3,7 @@ package app.sourcescribe.ui
 import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.StringRes
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -47,6 +49,7 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import app.sourcescribe.MainViewModel
@@ -55,7 +58,10 @@ import app.sourcescribe.core.*
 import app.sourcescribe.data.ArtifactRow
 import app.sourcescribe.data.AttemptRow
 import app.sourcescribe.data.ExportRow
+import app.sourcescribe.data.JobAction
+import app.sourcescribe.data.JobActions
 import app.sourcescribe.data.JobRow
+import app.sourcescribe.data.JobSituation
 import app.sourcescribe.data.SourceRow
 import app.sourcescribe.data.SttStep
 import app.sourcescribe.data.decodeStoredJobConfig
@@ -170,20 +176,47 @@ internal fun HistoryScreen(
     }
     actionsFor?.let { id ->
         val job = jobs.firstOrNull { it.id == id }
-        if (job == null) actionsFor = null else JobActionsDialog(
-            job = job,
-            // A limit belongs to the job for good, so a repeat of this job would end at the same limit again.
-            limitReached = attempts.filter { it.jobId == job.id }
-                .groupBy { it.branch }.values.mapNotNull { rows -> rows.maxBy { it.number }.error }
-                .firstOrNull { it in setOf("AUDIO_LONGER_THAN_LIMIT", "AUDIO_DURATION_UNKNOWN") },
-            remoteDeletionPossible = job.id in remoteDeletionJobIds,
-            close = { actionsFor = null },
-            openHelp = openHelp,
-            cancel = { actionsFor = null; model.cancel(job.id) },
-            resume = { actionsFor = null; model.resume(job.id) },
-            prepareAgain = { actionsFor = null; prepareAgain(job.id) },
-            confirm = { action -> actionsFor = null; confirmation = job.id to action },
-        )
+        if (job == null) {
+            actionsFor = null
+        } else {
+            // What the newest attempt of every branch stopped with, which is what the dialog explains and what
+            // the recommendation is derived from. One code per branch: an older attempt of the same branch has
+            // been superseded by the one that followed it.
+            val errors = remember(attempts, job.id) {
+                attempts.filter { it.jobId == job.id }.groupBy { it.branch }.values
+                    .mapNotNull { rows -> rows.maxBy { it.number }.error }.distinct()
+            }
+            val situation = JobSituation(
+                state = job.state,
+                outcome = job.outcome,
+                errors = errors,
+                configReadable = decodeStoredJobConfig(job.config) != null,
+                cancelRequested = job.cancelRequested,
+                remoteDeletionPossible = job.id in remoteDeletionJobIds,
+                incompleteResult = artifacts.any { it.jobId == job.id && it.complete != true },
+            )
+            JobActionsDialog(
+                situation = situation,
+                // A limit belongs to the job for good, so a repeat of this job would end at the same limit again.
+                limitReached = errors.any { it in setOf("AUDIO_LONGER_THAN_LIMIT", "AUDIO_DURATION_UNKNOWN") },
+                close = { actionsFor = null },
+                openHelp = openHelp,
+                act = { action ->
+                    actionsFor = null
+                    when (action) {
+                        JobAction.CANCEL -> model.cancel(job.id)
+                        JobAction.RESUME -> model.resume(job.id)
+                        JobAction.PREPARE_AGAIN -> prepareAgain(job.id)
+                        // The three that discard work, cost money at the provider, or delete something ask first.
+                        JobAction.RETRY_MISSING -> confirmation = job.id to R.string.retry_missing
+                        JobAction.RETRY_ALL -> confirmation = job.id to R.string.retry_all
+                        JobAction.DELETE_REMOTE -> confirmation = job.id to R.string.delete_remote
+                        JobAction.DELETE_JOB -> confirmation = job.id to R.string.delete_job
+                        JobAction.NOTHING -> Unit
+                    }
+                },
+            )
+        }
     }
     confirmation?.let { (id, action) ->
         ConfirmationDialog(stringResource(action), stringResource(when (action) {
@@ -428,86 +461,133 @@ private fun StatusRow(job: JobRow, config: JobConfig?) {
 
 @Composable
 private fun JobActionsDialog(
-    job: JobRow,
-    limitReached: String?,
-    remoteDeletionPossible: Boolean,
+    situation: JobSituation,
+    limitReached: Boolean,
     close: () -> Unit,
     openHelp: (HelpTopic) -> Unit,
-    cancel: () -> Unit,
-    resume: () -> Unit,
-    prepareAgain: () -> Unit,
-    confirm: (Int) -> Unit,
+    act: (JobAction) -> Unit,
 ) {
-    val savedConfig = remember(job.config) { decodeStoredJobConfig(job.config) }
-    val maximumHeight = dialogMaxHeight(0.8f)
     Dialog(close) {
         Surface(shape = MaterialTheme.shapes.large) {
-            Column(Modifier.fillMaxWidth().heightIn(max = maximumHeight).padding(20.dp)) {
-                Text(stringResource(R.string.job_actions), style = MaterialTheme.typography.titleLarge)
-                LazyColumn(Modifier.weight(1f, fill = false), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    if (limitReached != null) item {
-                        Column(Modifier.padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text(messageText(limitReached), color = MaterialTheme.colorScheme.error)
-                            Text(stringResource(R.string.limit_needs_new_job), style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Button(prepareAgain, Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
-                                Text(stringResource(R.string.prepare_again))
-                            }
-                        }
-                    }
-                    if (job.state !in setOf(ExecutionState.FINISHED, ExecutionState.CANCELLED)) item {
-                        TextButton(cancel, Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
-                            Text(stringResource(R.string.cancel_job), Modifier.fillMaxWidth())
-                        }
-                    }
-                    if (savedConfig != null && job.state == ExecutionState.WAITING_USER && !job.cancelRequested) item {
-                        TextButton(resume, Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
-                            Text(stringResource(R.string.resume_job), Modifier.fillMaxWidth())
-                        }
-                    }
-                    if (savedConfig != null && job.state != ExecutionState.RUNNING) {
-                        if (job.outcome !in setOf(Outcome.SUCCESS, Outcome.SUCCESS_WITH_WARNINGS)) item {
-                            TextButton({ confirm(R.string.retry_missing) }, Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
-                                Text(stringResource(R.string.retry_missing), Modifier.fillMaxWidth())
-                            }
-                        }
-                        item {
-                            TextButton({ confirm(R.string.retry_all) }, Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
-                                Text(stringResource(R.string.retry_all), Modifier.fillMaxWidth())
-                            }
-                        }
-                        item {
-                            Column {
-                                TextButton(prepareAgain, Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
-                                    Text(stringResource(R.string.prepare_again), Modifier.fillMaxWidth())
-                                }
-                                Text(stringResource(R.string.prepare_again_help), style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
-                    }
-                    if (job.state in setOf(ExecutionState.FINISHED, ExecutionState.CANCELLED) && remoteDeletionPossible) item {
-                        TextButton({ confirm(R.string.delete_remote) }, Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
-                            Text(stringResource(R.string.delete_remote), Modifier.fillMaxWidth())
-                        }
-                    }
-                    item {
-                        TextButton({ confirm(R.string.delete_job) }, Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
-                            Text(stringResource(R.string.delete_job), Modifier.fillMaxWidth(), fontWeight = FontWeight.SemiBold)
-                        }
-                    }
-                    item {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(stringResource(R.string.help_states_title), Modifier.weight(1f),
-                                style = MaterialTheme.typography.bodySmall)
-                            InfoButton(HelpTopic.STATES, openHelp)
-                        }
-                    }
-                }
-                TextButton(close, Modifier.fillMaxWidth()) { Text(stringResource(R.string.back)) }
-            }
+            JobActionsContent(situation, limitReached, dialogMaxHeight(0.8f), openHelp, act, close)
         }
     }
+}
+
+/**
+ * The job actions dialog: what happened, the one action to try, and what each of the others would do.
+ *
+ * Until 0.4.0 this was a list of every action the state allowed, in the order the code happened to write them,
+ * with no word about any of them and no sentence about what had gone wrong. The owner's report of 16 September
+ * was exactly that: "Decision required" and six buttons whose names he could not map to anything. The first of
+ * them, "Resume safely", was a dead end for the job he had - see [JobActions.offered].
+ *
+ * The height is fixed rather than bounded, and the list inside it scrolls. A dialog that takes its height from
+ * its content is a different size for every job, and the button the reader reaches for sits somewhere else each
+ * time; the owner's standing rule is that nothing may jump. `JobActionsLayoutTest` measures it.
+ *
+ * It is a separate composable from the dialog around it so that test can place it without a window.
+ */
+@Composable
+internal fun JobActionsContent(
+    situation: JobSituation,
+    limitReached: Boolean,
+    height: Dp,
+    openHelp: (HelpTopic) -> Unit,
+    act: (JobAction) -> Unit,
+    close: () -> Unit,
+) {
+    val offered = remember(situation) { JobActions.offered(situation) }
+    val recommended = remember(situation) { JobActions.recommended(situation) }
+    Column(Modifier.fillMaxWidth().height(height).padding(20.dp)) {
+        Text(stringResource(R.string.job_actions), style = MaterialTheme.typography.titleLarge)
+        LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            item(key = "happened") {
+                Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(stringResource(R.string.job_actions_what_happened),
+                        style = MaterialTheme.typography.titleSmall)
+                    // The error's own sentence, the one the job card shows as well, with the same help button
+                    // beside it. A job that recorded no error says how it ended instead.
+                    if (situation.errors.isEmpty()) {
+                        Text(stringResource(outcomeLabel(situation.outcome)), style = MaterialTheme.typography.bodyMedium)
+                    } else {
+                        situation.errors.forEach { AttemptError(it, openHelp) }
+                    }
+                    if (limitReached) {
+                        Text(stringResource(R.string.limit_needs_new_job), style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+            item(key = "recommended") {
+                Column(Modifier.padding(top = 16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(stringResource(R.string.job_actions_recommended),
+                        style = MaterialTheme.typography.titleSmall)
+                    if (recommended == null || recommended == JobAction.NOTHING) {
+                        Text(stringResource(R.string.job_actions_nothing), style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    } else {
+                        Button({ act(recommended) }, Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
+                            Text(stringResource(actionLabel(recommended)))
+                        }
+                        Text(stringResource(actionExplanation(recommended)),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+            val others = offered.filter { it != recommended }
+            if (others.isNotEmpty()) item(key = "others") {
+                Text(stringResource(R.string.job_actions_other), Modifier.padding(top = 16.dp),
+                    style = MaterialTheme.typography.titleSmall)
+            }
+            items(others, key = { it.name }) { action ->
+                Column(Modifier.padding(top = 4.dp)) {
+                    TextButton({ act(action) }, Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
+                        Text(stringResource(actionLabel(action)), Modifier.fillMaxWidth(),
+                            fontWeight = if (action == JobAction.DELETE_JOB) FontWeight.SemiBold else null)
+                    }
+                    Text(stringResource(actionExplanation(action)), style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            item(key = "help") {
+                Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(R.string.help_states_title), Modifier.weight(1f),
+                        style = MaterialTheme.typography.bodySmall)
+                    InfoButton(HelpTopic.STATES, openHelp)
+                }
+            }
+        }
+        TextButton(close, Modifier.fillMaxWidth()) { Text(stringResource(R.string.back)) }
+    }
+}
+
+/** The name of an action, as it stands on its button. */
+@StringRes
+private fun actionLabel(action: JobAction): Int = when (action) {
+    JobAction.CANCEL -> R.string.cancel_job
+    JobAction.RESUME -> R.string.resume_job
+    JobAction.RETRY_MISSING -> R.string.retry_missing
+    JobAction.RETRY_ALL -> R.string.retry_all
+    JobAction.PREPARE_AGAIN -> R.string.prepare_again
+    JobAction.DELETE_REMOTE -> R.string.delete_remote
+    JobAction.DELETE_JOB -> R.string.delete_job
+    // Never on a button; [JobActionsContent] shows a sentence for it instead.
+    JobAction.NOTHING -> R.string.job_actions_nothing
+}
+
+/** What an action does, and when to reach for it. One line under every button. */
+@StringRes
+private fun actionExplanation(action: JobAction): Int = when (action) {
+    JobAction.CANCEL -> R.string.cancel_job_line
+    JobAction.RESUME -> R.string.resume_job_line
+    JobAction.RETRY_MISSING -> R.string.retry_missing_line
+    JobAction.RETRY_ALL -> R.string.retry_all_line
+    JobAction.PREPARE_AGAIN -> R.string.prepare_again_line
+    JobAction.DELETE_REMOTE -> R.string.delete_remote_line
+    JobAction.DELETE_JOB -> R.string.delete_job_line
+    JobAction.NOTHING -> R.string.job_actions_nothing
 }
 
 private fun budgetText(microUsd: Long): String =

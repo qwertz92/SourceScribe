@@ -146,8 +146,15 @@
     <string name="source_duration_unknown">The length of this source is unknown – for a running live stream, for instance, YouTube states none. Without a length there is no price to show and no job to start.</string>
     <string name="unsupported_options">The selected options are not supported by the model. Check the advanced settings.</string>
     <string name="context_term_blank">One keyterm is blank. The provider refuses the whole list — fill the entry in or remove it.</string>
-    <string name="retry_missing">Retry missing branch</string>
-    <string name="retry_all">New run</string>
+    <string name="retry_missing">Fetch only what is missing</string>
+    <string name="retry_all">Run this job again</string>
+    <string name="cancel_job_line">Stops this job now. Everything already fetched and already paid for is kept.</string>
+    <string name="resume_job_line">Carries the stopped attempt on from where it stopped, and never sends a new paid request. Take it once the cause named above is gone – a connection, free space, or a key you have stored again.</string>
+    <string name="retry_missing_line">Asks only for the parts that are missing and keeps what has already arrived. Take it when a result came back incomplete.</string>
+    <string name="retry_all_line">Starts a new attempt for every branch, with this job’s saved settings and the extraction component in use now. Take it when the attempt’s own stored data is what refused it. Speech-to-text is paid for again.</string>
+    <string name="prepare_again_line">Loads this source and its settings into “New source”, where you can change provider, model and limits before starting a new job. This entry stays as it is. Take it when a limit, an option or the chosen provider is what refused this job.</string>
+    <string name="delete_remote_line">Asks the provider to remove what it stored for this job. Local results stay. Take it when the audio should not remain with the provider.</string>
+    <string name="delete_job_line">Removes this entry and the results kept only here. Exports already written stay. Take it when you no longer need the job.</string>
     <string name="resume_job">Resume safely</string>
     <string name="delete_job">Delete history entry</string>
     <string name="delete_pending">Deletion scheduled. Local processing will be stopped first.</string>
@@ -364,9 +371,12 @@
     </plurals>
     <string name="no_filter_matches">No entry matches this filter.</string>
     <string name="job_actions">Actions for this job</string>
+    <string name="job_actions_what_happened">What happened</string>
+    <string name="job_actions_recommended">Recommended</string>
+    <string name="job_actions_other">Other actions</string>
+    <string name="job_actions_nothing">Nothing offered here would change this. The sentence above says what happened; the entry can stay as it is or be deleted.</string>
     <string name="share_result">Share result</string>
     <string name="prepare_again">Prepare again</string>
-    <string name="prepare_again_help">Loads the source and settings of this job into the selection under New source. There you can change provider, model and limits and start the job explicitly. The existing history entry stays unchanged.</string>
 
     <!-- Settings -->
     <string name="export_tree_current">Current export folder</string>

@@ -148,8 +148,15 @@
     <string name="source_duration_unknown">Die Länge dieser Quelle ist unbekannt – bei einem laufenden Livestream etwa nennt YouTube keine. Ohne Länge lässt sich weder der Preis berechnen noch der Auftrag starten.</string>
     <string name="unsupported_options">Die gewählten Optionen passen nicht zum Modell. Bitte die erweiterten Einstellungen prüfen.</string>
     <string name="context_term_blank">Ein Fachbegriff ist leer. Der Anbieter lehnt die ganze Liste ab — Eintrag ausfüllen oder entfernen.</string>
-    <string name="retry_missing">Fehlenden Zweig neu ausführen</string>
-    <string name="retry_all">Neue Ausführung</string>
+    <string name="retry_missing">Nur das Fehlende holen</string>
+    <string name="retry_all">Auftrag noch einmal ausführen</string>
+    <string name="cancel_job_line">Beendet diesen Auftrag jetzt. Alles bereits Geholte und bereits Bezahlte bleibt erhalten.</string>
+    <string name="resume_job_line">Führt den angehaltenen Versuch von der Stelle weiter, an der er stehen geblieben ist, und sendet nie eine neue kostenpflichtige Anfrage. Nimm sie, sobald die oben genannte Ursache weg ist – eine Verbindung, freier Speicher oder ein neu hinterlegter Schlüssel.</string>
+    <string name="retry_missing_line">Fragt nur die fehlenden Teile an und behält, was schon angekommen ist. Nimm sie, wenn ein Ergebnis unvollständig zurückkam.</string>
+    <string name="retry_all_line">Startet für jeden Zweig einen neuen Versuch, mit den gespeicherten Einstellungen dieses Auftrags und der aktuell verwendeten Extraktionskomponente. Nimm sie, wenn die eigenen gespeicherten Daten des Versuchs ihn abgewiesen haben. Spracherkennung wird erneut bezahlt.</string>
+    <string name="prepare_again_line">Lädt diese Quelle und ihre Einstellungen unter „Neue Quelle“, wo du Anbieter, Modell und Grenzen vor dem Start eines neuen Auftrags ändern kannst. Dieser Eintrag bleibt, wie er ist. Nimm sie, wenn eine Grenze, eine Option oder der gewählte Anbieter diesen Auftrag abgewiesen hat.</string>
+    <string name="delete_remote_line">Bittet den Anbieter, die zu diesem Auftrag gespeicherten Daten zu entfernen. Lokale Ergebnisse bleiben. Nimm sie, wenn die Audiodaten nicht beim Anbieter bleiben sollen.</string>
+    <string name="delete_job_line">Entfernt diesen Eintrag und die nur hier aufbewahrten Ergebnisse. Bereits geschriebene Exporte bleiben. Nimm sie, wenn du den Auftrag nicht mehr brauchst.</string>
     <string name="resume_job">Sicher fortsetzen</string>
     <string name="delete_job">Verlaufseintrag löschen</string>
     <string name="delete_pending">Löschung vorgemerkt. Lokale Verarbeitung wird zuerst beendet.</string>
@@ -366,9 +373,12 @@
     </plurals>
     <string name="no_filter_matches">Kein Eintrag passt zu diesem Filter.</string>
     <string name="job_actions">Aktionen für diesen Auftrag</string>
+    <string name="job_actions_what_happened">Was passiert ist</string>
+    <string name="job_actions_recommended">Empfohlen</string>
+    <string name="job_actions_other">Weitere Aktionen</string>
+    <string name="job_actions_nothing">Nichts von dem, was hier angeboten wird, würde daran etwas ändern. Der Satz oben sagt, was passiert ist; der Eintrag kann so bleiben oder gelöscht werden.</string>
     <string name="share_result">Ergebnis teilen</string>
     <string name="prepare_again">Neu vorbereiten</string>
-    <string name="prepare_again_help">Lädt Quelle und Einstellungen dieses Auftrags in die Auswahl unter „Neue Quelle“. Dort kannst du Anbieter, Modell und Grenzen ändern und den Auftrag danach ausdrücklich neu starten. Der bestehende Verlaufseintrag bleibt unverändert.</string>
 
     <!-- Einstellungen -->
     <string name="export_tree_current">Aktueller Exportordner</string>
