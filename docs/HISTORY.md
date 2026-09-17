@@ -3,7 +3,7 @@
 Compact chronological work log, kept so that a later agent does not repeat a mistake. For the full
 round-by-round text it condenses (in German), run `git show 1118adc:docs/STATUS.md`. Reusable technical lessons
 live in [LEARNINGS.md](LEARNINGS.md) and are referenced below by title, not repeated. Open items are in
-[BUGS.md](BUGS.md) and [DEFECTS.md](DEFECTS.md). Entries stay one to three lines; when the file nears 16 KB, the
+[BUGS.md](BUGS.md), the only list of them. Entries stay one to three lines; when the file nears 16 KB, the
 oldest period is condensed into a short summary.
 
 ## 2026-09-07 - Project start
@@ -24,7 +24,7 @@ accessible layouts, bounded CI (`a801be3` onward). Built, gated, and signed as `
 ## 2026-09-10 - Owner's device test
 
 The owner tested the preview on-device and reported 20 items. 17 were implemented and verified on-device or
-by test; the 3 that stayed open are tracked in [BUGS.md](BUGS.md) and [DEFECTS.md](DEFECTS.md). This triggered 23 rounds of
+by test; the 3 that stayed open are tracked in [BUGS.md](BUGS.md). This triggered 23 rounds of
 independent adversarial review with Sonnet-5 agents, each round reviewing only the previous round's fixes.
 
 ## 2026-09-11 to 2026-09-14 - 23 rounds of adversarial review
@@ -140,5 +140,27 @@ STATUS/NEXT_STEPS/HANDOFF/LEARNINGS condensed (`573ff50` - the old 174 KB STATUS
 detail this file condenses stays readable via `git show 1118adc:docs/STATUS.md`), README/AGENTS/user guides (`082da99`),
 technical documents and ADRs (`a1b0598`), and finally the defect list, known bugs, and reports (`8a9e7bc`).
 
-Work towards 0.3.0 started that night with the start-up lock fix (`e66761a`); the plan is in
-[NEXT_STEPS.md](NEXT_STEPS.md).
+Work towards 0.3.0 started that night with the start-up lock fix (`e66761a`).
+
+## 2026-09-15 to 2026-09-16 - 0.3.0 dropped; the owner's second phone test and the 0.4.0 work
+
+Version raised to 0.3.0 (`5ebc11e`); JVM tests were green there, but the release-APK build attempt right after
+ended when the Gradle build daemon crashed mid-packaging, before a real 0.3.0 APK - signed or unsigned - ever
+existed. Before a retry, the owner's second device test (of the published 0.2.0-preview.1) found every job over
+ten minutes stopping with `PREPARED_AUDIO_INVALID` (P1) plus 15 further points, so 0.3.0 was dropped: every fix
+planned for it, plus the phone-test fixes, ships as 0.4.0 instead.
+
+**P1 cause:** the bundled ffmpeg's chunk encoder always produces audio 84-96 ms longer than the requested
+window (a whole MP3-frame count plus its own encoder delay); the planner made every window but the last exactly
+the 600,000 ms hard bound, so the encoder's own surplus pushed every chunk past it - every source over ten
+minutes failed on its first chunk, regardless of provider or codec. Fixed by storing the planned window, not the
+encoded length, as the chunk's duration (`f18937f`). LEARNINGS: the encoder-surplus tolerance rule.
+
+Three work packages ran one after another on the one checkout and emulator: **A**, transcription pipeline
+(`f18937f`, `618e9f3`, `494bdad`, `580be9f`, `57d9641`, `4c90ad2`, then `cd124d4`/`bf86675` for the live test);
+**B**, new-source screen (`e3f4a87`, `3709f2e`, `b184399`, `bcf8ad1`); **C**, history actions and the engine
+re-check (`c77c933`, `5332af8`, `a157cd0`, `b0b33b5`). This project's first real provider request: one Groq call,
+16 September, through `LiveGroqTranscriptionTest` against a 19-second public video, complete and stored - which
+also showed Groq reports no `model` field and names its language as a full word rather than a code; both fixed
+the same day. Independent review of the 0.4.0 work: round 1 (Sonnet, read-only, over the sixteen 0.4.0 commits `f18937f` to `f22389c`): 0 P1, 2 P2, 3 P3, 1 P4; all five fixed in `46d92e3`, `d0c55fb`, `c832a9c`, `0d1953d` and `75af4f3`, each with its test seen failing first, plus BUGS item 60 closed in `96b9588` and item 63 by the new `JobCardLayoutTest`; the round's other P3, progress that goes back after a retried upload, is recorded as deliberate in LEARNINGS, round 2 (Sonnet, read-only, over the seven fix commits `46d92e3` to `f7dd7d2`): 0 P1, 1 reported P2 that verification re-rated P3 because it needs two engine switches during one job's life (BUGS item 72), 2 further P3 (items 73 and 74, recorded), 1 overstated KDoc corrected in `7868497`; no code changed, so no third round. Version raised to 0.4.0
+(`f22389c`).

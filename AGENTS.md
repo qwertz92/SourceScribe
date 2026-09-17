@@ -42,4 +42,16 @@ Add a matching regression test after every review finding. Before release, rerun
 
 Version source code, tests, small approved fixtures, lock/version files, Room schemas, and documentation. Ignore keys, local SDK paths, signing files, private test data, audio downloads, and runtime logs. Run CI without real provider keys. Test helpers, cleartext HTTP for local fixtures, and demo providers must not be reachable in the personal release build. No persistent test backdoors.
 
-Keep `docs/STATUS.md` up to date; it describes the current state only. `docs/HISTORY.md` is the compact work log: one dated entry per release, review round, or notable mistake, one to three lines each, naming what went wrong and the `docs/LEARNINGS.md` entry it produced, so that a later agent does not repeat it. Keep it under 16 KB by condensing the oldest period into a short summary once it gets there; the full text stays in Git. The final report distinguishes implemented, fixture-tested, live-verified, and blocked. What is actually missing is listed in `docs/STATUS.md` and `docs/BUGS.md` — there and nowhere else.
+Each project question has exactly one file, kept current rather than reset. `docs/STATUS.md` describes the current
+state only: what the app does today, phase-by-phase implementation and live-verification status, the release
+history with hashes, the latest gate results, the environment, and the current blockers. `docs/BUGS.md` is the one
+list of open items — no separate defect file: every entry carries its location, precondition, expected versus
+actual behavior, evidence, what would close it, and its priority, all in one place. `docs/HISTORY.md` is the
+compact work log: one dated entry per release, review round, or notable mistake, one to three lines each, naming
+what went wrong and the `docs/LEARNINGS.md` entry it produced, so that a later agent does not repeat it. Keep it
+under 16 KB by condensing the oldest period into a short summary once it gets there; the full text stays in Git.
+`docs/LEARNINGS.md` holds verified pitfalls as rules, dated, for anyone resuming the work. There is no
+`docs/NEXT_STEPS.md`, `docs/HANDOFF.md`, or `docs/DEFECTS.md` — planned work and onboarding live in `STATUS.md`,
+and defect detail lives inline in `BUGS.md`. The final report distinguishes implemented, fixture-tested,
+live-verified, and blocked. What is actually missing is listed in `docs/STATUS.md` and `docs/BUGS.md` — there and
+nowhere else.

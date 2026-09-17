@@ -42,4 +42,4 @@ One integrator owns product contracts, the data model, and the scheduler. Indepe
 
 ## Remaining work after preview 0.2.0-preview.1
 
-Known issues are listed by priority in [BUGS](BUGS.md), details in [DEFECTS](DEFECTS.md), and the starting point with closing evidence in [NEXT_STEPS](NEXT_STEPS.md). The personal signing key is in place, and all but three points of the 10 September feedback are done. Live providers, a physical ARM64 device, and TalkBack remain explicitly open. The review loop is paused after round 23; what gets fixed next is for the owner to choose from BUGS, after testing the preview.
+Known issues, with priority and detail, are listed in [BUGS](BUGS.md); the starting point with closing evidence is in [STATUS](STATUS.md). The personal signing key is in place, and all but three points of the 10 September feedback are done. Live providers, a physical ARM64 device, and TalkBack remain explicitly open. The review loop is paused after round 23; what gets fixed next is for the owner to choose from BUGS, after testing the preview.

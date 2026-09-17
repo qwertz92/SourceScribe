@@ -6,17 +6,15 @@ These Markdown files are the shared knowledge base for Codex, Claude Code, OpenC
 |---|---|
 | [Product](PRODUCT.md) | Binding requirements SS-01 through SS-12 |
 | [Roadmap](ROADMAP.md) | P0 through P6 and release gates |
-| [Status](STATUS.md) | Actual state reached and blockers |
-| [Handoff](HANDOFF.md) | Current entry point for other agents/machines |
+| [Status](STATUS.md) | Current state, releases, gates, blockers, and environment — the only "where do we stand" document |
+| [0.4.0 verification report](reports/2026-09-16-preview-0.4.md) | Gates, APK hashes, device, and limits of preview 0.4.0 |
 | [0.2.0 verification report](reports/2026-09-14-preview-0.2.md) | Gates, APK hashes, device, and limits of preview 0.2.0 |
 | [0.1.0 verification report](reports/2026-09-08-preview.md) | Tests, APK hashes, device limits, and remaining acceptance for preview 0.1.0 |
 | [Try the preview](TRY_PREVIEW.md) | Installation, features, first tests, and TalkBack explained |
-| [Remaining work](NEXT_STEPS.md) | Prioritized open steps and closing evidence |
-| [Known issues by priority](BUGS.md) | Open items with impact and priority P1 through P4, for the owner to choose from |
-| [Known issues](DEFECTS.md) | What is not fully done, with its location and the missing evidence |
+| [Known bugs](BUGS.md) | The one list of open items, with location, trigger, evidence, and priority P1 through P4 |
 | [Learnings log](LEARNINGS.md) | Verified pitfalls and how to resume efficiently |
 | [Work history](HISTORY.md) | Dated log of releases, review rounds, and the mistakes they found |
-| [Build](BUILD.md) | Linux/WSL bootstrap, build, device verification, and personal signing |
+| [Build](BUILD.md) | Linux/WSL bootstrap, build, device verification, provider keys for live tests, and personal signing |
 | [Architecture](ARCHITECTURE.md) | Shared contracts and persistence |
 | [Integrations](INTEGRATIONS.md) | Extraction, the three providers, and export data |
 | [Security](SECURITY_UPDATES.md) | Trust, secrets, and updates |
@@ -29,3 +27,11 @@ Document new technical decisions under `docs/adr/` and completed reviews under `
 ## Wiki decision, 7 September 2026
 
 [Karpathy's LLM wiki concept](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) describes a continuously maintained Markdown knowledge base. The [community skill by Astro-Han](https://github.com/Astro-Han/karpathy-llm-wiki/blob/main/SKILL.md) that was reviewed additionally introduces `raw/`, `wiki/`, templates, and its own maintenance workflow. For this already-structured handoff package, an index over the existing documents is enough. That third-party skill was read, not installed: no global hook, no automatic adoption by other projects, and no additional LLM API.
+
+## Document structure, 16 September 2026
+
+Following the owner's shared rules of that date, each project keeps at most one file per question: `STATUS.md`
+(current state only), `BUGS.md` (the one list of open items), `HISTORY.md` (a dated, compact log), and
+`LEARNINGS.md` (verified pitfalls as rules). `NEXT_STEPS.md`, `HANDOFF.md`, and `DEFECTS.md` existed before this
+date and no longer do: `NEXT_STEPS.md` and `HANDOFF.md`'s still-true content moved into `STATUS.md`, and
+`DEFECTS.md`'s per-item detail moved inline into the matching numbered entry in `BUGS.md`.

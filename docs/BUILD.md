@@ -60,6 +60,63 @@ timeout 600 "$ADB" -s "$SERIAL" shell am instrument -w -r \
 
 When using Windows ADB from WSL, point `ADB` at the actual `adb.exe` path and translate every install argument into a Windows path, e.g. `"$(wslpath -w "$PWD/app/build/outputs/apk/debug/app-debug.apk")"`. The shell and instrumentation arguments stay the same. Do not run a second ADB/UI verification stream at the same time. The large UI/process/live-extractor fixtures are opt-in; their arguments and separate stages are in the integration report. A normal instrumented run is therefore not P0 live or provider evidence.
 
+## Provider keys for live tests
+
+A provider API key never goes into the repository, a commit, a log, a screenshot, or test output — this holds for
+every provider and for agents and the owner alike. For the one test that spends real money,
+`app`'s `LiveGroqTranscriptionTest`, the owner keeps a Groq key outside the repository, at
+`~/.local/share/sourcescribe/groq-key` in WSL, mode 600, one line, nothing else in the file. A build or test-runner
+script reads it into a shell variable — never printed, never echoed — and passes it as an instrumentation argument:
+
+```bash
+GROQ_KEY="$(cat ~/.local/share/sourcescribe/groq-key)"
+timeout 900 "$ADB" -s "$SERIAL" shell am instrument -w -r \
+  -e class app.sourcescribe.data.LiveGroqTranscriptionTest \
+  -e sourcescribeLiveProvider groq -e liveProviderKey "$GROQ_KEY" \
+  -e publicSourceUrl "<url of a clip of at most 30 seconds>" \
+  app.sourcescribe.debug.test/androidx.test.runner.AndroidJUnitRunner
+timeout 20 "$ADB" -s "$SERIAL" logcat -b all -c
+```
+
+The final `logcat -b all -c` is not optional: `adbd` writes the whole `am instrument` command line, the key
+included, into the device's own system log, outside the app's process and outside anything the test itself
+controls, and clearing the buffer afterward is the only way to remove it (see
+[LEARNINGS.md](LEARNINGS.md)). Without all three arguments the test skips itself with a sentence naming which one
+is missing. This is a real request against Groq's API: run it to prove a fix, not as part of the routine gate, and
+respect the owner's free-tier limits (one public clip of at most 30 seconds per run). AssemblyAI and OpenAI have no
+equivalent live test yet; adding one follows the same pattern once the owner provides a key for either.
+
+## Environment notes worth knowing before a device run
+
+Moved here from the retired `DEFECTS.md`, since these are operational facts about this build environment, not
+open defects.
+
+- **Instrumentation does not run over Gradle from WSL.** Gradle runs in WSL; the emulator runs under Windows. The
+  Windows `adb` server only listens on `127.0.0.1`, which WSL cannot reach. `connectedDebugAndroidTest` is
+  therefore not runnable locally without restarting the Windows `adb` server, which would also disconnect the
+  owner's own emulator. The working path is the one in "Device verification" above: build under WSL, then install
+  and run instrumentation under Windows ADB. The `extractor` module has 39 of its own instrumentation tests, and
+  without `-e sourcescribeEngineUpdate true` its `EngineUpdateManagerTest` silently skips 14 of them by assumption
+  while still reporting `OK` — always pass that flag.
+- **A failed install looks like a code defect.** If `/data` on the emulator is tight, `adb install -r` can fail
+  with `INSTALL_FAILED_INSUFFICIENT_STORAGE` for one APK while a smaller one installs, and instrumentation then
+  runs new tests against a stale app build and reports failures that look like real defects. After every install,
+  check the output says `Success`. Uninstall `app.sourcescribe.extractor.test` and `app.sourcescribe.debug.test`
+  first when storage is short — never the app itself, which would erase its settings and history.
+- **The debug app on the agent emulator carries settings left by earlier test runs.** Instrumentation tests write
+  to `app.sourcescribe.debug`'s own settings as a side effect of running. Anyone testing something that depends on
+  settings should read them first (`adb exec-out run-as app.sourcescribe.debug cat
+  files/datastore/settings.preferences_pb | sha256sum` shows whether a run changed them).
+- **Regenerate dependency verification after every version change.** `gradle/verification-metadata.xml` holds
+  SHA-256 checksums for every resolved artifact; a version bump in the catalogue fails first with
+  `dependency verification failed`. Fix with `bash tools/build-local.sh --write-verification-metadata sha256
+  :core:test :app:compileDebugKotlin :app:lintDebug`, then check the diff: only entries for the new versions
+  should appear, never fewer entries than before.
+- **Lint reports a new library version as an error, on purpose.** `lint { warningsAsErrors = true }` turns
+  `GradleDependency` into a hard error as soon as a newer Compose BOM or Room version is published, which forces
+  version updates to actually happen rather than accumulate. `NewerVersionAvailable` reads each module's lint
+  cache, so a local run can miss what CI catches until that cache is cleared.
+
 ## GitHub Actions
 
 `.github/workflows/android.yml` runs without secrets and without publishing an APK. The actions are pinned to immutable commits, checked against the official release refs on 7 September 2026:
@@ -71,11 +128,11 @@ When using Windows ADB from WSL, point `ADB` at the actual `adb.exe` path and tr
 
 The CI cache covers only the wrapper download and Gradle dependency files under `.ci-gradle/`; build outputs and a global user cache are not stored. The workflow runs JVM tests, the debug and release APKs, both Android test APKs, and full debug/release lint for both Android modules, with `--no-daemon --max-workers=1`.
 
-AVD creation and the emulator share the same explicit `ANDROID_AVD_HOME` under `.ci-android/avd`. The directory is created before the SDK setup step; after `avdmanager create`, the workflow checks the INI file and the registered AVD name. That way, startup does not depend on the two Android tools defaulting to different paths. On failure, the exit code is preserved and the workflow prints the emulator log excerpt and the ADB device list. It also prints error nodes from the JUnit XML reports and the tail of the UTP test logs, so install or runner failures stay diagnosable.
+AVD creation and the emulator share the same explicit `ANDROID_AVD_HOME` under `.ci-android/avd`. The directory is created before the SDK setup step; after `avdmanager create`, the workflow checks the INI file and the registered AVD name. That way, startup does not depend on the two Android tools defaulting to different paths. On failure, the exit code is preserved and the workflow prints the emulator log excerpt and the ADB device list. It also prints error nodes from the JUnit XML reports and the tail of the UTP test logs, so install or runner failures stay diagnosable. It also sums each module's instrumentation test/failure/error/skip counts into the job summary, reading the exception type out of a failed assumption's `<failure>` element rather than trusting the suite's own attributes (see [LEARNINGS.md](LEARNINGS.md)).
 
 It then starts a time-limited Android 37 emulator using the official image `system-images;android-37.0;google_apis_ps16k;x86_64`, with 4 GiB RAM and two CPU cores. Before `:app:connectedDebugAndroidTest :extractor:connectedDebugAndroidTest`, it checks that the actual page size is 16384. The emulator configuration follows the official [startup options](https://developer.android.com/studio/run/emulator-commandline) and [hardware/graphics acceleration](https://developer.android.com/studio/run/emulator-acceleration) docs; Linux GitHub runners support [Android hardware acceleration](https://docs.github.com/en/actions/reference/runners/github-hosted-runners). Any KVM access grant needed applies only to this short-lived CI runner's own user.
 
-The tests use synthetic data and local HTTPS servers. Network diagnostics may check public DNS/TLS reachability; real STT requests stay excluded. Update fixtures are enabled; real update downloads, live YouTube sources, and the interactive UI/process-restart fixtures need additional explicit test arguments and do not run automatically. This workflow is implemented; a CI run counts as evidence in the test report only once it is recorded there with its run ID.
+The tests use synthetic data and local HTTPS servers. Network diagnostics may check public DNS/TLS reachability; real STT requests stay excluded. Update fixtures are enabled; real update downloads, live YouTube sources, the live Groq test, and the interactive UI/process-restart fixtures need additional explicit test arguments and do not run automatically. This workflow is implemented; a CI run counts as evidence in the test report only once it is recorded there with its run ID.
 
 ## Personal release path
 
@@ -105,6 +162,6 @@ tools/sign-release.sh .local-tools/releases/SourceScribe-<version>-<commit>-unsi
 gh release upload v<version> .local-tools/releases/SourceScribe-<version>.apk
 ```
 
-`<version>` is the app version, for example `0.3.0`, and `<commit>` the short commit the release build ran at. Signing went correctly if the script ends with `signed APK:` and `certificate SHA-256: 19d1da9a8fe704082a531faed8a24d966c485aae581a7076dd4b4f66c11d3881`; otherwise it stops with an error and writes no APK. After the upload, compare the SHA-256 digest GitHub shows for the asset with `sha256sum` of the local file.
+`<version>` is the app version, for example `0.4.0`, and `<commit>` the short commit the release build ran at. Signing went correctly if the script ends with `signed APK:` and `certificate SHA-256: 19d1da9a8fe704082a531faed8a24d966c485aae581a7076dd4b4f66c11d3881`; otherwise it stops with an error and writes no APK. After the upload, compare the SHA-256 digest GitHub shows for the asset with `sha256sum` of the local file.
 
-Preview 0.2.0-preview.1 was signed this way on 14 September 2026, after its tag, and its APK attached to the release: 146,688,333 bytes, SHA-256 `ea8bf17fa1262c5d4869ad7a5db9f6183b54746714f82ac46c7c031c449f971b`. In the same check the script refused an APK signed with a throwaway key.
+Preview 0.2.0-preview.1 was signed this way on 14 September 2026, after its tag, and its APK attached to the release: 146,688,333 bytes, SHA-256 `ea8bf17fa1262c5d4869ad7a5db9f6183b54746714f82ac46c7c031c449f971b`. In the same check the script refused an APK signed with a throwaway key. Preview 0.3.0 reached only a version bump (`5ebc11e`); its release-APK build attempt crashed before packaging finished, so it was never signed or published, and 0.4.0 carries its fixes instead (see [STATUS.md](STATUS.md)).

@@ -1,6 +1,6 @@
 # Learnings for Resumption
 
-**As of 2026-09-14.** Failed attempts and fixes are in the
+**As of 2026-09-16.** Failed attempts and fixes are in the
 [2026-09-07 integration report](reports/2026-09-07-integration.md) and the
 [2026-09-08 preview report](reports/2026-09-08-preview.md); this file holds the reusable conclusions.
 
@@ -117,3 +117,77 @@
 - **A test that checks an interaction first waits for the app to allow it.** `MainViewModel` runs an
   exclusive action at startup that locks the language picker (among other things) and shows a progress bar;
   in CI this took over 25 seconds. Since round 23 the test waits until no progress bar is visible.
+- **A fixture that plays the role of an installed engine has to answer everything the app asks a real one.**
+  (14-15 September 2026) The start-up-lock fix (`e66761a`, closing item 47) made the runtime re-check probe
+  any active engine that is not the bundled one. `AppPipelineTest`'s caption-only fixture engine had been
+  standing in for exactly such an engine without ever answering `yt-dlp --version` or the EJS probe, so three
+  device tests broke and CI was red for two commits. Fixed by making the fixture engine answer the self-test
+  (`0509a18`), not by weakening the product's new check.
+- **The Android Gradle plugin writes a failed assumption as a `<testcase>` with a `<failure>` element, not as
+  `<skipped>`.** (14-15 September 2026) Counting instrumentation results from the XML report therefore has to
+  read the failure text's exception type (`org.junit[.internal].AssumptionViolatedException`) per test case;
+  trusting a suite's own `tests`/`failures`/`skipped` attributes counts an opt-in test that skipped itself as
+  failed (`a648add`, correcting `edaa927`).
+- **An MP3 chunk from the bundled ffmpeg encoder is 84 to 96 ms longer than the window it was asked to
+  encode.** (16 September 2026) The output is a whole number of MP3 frames plus the encoder's own delay. A
+  length check has to compare the measured length against the *planned window* with a tolerance, never
+  against the same hard maximum the window itself is bounded by — checking the encoded length against that
+  bound is what made every source over ten minutes fail its first chunk until `f18937f`, the 0.4.0 P1 fix.
+- **`adbd` writes the whole `am instrument` command line, arguments included, into the device's system log.**
+  (16 September 2026) A key passed as an instrumentation argument (e.g. `-e liveProviderKey <key>`) reaches
+  the device's own logcat even though the app's process never logs it. A test or build script that passes one
+  has to end with `adb logcat -b all -c` afterward; while `adb.exe` runs, the key is also visible in its own
+  Windows command line.
+- **A layout test's measuring height has to exceed every alternative's real content, or a bounded dialog
+  clamps every measurement to the same number.** (16 September 2026) `JobActionsLayoutTest`'s first version
+  measured at 480dp, which every situation's content exceeded, so a dialog that clamps its height at that
+  bound passed the test with its own fix reverted. Raised to 900dp — above the shortest situation's content at
+  font scale 1 — the same reversion produced three distinct heights again.
+- **An emulator started under `timeout` dies when the bound runs out, whatever is running on it.** On
+  16 September 2026 `emulator-5556` had been started with a 12-hour bound in the morning; the bound expired
+  at 22:26 in the middle of the 0.4.0 device gates and cut the extractor suite and every live test, which
+  then reported `device not found`. Start a test emulator with a bound longer than the working day, note
+  when it expires, and read a sudden `device not found` as the emulator, not the app.
+
+## Deliberate decisions a reviewer keeps re-reporting as bugs
+
+Moved here from the retired `DEFECTS.md` so a future review round checks this list before re-opening one of
+these. Each was investigated once, found to be a considered trade-off rather than an oversight, and is
+recorded so the investigation is not repeated.
+
+- **Tapping "Start" is the deliberate authorization, even right after "Prepare again."** A re-prepared job
+  starting and incurring cost on a single further tap looks like a missing confirmation, but this is
+  intentional app-wide: `configurationForStart` recomputes authorization from mode, model, and matching
+  stored key at every start, and a tap **is** that authorization, bound to exactly that configuration. The
+  invariant requires nothing be repeated *silently* — a tap is not silent — not an extra hurdle on top of it.
+- **`MALFORMED_SEGMENT` and `MALFORMED_WORD` deliberately sit in different warning groups**, even though both
+  arise on the same line of `parseEntries` and both drop the entry. The segment list is the displayed reading
+  text, so a missing entry there is a missing passage; the word list only carries per-word timing, so a
+  missing entry there is a missing timestamp. Same code, different consequence for the reader.
+- **The title's 40-byte cap in `TranscriptExporter.compose` is load-bearing, not cosmetic**, even though the
+  byte-budget arithmetic around it once had a real unit mix-up (bytes vs. character count). The mix-up never
+  triggered, because `generatedStem` already runs the title through the same 40-byte cap beforehand — the
+  widest name the builder can assemble stays under the 180-byte limit as long as that cap stands. Increasing
+  the title's share of the name would remove this second backstop.
+- **Most `PROVIDER_*` and `RESPONSE_*` branches in `messageText` are unreachable today, on purpose.** `SttStep`
+  handles provider errors itself within each phase and stores the bare code, so these branches rarely fire —
+  but they stay as the safety net for a `ProviderError` that escapes phase handling, where the step name
+  ("While submitting to the provider") is exactly right. The `AUDIO_*` branches modeled after
+  `ExtractionFailure` were different, had no conceivable producer at all, and were removed.
+- **Expandable elements shift what is below them on purpose** — the job card in history, help entries, the
+  provenance section in the result view, the advanced options, and the hint above "Check source" that
+  disappears once a key is chosen. The no-jump rule is read as a rule against motion nobody triggered; here the
+  change happens exactly where the reader just tapped and shows what was asked for, and reserving space for
+  collapsed content would defeat the point of collapsing. Changing this needs every occurrence counted first
+  and changed together, not one at a time.
+- **After a process death, a job field shows the draft's saved value, not the text that was typed and never
+  saved.** `rememberSaveable` text vanishing after `am kill` looks like a bug, but the draft lives only in the
+  view model and dies with the process by design: a new process gets a new session id, and a field shows what
+  the draft holds, because start reads the draft, not the field. Preserving typed values across a process death
+  would mean saving the draft itself (e.g. via `SavedStateHandle`), not a field's text.
+- **A retried chunk upload shows its progress from the finished chunks again, not from where the failed
+  attempt got to.** `SttStep.countingUpload` records the sum of the completed chunks when a submission starts,
+  so after a transient network failure the byte count and percentage visibly go back before climbing again.
+  Holding the failed attempt's figure would present bytes the provider never accepted as progress, and the
+  invariant forbids an invented percentage; only the measured rate is kept from going down. Recorded after
+  review round 1 of 0.4.0 (16 September 2026).
