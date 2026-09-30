@@ -1,10 +1,13 @@
 package app.sourcescribe.core.providers
 
+import app.sourcescribe.core.JobConfig
 import app.sourcescribe.core.Provider
 import app.sourcescribe.core.ProviderAdapter
 import app.sourcescribe.core.ProviderCapabilities
 import app.sourcescribe.core.ProviderError
 import app.sourcescribe.core.ProviderErrorCode
+import app.sourcescribe.core.ProviderFailure
+import app.sourcescribe.core.ProviderRejectionReason
 import app.sourcescribe.core.ProviderHttp
 import app.sourcescribe.core.ProviderTranscript
 import app.sourcescribe.core.Region
@@ -23,7 +26,21 @@ class GroqAdapter(private val http: ProviderHttp = ProviderHttp()) : ProviderAda
     override fun capabilities(model: String): ProviderCapabilities = when (model) {
         MODEL_V3 -> profile(model, PRICE_V3_MICRO_USD_PER_HOUR)
         MODEL_TURBO -> profile(model, PRICE_TURBO_MICRO_USD_PER_HOUR)
-        else -> throw ProviderError(ProviderErrorCode.UNSUPPORTED_OPTION)
+        else -> throw ProviderError(
+            ProviderErrorCode.UNSUPPORTED_OPTION,
+            failure = ProviderFailure(reason = ProviderRejectionReason.INVALID_MODEL),
+        )
+    }
+
+    override fun validateConfiguration(config: JobConfig) {
+        val model = SyncProviderSupport.model(config)
+        SyncProviderSupport.validateConfiguration(
+            config,
+            provider,
+            capabilities(model),
+            model,
+            promptLimited = true,
+        )
     }
 
     override suspend fun submit(

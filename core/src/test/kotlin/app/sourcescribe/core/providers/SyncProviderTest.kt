@@ -6,6 +6,7 @@ import app.sourcescribe.core.Provider
 import app.sourcescribe.core.ProviderAdapter
 import app.sourcescribe.core.ProviderError
 import app.sourcescribe.core.ProviderErrorCode
+import app.sourcescribe.core.ProviderRejectionReason
 import app.sourcescribe.core.ProviderHttp
 import app.sourcescribe.core.Region
 import app.sourcescribe.core.ResponseSpool
@@ -596,6 +597,71 @@ class SyncProviderTest {
     }
 
     @Test
+    fun configurationPreflightMatchesSubmissionForPromptLimitsAndAcceptsBoundary() {
+        val server = MockWebServer()
+        server.start()
+        try {
+            val groq = GroqAdapter(providerHttp(server))
+            val groqConfig = configuration(
+                Provider.GROQ,
+                GroqAdapter.MODEL_TURBO,
+                contextTerms = listOf("ä".repeat(113)),
+            )
+            val groqPreflight = assertThrows(ProviderError::class.java) {
+                groq.validateConfiguration(groqConfig)
+            }
+            val groqSubmit = assertThrows(ProviderError::class.java) {
+                runBlocking {
+                    groq.submit(
+                        request(Provider.GROQ, GroqAdapter.MODEL_TURBO, contextTerms = groqConfig.contextTerms),
+                        "key",
+                        ResponseSpool {},
+                    )
+                }
+            }
+            assertEquals(groqSubmit.code, groqPreflight.code)
+            assertEquals(groqSubmit.failure, groqPreflight.failure)
+            assertEquals(ProviderRejectionReason.CONTEXT_TOO_LONG, groqPreflight.failure?.reason)
+
+            val whisper = OpenAiAdapter(providerHttp(server))
+            val whisperConfig = configuration(
+                Provider.OPENAI,
+                OpenAiAdapter.MODEL_WHISPER_1,
+                contextTerms = listOf("ä".repeat(113)),
+            )
+            val whisperPreflight = assertThrows(ProviderError::class.java) {
+                whisper.validateConfiguration(whisperConfig)
+            }
+            val whisperSubmit = assertThrows(ProviderError::class.java) {
+                runBlocking {
+                    whisper.submit(
+                        request(
+                            Provider.OPENAI,
+                            OpenAiAdapter.MODEL_WHISPER_1,
+                            contextTerms = whisperConfig.contextTerms,
+                        ),
+                        "key",
+                        ResponseSpool {},
+                    )
+                }
+            }
+            assertEquals(whisperSubmit.code, whisperPreflight.code)
+            assertEquals(whisperSubmit.failure, whisperPreflight.failure)
+            assertEquals(ProviderRejectionReason.CONTEXT_TOO_LONG, whisperPreflight.failure?.reason)
+
+            groq.validateConfiguration(
+                configuration(Provider.GROQ, GroqAdapter.MODEL_TURBO, contextTerms = listOf("ä".repeat(112))),
+            )
+            whisper.validateConfiguration(
+                configuration(Provider.OPENAI, OpenAiAdapter.MODEL_WHISPER_1, contextTerms = listOf("ä".repeat(112))),
+            )
+            assertEquals(0, server.requestCount)
+        } finally {
+            server.shutdown()
+        }
+    }
+
+    @Test
     fun httpStatusesMapToProviderErrorsAndSubmissionUncertainty() {
         for ((status, expected) in listOf(
             401 to ProviderErrorCode.AUTHENTICATION,
@@ -750,23 +816,38 @@ class SyncProviderTest {
         return TranscriptionRequest(
             audio = file,
             mimeType = "audio/wav",
-            config = JobConfig(
-                mode = AcquisitionMode.STT_ONLY,
-                provider = provider,
-                model = model,
-                region = region,
-                language = language,
-                diarization = diarization,
-                wordTimestamps = wordTimestamps,
-                segmentTimestamps = segmentTimestamps,
-                contextTerms = contextTerms,
-                uploadApproved = uploadApproved,
+            config = configuration(
+                provider, model, language, wordTimestamps, segmentTimestamps, diarization,
+                contextTerms, region, uploadApproved,
             ),
             chunkIndex = chunkIndex,
             chunkStartMs = chunkStartMs,
             durationMs = durationMs,
         )
     }
+
+    private fun configuration(
+        provider: Provider,
+        model: String,
+        language: String? = null,
+        wordTimestamps: Boolean = false,
+        segmentTimestamps: Boolean = true,
+        diarization: Boolean = false,
+        contextTerms: List<String> = emptyList(),
+        region: Region = Region.US,
+        uploadApproved: Boolean = true,
+    ) = JobConfig(
+        mode = AcquisitionMode.STT_ONLY,
+        provider = provider,
+        model = model,
+        region = region,
+        language = language,
+        diarization = diarization,
+        wordTimestamps = wordTimestamps,
+        segmentTimestamps = segmentTimestamps,
+        contextTerms = contextTerms,
+        uploadApproved = uploadApproved,
+    )
 
     private fun providerHttp(server: MockWebServer): ProviderHttp = ProviderHttp(
         OkHttpClient.Builder().addInterceptor { chain ->

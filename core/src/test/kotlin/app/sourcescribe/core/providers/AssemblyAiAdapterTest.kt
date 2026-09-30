@@ -6,6 +6,7 @@ import app.sourcescribe.core.Provider
 import app.sourcescribe.core.ProviderError
 import app.sourcescribe.core.ProviderErrorCode
 import app.sourcescribe.core.ProviderHttp
+import app.sourcescribe.core.ProviderRejectionReason
 import app.sourcescribe.core.Region
 import app.sourcescribe.core.RemoteHandle
 import app.sourcescribe.core.ResponseSpool
@@ -374,6 +375,37 @@ class AssemblyAiAdapterTest {
             )
         }
         assertEquals(ProviderErrorCode.INVALID_INPUT, replayTooLong.code)
+        assertEquals(0, server.requestCount)
+    }
+
+    @Test
+    fun configurationPreflightMatchesSubmissionForModelLanguageAndTermLimits() {
+        val invalid = listOf(
+            baseConfig(model = "universal-3-pro") to ProviderRejectionReason.INVALID_MODEL,
+            baseConfig(model = AssemblyAiAdapter.MODEL_U35, language = "ru") to
+                ProviderRejectionReason.INVALID_LANGUAGE,
+            baseConfig(contextTerms = List(201) { "term" }) to ProviderRejectionReason.TOO_MANY_TERMS,
+            baseConfig(contextTerms = listOf("one two three four five six seven")) to
+                ProviderRejectionReason.TERM_TOO_LONG,
+        )
+
+        for ((config, reason) in invalid) {
+            val preflight = assertThrows(ProviderError::class.java) {
+                adapter.validateConfiguration(config)
+            }
+            val submit = assertThrows(ProviderError::class.java) {
+                runBlocking { adapter.submit(request(config), "key", ResponseSpool {}) }
+            }
+            assertEquals(submit.code, preflight.code)
+            assertEquals(submit.failure, preflight.failure)
+            assertEquals(reason, preflight.failure?.reason)
+        }
+
+        adapter.validateConfiguration(
+            baseConfig(
+                contextTerms = List(200) { "one two three four five six" },
+            ),
+        )
         assertEquals(0, server.requestCount)
     }
 

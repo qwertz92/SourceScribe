@@ -66,6 +66,7 @@ class ProviderError(
     val code: ProviderErrorCode,
     val retryAfterSeconds: Long? = null,
     val httpStatus: Int? = null,
+    val failure: ProviderFailure? = null,
 ) : Exception(code.name)
 
 /** Save charge-relevant submission/poll responses before parsing; non-billed upload receipts are transient. */
@@ -74,6 +75,7 @@ fun interface ResponseSpool { fun save(bytes: ByteArray) }
 interface ProviderAdapter {
     val provider: Provider
     fun capabilities(model: String): ProviderCapabilities
+    fun validateConfiguration(config: JobConfig) { }
     suspend fun submit(request: TranscriptionRequest, apiKey: String, spool: ResponseSpool): SubmissionResult
     fun parseSavedResponse(raw: ByteArray, request: TranscriptionRequest): SubmissionResult
     suspend fun poll(handle: RemoteHandle, request: TranscriptionRequest, apiKey: String, spool: ResponseSpool): PollResult {

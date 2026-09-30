@@ -1,12 +1,15 @@
 package app.sourcescribe.core.providers
 
+import app.sourcescribe.core.JobConfig
 import app.sourcescribe.core.Provider
 import app.sourcescribe.core.ProviderAdapter
 import app.sourcescribe.core.ProviderCapabilities
 import app.sourcescribe.core.ProviderError
 import app.sourcescribe.core.ProviderErrorCode
+import app.sourcescribe.core.ProviderFailure
 import app.sourcescribe.core.ProviderHttp
 import app.sourcescribe.core.ProviderTranscript
+import app.sourcescribe.core.ProviderRejectionReason
 import app.sourcescribe.core.Region
 import app.sourcescribe.core.ResponseSpool
 import app.sourcescribe.core.SubmissionResult
@@ -24,7 +27,21 @@ class OpenAiAdapter(private val http: ProviderHttp = ProviderHttp()) : ProviderA
         MODEL_GPT_TRANSCRIBE -> profile(model, false, false, false, true, PRICE_GPT_TRANSCRIBE_MICRO_USD_PER_HOUR)
         MODEL_WHISPER_1 -> profile(model, true, true, false, true, PRICE_WHISPER_MICRO_USD_PER_HOUR)
         MODEL_GPT_4O_TRANSCRIBE_DIARIZE -> profile(model, false, true, true, false, null)
-        else -> throw ProviderError(ProviderErrorCode.UNSUPPORTED_OPTION)
+        else -> throw ProviderError(
+            ProviderErrorCode.UNSUPPORTED_OPTION,
+            failure = ProviderFailure(reason = ProviderRejectionReason.INVALID_MODEL),
+        )
+    }
+
+    override fun validateConfiguration(config: JobConfig) {
+        val model = SyncProviderSupport.model(config)
+        SyncProviderSupport.validateConfiguration(
+            config,
+            provider,
+            capabilities(model),
+            model,
+            promptLimited = model == MODEL_WHISPER_1,
+        )
     }
 
     override suspend fun submit(

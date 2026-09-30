@@ -3,14 +3,17 @@ package app.sourcescribe.core.providers
 import app.sourcescribe.core.parseBounded
 
 import app.sourcescribe.core.ContextTerms
+import app.sourcescribe.core.JobConfig
 import app.sourcescribe.core.PollResult
 import app.sourcescribe.core.Provider
 import app.sourcescribe.core.ProviderAdapter
 import app.sourcescribe.core.ProviderCapabilities
 import app.sourcescribe.core.ProviderError
 import app.sourcescribe.core.ProviderErrorCode
+import app.sourcescribe.core.ProviderFailure
 import app.sourcescribe.core.ProviderHttp
 import app.sourcescribe.core.ProviderTranscript
+import app.sourcescribe.core.ProviderRejectionReason
 import app.sourcescribe.core.Region
 import app.sourcescribe.core.RemoteHandle
 import app.sourcescribe.core.ResponseSpool
@@ -45,7 +48,7 @@ class AssemblyAiAdapter(private val http: ProviderHttp = ProviderHttp()) : Provi
         val price = when (model) {
             MODEL_U35 -> PRICE_U35_MICRO_USD_PER_HOUR
             MODEL_U2 -> PRICE_U2_MICRO_USD_PER_HOUR
-            else -> unsupported()
+            else -> unsupported(ProviderRejectionReason.INVALID_MODEL)
         }
         return ProviderCapabilities(
             provider = provider,
@@ -64,6 +67,10 @@ class AssemblyAiAdapter(private val http: ProviderHttp = ProviderHttp()) : Provi
             priceAsOf = PRICING_DATE,
             pricingSource = PRICING_SOURCE,
         )
+    }
+
+    override fun validateConfiguration(config: JobConfig) {
+        validateConfig(config)
     }
 
     override suspend fun submit(
@@ -156,7 +163,7 @@ class AssemblyAiAdapter(private val http: ProviderHttp = ProviderHttp()) : Provi
     }
 
     private fun validateSubmission(request: TranscriptionRequest, apiKey: String): ValidatedRequest {
-        val validated = validateConfig(request, apiKey, requireApiKey = true)
+        val validated = validateRequestConfig(request.config, apiKey, requireApiKey = true)
         val audio = request.audio
         if (!request.config.uploadApproved) invalidInput()
         if (!audio.exists() || !audio.isFile || !audio.canRead()) invalidInput()
@@ -174,18 +181,19 @@ class AssemblyAiAdapter(private val http: ProviderHttp = ProviderHttp()) : Provi
     }
 
     private fun validatePoll(request: TranscriptionRequest, apiKey: String): ValidatedRequest {
-        val validated = validateConfig(request, apiKey, requireApiKey = true)
+        val validated = validateRequestConfig(request.config, apiKey, requireApiKey = true)
         validateChunk(request)
         return validated
     }
 
     private fun validateReplayRequest(request: TranscriptionRequest) {
-        validateConfig(request, apiKey = null, requireApiKey = false)
+        validateRequestConfig(request.config, apiKey = null, requireApiKey = false)
         validateChunk(request)
     }
 
     private fun validateChunk(request: TranscriptionRequest) {
-        if (request.durationMs < MIN_DURATION_MS || request.durationMs > MAX_DURATION_MS ||
+        if (request.config.maxAudioSeconds <= 0 ||
+            request.durationMs < MIN_DURATION_MS || request.durationMs > MAX_DURATION_MS ||
             request.chunkIndex < 0 || request.chunkStartMs < 0 ||
             request.chunkStartMs > Long.MAX_VALUE - request.durationMs
         ) invalidInput()
@@ -195,37 +203,59 @@ class AssemblyAiAdapter(private val http: ProviderHttp = ProviderHttp()) : Provi
         if (request.durationMs > configuredMaxMs) invalidInput()
     }
 
-    private fun validateConfig(
-        request: TranscriptionRequest,
+    private fun validateRequestConfig(
+        config: JobConfig,
         apiKey: String?,
         requireApiKey: Boolean,
     ): ValidatedRequest {
-        if (request.config.provider != provider) invalidInput()
-        val model = request.config.model?.takeIf { it.isNotBlank() } ?: invalidInput()
-        if (model !in SUPPORTED_MODELS) unsupported()
+        val validated = validateConfig(config)
         if (requireApiKey) validateApiKey(apiKey ?: "")
-        if (ContextTerms.refused(request.config.contextTerms)) invalidInput()
-        val terms = request.config.contextTerms.map { term ->
+        return validated
+    }
+
+    private fun validateConfig(config: JobConfig): ValidatedRequest {
+        if (config.provider != provider) invalidInput(ProviderRejectionReason.INVALID_OPTION)
+        val model = config.model?.takeIf { it.isNotBlank() }
+            ?: invalidInput(ProviderRejectionReason.INVALID_MODEL)
+        if (model !in SUPPORTED_MODELS) unsupported(ProviderRejectionReason.INVALID_MODEL)
+        val capabilities = capabilities(model)
+        if (config.region !in capabilities.regions) unsupported(ProviderRejectionReason.INVALID_OPTION)
+        if (config.language == null && !capabilities.automaticLanguage) {
+            unsupported(ProviderRejectionReason.INVALID_OPTION)
+        }
+        if (config.wordTimestamps && !capabilities.wordTimestamps) unsupported(ProviderRejectionReason.INVALID_OPTION)
+        if (config.segmentTimestamps && !capabilities.segmentTimestamps) {
+            unsupported(ProviderRejectionReason.INVALID_OPTION)
+        }
+        if (config.diarization && !capabilities.diarization) unsupported(ProviderRejectionReason.INVALID_OPTION)
+        if (config.contextTerms.isNotEmpty() && !capabilities.contextTerms) {
+            unsupported(ProviderRejectionReason.INVALID_OPTION)
+        }
+        if (ContextTerms.refused(config.contextTerms)) invalidInput(ProviderRejectionReason.INVALID_OPTION)
+        val terms = config.contextTerms.map { term ->
             val trimmed = term.trim()
-            if (trimmed.split(WHITESPACE).size > MAX_WORDS_PER_TERM) invalidInput()
+            if (trimmed.split(WHITESPACE).size > MAX_WORDS_PER_TERM) {
+                invalidInput(ProviderRejectionReason.TERM_TOO_LONG)
+            }
             trimmed
         }
         val maxTerms = if (model == MODEL_U2) MAX_TERMS_U2 else MAX_TERMS_U35
-        if (terms.size > maxTerms) invalidInput()
-        if (request.config.maxAudioSeconds <= 0) invalidInput()
-        request.config.language?.let { validateLanguage(it, model) }
-        return ValidatedRequest(model, request.config.region, terms, request.config.diarization)
+        if (terms.size > maxTerms) invalidInput(ProviderRejectionReason.TOO_MANY_TERMS)
+        config.language?.let { validateLanguage(it, model) }
+        return ValidatedRequest(model, config.region, terms, config.diarization)
     }
 
     private fun validateLanguage(value: String, model: String) {
         val language = value.trim()
-        if (!LANGUAGE_PATTERN.matches(language) || language !in supportedLanguages(model)) invalidInput()
+        if (!LANGUAGE_PATTERN.matches(language) || language !in supportedLanguages(model)) {
+            invalidInput(ProviderRejectionReason.INVALID_LANGUAGE)
+        }
     }
 
     private fun supportedLanguages(model: String): Set<String> = when (model) {
         MODEL_U35 -> UNIVERSAL_35_LANGUAGES
         MODEL_U2 -> UNIVERSAL_2_LANGUAGES
-        else -> unsupported()
+        else -> unsupported(ProviderRejectionReason.INVALID_MODEL)
     }
 
     private fun providerLanguageCode(value: String): String =
@@ -627,9 +657,17 @@ class AssemblyAiAdapter(private val http: ProviderHttp = ProviderHttp()) : Provi
         Region.EU -> EU_BASE_URL
     }
 
-    private fun invalidInput(): Nothing = throw ProviderError(ProviderErrorCode.INVALID_INPUT)
+    private fun invalidInput(reason: ProviderRejectionReason? = null): Nothing =
+        throw ProviderError(
+            ProviderErrorCode.INVALID_INPUT,
+            failure = reason?.let { ProviderFailure(reason = it) },
+        )
     private fun invalidResponse(): Nothing = throw ProviderError(ProviderErrorCode.INVALID_RESPONSE)
-    private fun unsupported(): Nothing = throw ProviderError(ProviderErrorCode.UNSUPPORTED_OPTION)
+    private fun unsupported(reason: ProviderRejectionReason = ProviderRejectionReason.INVALID_OPTION): Nothing =
+        throw ProviderError(
+            ProviderErrorCode.UNSUPPORTED_OPTION,
+            failure = ProviderFailure(reason = reason),
+        )
 
     private data class ValidatedRequest(
         val model: String,

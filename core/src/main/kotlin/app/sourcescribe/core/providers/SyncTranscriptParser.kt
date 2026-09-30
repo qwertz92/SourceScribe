@@ -8,6 +8,8 @@ import app.sourcescribe.core.Provider
 import app.sourcescribe.core.ProviderCapabilities
 import app.sourcescribe.core.ProviderError
 import app.sourcescribe.core.ProviderErrorCode
+import app.sourcescribe.core.ProviderFailure
+import app.sourcescribe.core.ProviderRejectionReason
 import app.sourcescribe.core.ProviderTranscript
 import app.sourcescribe.core.Segment
 import app.sourcescribe.core.TimeEvidence
@@ -37,7 +39,7 @@ internal object SyncProviderSupport {
     const val MAX_PROMPT_BYTES = 224
 
     fun model(config: JobConfig): String = config.model?.takeIf { it.isNotBlank() }
-        ?: throw ProviderError(ProviderErrorCode.INVALID_INPUT)
+        ?: invalidInput(ProviderRejectionReason.INVALID_MODEL)
 
     fun validateRequest(
         request: TranscriptionRequest,
@@ -48,17 +50,17 @@ internal object SyncProviderSupport {
         promptLimited: Boolean = false,
         minimumDurationMs: Long = 1L,
     ) {
-        if (request.config.provider != expectedProvider) invalidInput()
         if (!request.config.uploadApproved) invalidInput()
         validateOptions(request, expectedProvider, capabilities, model, promptLimited, minimumDurationMs)
         if (apiKey.isBlank() || apiKey.any { it == '\r' || it == '\n' }) invalidInput()
-        if (!request.audio.isFile || !request.audio.canRead()) invalidInput()
+        if (!request.audio.isFile || !request.audio.canRead()) invalidInput(ProviderRejectionReason.INVALID_AUDIO)
         val bytes = request.audio.length()
-        if (bytes <= 0 || bytes > capabilities.maxUploadBytes) invalidInput()
+        if (bytes <= 0) invalidInput(ProviderRejectionReason.INVALID_AUDIO)
+        if (bytes > capabilities.maxUploadBytes) invalidInput(ProviderRejectionReason.FILE_TOO_LARGE)
         val mime = request.mimeType.trim().lowercase(Locale.ROOT)
         if (request.mimeType.any { it == '\r' || it == '\n' } ||
             !mime.startsWith("audio/") || mime.length == "audio/".length
-        ) invalidInput()
+        ) invalidInput(ProviderRejectionReason.UNSUPPORTED_MEDIA)
         if (request.durationMs <= 0 || request.chunkStartMs < 0 || request.chunkIndex < 0) invalidInput()
         if (request.chunkStartMs > Long.MAX_VALUE - request.durationMs) invalidInput()
     }
@@ -71,27 +73,17 @@ internal object SyncProviderSupport {
         promptLimited: Boolean = false,
         minimumDurationMs: Long = 1L,
     ) {
-        if (request.config.provider != expectedProvider) invalidInput()
-        if (request.config.region !in capabilities.regions) unsupported()
-        if (model.isBlank()) unsupported()
-        if (request.config.language != null && normalizeLanguage(request.config.language) == null) invalidInput()
-        if (request.config.language == null && !capabilities.automaticLanguage) unsupported()
-        if (request.config.wordTimestamps && !capabilities.wordTimestamps) unsupported()
-        if (request.config.segmentTimestamps && !capabilities.segmentTimestamps) unsupported()
-        if (request.config.diarization && !capabilities.diarization) unsupported()
-        if (ContextTerms.refused(request.config.contextTerms)) invalidInput()
-        if (request.config.contextTerms.isNotEmpty() && !capabilities.contextTerms) unsupported()
-        if (promptLimited && request.config.contextTerms.isNotEmpty()) contextText(request.config.contextTerms)
+        validateConfiguration(request.config, expectedProvider, capabilities, model, promptLimited)
         if (minimumDurationMs <= 0 || request.config.maxAudioSeconds <= 0 || request.durationMs < minimumDurationMs ||
             request.chunkStartMs < 0 || request.chunkIndex < 0
-        ) invalidInput()
+        ) invalidInput(ProviderRejectionReason.INVALID_AUDIO)
         val maxDurationMs = if (request.config.maxAudioSeconds > Long.MAX_VALUE / 1000L) {
             Long.MAX_VALUE
         } else {
             request.config.maxAudioSeconds * 1000L
         }
-        if (request.durationMs > maxDurationMs) invalidInput()
-        if (request.chunkStartMs > Long.MAX_VALUE - request.durationMs) invalidInput()
+        if (request.durationMs > maxDurationMs) invalidInput(ProviderRejectionReason.INVALID_AUDIO)
+        if (request.chunkStartMs > Long.MAX_VALUE - request.durationMs) invalidInput(ProviderRejectionReason.INVALID_AUDIO)
         // A fourth place in this program that turns a duration into money, and the only one with no
         // surcharge in it. That is right for the two providers reaching this function today, and both
         // reasons were re-read from the providers' own pages on 2026-09-12: Groq offers no diarization at
@@ -119,6 +111,34 @@ internal object SyncProviderSupport {
         }
     }
 
+    fun validateConfiguration(
+        config: JobConfig,
+        expectedProvider: Provider,
+        capabilities: ProviderCapabilities,
+        model: String,
+        promptLimited: Boolean = false,
+    ) {
+        if (config.provider != expectedProvider) invalidInput(ProviderRejectionReason.INVALID_OPTION)
+        if (config.region !in capabilities.regions) unsupported(ProviderRejectionReason.INVALID_OPTION)
+        if (model.isBlank()) invalidInput(ProviderRejectionReason.INVALID_MODEL)
+        if (config.language != null && normalizeLanguage(config.language) == null) {
+            invalidInput(ProviderRejectionReason.INVALID_LANGUAGE)
+        }
+        if (config.language == null && !capabilities.automaticLanguage) {
+            unsupported(ProviderRejectionReason.INVALID_OPTION)
+        }
+        if (config.wordTimestamps && !capabilities.wordTimestamps) unsupported(ProviderRejectionReason.INVALID_OPTION)
+        if (config.segmentTimestamps && !capabilities.segmentTimestamps) {
+            unsupported(ProviderRejectionReason.INVALID_OPTION)
+        }
+        if (config.diarization && !capabilities.diarization) unsupported(ProviderRejectionReason.INVALID_OPTION)
+        if (ContextTerms.refused(config.contextTerms)) invalidInput(ProviderRejectionReason.INVALID_OPTION)
+        if (config.contextTerms.isNotEmpty() && !capabilities.contextTerms) {
+            unsupported(ProviderRejectionReason.INVALID_OPTION)
+        }
+        if (promptLimited && config.contextTerms.isNotEmpty()) contextText(config.contextTerms)
+    }
+
     fun language(config: JobConfig): String? = config.language?.let(::normalizeLanguage)
 
     fun contextText(terms: List<String>): String? {
@@ -129,7 +149,9 @@ internal object SyncProviderSupport {
             if (value.isEmpty()) continue
             val separatorBytes = if (result.isEmpty()) 0 else 2
             val valueBytes = value.toByteArray(StandardCharsets.UTF_8).size
-            if (valueBytes > MAX_PROMPT_BYTES - byteCount - separatorBytes) invalidInput()
+            if (valueBytes > MAX_PROMPT_BYTES - byteCount - separatorBytes) {
+                invalidInput(ProviderRejectionReason.CONTEXT_TOO_LONG)
+            }
             if (separatorBytes != 0) result.append(", ")
             result.append(value)
             byteCount += separatorBytes + valueBytes
@@ -152,9 +174,17 @@ internal object SyncProviderSupport {
         }
     }
 
-    private fun invalidInput(): Nothing = throw ProviderError(ProviderErrorCode.INVALID_INPUT)
+    private fun invalidInput(reason: ProviderRejectionReason? = null): Nothing =
+        throw ProviderError(
+            ProviderErrorCode.INVALID_INPUT,
+            failure = reason?.let { ProviderFailure(reason = it) },
+        )
 
-    private fun unsupported(): Nothing = throw ProviderError(ProviderErrorCode.UNSUPPORTED_OPTION)
+    private fun unsupported(reason: ProviderRejectionReason = ProviderRejectionReason.INVALID_OPTION): Nothing =
+        throw ProviderError(
+            ProviderErrorCode.UNSUPPORTED_OPTION,
+            failure = ProviderFailure(reason = reason),
+        )
 }
 
 /** Parses the bounded JSON returned by synchronous Groq/OpenAI transcription calls. */
