@@ -227,3 +227,43 @@ Two additional disposable source exports used for the exact-index CI check were 
 These exports contained no unique source data. Their combined regular-file size was 17,537,040 bytes; together
 with the nine copies above, 32,737,666 regular-file bytes (about 31.22 MiB) were removed.
 The dedicated headless emulator was stopped after the checks; its installed app data was retained.
+
+## Final disposable-helper cleanup — 1 October 2026
+
+After the owner's clarified cleanup instruction, the following finished helpers and redundant evidence copies
+were removed. The two runner scripts' exact content was verified recoverable in this task's session record;
+the isolated UI probe is reproducible from the retained original by changing its serial and dump filename.
+Screenshots already exist in pushed Git, and the duplicate build receipt was byte-identical to the retained one.
+
+| Removed path | Bytes |
+|---|---:|
+| `.local-tools/run-app-controls.py` | 5,078 |
+| `.local-tools/run-final-device.py` | 5,093 |
+| `.local-tools/ui_probe_5556.py` | 1,272 |
+| `.local-tools/build-reports/2026-10-01-history-ui.png` | 144,658 |
+| `.local-tools/build-reports/2026-10-01-history-ripple.png` | 161,198 |
+| `.local-tools/build-reports/2026-10-01-layout-fixtures-build.txt` | 6,382 |
+
+Removed from the host: 323,681 additional bytes. Unique raw build/device/provider receipts,
+mutation plans, upgrade snapshots and runtime-model evidence remain available for audit/reproduction.
+The signed candidate is retained for the owner to install. Existing SDK/caches/build directories and original
+helpers predate this task and were not deleted.
+
+Pre-existing historical source copies, outside this task's ownership, remain:
+
+| Retained path | Bytes |
+|---|---:|
+| `.local-tools/AppPipelineTest-r67.kt` | 87,595 |
+| `.local-tools/ChoiceAccessibilityTest-r69.kt` | 5,082 |
+| `.local-tools/ChoiceAccessibilityTest-r71.kt` | 5,093 |
+| `.local-tools/EngineJobPinningTest-r65.kt` | 18,498 |
+| `.local-tools/EngineJobPinningTest-r69.kt` | 19,549 |
+| `.local-tools/ProcessRecoveryTest-r65.kt` | 33,258 |
+| `.local-tools/TalkBackNavigationTest-r67.kt` | 14,415 |
+
+Recommendation: compare these older copies to reachable Git history before deciding to remove them. Their
+unique content has not been established here; they do not affect the app or the clean Git worktree.
+
+The temporary device-side UI dump `/sdcard/sourcescribe-final-window.xml` was also removed from the dedicated
+`emulator-5556` (15,487 bytes). Its SourceScribe origin and absence after deletion were checked; the emulator was
+then stopped again. Installed app data and the owner's emulator were retained.
