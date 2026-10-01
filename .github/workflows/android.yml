@@ -203,6 +203,9 @@ jobs:
           timeout 25 adb -s emulator-5554 shell input keyevent 82
           timeout 25 adb -s emulator-5554 shell getprop ro.build.fingerprint
           [[ "$(timeout 25 adb -s emulator-5554 shell getconf PAGE_SIZE | tr -d '\r')" == 16384 ]]
+          # Real notification-delivery regressions require the same runtime grant as the local device gate.
+          timeout 180 adb -s emulator-5554 install -r app/build/outputs/apk/debug/app-debug.apk
+          timeout 25 adb -s emulator-5554 shell pm grant app.sourcescribe.debug android.permission.POST_NOTIFICATIONS
           timeout 900 ./gradlew --no-daemon --max-workers=1 --console plain \
             -Pandroid.testInstrumentationRunnerArguments.sourcescribeEngineUpdate=true \
             :app:connectedDebugAndroidTest :extractor:connectedDebugAndroidTest
