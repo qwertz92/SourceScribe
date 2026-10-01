@@ -1,0 +1,182 @@
+{
+  "date": "2026-10-01",
+  "implementation_commit": "297e553",
+  "implementation_files_verified_byte_exact": 211,
+  "core": {
+    "tests": 231,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "lint_issue_counts": {
+    "app-debug": 0,
+    "app-release": 0,
+    "extractor-debug": 0,
+    "extractor-release": 0
+  },
+  "device": {
+    "post-control-app-device": {
+      "passed": 260,
+      "errors": 0,
+      "failures": 0,
+      "opt_in_skipped": 11,
+      "seconds": 144.743
+    },
+    "process-1": {
+      "passed": 1,
+      "errors": 0,
+      "failures": 0,
+      "opt_in_skipped": 0,
+      "seconds": 0.679
+    },
+    "process-2": {
+      "passed": 1,
+      "errors": 0,
+      "failures": 0,
+      "opt_in_skipped": 0,
+      "seconds": 0.737
+    },
+    "process-import-1": {
+      "passed": 1,
+      "errors": 0,
+      "failures": 0,
+      "opt_in_skipped": 0,
+      "seconds": 0.55
+    },
+    "process-import-2": {
+      "passed": 1,
+      "errors": 0,
+      "failures": 0,
+      "opt_in_skipped": 0,
+      "seconds": 0.149
+    },
+    "post-control-offline-positive": {
+      "passed": 1,
+      "errors": 0,
+      "failures": 0,
+      "opt_in_skipped": 0,
+      "seconds": 3.09
+    },
+    "unmetered-wait": {
+      "passed": 1,
+      "errors": 0,
+      "failures": 0,
+      "opt_in_skipped": 0,
+      "seconds": 10.319
+    },
+    "unmetered-resume": {
+      "passed": 1,
+      "errors": 0,
+      "failures": 0,
+      "opt_in_skipped": 0,
+      "seconds": 0.768
+    },
+    "final-extractor-device": {
+      "passed": 55,
+      "errors": 0,
+      "failures": 0,
+      "opt_in_skipped": 0,
+      "seconds": 261.843
+    },
+    "engine-job-pinning": {
+      "passed": 1,
+      "errors": 0,
+      "failures": 0,
+      "opt_in_skipped": 0,
+      "seconds": 66.899
+    },
+    "final-ui-fixture": {
+      "passed": 1,
+      "errors": 0,
+      "failures": 0,
+      "opt_in_skipped": 0,
+      "seconds": 0.752
+    }
+  },
+  "unmetered_wakeup": {
+    "previous_pid": "",
+    "automatic_pid": "11973",
+    "before_resume_instrumentation": true
+  },
+  "live_providers": {
+    "successful_groq_jobs": 3,
+    "assemblyai_paid_transcription_posts": 2,
+    "additional_paid_requests_for_upgrade_and_controls": 0
+  },
+  "signed_candidate": {
+    "filename": "SourceScribe-0.4.1-297e553.apk",
+    "version": "0.4.1",
+    "version_code": 4,
+    "bytes": 147040589,
+    "sha256": "a344994e3638494a1edfc96e968dabd5898d06c6662589beb34c3e4b42e72e9c",
+    "certificate_sha256": "19d1da9a8fe704082a531faed8a24d966c485aae581a7076dd4b4f66c11d3881",
+    "signature_verification": "PASS",
+    "zipalign_16kb": "PASS"
+  },
+  "release_upgrade": {
+    "date": "2026-10-01",
+    "device": "emulator-5556",
+    "package": "app.sourcescribe",
+    "baseline_was_absent": true,
+    "baseline_version": "0.4.0",
+    "candidate_version": "0.4.1",
+    "source_commit": "297e553",
+    "baseline_signed_apk_sha256": "1578c9e58ee332f9fe09a2cf04054be0aeba3528766c601fc66224b85dfe8ec2",
+    "candidate_signed_apk_sha256": "a344994e3638494a1edfc96e968dabd5898d06c6662589beb34c3e4b42e72e9c",
+    "update_mode": "adb install -r; no app data deletion",
+    "metadata_unchanged": {
+      "app_id": "10235",
+      "first_install": "2026-10-01 11:35:15",
+      "ce_data_inode": "581642",
+      "de_data_inode": "393813"
+    },
+    "history_entries": 1,
+    "caption_source": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+    "caption_track": "English native JSON3",
+    "passages": 6,
+    "complete_displayed_result_sha256": "fb1b360666324b351b0b1db1fb5f007bec6fe1ee2bdf10bf4c08d2bce958f530",
+    "complete_displayed_result_unchanged": true,
+    "appearance": "Dark",
+    "app_language": "English",
+    "provider_calls": 0,
+    "candidate_process_crash_buffer": "no fatal exception",
+    "result": "PASS"
+  },
+  "review_runtime": {
+    "model": "gpt-6-luna",
+    "verified_child_records": 13,
+    "final_scope_findings": {
+      "provider": [],
+      "stt": [],
+      "history": [],
+      "notifications": []
+    }
+  },
+  "independent_github_ci": {
+    "run_id": 36846190794,
+    "url": "https://github.com/qwertz92/SourceScribe/actions/runs/36846190794",
+    "head_sha": "2cdd6ee18d55bb080aba3e2edd9d490cf09a4523",
+    "conclusion": "success",
+    "counts": {
+      "app": {
+        "tests": 271,
+        "passed": 260,
+        "skipped": 11,
+        "failures": 0,
+        "errors": 0
+      },
+      "extractor": {
+        "tests": 55,
+        "passed": 51,
+        "skipped": 4,
+        "failures": 0,
+        "errors": 0
+      }
+    },
+    "changes_since_apk_implementation": [
+      ".github/workflows/android.yml",
+      "docs/BUILD.md"
+    ],
+    "opt_in_boundary": "All skipped methods were exercised separately locally; no provider keys are used in CI."
+  }
+}

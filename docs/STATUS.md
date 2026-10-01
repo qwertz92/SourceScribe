@@ -1,8 +1,8 @@
 # Project Status
 
 **As of 2026-10-01.** The published personal preview remains `0.4.0` (18 September 2026). Candidate `0.4.1`
-(versionCode 4) includes signed/pushed code commit `c93d5e8` plus uncommitted work; it is not public and final gates
-are pending. Full v1 acceptance is not reached yet.
+(versionCode 4) is signed, locally installable and verified from pushed implementation commit `297e553`.
+It has not been tagged or published. The candidate gates below passed; full v1 acceptance is not reached yet.
 The published app source is in public repo [qwertz92/SourceScribe](https://github.com/qwertz92/SourceScribe); this
 file describes the current state only; the dated log of how it got here, including 23 rounds of independent
 adversarial review over 0.1.0/0.2.0 and the 0.4.0 work, is in [HISTORY.md](HISTORY.md), and the lessons that work
@@ -34,8 +34,8 @@ its own. Full requirements: [PRODUCT.md](PRODUCT.md) (SS-01 to SS-12). Phase def
 | P2 First STT pipeline | Groq, local import, audio prep/chunking, credentials, submission limits | Live Groq transcription succeeded; one default-v3 rendition failed during free extraction before any provider call. The owner's unspecified source/model failure remains unreproduced. |
 | P3 Full acquisition | AssemblyAI, OpenAI, all four modes, `BOTH` partial-failure handling, language/tracks/options/presets | Live AssemblyAI verification stored a complete post-fix result after the initial run exposed missing default sentence timestamps. OpenAI has no supplied key. |
 | P4 Reliability | Queue/limits, recovery, unsafe submissions, export repair, update failures, source length taken from the source itself | Live-verified: process/permission boundaries, reboot recovery with a provider fixture, a signed engine update plus rollback, concurrent fixture jobs, and waiting/resume behavior. The specific interruption when a running job loses its unmetered network remains open under BUGS73. |
-| P5 UX and delivery | German/English, stable history cards and actions, measured transfer progress, quiet notifications, viewer/export, signing path | The normal candidate instrumentation and separately enabled offline-startup regression passed. Complete negative controls and the repeated normal build/app suite passed; remaining opt-ins, visual ripple, signing and in-place upgrade are pending. Full TalkBack operation remains unverified. |
-| P6 Acceptance | Integrated regressions; confirmed P1/P2 findings in the changed provider/history/recovery/notification scopes fixed | Core tests, four lint reports and final scoped GPT-6 Luna reviews passed. Candidate acceptance remains open for the pending gates above, physical ARM64, full TalkBack, a fresh-clone build, OpenAI (no key), and the owner's unspecified URL/model failure. Detailed evidence and coverage limits: [provider reliability report](reports/2026-09-30-provider-reliability.md). |
+| P5 UX and delivery | German/English, stable history cards and actions, measured transfer progress, quiet notifications, viewer/export, signing path | Normal instrumentation, all separately enabled opt-ins, full negative controls, visual whole-card ripple, release signing and the in-place 0.4.0-to-0.4.1 upgrade passed. Full TalkBack operation remains unverified. |
+| P6 Acceptance | Integrated regressions; confirmed P1/P2 findings in the changed provider/history/recovery/notification scopes fixed | Core tests, four lint reports and final scoped GPT-6 Luna reviews passed. Full acceptance remains open for physical ARM64, full TalkBack, a fresh-clone build, OpenAI (no key), and the owner's unspecified URL/model failure. Detailed evidence and coverage limits: [provider reliability report](reports/2026-09-30-provider-reliability.md). |
 
 Of the 20 items from the owner's 2026-09-10 device test, 18 are implemented and verified on-device or by test; item 1 (result-view scrolling) is unreproduced and tracked in [BUGS.md](BUGS.md); item 2 (button spacing) was set
 aside on 16 September 2026 because the owner could not recall what was meant. The owner's second device test, of preview 0.2.0 on 15-16 September 2026, added a P1
@@ -44,10 +44,10 @@ aside on 16 September 2026 because the owner could not recall what was meant. Th
 
 ## Releases
 
-**0.4.1 candidate** — version `0.4.1`, versionCode 4; first provider slice is signed and pushed as `c93d5e8`, the complete implementation has passed its local gates and is being committed. This is not the published 0.4.0 release. Core, initial lint/app gates and live Groq/AssemblyAI checks are complete; the repeated normal build/app suite passed; remaining candidate device and delivery gates are pending. Evidence and coverage boundaries: [provider reliability report](reports/2026-09-30-provider-reliability.md).
+**0.4.1 candidate** — version `0.4.1`, versionCode 4; signed/pushed implementation `297e553` (first slice `c93d5e8`). Local signed APK: `.local-tools/releases/SourceScribe-0.4.1-297e553.apk`, 147,040,589 bytes, SHA-256 `a344994e3638494a1edfc96e968dabd5898d06c6662589beb34c3e4b42e72e9c`; signature and 16 KiB alignment verified with the existing release certificate. No tag or public release was created. Core: 231 passed; all four lint reports: zero issues; normal app instrumentation: 260 passed, 11 documented opt-in skips, zero failures. All app opt-in flows were separately exercised; extractor: 55 passed, zero skips. Three Groq jobs and two paid AssemblyAI POSTs were tested. Signed 0.4.0-to-0.4.1 upgrade preserved the real caption job, all six displayed passages, language and appearance. Independent GitHub run `36846190794` passed on CI setup fix `2cdd6ee`; its normal suites retain documented opt-in skips, all exercised separately locally. Evidence and coverage boundaries: [provider reliability report](reports/2026-09-30-provider-reliability.md), [structured receipt](reports/2026-10-01-candidate-0.4.1-evidence.json).
 
 **0.4.0** — built and verified 16 September 2026 at commit `f7dd7d2`, published 18 September 2026. Version 0.4.0, versionCode 3. Answers the owner's 0.2.0 phone test
-(the P1 and 15 further points) and closes BUGS items 58 and 59. Unsigned release APK: `app/build/outputs/apk/release/app-release-unsigned.apk` (byte-identical copy: `.local-tools/releases/SourceScribe-0.4.0-f7dd7d2-unsigned.apk`,
+(the P1 and 15 further points) and closes BUGS items 58 and 59. Retained unsigned 0.4.0 APK: `.local-tools/releases/SourceScribe-0.4.0-f7dd7d2-unsigned.apk`,
 146,859,674 bytes, SHA-256 `031d37af5759a1055153a5f98f6fb7f92e0debe3302624afe93f6fe130dcbd7a`. Tag `v0.4.0`, on the documentation commit that follows `7868497`. Gates: 215 JVM tests, 4 lint reports clean, repository check PASS, app instrumentation 239 tests (230 passed, 9 opt-in skips), 4 process stages, extractor 55 (51 passed, 4 opt-in skips) plus its 5 live tests, 1 real Groq request SUCCESS, CI green at `7868497`, update 0.1.0 to 0.4.0 and 0.2.0 to 0.4.0 PASS on a fresh emulator. Full evidence:
 [2026-09-16 preview report](reports/2026-09-16-preview-0.4.md).
 
@@ -111,7 +111,6 @@ run on Android 17 (API 37); on 14 September 2026 the owner decided that older An
 | OpenAI live transcription | No key was supplied. | Owner supplies a key and authorizes a live call. |
 | Full TalkBack operation | Semantics and dialog activation are tested, but full focus navigation has no suitable real-input automation. | A human tester, or suitable real-input automation, walking all main screens with TalkBack on. |
 | Fresh-clone build | Never run on a second machine or a clean Linux/WSL system without existing project caches. | Run BUILD.md's fresh-clone steps on such a system. |
-| Upgrade test to candidate 0.4.1 | The 0.1.0 and 0.2.0-preview.1 upgrade to published 0.4.0 passed on a fresh emulator. An upgrade to candidate 0.4.1 has not been recorded. | Install the signed 0.4.1 candidate over a supported preview and verify the stored job, transcript, and settings survive. |
 
 ## Local environment
 

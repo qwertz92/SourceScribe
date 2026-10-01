@@ -216,3 +216,8 @@ recorded so the investigation is not repeated.
 - **Reserve error text using actual font measurement.** (1 October 2026) Two nominal line heights were
   insufficient at 200% font size. Compose's native text measurement reserves two rendered lines and the
   help-button slot; full details remain accessible in Actions.
+
+- **Grant runtime permissions in every device gate that tests delivery.** (1 October 2026) Real notification tests
+  intentionally fail when `POST_NOTIFICATIONS` is absent. The local gate granted it, but CI did not; preinstall the
+  debug APK and grant the permission before connected tests on the ephemeral runner. Do not replace delivery
+  assertions with assumptions or skips.

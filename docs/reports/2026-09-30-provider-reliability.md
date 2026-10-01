@@ -23,7 +23,9 @@ Confirmed defects and changes:
   Actions shows the failed branch and phase and the available diagnostic. Unknown reasons stay unknown.
 - Preparing the same source/rendition again can copy a verified original from an earlier attempt. Identity,
   engine binding, private regular-file status, and SHA-256 must all match. Missing, modified, or mismatched originals
-  are downloaded again. Paid requests, provider responses, and prepared chunks are not silently reused or repeated.
+  are downloaded again. Older checkpoints without a recorded source hash may therefore need one fresh download
+  before later attempts can reuse the verified original. Paid requests, provider responses, and prepared chunks
+  are not silently reused or repeated.
 - WorkManager phase continuations and AssemblyAI polling no longer alternate the visible queued/running status.
   Foreground native network callbacks refresh presentation while retaining the real retry deadline and constraints.
 - Upload progress counts the current audio request body, including multipart overhead. AssemblyAI's small JSON
@@ -65,11 +67,27 @@ regressions. Legacy unmarked receipts remain readable with truthful partial stat
 
 ## Local verification
 
-The complete build on 1 October passed `:core:test`, debug/test/release APK generation, the extractor JVM test task (`NO-SOURCE`),
-and all four app/extractor debug/release lint tasks. Core: 231 passed, zero failures or skips. Each lint XML
-contained zero issues. The app's fresh-APK instrumentation passed 260 of 271 cases, with 11 explicitly opt-in
-skips and zero failures (151.345 s). The separately enabled real offline-startup check passed without skipping.
-The complete normal build was repeated after all controls and passed (16m 17s, 261 tasks). All 211 implementation/build/tool source hashes matched the pre-build manifest. All four lint XMLs again contained zero issues. Fresh normal APKs were installed and the full app suite again passed: 260 passes, 11 documented opt-in skips, zero failures among 271 cases. The remaining opt-in, visual and signed-upgrade checks are pending.
+The complete normal build after all controls passed on 1 October: `:core:test`, debug/test/release APK generation,
+the extractor JVM test task (`NO-SOURCE`), and all four app/extractor debug/release lint tasks (16m 17s, 261 tasks).
+Core: 231 passed, zero failures or skips. Each lint XML contained zero issues. All 211 implementation/build/tool
+source hashes matched the pre-build manifest and the committed sources at `297e553`. Fresh normal APKs were
+installed; the complete app instrumentation passed 260 cases, with 11 explicitly opt-in skips and zero failures
+among 271 cases (144.743 s). The eleven opt-in methods were all separately exercised:
+
+| Additional device check | Result and limit |
+|---|---|
+| Live Groq and AssemblyAI methods | Passed through real provider calls; exact totals are above. |
+| Four process-death stages | 4/4 passed, no skips. Accepted AssemblyAI fixture receipt survives restart with retrieval only; private imported audio survives loss of its external grant and source. Fixture requests do not spend provider credits. |
+| Actual offline startup | 1 passed, no skips; a fresh activity recomputes the seeded queued job's waiting state from the offline snapshot. |
+| Actual unmetered waiting/resume | 2/2 passed, no skips. No app PID existed before restoring Wi-Fi; WorkManager woke PID 11973 before the second instrumentation invocation. Network settings were restored exactly. The worker uses a nonexistent attempt ID, so no provider job is submitted. |
+| Signed engine activation with pinned jobs | 1 passed, no skips (66.899 s). Two coordinator caption **fixture** jobs retained their old engine while a real signed engine activation and native runtime probe were performed. This is not two real caption acquisitions. |
+| Synthetic UI fixture | 1 passed, no skips; uses the actual app database builder and migrations. |
+
+The final extractor instrumentation passed all 55 cases, zero failures or skips (261.843 s), with every engine
+and public-source option enabled. It exercised actual native metadata/caption/audio/preparation and signed
+engine update/rollback: bundled yt-dlp `2026.08.19`, activated `2026.09.27.232945`, EJS `0.8.0`. The public source
+was the exact 19-second clip above. These extractor checks made no paid provider request. Counts and timings
+are also in the [structured evidence receipt](2026-10-01-candidate-0.4.1-evidence.json).
 
 Negative controls are run against retained tests, then restored byte-for-byte:
 
@@ -101,7 +119,7 @@ Negative controls are run against retained tests, then restored byte-for-byte:
   that each individual mutation has an independent oracle.
 
 Coverage boundaries: the cross-thread callback interleaving is not deterministically forced; the callback is
-now natively dispatched on the main handler. Visual ripple verification is pending. The local reprepare
+now natively dispatched on the main handler. The whole-card ripple was visually verified below. The local reprepare
 setting regression does not independently prove retention of a previously chosen YouTube rendition. Controls
 also do not isolate copy cancellation, an in-flight progress checkpoint, every legacy receipt path, or the
 OS-post/preference-recording crash race. These limits are not claimed as passing checks.
@@ -116,6 +134,38 @@ found a paid-resubmission P1; it was reproduced, fixed, negatively controlled an
 counts for the recorded scopes: provider 6, STT 5, history 5, notifications 8. These are scoped pass counts,
 not a claim that the project's older issue list is empty.
 
+## Signed candidate, native visual check and upgrade
+
+Implementation `297e553` and the first provider slice `c93d5e8` are signed and pushed to `main`. The local candidate
+is `.local-tools/releases/SourceScribe-0.4.1-297e553.apk`: version `0.4.1`, versionCode 4, 147,040,589 bytes,
+SHA-256 `a344994e3638494a1edfc96e968dabd5898d06c6662589beb34c3e4b42e72e9c`. `apksigner verify --print-certs`
+and `zipalign -c -P 16 4` passed. The existing release certificate SHA-256 is
+`19d1da9a8fe704082a531faed8a24d966c485aae581a7076dd4b4f66c11d3881`. No tag or public release was created.
+
+On the dedicated `emulator-5556`, an actual native touch-down, screenshot, then touch-up showed the ripple covers
+the card through the Actions footer. The screen contains an explicitly marked synthetic fixture:
+[idle screenshot](screenshots/history-041-idle.png), [pressed screenshot](screenshots/history-041-pressed.png).
+No owner emulator was operated or read.
+
+The production package was absent on that emulator after its earlier restart; the reason was not established.
+An existing signed 0.4.0 APK was therefore installed to create a controlled baseline, not presented as preserved
+pre-session owner data. Baseline signed APK SHA-256:
+`1578c9e58ee332f9fe09a2cf04054be0aeba3528766c601fc66224b85dfe8ec2` (the older status ledger's `031d37…` is
+its **unsigned** build hash). In the ordinary release UI, the exact public clip was processed with **YouTube only**
+and its English native JSON3 track. The job completed with six caption passages; appearance was set to Dark.
+The candidate was installed with `adb install -r` without uninstalling or deleting app data.
+
+After upgrade, the one completed history entry, all six displayed passages with their times/provenance, English
+app language and Dark appearance were retained. The complete displayed-result snapshot was byte-identical
+before and after. App ID 10235, first-install timestamp, and both credential/device-encrypted data inodes stayed
+unchanged; package version changed from code 3 to code 4. The running candidate's crash buffer had no fatal
+exception. This upgrade check made **zero provider calls**. Raw UI snapshots remain ignored rather than placing
+full transcript text in Git; the structured receipt records their equality and hash.
+
+Physical ARM64, full TalkBack navigation, a fresh-clone build and OpenAI live coverage (no key) remain unverified.
+The owner's exact URL/model failure is unreproduced. Older open items, including the specific running-worker
+network interruption in BUGS73, remain in [BUGS.md](../BUGS.md); clean scoped reviews do not close that backlog.
+
 ## Dependency compatibility measurement
 
 Official Google Maven metadata confirmed AGP 9.4.1, WorkManager 2.12.0, and core-ktx 1.19.1 as current stable
@@ -127,3 +177,53 @@ upstream `BasePlugin.kt` frame in `createAndroidJdkImageConfiguration`. No newer
 The wrapper stays at checksum-pinned 9.7.1; its comment requires remeasurement at the next AGP update.
 `org.gradle.warning.mode=fail` remains enabled. New dependency verification entries were additive (50 components
 after resolution, zero removals), from the existing official repositories; the final strict metadata-verified build passed with these entries.
+
+## GitHub notification test setup — 1 October 2026
+
+[Run 36840202696](https://github.com/qwertz92/SourceScribe/actions/runs/36840202696) on `297e553` failed four
+notification-delivery regressions: the ephemeral GitHub emulator had not granted `POST_NOTIFICATIONS`. It
+reported 256 passes, 11 opt-in skips, four failures, zero errors among 271 app cases. All four failures explicitly
+required that runtime permission; the local gate already grants it and passed 260 cases. Signed/pushed commit
+`2cdd6ee` applies the same setup to CI: install the built debug APK and grant the declared notification permission
+before the unchanged connected test tasks. No tests were skipped or weakened, and no credentials or paid calls
+were added. The workflow YAML parsed and every shell step passed `bash -n`; the exact exported Git index passed
+repository checks (247 files, six executable scripts). An earlier export under ignored `.local-tools` scanned zero
+files and was rejected, then retried outside ignored directories. A read-only follow-up review was empty; two
+stale live-evidence statements in BUGS11/64 were corrected without closing their unverified edge cases.
+[Run 36846190794](https://github.com/qwertz92/SourceScribe/actions/runs/36846190794) on `2cdd6ee` then passed:
+JVM/build/lint in 9m 20s; device task in 6m 23s. App: 260 passes, 11 documented opt-in skips, zero failures or errors
+among 271 cases. Extractor: 51 passes, four opt-in skips, zero failures or errors among 55 cases. Every skipped path
+was separately exercised locally as recorded above. Only the workflow and BUILD.md differ between `297e553`
+and `2cdd6ee`; the APK implementation is unchanged.
+
+## Temporary verification copies removed — 1 October 2026
+
+Only this task's staged-source and negative-control copies were removed after restored source hashes, normal
+checks and the signed/pushed implementation were verified. The source versions remain recoverable from Git.
+Raw evidence, SDK/caches, credentials, old releases and the signed candidate were retained. This was source-test
+cleanup, not a device-data deletion or a change to backup retention.
+
+| Removed path | Regular-file bytes |
+|---|---:|
+| `.local-tools/provider-index-check` | 13,931,158 |
+| `.local-tools/build-reports/2026-09-30-core-negative-source` | 90,598 |
+| `.local-tools/build-reports/2026-10-01-control-backup-functional-compile-failed` | 247,126 |
+| `.local-tools/build-reports/2026-10-01-control-backup-functional` | 247,126 |
+| `.local-tools/build-reports/2026-10-01-control-backup-safe-install-failed` | 144,216 |
+| `.local-tools/build-reports/2026-10-01-control-backup-safe` | 144,216 |
+| `.local-tools/build-reports/2026-10-01-control-backup-ui-partial` | 177,615 |
+| `.local-tools/build-reports/2026-10-01-control-backup-ui` | 177,615 |
+| `/tmp/sourcescribe-assembly-adapter-e33a6b4216d635d0.kt` | 40,956 |
+
+Total removed: 15,200,626 regular-file bytes (about 14.50 MiB); this is not a filesystem allocated-block measurement.
+
+Two additional disposable source exports used for the exact-index CI check were removed:
+
+| Removed path | Regular-file bytes |
+|---|---:|
+| `/tmp/sourcescribe-ci-index-check-moakqeaa` | 8,768,520 |
+| `.local-tools/final-ci-index-check` | 8,768,520 |
+
+These exports contained no unique source data. Their combined regular-file size was 17,537,040 bytes; together
+with the nine copies above, 32,737,666 regular-file bytes (about 31.22 MiB) were removed.
+The dedicated headless emulator was stopped after the checks; its installed app data was retained.

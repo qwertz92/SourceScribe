@@ -1,12 +1,13 @@
 # Known bugs
 
 **As of:** 1 October 2026. The published release remains 0.4.0; local candidate 0.4.1 (versionCode 4) has
-implementation passing its local gates; the remaining device and delivery verification is pending. This is the one list of every known, unfixed item, with its
+signed/pushed implementation `297e553` and passed local build, device, signing and in-place upgrade gates. This is the one list of every known, unfixed item, with its
 location, trigger, evidence, and priority in one place — `docs/DEFECTS.md` no longer exists; what used to live there
 is folded into the entry for its number below. Item 1 is the still-open feedback from the 10 September 2026 device
 test; item 2 (the bottom button "could use more space") was set aside on 16 September 2026 because the owner could
 not recall what was meant, and comes back only if it is reported again. Candidate item 74 is closed after its
-measured 200% layout checks passed; item 73 remains open pending an actual offline/unmetered device check.
+measured 200% layout checks passed; item 73 remains open for the specific running-worker network interruption.
+Offline startup and automatic unmetered wakeup passed; they do not exercise that running interruption.
 Closed, and kept only as a number so references stay valid, are 3, 4, 6, 7, 8, 9, 12, 13, 17, 18, 19, 20, 23, 31,
 32, 36, 41, 42, 47, 54, 56, 57, 58, 59, 60, 63, and 74; what each of them was and which commit closed it is in
 `docs/HISTORY.md` and in git.
@@ -34,8 +35,8 @@ no exploitable hole is demonstrated, so none of them carries a CVSS score.
 
 ## P1
 
-No P1 is recorded for the published 0.4.0 release. Candidate 0.4.1 has not received final verification; its status
-is pending, not a pass. What could be hiding a P1 is in the next section.
+No P1 is recorded for published 0.4.0 or remains demonstrated in the candidate 0.4.1 reviewed scopes.
+The local candidate gates passed; the unverified coverage below is not presented as a pass.
 
 ## Not verified
 
@@ -51,7 +52,6 @@ These gaps are not known bugs. If any of them fails, it is a P1.
   Full request totals and limits are in the [provider reliability report](reports/2026-09-30-provider-reliability.md).
 - **An ARM64 device, like almost every current phone.** All device tests still ran on x86_64 emulators with
   Android 17 (API 37). The ARM64 build of the app has never run in any of these tests.
-- **Upgrading an installed preview to candidate 0.4.1.** The upgrade to candidate 0.4.1 has not been verified. The earlier upgrade to 0.4.0 was verified on 16 September 2026 on a fresh emulator (Pixel 10, Android 17, AVD `Upgrade10` at port 5556): a 0.1.0-preview.1 and a 0.2.0-preview.1 install, each with one finished captions job from the 19-second clip, were updated in place to signed 0.4.0 with `adb install -r`; the job, transcript, and settings remained, and the crash log stayed empty. Candidate 0.4.1's upgrade check is still pending.
 
 Full operation with TalkBack is also not verified.
 
@@ -109,9 +109,9 @@ release notes suggest it holds up. On 14 September 2026 the owner decided that t
   transaction; no cost, no silent retry, and the partial state is preserved.
   `SttMissingRetryTest.retainedProviderWarningsMustMatchPartialArtifact` covers exactly this with
   `assertEquals(0, requestAttempts.get())`.
-- **Not reachable today:** the one real provider run this project has made (16 September, Groq) produced no partial
-  result, so no stored partial state with provider warnings exists yet. It becomes reachable once a real partial
-  result exists and warning generation is changed again afterward.
+- **Live evidence (1 October 2026):** the first AssemblyAI run stored a partial result with a missing-timestamps
+  warning. No observed result exceeded 64 distinct warnings or exercised a later warning-cap change, so this
+  specific incompatibility remains unverified.
 
 ### 14. Old artifacts keep the old caption code and keep getting the timestamp sentence (low)
 
@@ -196,11 +196,10 @@ release notes suggest it holds up. On 14 September 2026 the owner decided that t
   `INCOMPLETE_SEGMENT_TIMESTAMPS` and store a transcription that in fact lost nothing as `PARTIAL_SUCCESS`. This
   would be the reverse of the app's own invariant that a partial result must never appear as a full success: here a
   full result would appear as partial instead, which is the conservative direction but still a wrong label.
-- **Why it stays open, unverified:** the one real Groq run of 16 September (4 segments over a 19-second clip) did
-  not exercise a chunk anywhere near the 10-minute boundary where the surplus matters, and did not hit this case —
-  its only reported problem was the missing `model` field (item 0 of package B). Whether a real provider actually
-  times segments into an encoder's own trailing silence is unmeasured. If it turns out to happen routinely, this
-  would deserve a higher priority than P3.
+- **Why it stays open, unverified (1 October 2026):** the earlier 16 September run and the three successful Groq
+  jobs in this candidate's checks all used a 19-second clip. None exercised a chunk near the 10-minute boundary
+  or hit this case. Whether a real provider times segments into the encoder's trailing silence is unmeasured;
+  routine occurrence would deserve a higher priority than P3.
 - **Missing to close:** either widen the completeness check's tolerance by the same encoder surplus the audio
   preparation already tolerates, or measure real provider responses near a chunk boundary first, so the tolerance
   is not introduced blind.
@@ -231,9 +230,10 @@ release notes suggest it holds up. On 14 September 2026 the owner decided that t
 - **Expected vs. actual:** the card could say "waiting for an unmetered connection"; it says only the outcome,
   because an attempt that carries an error is read as sitting on its own retry delay. Nothing wrong is claimed —
   the conservative direction. Traced in code, not observed on a device.
-- **Candidate status (1 October 2026):** offline-startup passed separately, and interrupted-row rules passed in
-  instrumentation. Neither test directly exercises a running job stopped when its network becomes metered, so this
-  item remains open until that transition confirms the waiting reason and automatic resume.
+- **Candidate status (1 October 2026):** offline-startup and interrupted-row rules passed. Actual unmetered
+  WorkManager waiting/resume also passed, including system-driven process wakeup before the second instrumentation
+  invocation. None directly exercises a running job stopped when its network becomes metered, so this item remains
+  open until that transition confirms the waiting reason and automatic resume.
 - **Missing to close:** on a device, move a network-required job offline and then onto an unmetered connection;
   verify the card names the constraint and the work resumes without user action.
 
