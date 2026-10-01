@@ -1,6 +1,6 @@
 # Build and personal release
 
-SourceScribe builds with Java 17, the checked-in Gradle Wrapper 9.7.1, AGP 9.4.0, and compile/target SDK 37. The Android modules are `:app` and `:extractor`; `:core` is a JVM module. CI installs Build Tools 37.0.0 and 36.0.0 so both are available for Android and native checks.
+SourceScribe builds with Java 17, the checked-in Gradle Wrapper 9.7.1, AGP 9.4.1, and compile/target SDK 37. Gradle 9.8.0 was measured on 30 September 2026 and fails the strict warning gate because AGP 9.4.1 calls the deprecated `Configuration.setVisible`; recheck this hold at the next AGP update. The Android modules are `:app` and `:extractor`; `:core` is a JVM module. CI installs Build Tools 37.0.0 and 36.0.0 so both are available for Android and native checks.
 
 ## Fresh clone under Linux or WSL
 
@@ -51,10 +51,12 @@ export SERIAL=emulator-5556 # replace with the device id "adb devices" actually 
 timeout 90 "$ADB" -s "$SERIAL" install -r app/build/outputs/apk/debug/app-debug.apk
 timeout 60 "$ADB" -s "$SERIAL" install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
 timeout 60 "$ADB" -s "$SERIAL" install -r extractor/build/outputs/apk/androidTest/debug/extractor-debug-androidTest.apk
+timeout 20 "$ADB" -s "$SERIAL" shell pm grant app.sourcescribe.debug android.permission.POST_NOTIFICATIONS
 timeout 600 "$ADB" -s "$SERIAL" shell am instrument -w -r \
   -e notClass app.sourcescribe.data.UiFixtureTest \
   app.sourcescribe.debug.test/androidx.test.runner.AndroidJUnitRunner
 timeout 600 "$ADB" -s "$SERIAL" shell am instrument -w -r \
+  -e sourcescribeEngineUpdate true \
   app.sourcescribe.extractor.test/androidx.test.runner.AndroidJUnitRunner
 ```
 
@@ -62,29 +64,40 @@ When using Windows ADB from WSL, point `ADB` at the actual `adb.exe` path and tr
 
 ## Provider keys for live tests
 
-A provider API key never goes into the repository, a commit, a log, a screenshot, or test output — this holds for
-every provider and for agents and the owner alike. For the one test that spends real money,
-`app`'s `LiveGroqTranscriptionTest`, the owner keeps a Groq key outside the repository, at
-`~/.local/share/sourcescribe/groq-key` in WSL, mode 600, one line, nothing else in the file. A build or test-runner
-script reads it into a shell variable — never printed, never echoed — and passes it as an instrumentation argument:
+The opt-in `LiveGroqTranscriptionTest` exercises the real source-resolution, download, preparation, submission,
+normalization, and persistence pipeline for Groq or AssemblyAI. It is separate from the ordinary fixture gate.
+On 30 September 2026 the owner authorized Groq testing within the free allowance and sparing, short AssemblyAI
+checks after the local gates, because each AssemblyAI transcription consumes credits.
 
-```bash
-GROQ_KEY="$(cat ~/.local/share/sourcescribe/groq-key)"
-timeout 900 "$ADB" -s "$SERIAL" shell am instrument -w -r \
-  -e class app.sourcescribe.data.LiveGroqTranscriptionTest \
-  -e sourcescribeLiveProvider groq -e liveProviderKey "$GROQ_KEY" \
-  -e publicSourceUrl "<url of a clip of at most 30 seconds>" \
-  app.sourcescribe.debug.test/androidx.test.runner.AndroidJUnitRunner
-timeout 20 "$ADB" -s "$SERIAL" logcat -b all -c
+Keep keys in the ignored `.env.local` at the repository root, using `GROQ-KEY=...` and `ASSEMBLYAI-KEY=...`.
+`tools/run-live-provider.py` reads that file without sourcing it, redacts both keys from output, and requires an
+explicit device serial. Never stage the env file. Install the debug app and test APK before running:
+
+```text
+timeout 1300 python3 tools/run-live-provider.py groq https://www.youtube.com/watch?v=jNQXAC9IVRw --serial emulator-5556 --adb /mnt/c/Users/thoma/AppData/Local/Android/Sdk/platform-tools/adb.exe --report .local-tools/build-reports/live-groq.txt
+timeout 1300 python3 tools/run-live-provider.py assemblyai https://www.youtube.com/watch?v=jNQXAC9IVRw --audio-track 139-drc --serial emulator-5556 --adb /mnt/c/Users/thoma/AppData/Local/Android/Sdk/platform-tools/adb.exe --report .local-tools/build-reports/live-assemblyai.txt
 ```
 
-The final `logcat -b all -c` is not optional: `adbd` writes the whole `am instrument` command line, the key
-included, into the device's own system log, outside the app's process and outside anything the test itself
-controls, and clearing the buffer afterward is the only way to remove it (see
-[LEARNINGS.md](LEARNINGS.md)). Without all three arguments the test skips itself with a sentence naming which one
-is missing. This is a real request against Groq's API: run it to prove a fix, not as part of the routine gate, and
-respect the owner's free-tier limits (one public clip of at most 30 seconds per run). AssemblyAI and OpenAI have no
-equivalent live test yet; adding one follows the same pattern once the owner provides a key for either.
+Those commands use Windows ADB from WSL; replace its absolute path on another host. `--model whisper-large-v3`
+selects the other Groq model; without it the test uses the app's first/default model. AssemblyAI always uses its
+first/default model. The AssemblyAI command explicitly selects track `139-drc`, verified from this source's
+resolved audio tracks. `--audio-track` is test-only: its ID is resolved against the supplied video, and the test
+fails before saving credentials or making a Groq/AssemblyAI request if that exact ID is missing. Track IDs are
+source-scoped; pair one with the same video from which it was observed. Omitting the flag preserves the existing
+default track selection. This does not change app settings or automatically switch a production job to another
+rendition.
+The source and prepared duration must be at most 30 seconds by default; the AssemblyAI ceiling cannot be raised.
+Groq can use `--max-clip-seconds` for an explicitly authorized longer source.
+
+AssemblyAI permits exactly one upload and one potentially billable transcript POST in the test; later status
+GETs are allowed. The test rejects a second transcript POST. Neither test accepts a fixture as live success.
+A missing opt-in argument skips the test with a written reason. Success requires the actual provider marker,
+a successful stored outcome, and exactly one completed test; a zero ADB exit code alone is insufficient.
+
+The runner clears **the selected test device's** entire logcat buffer in `finally`, including on failure, because
+`adbd` records instrumentation arguments containing the key. Use the agent-owned `emulator-5556`, never the owner's
+`emulator-5554`. While ADB runs, the key is also present in its process command line. Do not capture process-command
+lists or device logs during the live run. Keys, audio, and full transcripts never enter the saved report.
 
 ## Environment notes worth knowing before a device run
 
@@ -95,9 +108,8 @@ open defects.
   Windows `adb` server only listens on `127.0.0.1`, which WSL cannot reach. `connectedDebugAndroidTest` is
   therefore not runnable locally without restarting the Windows `adb` server, which would also disconnect the
   owner's own emulator. The working path is the one in "Device verification" above: build under WSL, then install
-  and run instrumentation under Windows ADB. The `extractor` module has 39 of its own instrumentation tests, and
-  without `-e sourcescribeEngineUpdate true` its `EngineUpdateManagerTest` silently skips 14 of them by assumption
-  while still reporting `OK` — always pass that flag.
+  and run instrumentation under Windows ADB. Pass `-e sourcescribeEngineUpdate true` for the extractor update fixture tests; without the opt-in flag,
+  assumptions skip them while instrumentation can still report `OK`.
 - **A failed install looks like a code defect.** If `/data` on the emulator is tight, `adb install -r` can fail
   with `INSTALL_FAILED_INSUFFICIENT_STORAGE` for one APK while a smaller one installs, and instrumentation then
   runs new tests against a stale app build and reports failures that look like real defects. After every install,

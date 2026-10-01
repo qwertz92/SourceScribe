@@ -177,9 +177,19 @@
     <string name="remote_delete_confirmed">AssemblyAI confirmed the data deletion. This does not confirm a refund.</string>
     <string name="no_remote_handle">No undeleted AssemblyAI job ID is available.</string>
     <string name="provider_elapsed">Provider is processing · %1$s since job started</string>
-    <string name="processed_bytes">Processed: %1$s</string>
-    <string name="transfer_of_total">%1$d%% · %2$s of %3$s</string>
+    <string name="history_current_phase">Current step: %1$s · %2$s</string>
+    <string name="history_waiting_provider_response">Upload complete · waiting for provider response</string>
+    <string name="processed_bytes">This transfer: %1$s</string>
+    <string name="transfer_of_total">%1$d%% · %2$s of %3$s in this transfer</string>
     <string name="transfer_rate">%1$s · %2$s/s</string>
+    <string name="provider_http_status">HTTP status: %1$d</string>
+    <string name="provider_operation">Provider step: %1$s</string>
+    <string name="provider_reason">Provider detail: %1$s</string>
+    <string name="provider_operation_upload">Upload audio</string>
+    <string name="provider_operation_submit">Submit transcription</string>
+    <string name="provider_operation_retrieve">Retrieve transcript</string>
+    <string name="provider_operation_delete">Delete provider data</string>
+    <string name="provider_diagnostic_unknown">The exact cause is unknown; no structured provider details were saved.</string>
     <string name="provenance_details">Source and model details</string>
     <string name="model_requested">Requested model: %1$s</string>
     <string name="model_reported">Model reported by provider: %1$s</string>
@@ -373,6 +383,7 @@
     <string name="no_filter_matches">No entry matches this filter.</string>
     <string name="job_actions">Actions for this job</string>
     <string name="job_actions_what_happened">What happened</string>
+    <string name="failed_branch_step">Failed: %1$s · %2$s</string>
     <string name="job_actions_recommended">Recommended</string>
     <string name="job_actions_other">Other actions</string>
     <string name="job_actions_nothing">Nothing offered here would change this. The sentence above says what happened; the entry can stay as it is or be deleted.</string>
@@ -439,7 +450,19 @@
     <string name="reason_quota">The credit or quota of your account at the provider is used up.</string>
     <string name="reason_server">The provider reported a fault of its own. This is not caused by this app.</string>
     <string name="reason_remote_failed">The provider cancelled the job.</string>
-    <string name="reason_invalid_input">The provider rejected the request. Usually one chosen option does not fit the model.</string>
+    <string name="reason_invalid_input">This input or request could not be processed. Check the details for this attempt.</string>
+    <string name="provider_reason_file_too_large">The audio file exceeds the size accepted by the provider.</string>
+    <string name="provider_reason_unsupported_media">The provider does not accept this audio format.</string>
+    <string name="provider_reason_invalid_model">The provider did not accept this model identifier.</string>
+    <string name="provider_reason_invalid_language">The provider did not accept this language.</string>
+    <string name="provider_reason_invalid_option">The provider did not accept one or more transcription options.</string>
+    <string name="provider_reason_invalid_audio">The provider could not read the audio content.</string>
+    <string name="provider_reason_unknown">The provider did not give a more specific rejection reason.</string>
+    <string name="provider_reason_context_too_long">The request prompt exceeds the app’s conservative 224-byte UTF-8 limit.</string>
+    <string name="provider_reason_too_many_terms">Too many keyterms: at most 200 for Whisper U2 or 1,000 for Whisper U35.</string>
+    <string name="provider_reason_term_too_long">A keyterm can contain at most 6 words.</string>
+    <string name="provider_error_language_unsupported">The selected language is not supported by this provider or model.</string>
+    <string name="provider_error_model_unsupported">The selected model is not supported by this provider.</string>
     <string name="reason_source_unavailable">The video cannot be retrieved: private, deleted, or blocked in this country.</string>
     <string name="reason_challenge_required">YouTube asks for proof that no automated client is calling, and serves nothing until it gets it.</string>
     <string name="reason_no_captions">This video has no captions.</string>
@@ -523,4 +546,5 @@
     <string name="export_tree_default_used">Default folder</string>
     <string name="open_folder">Open folder</string>
     <string name="no_folder_app">No app on this device can show a folder. Open the folder in your file manager.</string>
+    <string name="waiting_automatic_retry">Automatic retry scheduled.</string>
 </resources>

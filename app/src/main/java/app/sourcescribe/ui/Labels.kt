@@ -24,6 +24,8 @@ import app.sourcescribe.core.Phase
 import app.sourcescribe.core.Provenance
 import app.sourcescribe.core.Provider
 import app.sourcescribe.core.ProviderErrorCode
+import app.sourcescribe.core.ProviderOperation
+import app.sourcescribe.core.ProviderRejectionReason
 import app.sourcescribe.core.Region
 import app.sourcescribe.core.TranscriptWarnings
 import app.sourcescribe.core.Translation
@@ -147,6 +149,26 @@ internal fun phaseLabel(phase: Phase) = when (phase) {
     Phase.RETRIEVE -> R.string.phase_retrieve
     Phase.NORMALIZE -> R.string.phase_normalize
     Phase.PERSIST -> R.string.phase_persist
+}
+
+@StringRes internal fun providerOperationLabel(operation: ProviderOperation) = when (operation) {
+    ProviderOperation.UPLOAD -> R.string.provider_operation_upload
+    ProviderOperation.SUBMIT -> R.string.provider_operation_submit
+    ProviderOperation.RETRIEVE -> R.string.provider_operation_retrieve
+    ProviderOperation.DELETE -> R.string.provider_operation_delete
+}
+
+@StringRes internal fun providerRejectionReasonLabel(reason: ProviderRejectionReason) = when (reason) {
+    ProviderRejectionReason.FILE_TOO_LARGE -> R.string.provider_reason_file_too_large
+    ProviderRejectionReason.UNSUPPORTED_MEDIA -> R.string.provider_reason_unsupported_media
+    ProviderRejectionReason.INVALID_MODEL -> R.string.provider_reason_invalid_model
+    ProviderRejectionReason.INVALID_LANGUAGE -> R.string.provider_reason_invalid_language
+    ProviderRejectionReason.INVALID_OPTION -> R.string.provider_reason_invalid_option
+    ProviderRejectionReason.INVALID_AUDIO -> R.string.provider_reason_invalid_audio
+    ProviderRejectionReason.CONTEXT_TOO_LONG -> R.string.provider_reason_context_too_long
+    ProviderRejectionReason.TOO_MANY_TERMS -> R.string.provider_reason_too_many_terms
+    ProviderRejectionReason.TERM_TOO_LONG -> R.string.provider_reason_term_too_long
+    ProviderRejectionReason.UNKNOWN -> R.string.provider_reason_unknown
 }
 
 /** Elapsed or media time. Hours are shown as hours instead of a three-digit minute count. */
@@ -392,6 +414,11 @@ internal fun messageSpec(code: String): MessageSpec? = when (code) {
     "AUDIO_DURATION_UNKNOWN" -> MessageSpec.Text(R.string.audio_duration_unknown)
     "UNSUPPORTED_OPTION", "PROVIDER_UNSUPPORTED_OPTION", "RESPONSE_UNSUPPORTED_OPTION",
     "PROVIDER_CAPABILITY_OR_CREDENTIAL_INVALID" -> MessageSpec.Text(R.string.unsupported_options)
+    "PROVIDER_CONTEXT_TOO_LONG" -> MessageSpec.Text(R.string.provider_reason_context_too_long)
+    "PROVIDER_TOO_MANY_TERMS" -> MessageSpec.Text(R.string.provider_reason_too_many_terms)
+    "PROVIDER_TERM_TOO_LONG" -> MessageSpec.Text(R.string.provider_reason_term_too_long)
+    "PROVIDER_LANGUAGE_UNSUPPORTED" -> MessageSpec.Text(R.string.provider_error_language_unsupported)
+    "PROVIDER_MODEL_UNSUPPORTED" -> MessageSpec.Text(R.string.provider_error_model_unsupported)
     "PRICE_UNKNOWN" -> MessageSpec.Text(R.string.price_unknown)
     "CONTEXT_TERM_BLANK" -> MessageSpec.Text(R.string.context_term_blank)
 
@@ -428,7 +455,7 @@ internal fun messageSpec(code: String): MessageSpec? = when (code) {
     "REMOTE_FAILED", "PROVIDER_REMOTE_FAILED", "RESPONSE_REMOTE_FAILED" ->
         MessageSpec.Step(code, R.string.reason_remote_failed)
     "INVALID_INPUT", "PROVIDER_INVALID_INPUT", "RESPONSE_INVALID_INPUT" ->
-        MessageSpec.Step(code, R.string.reason_invalid_input)
+        MessageSpec.Text(R.string.reason_invalid_input)
 
     // Reasons only the YouTube extraction can give.
     "SOURCE_UNAVAILABLE" -> MessageSpec.Step(code, R.string.reason_source_unavailable)

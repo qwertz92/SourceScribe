@@ -1,7 +1,6 @@
 package app.sourcescribe.data
 
 import android.util.Log
-import androidx.room.Room
 import androidx.room.withTransaction
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -54,11 +53,7 @@ class UiFixtureTest {
 
         val targetContext = InstrumentationRegistry.getInstrumentation().targetContext
         val artifacts = ArtifactFiles(File(targetContext.filesDir, "artifacts"))
-        val database = Room.databaseBuilder(
-            targetContext,
-            SourceScribeDatabase::class.java,
-            "sourcescribe.db",
-        ).addMigrations(SourceScribeDatabase.MIGRATION_1_2, SourceScribeDatabase.MIGRATION_2_3).build()
+        val database = AppModule.database(targetContext)
         try {
             val ids = FixtureIds(
                 sourceId = UUID.randomUUID().toString(),

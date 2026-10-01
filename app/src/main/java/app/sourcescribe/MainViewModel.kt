@@ -350,8 +350,10 @@ class MainViewModel @Inject constructor(
             uploadApproved = false, captionTrackId = null, audioTrackId = null,
         )
         val selected = base.copy(
-            captionTrackId = TrackSelection.captions(resolved, base).firstOrNull()?.id,
-            audioTrackId = TrackSelection.audio(resolved, null)?.id,
+            captionTrackId = TrackSelection.captions(resolved, base.copy(captionTrackId = stored.captionTrackId)).firstOrNull()?.id
+                ?: TrackSelection.captions(resolved, base).firstOrNull()?.id,
+            audioTrackId = TrackSelection.audio(resolved, stored.audioTrackId)?.id
+                ?: TrackSelection.audio(resolved, null)?.id,
         )
         if (revision == previewRevision.get()) {
             abandonCurrentImports()
@@ -595,6 +597,8 @@ class MainViewModel @Inject constructor(
             // `configError` sees the list.
             "BUDGET_INVALID", "PROVIDER_CAPABILITY_OR_CREDENTIAL_INVALID",
             "UNSUPPORTED_OPTION", "PRICE_UNKNOWN", "SOURCE_DURATION_UNKNOWN",
+            "PROVIDER_CONTEXT_TOO_LONG", "PROVIDER_TOO_MANY_TERMS", "PROVIDER_TERM_TOO_LONG",
+            "PROVIDER_LANGUAGE_UNSUPPORTED", "PROVIDER_MODEL_UNSUPPORTED",
         )
 
         fun previewError(preview: SourcePreview, credentials: List<CredentialInfo>): String? {
@@ -606,10 +610,10 @@ class MainViewModel @Inject constructor(
             if (requiresStt) {
                 if (config.provider == null || config.model == null) return "PROVIDER_REQUIRED"
                 if (!availableKey) return "CREDENTIAL_REQUIRED"
-                configError(config)?.let { return it }
             }
             val sttPossible = requiresStt ||
                 config.mode == AcquisitionMode.CAPTIONS_THEN_STT && captions.isEmpty() && config.uploadApproved && availableKey
+            if (sttPossible) configError(config)?.let { return it }
             if (sttPossible && preview.resolved.source.kind == SourceKind.YOUTUBE &&
                 TrackSelection.audio(preview.resolved, config.audioTrackId) == null) {
                 return if (preview.resolved.audio.isEmpty()) "NO_AUDIO" else "CHOOSE_AUDIO_TRACK"
@@ -638,14 +642,15 @@ class MainViewModel @Inject constructor(
             else -> {
                 val cap = capabilities(config)
                 when {
-                    cap == null || config.region !in cap.regions -> "PROVIDER_CAPABILITY_OR_CREDENTIAL_INVALID"
+                    cap == null -> app.sourcescribe.data.providerConfigurationError(config) ?: "PROVIDER_CAPABILITY_OR_CREDENTIAL_INVALID"
+                    config.region !in cap.regions -> "PROVIDER_CAPABILITY_OR_CREDENTIAL_INVALID"
                     // Before the capability question, the way both provider paths order it: a blank entry is
                     // refused as invalid input whether or not the model supports a prompt at all.
                     ContextTerms.refused(config.contextTerms) -> "CONTEXT_TERM_BLANK"
                     config.diarization && !cap.diarization || config.wordTimestamps && !cap.wordTimestamps ||
                         config.segmentTimestamps && !cap.segmentTimestamps || config.contextTerms.isNotEmpty() && !cap.contextTerms -> "UNSUPPORTED_OPTION"
                     config.maxCostMicrousd != null && cap.priceMicrousdPerHour == null -> "PRICE_UNKNOWN"
-                    else -> null
+                    else -> app.sourcescribe.data.providerConfigurationError(config)
                 }
             }
         }

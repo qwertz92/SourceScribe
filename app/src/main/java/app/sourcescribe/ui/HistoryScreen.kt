@@ -6,6 +6,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -41,13 +42,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -186,13 +186,14 @@ internal fun HistoryScreen(
         if (job == null) {
             actionsFor = null
         } else {
-            // What the newest attempt of every branch stopped with, which is what the dialog explains and what
-            // the recommendation is derived from. One code per branch: an older attempt of the same branch has
-            // been superseded by the one that followed it.
-            val errors = remember(attempts, job.id) {
+            // Keep the newest attempt of each branch together with its phase so the dialog can explain which
+            // branch stopped and show only structured provider details from that checkpoint.
+            val latestAttempts = remember(attempts, job.id) {
                 attempts.filter { it.jobId == job.id }.groupBy { it.branch }.values
-                    .mapNotNull { rows -> rows.maxBy { it.number }.error }.distinct()
+                    .mapNotNull { rows -> rows.maxByOrNull { it.number } }
+                    .sortedBy { it.branch.name }
             }
+            val errors = latestAttempts.mapNotNull { it.error }.distinct()
             val situation = JobSituation(
                 state = job.state,
                 outcome = job.outcome,
@@ -204,6 +205,7 @@ internal fun HistoryScreen(
             )
             JobActionsDialog(
                 situation = situation,
+                attempts = latestAttempts,
                 // A limit belongs to the job for good, so a repeat of this job would end at the same limit again.
                 limitReached = errors.any { it in setOf("AUDIO_LONGER_THAN_LIMIT", "AUDIO_DURATION_UNKNOWN") },
                 close = { actionsFor = null },
@@ -279,26 +281,23 @@ private fun JobCard(
     val rotation by animateFloatAsState(if (open) 180f else 0f, label = "job-chevron")
     val savedConfig = remember(job.config) { decodeStoredJobConfig(job.config) }
     val dateFormat = remember { DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT) }
-    OutlinedCard(Modifier.fillMaxWidth()) {
+    OutlinedCard(onClick = toggle, modifier = Modifier.fillMaxWidth()) {
         Column {
-            Surface(onClick = toggle, color = MaterialTheme.colorScheme.surface,
-                modifier = Modifier.fillMaxWidth().semantics { role = Role.Button }) {
-                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                        Text(listOfNotNull(
-                            dateFormat.format(Date(job.createdAt)),
-                            savedConfig?.provider?.let(::providerName)
-                                ?: stringResource(R.string.mode_captions_only).takeIf { savedConfig?.mode == AcquisitionMode.CAPTIONS_ONLY },
-                        ).joinToString(" · "), style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        StatusRow(job, savedConfig, attempts, sourceKind)
-                    }
-                    Icon(painterResource(R.drawable.ic_expand_more),
-                        contentDescription = stringResource(if (open) R.string.collapse_entry else R.string.expand_entry),
-                        modifier = Modifier.size(24.dp).rotate(rotation))
+            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text(listOfNotNull(
+                        dateFormat.format(Date(job.createdAt)),
+                        savedConfig?.provider?.let(::providerName)
+                            ?: stringResource(R.string.mode_captions_only).takeIf { savedConfig?.mode == AcquisitionMode.CAPTIONS_ONLY },
+                    ).joinToString(" · "), style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    StatusRow(job, savedConfig, attempts, sourceKind)
                 }
+                Icon(painterResource(R.drawable.ic_expand_more),
+                    contentDescription = stringResource(if (open) R.string.collapse_entry else R.string.expand_entry),
+                    modifier = Modifier.size(24.dp).rotate(rotation))
             }
             Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -364,8 +363,8 @@ private fun JobCard(
  */
 @Composable
 internal fun AttemptLines(attempt: AttemptRow, openHelp: (HelpTopic) -> Unit) {
-    Text("${if (attempt.branch == Branch.CAPTIONS) stringResource(R.string.mode_captions_only) else stringResource(R.string.mode_stt_only)} · ${stringResource(phaseLabel(attempt.phase))}",
-        style = MaterialTheme.typography.bodySmall)
+    ReservedText(attemptPhaseText(attempt), attemptPhaseAlternatives(), MaterialTheme.typography.bodySmall,
+    )
     // Which rendition this attempt actually bound, from what it stored when it resolved
     // the source. Read once per stored checkpoint rather than on every recomposition.
     //
@@ -385,7 +384,8 @@ internal fun AttemptLines(attempt: AttemptRow, openHelp: (HelpTopic) -> Unit) {
     //
     // Reserved the same way and for the same reason: the line is there for the length of a download or an
     // upload and gone before and after, which is three moves of everything beneath it per transfer.
-    val rate = transferRate(attempt.id, attempt.phase, attempt.processedBytes)
+    val rate = transferRate(attempt.id, attempt.phase, attempt.processedBytes,
+        isMoving = isTransferMoving(attempt))
     val total = attempt.totalBytes?.takeIf { it > 0 && attempt.processedBytes <= it }
     val moved = when {
         attempt.processedBytes <= 0 -> ""
@@ -394,10 +394,16 @@ internal fun AttemptLines(attempt: AttemptRow, openHelp: (HelpTopic) -> Unit) {
             percentOf(attempt.processedBytes, total), byteSize(attempt.processedBytes), byteSize(total))
     }
     ReservedText(
-        if (moved.isEmpty() || rate == null) moved else stringResource(R.string.transfer_rate, moved, byteSize(rate)),
+        if (!showsTransferProgress(attempt)) ""
+        else if (rate == null) moved else stringResource(R.string.transfer_rate, moved, byteSize(rate)),
         progressAlternatives(),
         MaterialTheme.typography.bodySmall)
-    attempt.error?.let { AttemptError(it, openHelp) }
+    val error = attempt.error
+    AttemptErrorSummary(
+        message = if (error == null) "" else messageText(error),
+        helpTopic = error?.let(::attemptHelpTopic),
+        openHelp = openHelp,
+    )
 }
 
 /** A waiting job explains itself where it is; the length limit additionally links to why it cannot be raised. */
@@ -406,13 +412,40 @@ private fun AttemptError(code: String, openHelp: (HelpTopic) -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(messageText(code), Modifier.weight(1f), style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.error)
-        when (code) {
-            "AUDIO_LONGER_THAN_LIMIT" -> InfoButton(HelpTopic.LIMITS, openHelp)
-            "CHOOSE_AUDIO_TRACK", "AUDIO_TRACK_CHANGED" -> InfoButton(HelpTopic.AUDIO_TRACK, openHelp)
-            "SUBMISSION_UNCERTAIN", "REMOTE_MAY_CONTINUE" -> InfoButton(HelpTopic.STATES, openHelp)
-            else -> Unit
+        attemptHelpTopic(code)?.let { InfoButton(it, openHelp) }
+    }
+}
+
+/** A two-line summary keeps the expanded card steady; Actions still shows the complete error text. */
+@Composable
+internal fun AttemptErrorSummary(message: String, helpTopic: HelpTopic?, openHelp: (HelpTopic) -> Unit) {
+    val style = MaterialTheme.typography.bodySmall
+    val textMeasurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    val twoLineHeight = remember(textMeasurer, style, density) {
+        with(density) { textMeasurer.measure("M\nM", style, maxLines = 2).size.height.toDp() }
+    }
+    Row(Modifier.heightIn(min = twoLineHeight), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            message,
+            Modifier.weight(1f),
+            style = style,
+            color = if (message.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
+            minLines = 2,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+            helpTopic?.let { InfoButton(it, openHelp) }
         }
     }
+}
+
+private fun attemptHelpTopic(code: String): HelpTopic? = when (code) {
+    "AUDIO_LONGER_THAN_LIMIT" -> HelpTopic.LIMITS
+    "CHOOSE_AUDIO_TRACK", "AUDIO_TRACK_CHANGED" -> HelpTopic.AUDIO_TRACK
+    "SUBMISSION_UNCERTAIN", "REMOTE_MAY_CONTINUE" -> HelpTopic.STATES
+    else -> null
 }
 
 /** The share of [total] that [processed] is, as whole percent, never past a hundred. */
@@ -428,20 +461,111 @@ internal fun percentOf(processed: Long, total: Long): Int =
  * new phase starts over, because the speed of a download says nothing about the upload that follows it.
  */
 @Composable
-private fun transferRate(attemptId: String, phase: Phase, bytes: Long): Long? {
+private fun transferRate(attemptId: String, phase: Phase, bytes: Long, isMoving: Boolean): Long? {
     var previous by remember(attemptId, phase) { mutableStateOf<Pair<Long, Long>?>(null) }
     var rate by remember(attemptId, phase) { mutableStateOf<Long?>(null) }
-    LaunchedEffect(attemptId, phase, bytes) {
-        val now = System.currentTimeMillis()
-        previous?.let { (measuredAt, measuredBytes) ->
-            val elapsed = now - measuredAt
-            if (bytes > measuredBytes && elapsed >= MIN_RATE_INTERVAL_MS) {
-                rate = (bytes - measuredBytes) * 1000L / elapsed
+    LaunchedEffect(attemptId, phase, bytes, isMoving) {
+        if (!isMoving || !isTransferPhase(phase)) {
+            previous = null
+            rate = null
+        } else {
+            val now = System.currentTimeMillis()
+            previous?.let { (measuredAt, measuredBytes) ->
+                val elapsed = now - measuredAt
+                rate = if (bytes > measuredBytes && elapsed >= MIN_RATE_INTERVAL_MS)
+                    (bytes - measuredBytes) * 1000L / elapsed else null
             }
+            previous = now to bytes
         }
-        previous = now to bytes
     }
-    return rate
+    return rate.takeIf { isMoving && isTransferPhase(phase) }
+}
+
+/** Only phases whose stored byte counters describe an audio download or upload expose transfer progress. */
+internal fun isTransferPhase(phase: Phase): Boolean = phase in setOf(Phase.DOWNLOAD_AUDIO, Phase.UPLOAD, Phase.SUBMIT)
+
+/** Transfer progress is present only when bytes have actually moved in a transfer phase. */
+internal fun showsTransferProgress(attempt: AttemptRow): Boolean {
+    return isTransferPhase(attempt.phase) && attempt.processedBytes > 0
+}
+
+/** A complete audio request means the provider has the upload and its response is the next visible wait. */
+internal fun isUploadCompleteWaiting(attempt: AttemptRow): Boolean {
+    if (attempt.state != ExecutionState.RUNNING) return false
+    if (attempt.phase !in setOf(Phase.UPLOAD, Phase.SUBMIT)) return false
+    val total = attempt.totalBytes?.takeIf { it > 0 && attempt.processedBytes <= it } ?: return false
+    return attempt.processedBytes > 0 && attempt.processedBytes == total
+}
+
+/** A completed upload is still shown at 100%, but its last measured speed is no longer current. */
+internal fun isTransferMoving(attempt: AttemptRow): Boolean =
+    attempt.state == ExecutionState.RUNNING && isTransferPhase(attempt.phase) && !isUploadCompleteWaiting(attempt)
+
+private fun currentAttempt(attempts: List<AttemptRow>): AttemptRow? = attempts
+    .asSequence()
+    .filter { it.state !in setOf(ExecutionState.FINISHED, ExecutionState.CANCELLED) }
+    .maxWithOrNull(compareBy<AttemptRow> { when (it.state) {
+        ExecutionState.RUNNING -> 4
+        ExecutionState.WAITING_REMOTE -> 3
+        ExecutionState.WAITING_NETWORK, ExecutionState.WAITING_RATE_LIMIT,
+        ExecutionState.WAITING_USER, ExecutionState.SUBMISSION_UNCERTAIN -> 2
+        ExecutionState.QUEUED -> 1
+        ExecutionState.FINISHED, ExecutionState.CANCELLED -> 0
+    } }
+        .thenBy { it.createdAt }.thenBy { it.number })
+
+@Composable
+private fun attemptPhaseText(attempt: AttemptRow): String = waitingProviderResponseLabel(attempt)?.let {
+    stringResource(it)
+} ?: stringResource(R.string.history_current_phase,
+    branchName(attempt.branch), stringResource(phaseLabel(attempt.phase)))
+
+internal fun isWaitingForTranscription(attempt: AttemptRow): Boolean =
+    attempt.state in setOf(ExecutionState.RUNNING, ExecutionState.WAITING_REMOTE) && attempt.phase == Phase.RETRIEVE
+
+@StringRes
+internal fun waitingProviderResponseLabel(attempt: AttemptRow): Int? =
+    R.string.history_waiting_provider_response.takeIf {
+        isWaitingForTranscription(attempt) || isUploadCompleteWaiting(attempt)
+    }
+
+@Composable
+private fun attemptPhaseAlternatives(): List<String> = buildList {
+    add(stringResource(R.string.history_waiting_provider_response))
+    Branch.entries.forEach { branch ->
+        Phase.entries.forEach { phase ->
+            add(stringResource(R.string.history_current_phase,
+                branchName(branch), stringResource(phaseLabel(phase))))
+        }
+    }
+}
+
+@Composable
+internal fun CollapsedAttemptLines(attempt: AttemptRow?) {
+    ReservedText(
+        if (attempt == null) "" else attemptPhaseText(attempt),
+        attemptPhaseAlternatives(),
+        MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    val rate = attempt?.let {
+        transferRate(it.id, it.phase, it.processedBytes,
+            isMoving = isTransferMoving(it))
+    }
+    val total = attempt?.totalBytes?.takeIf { it > 0 && attempt.processedBytes <= it }
+    val moved = when {
+        attempt == null || attempt.processedBytes <= 0 -> ""
+        total == null -> stringResource(R.string.processed_bytes, byteSize(attempt.processedBytes))
+        else -> stringResource(R.string.transfer_of_total,
+            percentOf(attempt.processedBytes, total), byteSize(attempt.processedBytes), byteSize(total))
+    }
+    ReservedText(
+        if (attempt == null || !showsTransferProgress(attempt)) ""
+        else if (rate == null) moved else stringResource(R.string.transfer_rate, moved, byteSize(rate)),
+        progressAlternatives(),
+        MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 /**
@@ -492,9 +616,10 @@ private fun StatusRow(job: JobRow, config: JobConfig?, attempts: List<AttemptRow
     val outcome = stringResource(outcomeLabel(job.outcome))
     val unmetered = stringResource(R.string.waiting_unmetered)
     val otherJob = stringResource(R.string.waiting_other_job)
+    val automaticRetry = stringResource(R.string.waiting_automatic_retry)
     // The chip's width follows its word, and its word changes while the list is open, so the outcome
     // goes underneath instead of beside it and nothing moves sideways when a job progresses. A waiting
-    // sentence replaces the outcome rather than adding a line, and all three reserve the height of the
+    // sentence replaces the outcome rather than adding a line, and each reserves the height of the
     // tallest, so a job that leaves the queue moves nothing under it either.
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         StatusChip(stringResource(stateChipLabel(job.state)), container, content)
@@ -502,12 +627,14 @@ private fun StatusRow(job: JobRow, config: JobConfig?, attempts: List<AttemptRow
             when (reason) {
                 QueueReason.UNMETERED_CONNECTION -> unmetered
                 QueueReason.ANOTHER_JOB -> otherJob
+                QueueReason.AUTOMATIC_RETRY -> automaticRetry
                 QueueReason.UNSTATED -> outcome
             },
-            listOf(outcome, unmetered, otherJob),
+            listOf(outcome, unmetered, otherJob, automaticRetry),
             MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        CollapsedAttemptLines(currentAttempt(attempts))
     }
 }
 
@@ -515,13 +642,14 @@ private fun StatusRow(job: JobRow, config: JobConfig?, attempts: List<AttemptRow
 private fun JobActionsDialog(
     situation: JobSituation,
     limitReached: Boolean,
+    attempts: List<AttemptRow> = emptyList(),
     close: () -> Unit,
     openHelp: (HelpTopic) -> Unit,
     act: (JobAction) -> Unit,
 ) {
     Dialog(close) {
         Surface(shape = MaterialTheme.shapes.large) {
-            JobActionsContent(situation, limitReached, dialogMaxHeight(0.8f), openHelp, act, close)
+            JobActionsContent(situation, limitReached, dialogMaxHeight(0.8f), openHelp, act, close, attempts)
         }
     }
 }
@@ -548,6 +676,7 @@ internal fun JobActionsContent(
     openHelp: (HelpTopic) -> Unit,
     act: (JobAction) -> Unit,
     close: () -> Unit,
+    attempts: List<AttemptRow> = emptyList(),
 ) {
     val offered = remember(situation) { JobActions.offered(situation) }
     val recommended = remember(situation) { JobActions.recommended(situation) }
@@ -560,7 +689,19 @@ internal fun JobActionsContent(
                         style = MaterialTheme.typography.titleSmall)
                     // The error's own sentence, the one the job card shows as well, with the same help button
                     // beside it. A job that recorded no error says how it ended instead.
-                    if (situation.errors.isEmpty()) {
+                    val failedAttempts = attempts.filter { it.error != null }
+                    if (failedAttempts.isNotEmpty()) {
+                        failedAttempts.forEach { attempt ->
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(stringResource(R.string.failed_branch_step,
+                                    branchName(attempt.branch), stringResource(phaseLabel(attempt.phase))),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                AttemptError(requireNotNull(attempt.error), openHelp)
+                                ProviderFailureDetails(attempt)
+                            }
+                        }
+                    } else if (situation.errors.isEmpty()) {
                         Text(stringResource(outcomeLabel(situation.outcome)), style = MaterialTheme.typography.bodyMedium)
                     } else {
                         situation.errors.forEach { AttemptError(it, openHelp) }
@@ -615,6 +756,30 @@ internal fun JobActionsContent(
             }
         }
         TextButton(close, Modifier.fillMaxWidth()) { Text(stringResource(R.string.back)) }
+    }
+}
+
+@Composable
+private fun ProviderFailureDetails(attempt: AttemptRow) {
+    val error = attempt.error ?: return
+    val failure = remember(attempt.checkpoint) { SttStep.storedProviderFailure(attempt.checkpoint) }
+    val details = if (failure == null) emptyList() else buildList {
+        failure.httpStatus?.let { add(stringResource(R.string.provider_http_status, it)) }
+        failure.operation?.let {
+            add(stringResource(R.string.provider_operation, stringResource(providerOperationLabel(it))))
+        }
+        failure.reason?.let {
+            add(stringResource(R.string.provider_reason, stringResource(providerRejectionReasonLabel(it))))
+        }
+    }
+    if (details.isEmpty() && error in setOf("INVALID_INPUT", "PROVIDER_INVALID_INPUT", "RESPONSE_INVALID_INPUT")) {
+        Text(stringResource(R.string.provider_diagnostic_unknown), style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+    } else {
+        details.forEach { detail ->
+            Text(detail, style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }
 

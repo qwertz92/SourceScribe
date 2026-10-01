@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<lint>
+    <!-- 2026-09-30: AGP 9.4.1 still calls Configuration.setVisible, so Gradle 9.8.0
+         fails org.gradle.warning.mode=fail. Keep the measured compatible wrapper only;
+         recheck with the next AGP update. Evidence: docs/reports/2026-09-30-provider-reliability.md. -->
+    <issue id="AndroidGradlePluginVersion">
+        <ignore path="gradle/wrapper/gradle-wrapper.properties" />
+    </issue>
+</lint>

@@ -16,7 +16,10 @@ import app.sourcescribe.core.JobConfig
 import app.sourcescribe.core.Origin
 import app.sourcescribe.core.Phase
 import app.sourcescribe.core.Provider
+import app.sourcescribe.core.ProviderFailure
 import app.sourcescribe.core.ProviderHttp
+import app.sourcescribe.core.ProviderOperation
+import app.sourcescribe.core.ProviderRejectionReason
 import app.sourcescribe.core.Provenance
 import app.sourcescribe.core.Region
 import app.sourcescribe.core.Segment
@@ -52,6 +55,7 @@ import okhttp3.tls.HeldCertificate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -138,6 +142,10 @@ class SttRecoveryTest {
         assertEquals(Phase.NORMALIZE, first.phase)
         assertEquals(1, server.requestCount)
         assertEquals(1, dao.submissions(seeded.attempt.id).size)
+        val upload = server.takeRequest()
+        val progress = requireNotNull(dao.attempt(seeded.attempt.id))
+        assertEquals(upload.body.size, progress.processedBytes)
+        assertEquals(upload.body.size, progress.totalBytes)
 
         // A caller retrying with its stale claimed row must discover the saved response.
         val staleRetry = step.run(seeded.attempt, seeded.owner, seeded.config)
@@ -145,6 +153,344 @@ class SttRecoveryTest {
         assertEquals(Phase.NORMALIZE, staleRetry.phase)
         assertEquals(1, server.requestCount)
         assertEquals(1, dao.submissions(seeded.attempt.id).size)
+    }
+
+    @Test
+    fun assemblyJsonSubmitDoesNotReplaceCompletedAudioUploadProgress() = withFixture {
+        val seeded = seed(provider = Provider.ASSEMBLYAI)
+        server.enqueue(MockResponse().setResponseCode(200).setBody(AAI_UPLOAD_RESPONSE))
+        server.enqueue(MockResponse().setResponseCode(200).setBody(aaiError(REMOTE_ID_A)))
+
+        val result = step.run(seeded.attempt, seeded.owner, seeded.config)
+
+        assertEquals(Phase.RETRIEVE, result.phase)
+        val upload = server.takeRequest()
+        assertEquals("/v2/upload", upload.path)
+        assertEquals("/v2/transcript", server.takeRequest().path)
+        val progress = requireNotNull(dao.attempt(seeded.attempt.id))
+        assertEquals(upload.body.size, progress.processedBytes)
+        assertEquals(upload.body.size, progress.totalBytes)
+    }
+
+    @Test
+    fun preparationToSubmitResetsMp3ProgressBeforeAnyUpload() = withFixture {
+        val seeded = seed(
+            phase = Phase.PREPARE_AUDIO,
+            sourceKind = SourceKind.YOUTUBE,
+            bindSourceAudio = true,
+            engineId = "fixture-engine",
+            providerFailure = ProviderFailure(httpStatus = 500, operation = ProviderOperation.SUBMIT),
+            error = "PROVIDER_SERVER",
+            initialProcessedBytes = FIXTURE_AUDIO_BYTES.toLong(),
+            initialTotalBytes = FIXTURE_AUDIO_BYTES.toLong(),
+        )
+
+        val result = step.run(seeded.attempt, seeded.owner, seeded.config)
+
+        assertEquals(Phase.SUBMIT, result.phase)
+        assertEquals(0L, result.processedBytes)
+        assertNull(result.totalBytes)
+        assertNull(SttStep.storedProviderFailure(result.checkpoint))
+        assertNull(result.error)
+        assertEquals(0, server.requestCount)
+    }
+
+    @Test
+    fun providerRejectionDiagnosticPersistsAndClearsOnRetry() = withFixture {
+        val seeded = seed()
+        server.enqueue(MockResponse().setResponseCode(413).setBody("{\"error\":{\"message\":\"file too large\"}}"))
+
+        val rejected = step.run(seeded.attempt, seeded.owner, seeded.config)
+        val upload = server.takeRequest()
+        val persistedProgress = requireNotNull(dao.attempt(seeded.attempt.id))
+
+        val failure = requireNotNull(SttStep.storedProviderFailure(rejected.checkpoint))
+        assertEquals(413, failure.httpStatus)
+        assertEquals(ProviderOperation.SUBMIT, failure.operation)
+        assertEquals(ProviderRejectionReason.FILE_TOO_LARGE, failure.reason)
+        assertEquals(upload.body.size, rejected.processedBytes)
+        assertEquals(upload.body.size, rejected.totalBytes)
+        assertEquals(rejected.processedBytes, persistedProgress.processedBytes)
+        assertEquals(rejected.totalBytes, persistedProgress.totalBytes)
+        assertEquals(1, server.requestCount)
+
+        val retriedWithLocalError = step.run(
+            rejected,
+            seeded.owner,
+            seeded.config.copy(contextTerms = listOf("ä".repeat(113))),
+        )
+        assertEquals("PROVIDER_CONTEXT_TOO_LONG", retriedWithLocalError.error)
+        assertNull(SttStep.storedProviderFailure(retriedWithLocalError.checkpoint))
+        assertEquals(1, server.requestCount)
+    }
+
+    @Test
+    fun invalidProviderTermsStopBeforeYoutubeResolution() = withFixture {
+        val seeded = seed(provider = Provider.ASSEMBLYAI, phase = Phase.RESOLVE, sourceKind = SourceKind.YOUTUBE)
+
+        val result = step.run(
+            seeded.attempt,
+            seeded.owner,
+            seeded.config.copy(contextTerms = (1..201).map { "term-$it" }),
+        )
+
+        assertEquals(ExecutionState.WAITING_USER, result.state)
+        assertEquals("PROVIDER_TOO_MANY_TERMS", result.error)
+        assertEquals(Phase.RESOLVE, result.phase)
+        assertEquals(0, server.requestCount)
+        assertNull(SttStep.storedProviderFailure(result.checkpoint))
+    }
+
+    @Test
+    fun verifiedSameSourceRenditionAndEngineAudioIsCopiedIntoNewAttempt() = withFixture {
+        val previous = seed(
+            phase = Phase.PREPARE_AUDIO,
+            sourceKind = SourceKind.YOUTUBE,
+            bindSourceAudio = true,
+            engineId = "fixture-engine",
+        )
+        val target = seed(
+            phase = Phase.RESOLVE,
+            sourceKind = SourceKind.YOUTUBE,
+            engineId = "fixture-engine",
+        )
+        val targetAudio = sourceAudioFile(target.attempt.id)
+        assertTrue(targetAudio.delete())
+        val refreshedSource = target.source.copy(title = "Updated metadata", durationMs = FIXTURE_DURATION_MS + 100)
+        val refreshedTrack = requireNotNull(target.audio).copy(name = "Updated rendition metadata", codec = "opus")
+
+        val reusedHash = step.reuseVerifiedSourceAudio(target.attempt, refreshedSource, refreshedTrack)
+
+        assertEquals(sha256(ByteArray(FIXTURE_AUDIO_BYTES) { index -> (index and 0xff).toByte() }), reusedHash)
+        assertTrue(targetAudio.isFile)
+        assertEquals(sourceAudioFile(previous.attempt.id).readBytes().toList(), targetAudio.readBytes().toList())
+        assertTrue(File(attemptDirectory(target.attempt.id), "audio-0.mp3").isFile)
+        assertFalse(File(attemptDirectory(target.attempt.id), "normalized.json").exists())
+        assertTrue(dao.submissions(target.attempt.id).isEmpty())
+    }
+
+    @Test
+    fun sourceAudioReuseRejectsDifferentSourcesAndSymlinkedEntries() = withFixture {
+        val previous = seed(
+            phase = Phase.PREPARE_AUDIO,
+            sourceKind = SourceKind.YOUTUBE,
+            bindSourceAudio = true,
+            engineId = "fixture-engine",
+        )
+        val results = linkedMapOf<String, Any?>()
+
+        val sourceIdTarget = seed(
+            phase = Phase.RESOLVE,
+            sourceKind = SourceKind.YOUTUBE,
+            engineId = "fixture-engine",
+        )
+        val sourceIdAudio = sourceAudioFile(sourceIdTarget.attempt.id)
+        assertTrue(sourceIdAudio.delete())
+        results["different source id"] = reuseOutcome(
+            sourceIdTarget,
+            sourceIdTarget.source.copy(id = "other-source"),
+            requireNotNull(sourceIdTarget.audio),
+        )
+        results["different source id copied target"] = sourceIdAudio.exists().takeIf { it }
+
+        val videoIdTarget = seed(
+            phase = Phase.RESOLVE,
+            sourceKind = SourceKind.YOUTUBE,
+            engineId = "fixture-engine",
+        )
+        val videoIdAudio = sourceAudioFile(videoIdTarget.attempt.id)
+        assertTrue(videoIdAudio.delete())
+        results["different video id"] = reuseOutcome(
+            videoIdTarget,
+            videoIdTarget.source.copy(videoId = "other-video"),
+            requireNotNull(videoIdTarget.audio),
+        )
+        results["different video id copied target"] = videoIdAudio.exists().takeIf { it }
+
+        val candidate = sourceAudioFile(previous.attempt.id)
+        val realFile = File(candidate.parentFile, "source.audio.real")
+        assertTrue(candidate.renameTo(realFile))
+        java.nio.file.Files.createSymbolicLink(candidate.toPath(), realFile.toPath())
+        val symlinkTarget = seed(
+            phase = Phase.RESOLVE,
+            sourceKind = SourceKind.YOUTUBE,
+            engineId = "fixture-engine",
+        )
+        val symlinkTargetAudio = sourceAudioFile(symlinkTarget.attempt.id)
+        assertTrue(symlinkTargetAudio.delete())
+        results["symlinked candidate source audio"] = reuseOutcome(
+            symlinkTarget,
+            symlinkTarget.source,
+            requireNotNull(symlinkTarget.audio),
+        )
+        results["symlinked candidate copied target"] = symlinkTargetAudio.exists().takeIf { it }
+
+        assertAllExpectedNull(results)
+    }
+
+    @Test
+    fun sourceAudioReuseRejectsDifferentTrackEngineAndCorruptedHash() = withFixture {
+        val previous = seed(
+            phase = Phase.PREPARE_AUDIO,
+            sourceKind = SourceKind.YOUTUBE,
+            bindSourceAudio = true,
+            engineId = "fixture-engine",
+        )
+        val results = linkedMapOf<String, Any?>()
+
+        val target = seed(
+            phase = Phase.RESOLVE,
+            sourceKind = SourceKind.YOUTUBE,
+            engineId = "different-engine",
+        )
+        val targetAudio = sourceAudioFile(target.attempt.id)
+        assertTrue(targetAudio.delete())
+        val track = requireNotNull(target.audio)
+        results["different engine"] = reuseOutcome(target, target.source, track)
+        results["different engine copied target"] = targetAudio.exists().takeIf { it }
+
+        val sameEngineTarget = seed(
+            phase = Phase.RESOLVE,
+            sourceKind = SourceKind.YOUTUBE,
+            engineId = "fixture-engine",
+        )
+        val mismatchedTrack = track.copy(id = "different-track")
+        val sameEngineAudio = sourceAudioFile(sameEngineTarget.attempt.id)
+        assertTrue(sameEngineAudio.delete())
+        results["different rendition"] = reuseOutcome(sameEngineTarget, sameEngineTarget.source, mismatchedTrack)
+        results["different rendition copied target"] = sameEngineAudio.exists().takeIf { it }
+
+        val candidateAudio = sourceAudioFile(previous.attempt.id)
+        candidateAudio.writeBytes(ByteArray(FIXTURE_AUDIO_BYTES) { index -> ((index + 1) and 0xff).toByte() })
+        val corruptTarget = seed(
+            phase = Phase.RESOLVE,
+            sourceKind = SourceKind.YOUTUBE,
+            engineId = "fixture-engine",
+        )
+        val corruptTargetAudio = sourceAudioFile(corruptTarget.attempt.id)
+        assertTrue(corruptTargetAudio.delete())
+        results["corrupted source audio hash"] = reuseOutcome(
+            corruptTarget,
+            corruptTarget.source,
+            requireNotNull(corruptTarget.audio),
+        )
+        results["corrupted source copied target"] = corruptTargetAudio.exists().takeIf { it }
+
+        assertAllExpectedNull(results)
+    }
+
+    @Test
+    fun resolveReusesVerifiedSourceAudioForNewAttemptWithoutDownloading() = withFixture {
+        val engineId = installAudioFixtureEngine()
+        val previous = seed(
+            phase = Phase.PREPARE_AUDIO,
+            sourceKind = SourceKind.YOUTUBE,
+            bindSourceAudio = true,
+            engineId = engineId,
+            audioTrackId = "251",
+        )
+        val target = seed(
+            phase = Phase.RESOLVE,
+            sourceKind = SourceKind.YOUTUBE,
+            engineId = engineId,
+            audioTrackId = "251",
+        )
+        val targetAudio = sourceAudioFile(target.attempt.id)
+        assertTrue(targetAudio.delete())
+
+        val resolved = step.run(target.attempt, target.owner, target.config)
+
+        assertEquals(Phase.PREPARE_AUDIO, resolved.phase)
+        assertEquals(ExecutionState.QUEUED, resolved.state)
+        assertNull(resolved.error)
+        assertTrue(targetAudio.isFile)
+        assertEquals(sourceAudioFile(previous.attempt.id).readBytes().toList(), targetAudio.readBytes().toList())
+        assertFalse(fixtureDownloadMarker(target.attempt.id).exists())
+        assertEquals(0, server.requestCount)
+    }
+
+    @Test
+    fun resolveFallsBackToDownloadForMissingDifferentOrCorruptAudio() = withFixture {
+        val engineId = installAudioFixtureEngine()
+
+        val missing = seed(
+            phase = Phase.RESOLVE,
+            sourceKind = SourceKind.YOUTUBE,
+            engineId = engineId,
+            audioTrackId = "251",
+        )
+        assertTrue(sourceAudioFile(missing.attempt.id).delete())
+        val missingResult = step.run(missing.attempt, missing.owner, missing.config)
+        assertEquals(Phase.DOWNLOAD_AUDIO, missingResult.phase)
+        assertFalse(fixtureDownloadMarker(missing.attempt.id).exists())
+
+        seed(
+            phase = Phase.PREPARE_AUDIO,
+            sourceKind = SourceKind.YOUTUBE,
+            bindSourceAudio = true,
+            engineId = engineId,
+            audioTrackId = "140",
+        )
+        val differentTrack = seed(
+            phase = Phase.RESOLVE,
+            sourceKind = SourceKind.YOUTUBE,
+            engineId = engineId,
+            audioTrackId = "251",
+        )
+        assertTrue(sourceAudioFile(differentTrack.attempt.id).delete())
+        val differentResult = step.run(differentTrack.attempt, differentTrack.owner, differentTrack.config)
+        assertEquals(Phase.DOWNLOAD_AUDIO, differentResult.phase)
+        assertFalse(fixtureDownloadMarker(differentTrack.attempt.id).exists())
+
+        val corruptPrevious = seed(
+            phase = Phase.PREPARE_AUDIO,
+            sourceKind = SourceKind.YOUTUBE,
+            bindSourceAudio = true,
+            engineId = engineId,
+            audioTrackId = "251",
+        )
+        sourceAudioFile(corruptPrevious.attempt.id)
+            .writeBytes(ByteArray(FIXTURE_AUDIO_BYTES) { index -> ((index + 1) and 0xff).toByte() })
+        val corrupt = seed(
+            phase = Phase.RESOLVE,
+            sourceKind = SourceKind.YOUTUBE,
+            engineId = engineId,
+            audioTrackId = "251",
+        )
+        assertTrue(sourceAudioFile(corrupt.attempt.id).delete())
+        val corruptResult = step.run(corrupt.attempt, corrupt.owner, corrupt.config)
+        assertEquals(Phase.DOWNLOAD_AUDIO, corruptResult.phase)
+        assertFalse(fixtureDownloadMarker(corrupt.attempt.id).exists())
+        assertEquals(0, server.requestCount)
+    }
+
+    @Test
+    fun verifiedAudioReuseDoesNotCopyWhenStorageReservationIsDenied() = withFixture {
+        seed(
+            phase = Phase.PREPARE_AUDIO,
+            sourceKind = SourceKind.YOUTUBE,
+            bindSourceAudio = true,
+            engineId = "fixture-engine",
+        )
+        val target = seed(
+            phase = Phase.RESOLVE,
+            sourceKind = SourceKind.YOUTUBE,
+            engineId = "fixture-engine",
+        )
+        val targetAudio = sourceAudioFile(target.attempt.id)
+        assertTrue(targetAudio.delete())
+        forceStorageLimitExceeded()
+
+        val failure = runCatching {
+            step.reuseVerifiedSourceAudio(target.attempt, target.source, requireNotNull(target.audio))
+        }.exceptionOrNull()
+
+        assertTrue(failure is StorageBudgetException)
+        assertEquals(StorageBudgetException.STORAGE_LIMIT, (failure as StorageBudgetException).reason)
+        assertFalse(targetAudio.exists())
+        assertFalse(attemptDirectory(target.attempt.id).listFiles().orEmpty().any {
+            it.name.startsWith(".source-audio-")
+        })
     }
 
     @Test
@@ -208,6 +554,43 @@ class SttRecoveryTest {
 
         assertEquals(ExecutionState.FINISHED, result.state)
         assertEquals(2, server.requestCount)
+    }
+
+    @Test
+    fun completedAssemblySubmitIsAcceptedBeforeRetrievalAndRetriesOnlyGets() = withFixture {
+        val seeded = seed(provider = Provider.ASSEMBLYAI)
+        val completed = """{"id":"$REMOTE_ID_A","status":"completed","text":"fixture transcript","language_code":"en","speech_model_used":"universal-2","words":[{"text":"fixture transcript","start":0,"end":1000}]}"""
+        val sentences = """{"id":"$REMOTE_ID_A","sentences":[{"text":"fixture transcript","start":0,"end":1000}]}"""
+        server.enqueue(MockResponse().setResponseCode(200).setBody(AAI_UPLOAD_RESPONSE))
+        server.enqueue(MockResponse().setResponseCode(200).setBody(completed))
+        server.enqueue(MockResponse().setResponseCode(503).setBody("{}"))
+
+        var result = step.run(seeded.attempt, seeded.owner, seeded.config)
+
+        assertEquals(Phase.RETRIEVE, result.phase)
+        assertEquals(ExecutionState.WAITING_REMOTE, result.state)
+        assertEquals(SubmissionState.ACCEPTED, dao.submissions(result.id).single().state)
+        assertEquals(REMOTE_ID_A, dao.submissions(result.id).single().remoteId)
+        assertEquals("acceptance must be persisted before any retrieval", 2, server.requestCount)
+
+        result = step.run(result, seeded.owner, seeded.config)
+        assertEquals(Phase.RETRIEVE, result.phase)
+        assertEquals(ExecutionState.WAITING_NETWORK, result.state)
+        assertEquals(SubmissionState.ACCEPTED, dao.submissions(result.id).single().state)
+
+        server.enqueue(MockResponse().setResponseCode(200).setBody(completed))
+        server.enqueue(MockResponse().setResponseCode(200).setBody(sentences))
+        result = step.run(result, seeded.owner, seeded.config)
+        assertEquals(Phase.NORMALIZE, result.phase)
+        result = step.run(result, seeded.owner, seeded.config)
+        result = step.run(result, seeded.owner, seeded.config)
+        assertEquals(ExecutionState.FINISHED, result.state)
+        assertEquals(app.sourcescribe.core.Outcome.SUCCESS, result.outcome)
+        assertEquals(5, server.requestCount)
+        val requests = List(server.requestCount) { server.takeRequest() }
+        assertEquals(listOf("POST", "POST", "GET", "GET", "GET"), requests.map { it.method })
+        assertEquals(1, requests.count { it.method == "POST" && it.path == "/v2/transcript" })
+        assertEquals("/v2/transcript/$REMOTE_ID_A/sentences", requests.last().path)
     }
 
     @Test
@@ -415,6 +798,7 @@ class SttRecoveryTest {
         assertEquals(Phase.RETRIEVE, replay.phase)
         assertEquals(ExecutionState.WAITING_USER, replay.state)
         assertEquals("REMOTE_FAILED", replay.error)
+        assertNull(SttStep.storedProviderFailure(replay.checkpoint))
         assertFalse(replay.phase == Phase.NORMALIZE)
         assertEquals(0, server.requestCount)
 
@@ -443,6 +827,10 @@ class SttRecoveryTest {
 
         assertEquals(ExecutionState.WAITING_USER, result.state)
         assertEquals("SERVER", result.error)
+        val failure = requireNotNull(SttStep.storedProviderFailure(result.checkpoint))
+        assertEquals(500, failure.httpStatus)
+        assertEquals(ProviderOperation.RETRIEVE, failure.operation)
+        assertEquals(ProviderRejectionReason.UNKNOWN, failure.reason)
         assertEquals(SubmissionState.ACCEPTED, dao.submissions(seeded.attempt.id).single().state)
         assertEquals(REMOTE_ID_A, dao.submissions(seeded.attempt.id).single().remoteId)
         assertEquals(4, server.requestCount)
@@ -728,16 +1116,40 @@ class SttRecoveryTest {
         }
     }
 
+    private suspend fun RecoveryFixture.reuseOutcome(
+        target: Seeded,
+        source: Source,
+        audio: AudioTrack,
+    ): Any? = try {
+        step.reuseVerifiedSourceAudio(target.attempt, source, audio)
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (failure: Exception) {
+        failure
+    }
+
+    private fun assertAllExpectedNull(results: Map<String, Any?>) {
+        val unexpected = results.filterValues { it != null }
+        assertTrue(
+            "Expected every source-audio reuse case to reject; unexpected results: $unexpected",
+            unexpected.isEmpty(),
+        )
+    }
+
     private class RecoveryFixture(base: Context) {
+        private val baseContext = base
         val root = File(base.cacheDir, "stt-recovery-${UUID.randomUUID()}").also { check(it.mkdirs()) }
         private val context = IsolatedContext(base, root)
         val database = Room.inMemoryDatabaseBuilder(context, SourceScribeDatabase::class.java).build()
         val dao = database.records()
         val credentials = CredentialStore(context)
+        private val settings = SettingsStore(context)
         private val runtime = NativeRuntime(context)
         private val extractor = ExtractorEngine(runtime)
         private val engines = EngineUpdateManager(context, runtime)
         private val artifacts = ArtifactFiles(File(context.filesDir, "artifacts"))
+        private val storage = StorageBudget(context, settings)
+        private val runtimeLink = File(context.noBackupFilesDir, "youtubedl-android")
         val server = MockWebServer()
         private val serverCertificate = HeldCertificate.Builder()
             .addSubjectAlternativeName("localhost")
@@ -781,6 +1193,7 @@ class SttRecoveryTest {
                 engines,
                 artifacts,
                 providerHttp,
+                storage,
             )
         }
 
@@ -801,6 +1214,13 @@ class SttRecoveryTest {
             leaseOffsetMs: Long = LEASE_MS,
             actualDurationAdjustments: Map<Int, Long> = emptyMap(),
             retainRaw: Boolean = false,
+            bindSourceAudio: Boolean = false,
+            engineId: String? = null,
+            providerFailure: ProviderFailure? = null,
+            error: String? = null,
+            initialProcessedBytes: Long = 0,
+            initialTotalBytes: Long? = null,
+            audioTrackId: String = "fixture-audio",
         ): Seeded {
             val audioBytes = ByteArray(FIXTURE_AUDIO_BYTES) { index -> (index and 0xff).toByte() }
             val audioHash = sha256(audioBytes)
@@ -815,16 +1235,16 @@ class SttRecoveryTest {
                     durationMs = durationMs,
                 )
                 SourceKind.YOUTUBE -> Source(
-                    id = "youtube:fixture-video",
+                    id = "youtube:$FIXTURE_VIDEO_ID",
                     kind = SourceKind.YOUTUBE,
-                    canonicalUrl = "https://www.youtube.com/watch?v=fixture-video",
-                    videoId = "fixture-video",
+                    canonicalUrl = "https://www.youtube.com/watch?v=$FIXTURE_VIDEO_ID",
+                    videoId = FIXTURE_VIDEO_ID,
                     title = "Fixture video",
                     durationMs = durationMs,
                 )
             }
             val audio = if (sourceKind == SourceKind.YOUTUBE) AudioTrack(
-                id = "fixture-audio",
+                id = audioTrackId,
                 sourceVideoId = requireNotNull(source.videoId),
                 language = null,
                 name = "Fixture audio",
@@ -862,6 +1282,9 @@ class SttRecoveryTest {
                 durationMs = durationMs,
                 chunkCount = SttStep.chunkPlan(durationMs).size,
                 nextChunkIndex = SttStep.chunkPlan(durationMs).size,
+                sourceAudioTrackId = audio?.id?.takeIf { bindSourceAudio },
+                sourceAudioSha256 = audioHash.takeIf { bindSourceAudio },
+                providerFailure = providerFailure,
                 prepared = SttStep.chunkPlan(durationMs).map { window ->
                     FixtureChunk(
                         index = window.index,
@@ -890,8 +1313,12 @@ class SttRecoveryTest {
                 state = ExecutionState.RUNNING,
                 phase = phase,
                 checkpoint = json.encodeToString(checkpoint),
+                engineId = engineId,
+                error = error,
                 leaseOwner = owner,
                 leaseUntil = now + leaseOffsetMs,
+                processedBytes = initialProcessedBytes,
+                totalBytes = initialTotalBytes,
             )
             dao.createJob(
                 source = SourceRow(source.id, json.encodeToString(source), "Fixture audio"),
@@ -965,7 +1392,86 @@ class SttRecoveryTest {
                     }
                 }
             }
-            return Seeded(attempt, config, owner, artifactId, source)
+            return Seeded(attempt, config, owner, artifactId, source, audio)
+        }
+
+        suspend fun installAudioFixtureEngine(): String {
+            NativeRuntime(baseContext).initialize()
+            val actualRuntime = File(baseContext.noBackupFilesDir, runtimeLink.name)
+            check(actualRuntime.isDirectory)
+            java.nio.file.Files.createSymbolicLink(runtimeLink.toPath(), actualRuntime.toPath())
+
+            val version = "stt-recovery-fixture"
+            val script = """
+                import json
+                import pathlib
+                import sys
+
+                video_id = "$FIXTURE_VIDEO_ID"
+                if "--version" in sys.argv:
+                    print("$version")
+                    sys.exit(0)
+                if "--dump-single-json" in sys.argv:
+                    print(json.dumps({
+                        "id": video_id,
+                        "title": "Refreshed fixture source",
+                        "duration": 1,
+                        "formats": [{
+                            "format_id": "251",
+                            "vcodec": "none",
+                            "acodec": "opus",
+                            "ext": "webm",
+                            "abr": 105.2,
+                            "filesize": 4096,
+                        }],
+                    }))
+                    sys.exit(0)
+                if "--format" in sys.argv:
+                    output = pathlib.Path(sys.argv[sys.argv.index("--output") + 1])
+                    output.with_name("fixture-download.called").write_text("called", encoding="utf-8")
+                    sys.exit(70)
+                sys.exit(64)
+            """.trimIndent().toByteArray(Charsets.UTF_8)
+            val engine = java.io.ByteArrayOutputStream().also { bytes ->
+                java.util.zip.ZipOutputStream(bytes).use { zip ->
+                    zip.putNextEntry(java.util.zip.ZipEntry("__main__.py"))
+                    zip.write(script)
+                    zip.closeEntry()
+                    zip.putNextEntry(java.util.zip.ZipEntry("yt_dlp_ejs/__init__.py"))
+                    zip.write("version = \"$version\"\n".toByteArray(Charsets.UTF_8))
+                    zip.closeEntry()
+                }
+            }.toByteArray()
+            val id = sha256(engine)
+            val enginesDirectory = File(context.noBackupFilesDir, "engines").also { check(it.mkdirs()) }
+            val slot = File(enginesDirectory, id).also { check(it.mkdirs()) }
+            File(slot, "yt-dlp").writeBytes(engine)
+            val installation = org.json.JSONObject()
+                .put("id", id)
+                .put("version", version)
+                .put("ejsVersion", version)
+                .put("channel", "STABLE")
+                .put("sha256", id)
+                .put("healthy", true)
+                .put("bundled", false)
+            File(enginesDirectory, "state.json").writeText(
+                org.json.JSONObject()
+                    .put("active", id)
+                    .put("previous", org.json.JSONObject.NULL)
+                    .put("healthy", org.json.JSONArray().put(id))
+                    .put("installations", org.json.JSONArray().put(installation))
+                    .put("lastCheckedMs", 0)
+                    .put("nextAllowedMs", 0)
+                    .toString(),
+            )
+            return id
+        }
+
+        suspend fun forceStorageLimitExceeded() {
+            settings.update { it.copy(storageLimitBytes = STORAGE_LIMIT_BYTES) }
+            java.io.RandomAccessFile(File(context.filesDir, "fixture-quota-filler.bin"), "rw").use { file ->
+                file.setLength(STORAGE_LIMIT_BYTES)
+            }
         }
 
         fun readNormalized(attemptId: String): String = context.noBackupFilesDir
@@ -992,12 +1498,22 @@ class SttRecoveryTest {
             .resolve(attemptId)
             .resolve("source.audio")
 
+        fun attemptDirectory(attemptId: String): File = context.noBackupFilesDir
+            .resolve(ATTEMPTS_DIRECTORY)
+            .resolve(attemptId)
+
+        fun fixtureDownloadMarker(attemptId: String): File =
+            File(attemptDirectory(attemptId), "fixture-download.called")
+
         fun close() {
             database.close()
             try {
                 server.shutdown()
             } catch (_: IOException) {
                 // Fixture cleanup must not touch files outside its UUID root.
+            }
+            if (java.nio.file.Files.isSymbolicLink(runtimeLink.toPath())) {
+                java.nio.file.Files.delete(runtimeLink.toPath())
             }
             root.deleteRecursively()
         }
@@ -1009,12 +1525,15 @@ class SttRecoveryTest {
     private class IsolatedContext(base: Context, root: File) : ContextWrapper(base) {
         private val files = File(root, "files").also { check(it.mkdirs()) }
         private val noBackup = File(root, "no-backup").also { check(it.mkdirs()) }
+        private val cache = File(root, "cache").also { check(it.mkdirs()) }
 
         override fun getApplicationContext(): Context = this
 
         override fun getFilesDir(): File = files
 
         override fun getNoBackupFilesDir(): File = noBackup
+
+        override fun getCacheDir(): File = cache
     }
 
     private data class Seeded(
@@ -1023,6 +1542,7 @@ class SttRecoveryTest {
         val owner: String,
         val artifactId: String,
         val source: Source,
+        val audio: AudioTrack?,
     )
 
     @Serializable
@@ -1038,6 +1558,9 @@ class SttRecoveryTest {
         val missingChunks: List<Int> = emptyList(),
         val normalized: Boolean = false,
         val engineVersions: Map<String, String> = emptyMap(),
+        val sourceAudioTrackId: String? = null,
+        val sourceAudioSha256: String? = null,
+        val providerFailure: ProviderFailure? = null,
     )
 
     @Serializable
@@ -1053,6 +1576,7 @@ class SttRecoveryTest {
     companion object {
         private const val FIXTURE_AUDIO_BYTES = 4 * 1024
         private const val FIXTURE_DURATION_MS = 1_000L
+        private const val FIXTURE_VIDEO_ID = "SSfixture01"
         private const val AUDIO_MIME_TYPE = "audio/mpeg"
         private const val ATTEMPTS_DIRECTORY = "attempts"
         private const val RESPONSES_DIRECTORY = "responses"
@@ -1062,6 +1586,7 @@ class SttRecoveryTest {
         private const val MULTI_CHUNK_DURATION_MS = 601_000L
         private const val THREE_CHUNK_DURATION_MS = 1_201_000L
         private const val LARGE_RESPONSE_BYTES = 6 * 1024 * 1024
+        private const val STORAGE_LIMIT_BYTES = 256L * 1024 * 1024
         private const val SHA256_HEX_LENGTH = 64
         private const val REMOTE_ID_A = "0072a82b-aa22-4962-add2-6121c36c17c6"
         private const val REMOTE_ID_B = "1072a82b-aa22-4962-add2-6121c36c17c6"

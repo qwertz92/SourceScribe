@@ -18,6 +18,32 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class ViewRulesTest {
     @Test
+    fun providerSpecificOptionsAreRefusedBeforeAcquisitionIncludingFallback() {
+        val source = SourceResolver.youtube("https://www.youtube.com/watch?v=jNQXAC9IVRw").copy(durationMs = 19_000L)
+        val id = requireNotNull(source.videoId)
+        val resolved = ResolvedSource(source, emptyList(), listOf(
+            AudioTrack("251", id, "en", null, true, "fixture")), emptyMap())
+        val groqKey = CredentialInfo("groq-key", Provider.GROQ, Region.US)
+        val assemblyKey = CredentialInfo("assembly-key", Provider.ASSEMBLYAI, Region.US)
+        val cases = listOf(
+            JobConfig(provider = Provider.GROQ, model = GroqAdapter.MODEL_TURBO, credentialId = groqKey.id,
+                contextTerms = listOf("ä".repeat(113))) to "PROVIDER_CONTEXT_TOO_LONG",
+            JobConfig(provider = Provider.ASSEMBLYAI, model = AssemblyAiAdapter.MODEL_U2, credentialId = assemblyKey.id,
+                contextTerms = (1..201).map { "term$it" }) to "PROVIDER_TOO_MANY_TERMS",
+            JobConfig(provider = Provider.ASSEMBLYAI, model = AssemblyAiAdapter.MODEL_U2, credentialId = assemblyKey.id,
+                contextTerms = listOf("one two three four five six seven")) to "PROVIDER_TERM_TOO_LONG",
+            JobConfig(provider = Provider.ASSEMBLYAI, model = AssemblyAiAdapter.MODEL_U35, credentialId = assemblyKey.id,
+                language = "ru") to "PROVIDER_LANGUAGE_UNSUPPORTED",
+        )
+        for ((config, expected) in cases) for (mode in listOf(AcquisitionMode.STT_ONLY, AcquisitionMode.BOTH, AcquisitionMode.CAPTIONS_THEN_STT)) {
+            assertEquals("$mode ${config.provider}", expected, MainViewModel.previewError(
+                SourcePreview(resolved, config.copy(mode = mode, audioTrackId = "251"), null), listOf(groqKey, assemblyKey)))
+        }
+        assertNull(MainViewModel.previewError(SourcePreview(resolved, cases[0].first.copy(
+            mode = AcquisitionMode.STT_ONLY, contextTerms = listOf("ä".repeat(112)), audioTrackId = "251"), null), listOf(groqKey)))
+    }
+
+    @Test
     fun deliberateStartBindsApprovalToModeCredentialProviderAndRegionWithoutChangingTheDraft() {
         val key = CredentialInfo("selected-key", Provider.GROQ, Region.US)
         val draft = JobConfig(mode = AcquisitionMode.STT_ONLY, provider = key.provider, region = key.region,
@@ -149,7 +175,7 @@ class ViewRulesTest {
         for (state in ExecutionState.entries) {
             val attempts = listOf(queuedAttempt(Branch.STT, Phase.DOWNLOAD_AUDIO).copy(state = state))
             assertEquals("$state on unmetered only",
-                if (state == ExecutionState.QUEUED) QueueReason.UNMETERED_CONNECTION else QueueReason.UNSTATED,
+                if (state in setOf(ExecutionState.QUEUED, ExecutionState.WAITING_NETWORK)) QueueReason.UNMETERED_CONNECTION else QueueReason.UNSTATED,
                 JobWaits.reason(state, unmetered, attempts, SourceKind.YOUTUBE))
             assertEquals("$state on any connection", QueueReason.UNSTATED,
                 JobWaits.reason(state, JobConfig(), attempts, SourceKind.YOUTUBE))
@@ -247,6 +273,15 @@ class ViewRulesTest {
     }
 
     @Test
+    fun staleProviderModelsAreExplainedBeforeGenericCapabilityChecks() {
+        for (provider in Provider.entries) {
+            val config = JobConfig(mode = AcquisitionMode.STT_ONLY, provider = provider,
+                model = "retired-model", credentialId = "fixture", uploadApproved = true)
+            assertEquals(provider.name, "PROVIDER_MODEL_UNSUPPORTED", MainViewModel.configError(config))
+        }
+    }
+
+    @Test
     fun damagedStoredConfigurationHasNoFallbackProviderOrDefaults() {
         for (raw in listOf("", "{", "{\"mode\":\"BROKEN\"}", "{\"provider\":\"UNKNOWN\"}")) {
             assertNull(app.sourcescribe.data.decodeStoredJobConfig(raw))
@@ -313,11 +348,15 @@ class ViewRulesTest {
             { it }, { it.copy(diarization = true) }, { it.copy(wordTimestamps = true) }, { it.copy(segmentTimestamps = true) },
             { it.copy(contextTerms = listOf("Kubernetes")) }, { it.copy(contextTerms = listOf("Kubernetes", "")) },
             { it.copy(maxCostMicrousd = -1L) }, { it.copy(maxCostMicrousd = 1L) },
+            { it.copy(contextTerms = listOf("ä".repeat(113))) },
+            { it.copy(contextTerms = (1..201).map { number -> "term-$number" }) },
+            { it.copy(contextTerms = listOf("one two three four five six seven")) },
+            { it.copy(language = "not-a-language-code") }, { it.copy(language = "ru") },
         )
         // Every mode, provider, model, region and source shape against each option, with and without a key.
         val seen = mutableSetOf<String>()
         for (mode in AcquisitionMode.entries) for (provider in listOf(null) + Provider.entries) {
-            val models = listOf(null) + (provider?.let { MainViewModel.models(it) } ?: emptyList())
+            val models = listOf(null, "retired-model") + (provider?.let { MainViewModel.models(it) } ?: emptyList())
             for (model in models) for (region in Region.entries) for (option in options) for (resolved in sources) {
                 val key = CredentialInfo("fixture-key", provider ?: Provider.GROQ, region)
                 val config = option(JobConfig(mode = mode, provider = provider, model = model, region = region, credentialId = key.id))

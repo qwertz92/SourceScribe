@@ -185,9 +185,34 @@ recorded so the investigation is not repeated.
   view model and dies with the process by design: a new process gets a new session id, and a field shows what
   the draft holds, because start reads the draft, not the field. Preserving typed values across a process death
   would mean saving the draft itself (e.g. via `SavedStateHandle`), not a field's text.
-- **A retried chunk upload shows its progress from the finished chunks again, not from where the failed
-  attempt got to.** `SttStep.countingUpload` records the sum of the completed chunks when a submission starts,
-  so after a transient network failure the byte count and percentage visibly go back before climbing again.
-  Holding the failed attempt's figure would present bytes the provider never accepted as progress, and the
-  invariant forbids an invented percentage; only the measured rate is kept from going down. Recorded after
-  review round 1 of 0.4.0 (16 September 2026).
+- **Upload counters describe the current audio request, not earlier chunks or a later JSON POST.**
+  (30 September 2026) Multipart envelope bytes belong to the request total. Read the current DAO row before saving
+  the next phase or an error; saving the row loaded before the upload erases its measured counters. A retry starts
+  its own request at zero, and a completed upload can remain visible while awaiting the provider response.
+
+## Provider reliability, 30 September–1 October 2026
+
+- **Validate provider options before acquiring audio, using the same validator as submission.** Include the
+  captions-then-STT fallback. A zero-request local validation failure must never claim the provider rejected it.
+- **Store typed provider diagnostics, not arbitrary response text.** Preserve the operation, status, and recognized
+  reason; keep body parsing bounded and unknown causes unknown. Clear a prior diagnostic before a fresh/local retry.
+- **Reusing source audio needs the original binding and a fresh hash check.** Match source, rendition, and engine;
+  reject the original directory entry if it is a symlink before canonicalizing. Copy into the new attempt under
+  the storage reservation; paid chunks and provider submissions remain independent.
+- **Worker continuations and polls need stable presentation.** Keep scheduler states/deadlines real; map transient
+  phase handoffs and poll claims for display. A retry label must not invent a network cause for an HTTP server error.
+- **Notify events, not phases.** Keep routine progress quiet; deduplicate actionable errors and background completion
+  durably. Mark foreground/historic completions handled so startup cannot re-announce them.
+
+- **Persist paid acceptance before performing another HTTP request.** (1 October 2026) A non-chargeable GET
+  that fails inside `submit()` can reach the submission retry handler and cause a second paid POST. Return the
+  accepted handle first; do sentence retrieval only in `poll()`, retaining the same ID and atomic pending receipt.
+- **AssemblyAI sentence timestamps do not require speaker labels.** (1 October 2026) Default segment timing
+  with diarization disabled needs the accepted transcript's `/sentences` response; timed words alone do not
+  establish native sentence boundaries. Keep both responses bound to the same ID and response-size limit.
+- **Network callback ordering needs one dispatch thread.** (1 October 2026) Use the native callback Handler
+  overload so lifecycle snapshot seeding and callbacks share the main thread; cancel-and-join alone cannot
+  serialize jobs whose predecessors are captured concurrently on different threads.
+- **Reserve error text using actual font measurement.** (1 October 2026) Two nominal line heights were
+  insufficient at 200% font size. Compose's native text measurement reserves two rendered lines and the
+  help-button slot; full details remain accessible in Actions.

@@ -25,6 +25,9 @@ enum class QueueReason {
 
     /** Another job on this device holds the audio or the provider lock; the attempt retries by itself. */
     ANOTHER_JOB,
+
+    /** A network failure is waiting for its automatic retry time. */
+    AUTOMATIC_RETRY,
 }
 
 /**
@@ -77,14 +80,16 @@ object JobWaits {
         attempts: List<AttemptRow>,
         sourceKind: SourceKind?,
     ): QueueReason {
-        if (state != ExecutionState.QUEUED) return QueueReason.UNSTATED
+        if (state !in setOf(ExecutionState.QUEUED, ExecutionState.WAITING_NETWORK)) return QueueReason.UNSTATED
         val queued = attempts.groupBy { it.branch }.values
             .map { rows -> rows.maxBy { it.number } }
-            .filter { it.state == ExecutionState.QUEUED }
+            .filter { it.state in setOf(ExecutionState.QUEUED, ExecutionState.WAITING_NETWORK) }
         val held = config?.networkPolicy == NetworkPolicy.UNMETERED &&
-            queued.any { it.error == null && needsNetwork(it.branch, it.phase, sourceKind) }
+            queued.any { (it.error == null || state == ExecutionState.WAITING_NETWORK) &&
+                needsNetwork(it.branch, it.phase, sourceKind) }
         return when {
             held -> QueueReason.UNMETERED_CONNECTION
+            queued.any { it.state == ExecutionState.WAITING_NETWORK && it.nextAt > 0 } -> QueueReason.AUTOMATIC_RETRY
             queued.any { it.error in HELD_BY_ANOTHER_JOB } -> QueueReason.ANOTHER_JOB
             else -> QueueReason.UNSTATED
         }

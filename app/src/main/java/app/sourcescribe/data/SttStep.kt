@@ -21,6 +21,7 @@ import app.sourcescribe.core.ProviderAdapter
 import app.sourcescribe.core.ProviderCapabilities
 import app.sourcescribe.core.ProviderError
 import app.sourcescribe.core.ProviderErrorCode
+import app.sourcescribe.core.ProviderFailure
 import app.sourcescribe.core.ProviderTranscript
 import app.sourcescribe.core.Provenance
 import app.sourcescribe.core.RemoteHandle
@@ -96,6 +97,7 @@ class SttStep @Inject constructor(
     private val engines: EngineUpdateManager,
     private val artifacts: ArtifactFiles,
     private val providerHttp: app.sourcescribe.core.ProviderHttp,
+    private val storage: StorageBudget? = null,
 ) {
     private val appContext = context.applicationContext
     private val preparation = AudioPreparation(runtime)
@@ -117,16 +119,21 @@ class SttStep @Inject constructor(
         if (row.state in TERMINAL_STATES) return row
         return try {
             ensureFence(row, owner)
-            val checkpoint = checkpoint(row.checkpoint)
-            when (row.phase) {
-                Phase.RESOLVE -> resolve(row, owner, config, checkpoint)
-                Phase.DOWNLOAD_AUDIO -> download(row, owner, config, checkpoint, maxDownloadBytes)
-                Phase.PREPARE_AUDIO -> prepare(row, owner, config, checkpoint)
-                Phase.UPLOAD, Phase.SUBMIT -> submit(row, owner, config, checkpoint)
-                Phase.RETRIEVE -> retrieve(row, owner, config, checkpoint)
-                Phase.NORMALIZE -> normalize(row, owner, config, checkpoint)
-                Phase.PERSIST -> persist(row, owner, config, checkpoint)
-                Phase.FETCH_CAPTIONS -> waitForUser(row, owner, "INVALID_STT_PHASE")
+            var currentRow = row
+            var currentCheckpoint = checkpoint(row.checkpoint)
+            if (currentRow.error != null || currentCheckpoint.providerFailure != null) {
+                currentCheckpoint = currentCheckpoint.copy(providerFailure = null)
+                currentRow = save(currentRow.copy(checkpoint = encode(currentCheckpoint), error = null), owner)
+            }
+            when (currentRow.phase) {
+                Phase.RESOLVE -> resolve(currentRow, owner, config, currentCheckpoint)
+                Phase.DOWNLOAD_AUDIO -> download(currentRow, owner, config, currentCheckpoint, maxDownloadBytes)
+                Phase.PREPARE_AUDIO -> prepare(currentRow, owner, config, currentCheckpoint)
+                Phase.UPLOAD, Phase.SUBMIT -> submit(currentRow, owner, config, currentCheckpoint)
+                Phase.RETRIEVE -> retrieve(currentRow, owner, config, currentCheckpoint)
+                Phase.NORMALIZE -> normalize(currentRow, owner, config, currentCheckpoint)
+                Phase.PERSIST -> persist(currentRow, owner, config, currentCheckpoint)
+                Phase.FETCH_CAPTIONS -> waitForUser(currentRow, owner, "INVALID_STT_PHASE")
             }
         } catch (cancelled: CancellationException) {
             withContext(NonCancellable) { markSendingUncertain(row, owner) }
@@ -163,7 +170,14 @@ class SttStep @Inject constructor(
         } catch (_: CheckpointDamaged) {
             waitForUser(currentRow(row, owner), owner, "CHECKPOINT_DAMAGED")
         } catch (failure: ProviderError) {
-            waitForUser(currentRow(row, owner), owner, "PROVIDER_${failure.code.name}")
+            val latest = currentRow(row, owner)
+            val latestCheckpoint = checkpoint(latest.checkpoint).copy(providerFailure = failure.failure)
+            save(latest.copy(
+                checkpoint = encode(latestCheckpoint),
+                state = ExecutionState.WAITING_USER,
+                nextAt = 0,
+                error = "PROVIDER_${failure.code.name}",
+            ), owner)
         }
     }
 
@@ -461,21 +475,130 @@ class SttStep @Inject constructor(
         val resolved = withTimeout(RESOLVE_TIMEOUT_MS) {
             extractor.resolve(source, engines.file(installation))
         }
+        if (resolved.source.id != source.id || resolved.source.videoId != source.videoId) {
+            return waitForUser(row, owner, "SOURCE_ID_MISMATCH")
+        }
         val audio = TrackSelection.audio(resolved, config.audioTrackId)
             ?: return waitForUser(row, owner, if (config.audioTrackId == null) "CHOOSE_AUDIO_TRACK" else "AUDIO_TRACK_CHANGED")
+        if (audio.sourceVideoId != source.videoId) return waitForUser(row, owner, "AUDIO_TRACK_CHANGED")
+        val reusedHash = reuseVerifiedSourceAudio(row, resolved.source, audio)
         val next = checkpoint.copy(
             source = resolved.source,
             audio = audio,
+            sourceAudioTrackId = reusedHash?.let { audio.id } ?: checkpoint.sourceAudioTrackId,
+            sourceAudioSha256 = reusedHash ?: checkpoint.sourceAudioSha256,
             engineVersions = mapOf("yt-dlp" to installation.version, "yt-dlp-ejs" to installation.ejsVersion),
         )
         return save(row.copy(
-            phase = Phase.DOWNLOAD_AUDIO,
+            phase = if (reusedHash == null) Phase.DOWNLOAD_AUDIO else Phase.PREPARE_AUDIO,
             state = ExecutionState.QUEUED,
             nextAt = 0,
+            processedBytes = 0,
+            totalBytes = null,
             checkpoint = encode(next),
             error = null,
         ), owner)
     }
+
+    /** Copies only a source-audio file whose durable source, rendition, engine, and hash bindings match. */
+    internal suspend fun reuseVerifiedSourceAudio(
+        target: AttemptRow,
+        source: Source,
+        audio: AudioTrack,
+    ): String? {
+        val storage = storage ?: return null
+        val videoId = source.videoId?.takeIf { it.isNotBlank() } ?: return null
+        if (source.kind != SourceKind.YOUTUBE || audio.sourceVideoId != videoId || target.engineId == null) return null
+
+        val candidates = dao.allAttempts()
+            .asSequence()
+            .filter { attempt ->
+                attempt.id != target.id && attempt.branch == Branch.STT &&
+                    attempt.phase !in setOf(Phase.RESOLVE, Phase.DOWNLOAD_AUDIO) &&
+                    attempt.engineId == target.engineId
+            }
+            .sortedWith(compareByDescending<AttemptRow> { it.createdAt }.thenByDescending { it.id })
+        for (previous in candidates) {
+            val job = dao.job(previous.jobId) ?: continue
+            if (job.sourceId != source.id) continue
+            val sourceRow = dao.source(job.sourceId) ?: continue
+            if (sourceRow.id != source.id) continue
+            val storedSource = decodeSource(sourceRow.snapshot) ?: continue
+            if (!sameYouTubeIdentity(storedSource, source)) continue
+            val previousCheckpoint = try {
+                checkpoint(previous.checkpoint)
+            } catch (_: CheckpointDamaged) {
+                continue
+            }
+            val previousSource = previousCheckpoint.source ?: continue
+            val previousAudio = previousCheckpoint.audio ?: continue
+            val expectedHash = previousCheckpoint.sourceAudioSha256 ?: continue
+            if (!sameYouTubeIdentity(previousSource, source) || previousAudio.id != audio.id ||
+                previousAudio.sourceVideoId != videoId || previousCheckpoint.sourceAudioTrackId != audio.id
+            ) continue
+
+            val previousDirectory = existingAttemptDirectory(previous.id) ?: continue
+            val previousAudioFile = regularPrivateFile(File(previousDirectory, SOURCE_AUDIO_NAME), previousDirectory) ?: continue
+            val expectedBytes = previousAudioFile.length()
+            if (expectedBytes !in 1..MAX_SOURCE_AUDIO_BYTES) continue
+            val actualHash = try {
+                withContext(Dispatchers.IO) { sha256(previousAudioFile) }
+            } catch (_: IOException) {
+                continue
+            } catch (_: SecurityException) {
+                continue
+            }
+            if (actualHash != expectedHash || previousAudioFile.length() != expectedBytes) continue
+
+            val targetDirectory = try {
+                attemptDirectory(target.id)
+            } catch (_: IOException) {
+                return null
+            }
+            val targetAudio = File(targetDirectory, SOURCE_AUDIO_NAME)
+            if (Files.isSymbolicLink(targetAudio.toPath())) return null
+            if (targetAudio.exists()) {
+                val existing = regularPrivateFile(targetAudio, targetDirectory) ?: return null
+                if (existing.length() != expectedBytes) return null
+                val existingHash = try {
+                    withContext(Dispatchers.IO) { sha256(existing) }
+                } catch (_: IOException) {
+                    return null
+                } catch (_: SecurityException) {
+                    return null
+                }
+                return expectedHash.takeIf { existingHash == expectedHash && existing.length() == expectedBytes }
+            }
+
+            val temporary = File(targetDirectory, ".source-audio-${UUID.randomUUID()}.tmp")
+            try {
+                storage.withReservation(expectedBytes) {
+                    copyBounded(
+                        source = previousAudioFile,
+                        target = temporary,
+                        expectedBytes = expectedBytes,
+                        maximumBytes = MAX_SOURCE_AUDIO_BYTES,
+                        expectedSha256 = expectedHash,
+                    )
+                    moveAtomically(temporary, targetAudio)
+                }
+                return expectedHash
+            } catch (failure: StorageBudgetException) {
+                throw failure
+            } catch (_: IOException) {
+                return null
+            } catch (_: SecurityException) {
+                return null
+            } finally {
+                temporary.delete()
+            }
+        }
+        return null
+    }
+
+    private fun sameYouTubeIdentity(first: Source, second: Source): Boolean =
+        first.kind == SourceKind.YOUTUBE && second.kind == SourceKind.YOUTUBE &&
+            first.id == second.id && first.videoId == second.videoId && !first.videoId.isNullOrBlank()
 
     private suspend fun download(
         row: AttemptRow,
@@ -506,7 +629,14 @@ class SttStep @Inject constructor(
                     }
                 } == true
             if (bound) {
-                return save(row.copy(phase = Phase.PREPARE_AUDIO, state = ExecutionState.QUEUED, nextAt = 0, error = null), owner)
+                return save(row.copy(
+                    phase = Phase.PREPARE_AUDIO,
+                    state = ExecutionState.QUEUED,
+                    nextAt = 0,
+                    processedBytes = 0,
+                    totalBytes = null,
+                    error = null,
+                ), owner)
             }
             // A file left behind before its binding checkpoint was durable is not
             // evidence for an upload. Rebuild it through the free extractor path.
@@ -629,8 +759,8 @@ class SttStep @Inject constructor(
                 phase = Phase.SUBMIT,
                 state = ExecutionState.QUEUED,
                 nextAt = 0,
-                processedBytes = checkpoint.prepared.sumOf { it.bytes },
-                totalBytes = checkpoint.prepared.sumOf { it.bytes },
+                processedBytes = 0,
+                totalBytes = null,
                 retries = 0,
                 checkpoint = encode(checkpoint),
                 error = null,
@@ -679,8 +809,8 @@ class SttStep @Inject constructor(
             phase = if (checkpoint.nextChunkIndex < checkpoint.chunkCount) Phase.PREPARE_AUDIO else Phase.SUBMIT,
             state = ExecutionState.QUEUED,
             nextAt = 0,
-            processedBytes = processed,
-            totalBytes = if (checkpoint.nextChunkIndex == checkpoint.chunkCount) processed else null,
+            processedBytes = if (checkpoint.nextChunkIndex == checkpoint.chunkCount) 0 else processed,
+            totalBytes = null,
             checkpoint = encode(checkpoint),
             error = null,
         ), owner)
@@ -786,53 +916,49 @@ class SttStep @Inject constructor(
             ensureFence(row, owner)
             currentCoroutineContext().ensureActive()
             withTimeout(SUBMIT_TIMEOUT_MS) {
-                countingUpload(row, owner, checkpoint, chunk) {
+                countingUpload(row, owner) {
                     valid.adapter.submit(request, key, AtomicResponseSpool(responsePath(row.id, submission.id)))
                 }
             }
         } catch (failure: ProviderError) {
-            return handleSubmitError(row, owner, config, sending, failure)
+            return handleSubmitError(currentRow(row, owner), owner, config, checkpoint, sending, failure)
         }
-        return saveSubmissionResult(row, owner, config, checkpoint, valid.adapter, sending, result)
+        return saveSubmissionResult(currentRow(row, owner), owner, config, checkpoint, valid.adapter, sending, result)
     }
 
-    /**
-     * Runs [send] while the attempt records how much of the submission has left the device.
-     *
-     * The chunks before this one are at the provider already, so the number is their bytes plus what this
-     * one has written, against the bytes of every chunk: one count for the whole submission instead of one
-     * that starts at zero again for every ten-minute piece. The report itself arrives on the thread OkHttp
-     * writes the body on, which may not touch the database, so it only moves a value in memory that a
-     * coroutine of this step writes on, once a second. The last write happens whatever the outcome — a
-     * failed upload leaves the number where the bytes actually stopped, not where the last tick left it.
-     */
+    /** Records the current request body's exact byte counts while [send] is in flight. */
     private suspend fun <T> countingUpload(
         row: AttemptRow,
         owner: String,
-        checkpoint: SttCheckpoint,
-        chunk: PreparedChunk,
         send: suspend () -> T,
     ): T = coroutineScope {
-        val done = checkpoint.prepared.filter { it.index < chunk.index }.sumOf { it.bytes }
-        val total = checkpoint.prepared.sumOf { it.bytes }
-        val sent = AtomicLong(done)
-        dao.recordProgress(row.id, owner, done, total)
+        val sent = AtomicLong(0)
+        val total = AtomicLong(-1)
+        dao.recordProgress(row.id, owner, 0, null)
         val reporter = launch {
-            var written = done
+            var reportedBytes = 0L
+            var reportedTotal = -1L
             while (isActive) {
                 delay(PROGRESS_INTERVAL_MS)
                 val now = sent.get()
-                if (now != written) {
-                    written = now
-                    dao.recordProgress(row.id, owner, written, total)
+                val currentTotal = total.get()
+                if (now != reportedBytes || currentTotal != reportedTotal) {
+                    reportedBytes = now
+                    reportedTotal = currentTotal
+                    dao.recordProgress(row.id, owner, now, currentTotal.takeIf { it >= 0 })
                 }
             }
         }
         try {
-            withContext(UploadProgress { written, _ -> sent.set(done + written) }) { send() }
+            withContext(UploadProgress { written, requestTotal ->
+                sent.set(written)
+                total.set(requestTotal)
+            }) { send() }
         } finally {
             reporter.cancel()
-            withContext(NonCancellable) { dao.recordProgress(row.id, owner, sent.get(), total) }
+            withContext(NonCancellable) {
+                dao.recordProgress(row.id, owner, sent.get(), total.get().takeIf { it >= 0 })
+            }
         }
     }
 
@@ -860,7 +986,7 @@ class SttStep @Inject constructor(
             ) {
                 // The process may have stopped after AAI spooled a status=error
                 // receipt but before the live submit path recorded its ID.
-                handleSubmitError(row, owner, config, submission, failure)
+                handleSubmitError(row, owner, config, checkpoint, submission, failure)
             } else {
                 responseParseFailure(row, owner, submission, failure)
             }
@@ -931,7 +1057,7 @@ class SttStep @Inject constructor(
                 val parsed = try {
                     valid.adapter.parseSavedResponse(response, request(row.id, config, chunk))
                 } catch (failure: ProviderError) {
-                    return replayRemoteResponseFailure(row, owner, submission, failure)
+                    return replayRemoteResponseFailure(row, owner, submission, checkpoint, failure)
                 } catch (_: IOException) {
                     return waitForUser(row, owner, "RESPONSE_STORAGE")
                 } catch (_: SecurityException) {
@@ -978,7 +1104,7 @@ class SttStep @Inject constructor(
                 valid.adapter.poll(handle, request, key, AtomicResponseSpool(responsePath(row.id, submission.id)))
             }
         } catch (failure: ProviderError) {
-            return handlePollError(row, owner, submission, failure)
+            return handlePollError(row, owner, submission, checkpoint, failure)
         }
         return when (result) {
             is PollResult.Waiting -> save(row.copy(
@@ -1402,9 +1528,11 @@ class SttStep @Inject constructor(
         row: AttemptRow,
         owner: String,
         config: JobConfig,
+        checkpoint: SttCheckpoint,
         submission: SubmissionRow,
         failure: ProviderError,
     ): AttemptRow {
+        val failedRow = row.copy(checkpoint = encode(checkpoint.copy(providerFailure = failure.failure)))
         val rawExists = regularResponseFile(responsePath(row.id, submission.id), row.id)
         if (config.provider == Provider.ASSEMBLYAI &&
             submission.provider == Provider.ASSEMBLYAI.name &&
@@ -1423,8 +1551,8 @@ class SttStep @Inject constructor(
                 null
             }
             if (receiptId != null && validHandle(RemoteHandle(Provider.ASSEMBLYAI, config.region, receiptId), Provider.ASSEMBLYAI, config)) {
-                updateSubmissionClaimed(row, owner, submission.copy(state = SubmissionState.ACCEPTED, remoteId = receiptId))
-                return save(row.copy(
+                updateSubmissionClaimed(failedRow, owner, submission.copy(state = SubmissionState.ACCEPTED, remoteId = receiptId))
+                return save(failedRow.copy(
                     phase = Phase.RETRIEVE,
                     state = ExecutionState.WAITING_USER,
                     nextAt = 0,
@@ -1439,33 +1567,33 @@ class SttStep @Inject constructor(
                 rawExists == null -> {
                 // Upload responses are non-chargeable and are not spooled. A malformed
                 // upload receipt therefore happened before the paid transcript POST.
-                updateSubmissionClaimed(row, owner, submission.copy(
+                updateSubmissionClaimed(failedRow, owner, submission.copy(
                     state = SubmissionState.REJECTED,
                     rejectionCode = failure.code.name,
                 ))
-                save(row.copy(state = ExecutionState.WAITING_USER, nextAt = 0, error = failure.code.name), owner)
+                save(failedRow.copy(state = ExecutionState.WAITING_USER, nextAt = 0, error = failure.code.name), owner)
             }
             rawExists != null && submission.provider == Provider.ASSEMBLYAI.name &&
                 failure.code == ProviderErrorCode.INVALID_RESPONSE -> {
                 // A chargeable AAI response without a valid receipt must stay
                 // uncertain. Treating it as a saved direct result could permit a
                 // later retry without a durable remote binding.
-                markSubmissionUncertain(row, owner, submission, "REMOTE_RECEIPT_MISSING")
+                markSubmissionUncertain(failedRow, owner, submission, "REMOTE_RECEIPT_MISSING")
             }
-            rawExists != null && failure.code == ProviderErrorCode.INVALID_RESPONSE -> responseParseFailure(row, owner, submission, failure)
+            rawExists != null && failure.code == ProviderErrorCode.INVALID_RESPONSE -> responseParseFailure(failedRow, owner, submission, failure)
             submission.provider == Provider.ASSEMBLYAI.name &&
                 failure.code in setOf(ProviderErrorCode.NETWORK, ProviderErrorCode.SERVER) -> {
-                val retries = row.retries + 1
-                updateSubmissionClaimed(row, owner, submission.copy(state = SubmissionState.PREPARED, rejectionCode = null))
+                val retries = failedRow.retries + 1
+                updateSubmissionClaimed(failedRow, owner, submission.copy(state = SubmissionState.PREPARED, rejectionCode = null))
                 if (retries <= MAX_NETWORK_RETRIES) {
-                    save(row.copy(
+                    save(failedRow.copy(
                         state = ExecutionState.WAITING_NETWORK,
                         nextAt = System.currentTimeMillis() + retryDelayMillis(MIN_REMOTE_RETRY_MS),
                         retries = retries,
                         error = failure.code.name,
                     ), owner)
                 } else {
-                    save(row.copy(
+                    save(failedRow.copy(
                         state = ExecutionState.WAITING_USER,
                         nextAt = 0,
                         retries = retries,
@@ -1474,29 +1602,29 @@ class SttStep @Inject constructor(
                 }
             }
             failure.code == ProviderErrorCode.RATE_LIMIT -> {
-                val retries = row.retries + 1
+                val retries = failedRow.retries + 1
                 if (retries > MAX_NETWORK_RETRIES) {
                     // A rate limit is not a confirmed pre-accept rejection. Keep the
                     // prepared row so its budget reservation remains counted when the
                     // user resumes the bounded retry.
-                    updateSubmissionClaimed(row, owner, submission.copy(state = SubmissionState.PREPARED, rejectionCode = null))
-                    save(row.copy(state = ExecutionState.WAITING_USER, nextAt = 0, retries = retries, error = failure.code.name), owner)
+                    updateSubmissionClaimed(failedRow, owner, submission.copy(state = SubmissionState.PREPARED, rejectionCode = null))
+                    save(failedRow.copy(state = ExecutionState.WAITING_USER, nextAt = 0, retries = retries, error = failure.code.name), owner)
                 } else {
-                    updateSubmissionClaimed(row, owner, submission.copy(state = SubmissionState.PREPARED, rejectionCode = null))
-                    save(row.copy(state = ExecutionState.WAITING_RATE_LIMIT, nextAt = System.currentTimeMillis() + retryDelayMillis((failure.retryAfterSeconds ?: MIN_REMOTE_RETRY_SECONDS).coerceIn(MIN_REMOTE_RETRY_SECONDS, MAX_RETRY_AFTER_SECONDS) * 1000L), retries = retries, error = failure.code.name), owner)
+                    updateSubmissionClaimed(failedRow, owner, submission.copy(state = SubmissionState.PREPARED, rejectionCode = null))
+                    save(failedRow.copy(state = ExecutionState.WAITING_RATE_LIMIT, nextAt = System.currentTimeMillis() + retryDelayMillis((failure.retryAfterSeconds ?: MIN_REMOTE_RETRY_SECONDS).coerceIn(MIN_REMOTE_RETRY_SECONDS, MAX_RETRY_AFTER_SECONDS) * 1000L), retries = retries, error = failure.code.name), owner)
                 }
             }
             failure.code == ProviderErrorCode.SUBMISSION_UNCERTAIN -> {
-                updateSubmissionClaimed(row, owner, submission.copy(state = SubmissionState.UNCERTAIN, rejectionCode = null))
-                save(row.copy(state = ExecutionState.SUBMISSION_UNCERTAIN, nextAt = 0, error = failure.code.name), owner)
+                updateSubmissionClaimed(failedRow, owner, submission.copy(state = SubmissionState.UNCERTAIN, rejectionCode = null))
+                save(failedRow.copy(state = ExecutionState.SUBMISSION_UNCERTAIN, nextAt = 0, error = failure.code.name), owner)
             }
             failure.code in KNOWN_REJECTION_CODES -> {
-                updateSubmissionClaimed(row, owner, submission.copy(state = SubmissionState.REJECTED, rejectionCode = failure.code.name))
-                save(row.copy(state = ExecutionState.WAITING_USER, nextAt = 0, error = failure.code.name), owner)
+                updateSubmissionClaimed(failedRow, owner, submission.copy(state = SubmissionState.REJECTED, rejectionCode = failure.code.name))
+                save(failedRow.copy(state = ExecutionState.WAITING_USER, nextAt = 0, error = failure.code.name), owner)
             }
             else -> {
-                updateSubmissionClaimed(row, owner, submission.copy(state = SubmissionState.UNCERTAIN, rejectionCode = null))
-                save(row.copy(state = ExecutionState.SUBMISSION_UNCERTAIN, nextAt = 0, error = failure.code.name), owner)
+                updateSubmissionClaimed(failedRow, owner, submission.copy(state = SubmissionState.UNCERTAIN, rejectionCode = null))
+                save(failedRow.copy(state = ExecutionState.SUBMISSION_UNCERTAIN, nextAt = 0, error = failure.code.name), owner)
             }
         }
     }
@@ -1505,31 +1633,33 @@ class SttStep @Inject constructor(
         row: AttemptRow,
         owner: String,
         submission: SubmissionRow,
+        checkpoint: SttCheckpoint,
         failure: ProviderError,
     ): AttemptRow {
-        val retries = row.retries + 1
+        val failedRow = row.copy(checkpoint = encode(checkpoint.copy(providerFailure = failure.failure)))
+        val retries = failedRow.retries + 1
         return when (failure.code) {
             ProviderErrorCode.RATE_LIMIT -> if (retries <= MAX_NETWORK_RETRIES) {
-                save(row.copy(state = ExecutionState.WAITING_RATE_LIMIT, nextAt = System.currentTimeMillis() + retryDelayMillis((failure.retryAfterSeconds ?: MIN_REMOTE_RETRY_SECONDS).coerceIn(MIN_REMOTE_RETRY_SECONDS, MAX_RETRY_AFTER_SECONDS) * 1000L), retries = retries, error = failure.code.name), owner)
+                save(failedRow.copy(state = ExecutionState.WAITING_RATE_LIMIT, nextAt = System.currentTimeMillis() + retryDelayMillis((failure.retryAfterSeconds ?: MIN_REMOTE_RETRY_SECONDS).coerceIn(MIN_REMOTE_RETRY_SECONDS, MAX_RETRY_AFTER_SECONDS) * 1000L), retries = retries, error = failure.code.name), owner)
             } else {
-                preserveRemote(row, owner, failure.code.name, retries)
+                preserveRemote(failedRow, owner, failure.code.name, retries)
             }
             ProviderErrorCode.NETWORK, ProviderErrorCode.SERVER -> if (retries <= MAX_NETWORK_RETRIES) {
-                save(row.copy(state = ExecutionState.WAITING_NETWORK, nextAt = System.currentTimeMillis() + retryDelayMillis(MIN_REMOTE_RETRY_MS), retries = retries, error = failure.code.name), owner)
+                save(failedRow.copy(state = ExecutionState.WAITING_NETWORK, nextAt = System.currentTimeMillis() + retryDelayMillis(MIN_REMOTE_RETRY_MS), retries = retries, error = failure.code.name), owner)
             } else {
-                preserveRemote(row, owner, failure.code.name, retries)
+                preserveRemote(failedRow, owner, failure.code.name, retries)
             }
             ProviderErrorCode.REMOTE_FAILED, ProviderErrorCode.AUTHENTICATION, ProviderErrorCode.ACCESS_DENIED, ProviderErrorCode.QUOTA -> {
                 if (failure.code == ProviderErrorCode.REMOTE_FAILED) {
                     clearRemoteSpool(row.id, submission.id)
                 }
-                preserveRemote(row, owner, failure.code.name)
+                preserveRemote(failedRow, owner, failure.code.name)
             }
             ProviderErrorCode.INVALID_RESPONSE -> {
                 clearRemoteSpool(row.id, submission.id)
-                preserveRemote(row, owner, failure.code.name)
+                preserveRemote(failedRow, owner, failure.code.name)
             }
-            else -> preserveRemote(row, owner, failure.code.name)
+            else -> preserveRemote(failedRow, owner, failure.code.name)
         }
     }
 
@@ -1537,15 +1667,17 @@ class SttStep @Inject constructor(
         row: AttemptRow,
         owner: String,
         submission: SubmissionRow,
+        checkpoint: SttCheckpoint,
         failure: ProviderError,
     ): AttemptRow {
+        val failedRow = row.copy(checkpoint = encode(checkpoint.copy(providerFailure = failure.failure)))
         if (failure.code == ProviderErrorCode.REMOTE_FAILED || failure.code == ProviderErrorCode.INVALID_RESPONSE) {
             if (!deleteResponseSpool(row.id, submission.id)) {
-                return preserveRemote(row, owner, "RESPONSE_STORAGE")
+                return preserveRemote(failedRow, owner, "RESPONSE_STORAGE")
             }
-            return preserveRemote(row, owner, failure.code.name)
+            return preserveRemote(failedRow, owner, failure.code.name)
         }
-        return waitForUser(row, owner, "RESPONSE_${failure.code.name}")
+        return save(failedRow.copy(state = ExecutionState.WAITING_USER, nextAt = 0, error = "RESPONSE_${failure.code.name}"), owner)
     }
 
     private fun responseBelongsToRemote(provider: Provider, response: ByteArray, remoteId: String): Boolean {
@@ -1725,6 +1857,11 @@ class SttStep @Inject constructor(
         if (ContextTerms.refused(config.contextTerms) || config.language?.isBlank() == true) return null
         if (config.maxAudioSeconds !in 1..MAX_AUDIO_SECONDS) return null
         val adapter = adapter(provider)
+        try {
+            adapter.validateConfiguration(config)
+        } catch (_: ProviderError) {
+            return null
+        }
         val capabilities = try {
             adapter.capabilities(model)
         } catch (_: ProviderError) {
@@ -1745,14 +1882,17 @@ class SttStep @Inject constructor(
         return Validated(adapter, capabilities)
     }
 
-    private fun validationError(config: JobConfig): String = when {
-        config.provider == null -> "PROVIDER_REQUIRED"
-        config.model.isNullOrBlank() -> "MODEL_REQUIRED"
-        !config.uploadApproved -> "UPLOAD_APPROVAL_REQUIRED"
-        config.credentialId.isNullOrBlank() -> "CREDENTIAL_REQUIRED"
-        config.maxCostMicrousd?.let { it < 0 } == true -> "BUDGET_INVALID"
-        config.maxAudioSeconds !in 1..MAX_AUDIO_SECONDS -> "AUDIO_DURATION_LIMIT"
-        else -> "PROVIDER_CAPABILITY_OR_CREDENTIAL_INVALID"
+    private fun validationError(config: JobConfig): String {
+        providerConfigurationError(config)?.let { return it }
+        return when {
+            config.provider == null -> "PROVIDER_REQUIRED"
+            config.model.isNullOrBlank() -> "MODEL_REQUIRED"
+            !config.uploadApproved -> "UPLOAD_APPROVAL_REQUIRED"
+            config.credentialId.isNullOrBlank() -> "CREDENTIAL_REQUIRED"
+            config.maxCostMicrousd?.let { it < 0 } == true -> "BUDGET_INVALID"
+            config.maxAudioSeconds !in 1..MAX_AUDIO_SECONDS -> "AUDIO_DURATION_LIMIT"
+            else -> "PROVIDER_CAPABILITY_OR_CREDENTIAL_INVALID"
+        }
     }
 
     private fun adapter(provider: Provider): ProviderAdapter = when (provider) {
@@ -2078,7 +2218,10 @@ class SttStep @Inject constructor(
     }
 
     private fun regularPrivateFile(file: File, directory: File): File? {
-        val canonical = try { file.canonicalFile } catch (_: IOException) { return null } catch (_: SecurityException) { return null }
+        val canonical = try {
+            if (Files.isSymbolicLink(file.toPath())) return null
+            file.canonicalFile
+        } catch (_: IOException) { return null } catch (_: SecurityException) { return null }
         val parent = try { directory.canonicalFile } catch (_: IOException) { return null } catch (_: SecurityException) { return null }
         return canonical.takeIf {
             it.parentFile?.path == parent.path &&
@@ -2176,6 +2319,7 @@ class SttStep @Inject constructor(
         val rawExtension: String? = null,
         val sourceAudioTrackId: String? = null,
         val sourceAudioSha256: String? = null,
+        val providerFailure: ProviderFailure? = null,
         val reusedArtifactId: String? = null,
         val engineVersions: Map<String, String> = emptyMap(),
     )
@@ -2260,8 +2404,19 @@ class SttStep @Inject constructor(
             null
         }
 
+        /** Safe, structured details from the most recent provider rejection, if a checkpoint stores one. */
+        fun storedProviderFailure(checkpoint: String): ProviderFailure? = try {
+            if (checkpoint.length > MAX_CHECKPOINT_BYTES) null
+            else LENIENT_JSON.decodeFromString<StoredProviderFailure>(checkpoint).providerFailure
+        } catch (_: Exception) {
+            null
+        }
+
         @Serializable
         private data class StoredAudio(val audio: AudioTrack? = null)
+
+        @Serializable
+        private data class StoredProviderFailure(val providerFailure: ProviderFailure? = null)
 
         private val LENIENT_JSON = Json { ignoreUnknownKeys = true }
 

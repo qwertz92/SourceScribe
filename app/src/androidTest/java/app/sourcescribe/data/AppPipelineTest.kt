@@ -1,9 +1,11 @@
 package app.sourcescribe.data
 
 import android.annotation.SuppressLint
+import android.app.NotificationManager
 import android.content.Context
 import android.content.ContextWrapper
 import androidx.room.Room
+import androidx.core.content.edit
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.work.Constraints
@@ -681,6 +683,42 @@ class AppPipelineTest {
     }
 
     @Test
+    fun recoverNotifiesNewCompletionOnceButKeepsHistoricalCompletionQuiet() = withFixture {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            assertTrue(
+                "The device gate must grant POST_NOTIFICATIONS for recovery delivery assertions",
+                context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) == android.content.pm.PackageManager.PERMISSION_GRANTED,
+            )
+        }
+        val manager = context.getSystemService(NotificationManager::class.java)
+        val preferences = context.getSharedPreferences("job_notification_events", Context.MODE_PRIVATE)
+        val recovered = seedCaption(state = ExecutionState.FINISHED)
+        dao.updateJob(recovered.job.copy(state = ExecutionState.RUNNING))
+        val historical = seedCaption(state = ExecutionState.FINISHED)
+        dao.updateJob(historical.job.copy(state = ExecutionState.FINISHED, outcome = Outcome.SUCCESS))
+        try {
+            coordinator.recover()
+
+            assertEquals(ExecutionState.FINISHED, requireNotNull(dao.job(recovered.job.id)).state)
+            assertTrue("A crash after the attempt finalized must deliver its newly recovered completion",
+                manager.activeNotifications.any { it.tag == recovered.job.id })
+            assertFalse("An already finished job must remain quiet during recovery",
+                manager.activeNotifications.any { it.tag == historical.job.id })
+
+            restartedCoordinator().recover()
+
+            assertEquals(1, manager.activeNotifications.count { it.tag == recovered.job.id })
+            assertFalse(manager.activeNotifications.any { it.tag == historical.job.id })
+            assertEquals(0, providerRequests())
+        } finally {
+            manager.cancel(recovered.job.id, 1)
+            manager.cancel(historical.job.id, 1)
+            preferences.edit { remove(recovered.job.id); remove(historical.job.id) }
+        }
+    }
+
+    @Test
     fun recoverPreservesFutureRemoteRetryTimeWhileClearingLease() = withFixture {
         val seeded = seedWaitingRemote()
         val future = System.currentTimeMillis() + 6 * 60 * 60 * 1000L
@@ -1237,6 +1275,72 @@ class AppPipelineTest {
         assertTrue(rawResponse.isFile)
         assertEquals("{\"fixture\":\"spooled-before-cancel\"}", rawResponse.readText())
         assertEquals(0, providerRequests())
+    }
+
+    @Test
+    fun recoveryNotifiesPersistedCancellationUncertaintyOnceAfterOsDismissal() = withFixture {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            assertTrue(
+                "The device gate must grant POST_NOTIFICATIONS for recovery delivery assertions",
+                context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) == android.content.pm.PackageManager.PERMISSION_GRANTED,
+            )
+        }
+        val manager = context.getSystemService(NotificationManager::class.java)
+        val preferences = context.getSharedPreferences("job_notification_events", Context.MODE_PRIVATE)
+        val seeded = seedWaitingRemote()
+        val now = System.currentTimeMillis()
+        val running = seeded.attempt.copy(
+            state = ExecutionState.RUNNING,
+            phase = Phase.SUBMIT,
+            leaseOwner = "fixture-worker",
+            leaseUntil = now + LEASE_MS,
+            nextAt = 0,
+        )
+        dao.updateJob(seeded.job.copy(state = ExecutionState.RUNNING))
+        dao.updateAttempt(running)
+        val submissionId = UUID.randomUUID().toString()
+        val rawResponse = writeAttemptFile(running.id, "responses/$submissionId.json", "{\"fixture\":\"sent\"}")
+        dao.insertSubmission(
+            SubmissionRow(
+                id = submissionId,
+                attemptId = running.id,
+                chunkIndex = 0,
+                provider = Provider.GROQ.name,
+                credentialId = "fixture-credential",
+                region = Region.US.name,
+                inputHash = "fixture-input-hash",
+                configHash = "fixture-config-hash",
+                state = SubmissionState.SENDING,
+                createdAt = now,
+                estimatedMicrousd = 1,
+                rawResponsePath = rawResponse.absolutePath,
+            ),
+        )
+        val id = seeded.job.id
+        try {
+            // Simulate process death after DAO cancellation persists uncertainty, before coordinator.cancel can notify.
+            assertTrue(dao.cancelJob(id))
+            assertEquals(ExecutionState.SUBMISSION_UNCERTAIN, requireNotNull(dao.attempt(running.id)).state)
+            assertFalse(manager.activeNotifications.any { it.tag == id })
+
+            restartedCoordinator().recover()
+
+            assertTrue("Recovery must surface the cost-relevant uncertain submission", manager.activeNotifications.any { it.tag == id })
+            assertEquals(1, manager.activeNotifications.count { it.tag == id })
+            assertEquals(0, providerRequests())
+            assertEquals(SubmissionState.SENDING, dao.submissions(running.id).single().state)
+
+            // NotificationManager.cancel represents dismissing the notification in the system shade; it must
+            // leave the handled signature intact so another process recovery does not replay it.
+            manager.cancel(id, 1)
+            restartedCoordinator().recover()
+            assertFalse("A dismissed uncertainty alert must not be replayed", manager.activeNotifications.any { it.tag == id })
+            assertEquals(0, providerRequests())
+        } finally {
+            manager.cancel(id, 1)
+            preferences.edit { remove(id) }
+        }
     }
 
     @Test

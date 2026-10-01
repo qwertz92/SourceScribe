@@ -149,7 +149,14 @@ class JobCoordinator @Inject constructor(
             recoverFinalizedArtifacts()
             for (job in dao.allJobs()) {
                 try {
-                    summarize(job.id)
+                    if (job.cancelRequested) {
+                        // Cancellation can persist uncertainty before the process dies, ahead of its notification.
+                        notifications.update(job, dao.attempts(job.id), notifyCompletion = false)
+                    } else {
+                        // A previously finished job is historical, but an unfinished row may have crashed after its
+                        // final attempt persisted. Let that newly recovered terminal outcome notify in background.
+                        summarize(job.id, notifyCompletion = job.state != ExecutionState.FINISHED)
+                    }
                     if (job.deleteRequested) finishDeletion(job.id) else cleanupPersisted(job.id)
                 } catch (failure: IOException) {
                     recordMaintenanceFailure(job.id, failure)
@@ -554,7 +561,22 @@ class JobCoordinator @Inject constructor(
         } }
     }
 
-    private suspend fun summarize(jobId: String) = database.withTransaction {
+    suspend fun refreshNetworkStates(network: android.net.NetworkCapabilities?) {
+        for (job in dao.allJobs().filter { it.state in runnable || it.state == ExecutionState.RUNNING }) {
+            summarize(job.id, network = network)
+        }
+    }
+
+    private fun currentNetworkCapabilities(): android.net.NetworkCapabilities? {
+        val connectivity = context.getSystemService(android.net.ConnectivityManager::class.java)
+        return connectivity.getNetworkCapabilities(connectivity.activeNetwork)
+    }
+
+    private suspend fun summarize(
+        jobId: String,
+        notifyCompletion: Boolean = true,
+        network: android.net.NetworkCapabilities? = currentNetworkCapabilities(),
+    ) = database.withTransaction {
         val job = dao.job(jobId) ?: return@withTransaction
         if (job.cancelRequested) return@withTransaction
         val config = configuration(job) ?: return@withTransaction
@@ -562,11 +584,19 @@ class JobCoordinator @Inject constructor(
         val latestIds = attempts.map { it.id }.toSet()
         val saved = dao.artifacts(jobId).filter { it.attemptId in latestIds }
         val remaining = attempts.filter { it.state !in setOf(ExecutionState.FINISHED, ExecutionState.CANCELLED) }
-        val state = remaining.firstOrNull { it.state == ExecutionState.RUNNING }?.state ?: remaining.firstOrNull()?.state ?: ExecutionState.FINISHED
+        val sourceKind = dao.source(job.sourceId)?.let { decodeStoredSourceKind(it.snapshot) }
+        val connected = network?.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
+        val unmetered = network?.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_NOT_METERED) == true
+        val states = remaining.map { row ->
+            val allowed = !JobWaits.needsNetwork(row.branch, row.phase, sourceKind) ||
+                connected && (config.networkPolicy != NetworkPolicy.UNMETERED || unmetered)
+            visibleAttemptState(row, allowed)
+        }
+        val state = states.firstOrNull { it == ExecutionState.RUNNING } ?: states.firstOrNull() ?: ExecutionState.FINISHED
         val outcome = if (remaining.isNotEmpty()) Outcome.NONE else AcquisitionPlanner.outcome(config.mode, saved.map { it.branch }.toSet(), saved.any { it.warningCount > 0 }, saved.all { it.complete == true })
         val updated = job.copy(state = state, outcome = outcome)
         dao.updateJob(updated)
-        notifications.update(updated, attempts)
+        notifications.update(updated, attempts, notifyCompletion)
     }
 
     private suspend fun configuration(job: JobRow): JobConfig? {

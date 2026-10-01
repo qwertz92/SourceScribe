@@ -7,6 +7,7 @@ import app.sourcescribe.R
 import app.sourcescribe.ShownCodes
 import java.util.Locale
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -34,6 +35,24 @@ class MessageTextTest {
             val sentence = context.createConfigurationContext(configuration).resources
                 .getQuantityString(R.plurals.invalid_duration, 7, 7)
             assertTrue("$tag: $sentence", " 7 " in sentence)
+        }
+    }
+
+    @Test
+    fun invalidInputSentenceDoesNotContradictKnownProviderDetails() {
+        // A recorded HTTP 413 with FILE_TOO_LARGE confirms a provider rejection; the generic summary must not deny
+        // that evidence or claim the cause is unknown when the structured details below identify it.
+        val text = (messageSpec("PROVIDER_INVALID_INPUT") as? MessageSpec.Text)?.text
+            ?: error("PROVIDER_INVALID_INPUT must use a localized text sentence")
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        for (tag in listOf("de", "en")) {
+            val configuration = Configuration(context.resources.configuration).apply { setLocale(Locale.forLanguageTag(tag)) }
+            val sentence = context.createConfigurationContext(configuration).resources.getString(text)
+                .lowercase(Locale.ROOT)
+            val contradictedEvidence = if (tag == "de") listOf("unbekannt", "nicht belegt")
+                else listOf("unknown", "not confirmed")
+            assertFalse("$tag: $sentence", contradictedEvidence.any { phrase -> phrase in sentence })
+            assertTrue("$tag: $sentence", "details" in sentence)
         }
     }
 

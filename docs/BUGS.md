@@ -1,12 +1,15 @@
 # Known bugs
 
-**As of:** 16 September 2026, after the 0.4.0 work, at commit `f7dd7d2`, before the 0.4.0
-release. This is the one list of every known, unfixed item, with its location, trigger, evidence, and priority in
-one place — `docs/DEFECTS.md` no longer exists; what used to live there is folded into the entry for its number
-below. Item 1 is the still-open feedback from the 10 September 2026 device test; item 2 (the bottom button "could use
-more space") was set aside on 16 September 2026 because the owner could not recall what was meant, and comes back
-only if it is reported again. Closed, and kept only as a number so references stay valid, are 3, 4, 6, 7, 8, 9, 12, 13, 17, 18, 19, 20, 23, 31, 32, 36, 41, 42, 47, 54, 56,
-57, 58, 59, 60, and 63; what each of them was and which commit closed it is in `docs/HISTORY.md` and in git.
+**As of:** 1 October 2026. The published release remains 0.4.0; local candidate 0.4.1 (versionCode 4) has
+implementation passing its local gates; the remaining device and delivery verification is pending. This is the one list of every known, unfixed item, with its
+location, trigger, evidence, and priority in one place — `docs/DEFECTS.md` no longer exists; what used to live there
+is folded into the entry for its number below. Item 1 is the still-open feedback from the 10 September 2026 device
+test; item 2 (the bottom button "could use more space") was set aside on 16 September 2026 because the owner could
+not recall what was meant, and comes back only if it is reported again. Candidate item 74 is closed after its
+measured 200% layout checks passed; item 73 remains open pending an actual offline/unmetered device check.
+Closed, and kept only as a number so references stay valid, are 3, 4, 6, 7, 8, 9, 12, 13, 17, 18, 19, 20, 23, 31,
+32, 36, 41, 42, 47, 54, 56, 57, 58, 59, 60, 63, and 74; what each of them was and which commit closed it is in
+`docs/HISTORY.md` and in git.
 
 ## Scale
 
@@ -29,38 +32,26 @@ installed engine directly) rather than a defect correction.
 case; where a worse case would rate higher, that is noted. For the security-adjacent items 37, 40, and 42(closed),
 no exploitable hole is demonstrated, so none of them carries a CVSS score.
 
-47 items are open: 1 P2, 10 P3, 35 P4, and item 55, which stays untested by the owner's decision (see
-"Not verified").
-
 ## P1
 
-None known. What could be hiding a P1 is in the next section.
+No P1 is recorded for the published 0.4.0 release. Candidate 0.4.1 has not received final verification; its status
+is pending, not a pass. What could be hiding a P1 is in the next section.
 
 ## Not verified
 
 These gaps are not known bugs. If any of them fails, it is a P1.
 
-- **Real transcription with AssemblyAI, OpenAI, and Groq.** AssemblyAI and OpenAI have never been called with a
-  real key in this project, only against simulated provider responses. Groq was called for real exactly once, on
-  16 September 2026, through the app's own pipeline end to end (`LiveGroqTranscriptionTest`, the public 19-second
-  video `jNQXAC9IVRw`, the app's default model): the run resolved the source with the real engine, downloaded the
-  recommended audio rendition, prepared and uploaded it, and stored a complete transcript — outcome `SUCCESS`,
-  exactly one provider request, 4 segments, 197 characters, shown afterward in history. That proves the whole path
-  once, for one provider, one clip of 19 seconds, one language, and one chunk — it does not prove AssemblyAI,
-  OpenAI, a source needing more than one chunk, a provider error against a real endpoint, or a paid Groq tier. The
-  same run also showed two things the app had never seen from a real provider before: Groq's response carries no
-  `model` field (the app already falls back to the requested model when none is reported, and the live test now
-  asserts exactly that), and Groq names its language as the English word "english" rather than a two-letter code,
-  which the parser did not recognize until today's fix (see item 69 below) — before that fix, the stored transcript
-  from this same run carried no language at all. Whether Groq's `language` field really holds "english" and not,
-  say, "en", is itself only known from this one run; the fix reads both shapes, but a second live run is what would
-  confirm which one a real Groq response actually sends.
+- **Provider coverage.** On the exact public 19-second source, three Groq jobs succeeded: the Turbo baseline, one
+  post-fix Turbo run, and one v3 run using explicit free rendition `139-drc`. Default v3 rendition `251` failed
+  during free extraction with `CHALLENGE_REQUIRED` and zero provider calls. Exactly two AssemblyAI paid POSTs were
+  made: the first stored a truthful partial result; the post-fix run stored full success with four sentence-timed
+  segments, language `en`, and requested/reported `universal-3-5-pro`. The fix retrieves sentences only after the
+  accepted receipt is durably stored; no model change or paid retry was used. No more AssemblyAI call is required.
+  OpenAI remains untested because no key was supplied. The owner's exact URL/model failure is still unreproduced.
+  Full request totals and limits are in the [provider reliability report](reports/2026-09-30-provider-reliability.md).
 - **An ARM64 device, like almost every current phone.** All device tests still ran on x86_64 emulators with
   Android 17 (API 37). The ARM64 build of the app has never run in any of these tests.
-- **Updating an installed preview 0.1.0 or 0.2.0-preview.1 to 0.4.0.** Preview 0.2.0 migrated the database from
-  schema 3 to schema 4, verified only against test databases in `MigrationTest`; neither 0.3.0's unpublished build
-  nor the 0.4.0 work changed the schema further (it is still version 4), so both an 0.1.0 and an 0.2.0 installation
-  would take the same migration path an 0.4.0 update would exercise for the first time on a real phone. Verified on 16 September 2026 on a fresh emulator (Pixel 10, Android 17, the same system image as the test device, started as AVD `Upgrade10` at port 5556 because the usual AVD had no room for a second 147 MB install): a 0.1.0-preview.1 and a 0.2.0-preview.1 install, each with one finished captions job of the 19-second clip, were updated in place to the signed 0.4.0 with `adb install -r`; after the update the job, its stored transcript and the settings were still there and the crash log stayed empty
+- **Upgrading an installed preview to candidate 0.4.1.** The upgrade to candidate 0.4.1 has not been verified. The earlier upgrade to 0.4.0 was verified on 16 September 2026 on a fresh emulator (Pixel 10, Android 17, AVD `Upgrade10` at port 5556): a 0.1.0-preview.1 and a 0.2.0-preview.1 install, each with one finished captions job from the 19-second clip, were updated in place to signed 0.4.0 with `adb install -r`; the job, transcript, and settings remained, and the crash log stayed empty. Candidate 0.4.1's upgrade check is still pending.
 
 Full operation with TalkBack is also not verified.
 
@@ -145,17 +136,6 @@ release notes suggest it holds up. On 14 September 2026 the owner decided that t
 - **Why it stays open:** help text is static per topic and does not know the chosen provider; a dynamic paragraph
   there is a change to the help model, not a one-liner. Writing the three URLs into the cost help text instead
   would state each address a second time — exactly what `StatedNumbersTest` exists to prevent.
-
-### 25. Groq's upload limit is the smaller of two tiers (low)
-
-- **Location:** `GroqAdapter.MAX_UPLOAD_BYTES`.
-- **Precondition:** a paid Groq key ("dev tier") and a file between 25 and 100MB.
-- **Expected vs. actual:** Groq documents 25MB for the free tier and 100MB for the paid tier. The app does not know
-  the tier of a user-supplied key and holds everyone to the smaller limit; a paying user gets a local rejection for
-  a file the provider would have accepted.
-- **Why it stays this way:** the alternative is worse. Raising the limit turns a local rejection into a failure at
-  the provider, the costlier of the two outcomes for a paid service. The real fix is a tier field in the
-  credentials, not a bigger number.
 
 ### 35. Line-wrapping limits on two screens are only partly measured on-device (low)
 
@@ -251,19 +231,11 @@ release notes suggest it holds up. On 14 September 2026 the owner decided that t
 - **Expected vs. actual:** the card could say "waiting for an unmetered connection"; it says only the outcome,
   because an attempt that carries an error is read as sitting on its own retry delay. Nothing wrong is claimed —
   the conservative direction. Traced in code, not observed on a device.
-- **Missing to close:** the rows do not record why the worker was stopped; storing the stop reason
-  (`WorkInfo.stopReason`, API 31 and later) at `onStopped` would let the rule tell the constraint from an
-  interruption. About an hour, with a `ViewRulesTest` case.
-
-### 74. The error sentence of an open job card appears without reserved space (P3, review round 2, deliberate for now)
-
-- **Location:** `HistoryScreen.kt`, `AttemptLines`, `attempt.error?.let { AttemptError(it, openHelp) }`.
-- **What happens:** when an attempt stops while its card is open, its sentence appears and pushes what is below.
-  The rendition and transfer lines got reserved space in `c832a9c`; this one did not, because an error sentence
-  runs to three or four lines and reserving that for every open attempt would leave a large blank block in the
-  normal case.
-- **Missing to close:** a decision on that trade-off (a blank block always, or a one-time shift when the job
-  stops); `JobCardLayoutTest` then needs a fixture with an error. Minutes once decided.
+- **Candidate status (1 October 2026):** offline-startup passed separately, and interrupted-row rules passed in
+  instrumentation. Neither test directly exercises a running job stopped when its network becomes metered, so this
+  item remains open until that transition confirms the waiting reason and automatic resume.
+- **Missing to close:** on a device, move a network-required job offline and then onto an unmetered connection;
+  verify the card names the constraint and the work resumes without user action.
 
 ## P4
 

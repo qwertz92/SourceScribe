@@ -24,8 +24,10 @@ import app.sourcescribe.core.TranscriptionRequest
 import app.sourcescribe.core.Warnings
 import java.util.UUID
 import java.util.Locale
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -112,7 +114,13 @@ class AssemblyAiAdapter(private val http: ProviderHttp = ProviderHttp()) : Provi
             .header("Content-Type", JSON)
             .post(submitBody)
             .build()
-        return when (val decoded = decodeResponse(http.perform(submit, mayCharge = true, spool), request)) {
+        var acceptedReceipt: ByteArray? = null
+        val raw = http.perform(
+            submit,
+            mayCharge = true,
+            spool = pendingSentenceSpool(spool, request, expectedId = null) { acceptedReceipt = it },
+        )
+        return when (val decoded = decodeResponse(acceptedReceipt ?: raw, request)) {
             is DecodedResponse.Waiting -> SubmissionResult.Remote(
                 RemoteHandle(provider, validated.region, decoded.id),
             )
@@ -143,7 +151,12 @@ class AssemblyAiAdapter(private val http: ProviderHttp = ProviderHttp()) : Provi
             .url("${baseUrl(validated.region)}/v2/transcript/$id")
             .header("Authorization", apiKey.trim())
             .build()
-        return when (val decoded = decodeResponse(http.perform(poll, mayCharge = false, spool), request, id)) {
+        val raw = http.perform(
+            poll,
+            mayCharge = false,
+            spool = pendingSentenceSpool(spool, request, expectedId = id),
+        )
+        return when (val decoded = completeWithSentences(raw, request, validated.region, apiKey, spool, id)) {
             is DecodedResponse.Waiting -> PollResult.Waiting()
             is DecodedResponse.Complete -> PollResult.Complete(decoded.transcript)
         }
@@ -288,13 +301,21 @@ class AssemblyAiAdapter(private val http: ProviderHttp = ProviderHttp()) : Provi
         if (expectedId != null && id != expectedId) invalidResponse()
         return when (requiredString(objectValue, "status")) {
             STATUS_QUEUED, STATUS_PROCESSING -> DecodedResponse.Waiting(id)
-            STATUS_COMPLETED -> DecodedResponse.Complete(parseTranscript(objectValue, request))
+            STATUS_COMPLETED -> when (val sentenceReceipt = objectValue[SENTENCE_RECEIPT_FIELD]) {
+                JsonNull -> DecodedResponse.Waiting(id)
+                null -> DecodedResponse.Complete(parseTranscript(objectValue, request))
+                else -> DecodedResponse.Complete(parseTranscript(objectValue, request, sentenceReceipt))
+            }
             STATUS_ERROR -> throw ProviderError(ProviderErrorCode.REMOTE_FAILED)
             else -> invalidResponse()
         }
     }
 
-    private fun parseTranscript(objectValue: JsonObject, request: TranscriptionRequest): ProviderTranscript {
+    private fun parseTranscript(
+        objectValue: JsonObject,
+        request: TranscriptionRequest,
+        sentenceReceipt: JsonElement? = null,
+    ): ProviderTranscript {
         val text = requiredString(objectValue, "text")
         val model = request.config.model?.takeIf { it in SUPPORTED_MODELS } ?: invalidResponse()
         val warnings = Warnings()
@@ -305,6 +326,7 @@ class AssemblyAiAdapter(private val http: ProviderHttp = ProviderHttp()) : Provi
         val parsedUtterances = parseUtterances(objectValue, warnings, request.config.diarization)
         val words = toWordSegments(parsedWords.entries, request, warnings)
         val utterances = toUtteranceSegments(parsedUtterances.entries, request, warnings)
+        val sentences = sentenceReceipt?.let { parseSentences(objectValue, it, request, warnings) }
 
         var technicallyComplete = !parsedWords.malformed && !parsedUtterances.malformed
         if (words.size != parsedWords.entries.size) technicallyComplete = false
@@ -319,20 +341,19 @@ class AssemblyAiAdapter(private val http: ProviderHttp = ProviderHttp()) : Provi
             warnings += WARNING_DIARIZATION_MISSING
             technicallyComplete = false
         }
-        if (request.config.segmentTimestamps && utterances.isEmpty()) {
+        if (request.config.segmentTimestamps && utterances.isEmpty() && sentences == null) {
             warnings += WARNING_SEGMENT_TIMESTAMPS_MISSING
             technicallyComplete = false
         }
 
         // Keep the complete provider text in segments. Word-level evidence lives in the
         // dedicated words field so requesting both granularities cannot discard either one.
-        val segments = if (utterances.isNotEmpty() &&
+        val segments = when {
+            sentences != null -> sentences
+            utterances.isNotEmpty() &&
             !parsedUtterances.malformed &&
-            utterances.size == parsedUtterances.entries.size
-        ) {
-            utterances
-        } else {
-            listOf(fullTextSegment(text, words, request))
+            utterances.size == parsedUtterances.entries.size -> utterances
+            else -> listOf(fullTextSegment(text, words, request))
         }
         return ProviderTranscript(
             segments = segments,
@@ -344,6 +365,30 @@ class AssemblyAiAdapter(private val http: ProviderHttp = ProviderHttp()) : Provi
             words = words,
             reportedLanguages = reportedLanguages,
         )
+    }
+
+    private fun parseSentences(
+        native: JsonObject,
+        sentenceReceipt: JsonElement,
+        request: TranscriptionRequest,
+        warnings: Warnings,
+    ): List<Segment> {
+        val response = sentenceReceipt as? JsonObject ?: invalidResponse()
+        val transcriptId = canonicalUuid(requiredString(native, "id"), ProviderErrorCode.INVALID_RESPONSE)
+        val sentenceId = canonicalUuid(requiredString(response, "id"), ProviderErrorCode.INVALID_RESPONSE)
+        if (sentenceId != transcriptId) invalidResponse()
+        val parsed = parseUtterances(
+            response,
+            warnings,
+            speakerRequired = false,
+            entriesKey = "sentences",
+            malformedWarning = WARNING_SENTENCE_TIMESTAMPS_MALFORMED,
+        )
+        if (parsed.malformed || parsed.entries.isEmpty()) invalidResponse()
+        val segments = toUtteranceSegments(parsed.entries, request, warnings)
+        if (segments.size != parsed.entries.size) invalidResponse()
+        if (parsed.entries.joinToString(" ") { it.text } != requiredString(native, "text")) invalidResponse()
+        return segments
     }
 
     private fun parseWords(
@@ -391,11 +436,13 @@ class AssemblyAiAdapter(private val http: ProviderHttp = ProviderHttp()) : Provi
         objectValue: JsonObject,
         warnings: Warnings,
         speakerRequired: Boolean,
+        entriesKey: String = "utterances",
+        malformedWarning: String = WARNING_DIARIZATION_MALFORMED,
     ): ParsedUtterances {
-        val value = objectValue["utterances"] ?: return ParsedUtterances(emptyList(), false, false)
+        val value = objectValue[entriesKey] ?: return ParsedUtterances(emptyList(), false, false)
         if (value is JsonNull) return ParsedUtterances(emptyList(), false, false)
         val array = value as? JsonArray ?: run {
-            warnings += WARNING_DIARIZATION_MALFORMED
+            warnings += malformedWarning
             return ParsedUtterances(emptyList(), malformed = true, missingSpeakers = false)
         }
         var malformed = false
@@ -405,7 +452,7 @@ class AssemblyAiAdapter(private val http: ProviderHttp = ProviderHttp()) : Provi
         array.forEachIndexed { index, element ->
             val utterance = element as? JsonObject
             if (utterance == null) {
-                warnings += "${WARNING_DIARIZATION_MALFORMED}_$index"
+                warnings += "${malformedWarning}_$index"
                 malformed = true
                 return@forEachIndexed
             }
@@ -413,7 +460,7 @@ class AssemblyAiAdapter(private val http: ProviderHttp = ProviderHttp()) : Provi
             val start = optionalEntryTimestamp(utterance, "start")
             val end = optionalEntryTimestamp(utterance, "end")
             if (text == null || start == null || end == null || end <= start || start < previousStart) {
-                warnings += "${WARNING_DIARIZATION_MALFORMED}_$index"
+                warnings += "${malformedWarning}_$index"
                 malformed = true
                 return@forEachIndexed
             }
@@ -657,6 +704,104 @@ class AssemblyAiAdapter(private val http: ProviderHttp = ProviderHttp()) : Provi
         Region.EU -> EU_BASE_URL
     }
 
+    private suspend fun completeWithSentences(
+        raw: ByteArray,
+        request: TranscriptionRequest,
+        region: Region,
+        apiKey: String,
+        spool: ResponseSpool,
+        expectedId: String? = null,
+    ): DecodedResponse {
+        val decoded = decodeResponse(raw, request, expectedId)
+        if (decoded !is DecodedResponse.Complete) return decoded
+
+        val native = parseObject(raw)
+        if (!requiresSentenceRetrieval(native, request)) return decoded
+        val id = canonicalUuid(requiredString(native, "id"), ProviderErrorCode.INVALID_RESPONSE)
+        val retrieve = Request.Builder()
+            .url("${baseUrl(region)}/v2/transcript/$id/sentences")
+            .header("Authorization", apiKey.trim())
+            .build()
+        val sentenceResponse = parseObject(http.perform(retrieve, mayCharge = false))
+        val composite = receiptWithSentences(native, sentenceResponse)
+        val complete = decodeResponse(composite, request, id) as? DecodedResponse.Complete ?: invalidResponse()
+        try {
+            spool.save(composite)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            throw ProviderError(ProviderErrorCode.RESPONSE_STORAGE)
+        }
+        return complete
+    }
+
+    private fun pendingSentenceSpool(
+        spool: ResponseSpool,
+        request: TranscriptionRequest,
+        expectedId: String?,
+        onSaved: ((ByteArray) -> Unit)? = null,
+    ): ResponseSpool = ResponseSpool { raw ->
+        val receipt = pendingSentenceReceipt(raw, request, expectedId)
+        spool.save(receipt)
+        onSaved?.invoke(receipt)
+    }
+
+    private fun pendingSentenceReceipt(
+        raw: ByteArray,
+        request: TranscriptionRequest,
+        expectedId: String?,
+    ): ByteArray {
+        val native = try {
+            parseObject(raw)
+        } catch (_: ProviderError) {
+            return raw
+        }
+        if (!requiresSentenceRetrieval(native, request)) return raw
+        val id = try {
+            canonicalUuid(requiredString(native, "id"), ProviderErrorCode.INVALID_RESPONSE)
+        } catch (_: ProviderError) {
+            return raw
+        }
+        if (expectedId != null && id != expectedId) return raw
+        val receipt = encodeReceipt(native, JsonNull)
+        if (receipt.size > MAX_RESPONSE_BYTES) {
+            throw ProviderError(
+                if (expectedId == null) ProviderErrorCode.SUBMISSION_UNCERTAIN
+                else ProviderErrorCode.RESPONSE_STORAGE,
+            )
+        }
+        return receipt
+    }
+
+    private fun requiresSentenceRetrieval(
+        native: JsonObject,
+        request: TranscriptionRequest,
+    ): Boolean {
+        if (!request.config.segmentTimestamps || request.config.diarization ||
+            native.containsKey(SENTENCE_RECEIPT_FIELD)
+        ) return false
+        val status = native["status"] as? JsonPrimitive
+        if (status?.isString != true || status.content != STATUS_COMPLETED) return false
+        val text = native["text"] as? JsonPrimitive
+        if (text?.isString != true || text.content.isBlank()) return false
+        return when (val utterances = native["utterances"]) {
+            null, JsonNull -> true
+            is JsonArray -> utterances.isEmpty()
+            else -> false
+        }
+    }
+
+    private fun receiptWithSentences(native: JsonObject, sentences: JsonObject): ByteArray {
+        val receipt = encodeReceipt(native, sentences)
+        if (receipt.size > MAX_RESPONSE_BYTES) throw ProviderError(ProviderErrorCode.RESPONSE_STORAGE)
+        return receipt
+    }
+
+    private fun encodeReceipt(native: JsonObject, sentences: JsonElement): ByteArray =
+        JsonObject(native.toMutableMap().apply { put(SENTENCE_RECEIPT_FIELD, sentences) })
+            .toString()
+            .encodeToByteArray()
+
     private fun invalidInput(reason: ProviderRejectionReason? = null): Nothing =
         throw ProviderError(
             ProviderErrorCode.INVALID_INPUT,
@@ -715,6 +860,7 @@ class AssemblyAiAdapter(private val http: ProviderHttp = ProviderHttp()) : Provi
         private const val STATUS_PROCESSING = "processing"
         private const val STATUS_COMPLETED = "completed"
         private const val STATUS_ERROR = "error"
+        private const val SENTENCE_RECEIPT_FIELD = "sourcescribe_sentences"
         private const val MAX_WORDS_PER_TERM = 6
         private const val MAX_TERMS_U2 = 200
         private const val MAX_TERMS_U35 = 1000
@@ -729,6 +875,7 @@ class AssemblyAiAdapter(private val http: ProviderHttp = ProviderHttp()) : Provi
         private const val WARNING_DIARIZATION_OUT_OF_RANGE = "DIARIZATION_OUT_OF_RANGE"
         private const val WARNING_DIARIZATION_SPEAKER_MISSING = "DIARIZATION_SPEAKER_MISSING"
         private const val WARNING_SEGMENT_TIMESTAMPS_MISSING = "SEGMENT_TIMESTAMPS_MISSING"
+        private const val WARNING_SENTENCE_TIMESTAMPS_MALFORMED = "SENTENCE_TIMESTAMPS_MALFORMED"
         private const val WARNING_REPORTED_LANGUAGES_MALFORMED = "REPORTED_LANGUAGES_MALFORMED"
         private val SUPPORTED_MODELS = setOf(MODEL_U35, MODEL_U2)
         private val UUID_PATTERN = Regex("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")

@@ -179,9 +179,19 @@
     <string name="remote_delete_confirmed">AssemblyAI hat die Datenlöschung bestätigt. Dies bestätigt keine Kostenerstattung.</string>
     <string name="no_remote_handle">Keine noch nicht gelöschte AssemblyAI-Auftrags-ID vorhanden.</string>
     <string name="provider_elapsed">Provider verarbeitet · seit Auftragsstart %1$s</string>
-    <string name="processed_bytes">Verarbeitet: %1$s</string>
-    <string name="transfer_of_total">%1$d %% · %2$s von %3$s</string>
+    <string name="history_current_phase">Aktueller Schritt: %1$s · %2$s</string>
+    <string name="history_waiting_provider_response">Upload abgeschlossen · Antwort des Anbieters ausstehend</string>
+    <string name="processed_bytes">Dieser Transfer: %1$s</string>
+    <string name="transfer_of_total">%1$d %% · %2$s von %3$s in diesem Transfer</string>
     <string name="transfer_rate">%1$s · %2$s/s</string>
+    <string name="provider_http_status">HTTP-Status: %1$d</string>
+    <string name="provider_operation">Provider-Schritt: %1$s</string>
+    <string name="provider_reason">Provider-Angabe: %1$s</string>
+    <string name="provider_operation_upload">Audio-Upload</string>
+    <string name="provider_operation_submit">Transkription beauftragen</string>
+    <string name="provider_operation_retrieve">Transkript abrufen</string>
+    <string name="provider_operation_delete">Provider-Daten löschen</string>
+    <string name="provider_diagnostic_unknown">Die genaue Ursache ist unbekannt; es wurden keine strukturierten Provider-Details gespeichert.</string>
     <string name="provenance_details">Herkunft und Modellangaben</string>
     <string name="model_requested">Angefordertes Modell: %1$s</string>
     <string name="model_reported">Vom Anbieter gemeldetes Modell: %1$s</string>
@@ -375,6 +385,7 @@
     <string name="no_filter_matches">Kein Eintrag passt zu diesem Filter.</string>
     <string name="job_actions">Aktionen für diesen Auftrag</string>
     <string name="job_actions_what_happened">Was passiert ist</string>
+    <string name="failed_branch_step">Fehlgeschlagen: %1$s · %2$s</string>
     <string name="job_actions_recommended">Empfohlen</string>
     <string name="job_actions_other">Weitere Aktionen</string>
     <string name="job_actions_nothing">Nichts von dem, was hier angeboten wird, würde daran etwas ändern. Der Satz oben sagt, was passiert ist; der Eintrag kann so bleiben oder gelöscht werden.</string>
@@ -441,7 +452,19 @@
     <string name="reason_quota">Das Guthaben oder Kontingent deines Kontos beim Anbieter ist aufgebraucht.</string>
     <string name="reason_server">Der Anbieter hat einen eigenen Fehler gemeldet. Das liegt nicht an dieser App.</string>
     <string name="reason_remote_failed">Der Anbieter hat den Auftrag abgebrochen.</string>
-    <string name="reason_invalid_input">Der Anbieter hat die Anfrage abgelehnt. Meist passt eine gewählte Option nicht zum Modell.</string>
+    <string name="reason_invalid_input">Diese Eingabe oder Anfrage konnte nicht verarbeitet werden. Prüfe die Details zu diesem Versuch.</string>
+    <string name="provider_reason_file_too_large">Die Audiodatei überschreitet die vom Anbieter akzeptierte Größe.</string>
+    <string name="provider_reason_unsupported_media">Der Anbieter akzeptiert dieses Audioformat nicht.</string>
+    <string name="provider_reason_invalid_model">Der Anbieter hat diese Modellkennung nicht akzeptiert.</string>
+    <string name="provider_reason_invalid_language">Der Anbieter hat diese Sprache nicht akzeptiert.</string>
+    <string name="provider_reason_invalid_option">Der Anbieter hat eine oder mehrere Transkriptionsoptionen nicht akzeptiert.</string>
+    <string name="provider_reason_invalid_audio">Der Anbieter konnte den Audioinhalt nicht lesen.</string>
+    <string name="provider_reason_unknown">Der Anbieter hat den Ablehnungsgrund nicht näher angegeben.</string>
+    <string name="provider_reason_context_too_long">Der Anfrage-Prompt überschreitet die vorsichtige App-Grenze von 224 UTF-8-Bytes.</string>
+    <string name="provider_reason_too_many_terms">Zu viele Schlüsselbegriffe: höchstens 200 für Whisper U2 oder 1.000 für Whisper U35.</string>
+    <string name="provider_reason_term_too_long">Ein Schlüsselbegriff darf höchstens 6 Wörter enthalten.</string>
+    <string name="provider_error_language_unsupported">Die gewählte Sprache wird von diesem Anbieter oder Modell nicht unterstützt.</string>
+    <string name="provider_error_model_unsupported">Das gewählte Modell wird von diesem Anbieter nicht unterstützt.</string>
     <string name="reason_source_unavailable">Das Video ist nicht abrufbar: privat, gelöscht oder im aktuellen Land gesperrt.</string>
     <string name="reason_challenge_required">YouTube verlangt eine Bestätigung, dass kein automatisiertes Programm zugreift, und liefert bis dahin nichts aus.</string>
     <string name="reason_no_captions">Zu diesem Video gibt es keine Untertitel.</string>
@@ -525,4 +548,5 @@
     <string name="export_tree_default_used">Standardordner</string>
     <string name="open_folder">Ordner öffnen</string>
     <string name="no_folder_app">Auf diesem Gerät kann keine App einen Ordner anzeigen. Öffne den Ordner in deiner Dateiverwaltung.</string>
+    <string name="waiting_automatic_retry">Wiederholung folgt automatisch.</string>
 </resources>

@@ -1,7 +1,9 @@
 # Project Status
 
-**As of 2026-09-18.** Current release: personal preview `0.4.0`, published 18 September 2026. Full v1 acceptance is not reached yet.
-App source is the tip of `main`, public repo [qwertz92/SourceScribe](https://github.com/qwertz92/SourceScribe). This
+**As of 2026-10-01.** The published personal preview remains `0.4.0` (18 September 2026). Candidate `0.4.1`
+(versionCode 4) includes signed/pushed code commit `c93d5e8` plus uncommitted work; it is not public and final gates
+are pending. Full v1 acceptance is not reached yet.
+The published app source is in public repo [qwertz92/SourceScribe](https://github.com/qwertz92/SourceScribe); this
 file describes the current state only; the dated log of how it got here, including 23 rounds of independent
 adversarial review over 0.1.0/0.2.0 and the 0.4.0 work, is in [HISTORY.md](HISTORY.md), and the lessons that work
 produced are in [LEARNINGS.md](LEARNINGS.md). Open items are in [BUGS.md](BUGS.md), the only list of them.
@@ -29,11 +31,11 @@ its own. Full requirements: [PRODUCT.md](PRODUCT.md) (SS-01 to SS-12). Phase def
 |---|---|---|
 | P0 Feasibility | Runtime, verifier, manager; WebP rebuilt for both ABIs with 16 KB page alignment | Python/TLS, JS/EJS, FFmpeg, exact YouTube metadata/caption/audio, and update/rollback are all live-verified. Physical ARM64: not run yet; needs the owner's phone. |
 | P1 Real pass-through | URL/planner, caption provenance, Room, export/viewer | Live-verified end to end: Android Share -> real caption -> internal storage -> SAF Markdown -> share dialog. |
-| P2 First STT pipeline | Groq, local import, audio prep/chunking, credentials, submission limits | Real Groq transcription: run once for real, end to end, on 16 September 2026 (one request, a complete short transcript). AssemblyAI and OpenAI: not run yet. |
-| P3 Full acquisition | AssemblyAI, OpenAI, all four modes, `BOTH` partial-failure handling, language/tracks/options/presets | Real AssemblyAI/OpenAI transcription: not run yet; a mock response is never accepted as a provider pass. |
-| P4 Reliability | Queue/limits, recovery, unsafe submissions, export repair, update failures, source length taken from the source itself | Live-verified: process/permission boundaries, reboot recovery with a provider fixture, a signed engine update plus rollback, concurrent fixture jobs, waiting for an unmetered connection and resuming on its own. |
-| P5 UX and delivery | German/English app language, system/light/dark theme, reworked new-source screen and job-actions dialog, viewer/search/copy/share, formats, diagnostics, signing path | ADB/screenshot checks incl. 200% font size: pass. Personal release signing and install: pass. Full TalkBack operation: **blocked**, no suitable real-input automation available. |
-| P6 Acceptance | Integrated regression; every confirmed P1/P2 defect fixed with a regression test | Full acceptance not reached: live AssemblyAI/OpenAI runs, a run on a physical ARM64 phone, an installed-preview upgrade test, and full TalkBack coverage are still missing. |
+| P2 First STT pipeline | Groq, local import, audio prep/chunking, credentials, submission limits | Live Groq transcription succeeded; one default-v3 rendition failed during free extraction before any provider call. The owner's unspecified source/model failure remains unreproduced. |
+| P3 Full acquisition | AssemblyAI, OpenAI, all four modes, `BOTH` partial-failure handling, language/tracks/options/presets | Live AssemblyAI verification stored a complete post-fix result after the initial run exposed missing default sentence timestamps. OpenAI has no supplied key. |
+| P4 Reliability | Queue/limits, recovery, unsafe submissions, export repair, update failures, source length taken from the source itself | Live-verified: process/permission boundaries, reboot recovery with a provider fixture, a signed engine update plus rollback, concurrent fixture jobs, and waiting/resume behavior. The specific interruption when a running job loses its unmetered network remains open under BUGS73. |
+| P5 UX and delivery | German/English, stable history cards and actions, measured transfer progress, quiet notifications, viewer/export, signing path | The normal candidate instrumentation and separately enabled offline-startup regression passed. Complete negative controls and the repeated normal build/app suite passed; remaining opt-ins, visual ripple, signing and in-place upgrade are pending. Full TalkBack operation remains unverified. |
+| P6 Acceptance | Integrated regressions; confirmed P1/P2 findings in the changed provider/history/recovery/notification scopes fixed | Core tests, four lint reports and final scoped GPT-6 Luna reviews passed. Candidate acceptance remains open for the pending gates above, physical ARM64, full TalkBack, a fresh-clone build, OpenAI (no key), and the owner's unspecified URL/model failure. Detailed evidence and coverage limits: [provider reliability report](reports/2026-09-30-provider-reliability.md). |
 
 Of the 20 items from the owner's 2026-09-10 device test, 18 are implemented and verified on-device or by test; item 1 (result-view scrolling) is unreproduced and tracked in [BUGS.md](BUGS.md); item 2 (button spacing) was set
 aside on 16 September 2026 because the owner could not recall what was meant. The owner's second device test, of preview 0.2.0 on 15-16 September 2026, added a P1
@@ -41,6 +43,8 @@ aside on 16 September 2026 because the owner could not recall what was meant. Th
 (details in [HISTORY.md](HISTORY.md)).
 
 ## Releases
+
+**0.4.1 candidate** — version `0.4.1`, versionCode 4; first provider slice is signed and pushed as `c93d5e8`, the complete implementation has passed its local gates and is being committed. This is not the published 0.4.0 release. Core, initial lint/app gates and live Groq/AssemblyAI checks are complete; the repeated normal build/app suite passed; remaining candidate device and delivery gates are pending. Evidence and coverage boundaries: [provider reliability report](reports/2026-09-30-provider-reliability.md).
 
 **0.4.0** — built and verified 16 September 2026 at commit `f7dd7d2`, published 18 September 2026. Version 0.4.0, versionCode 3. Answers the owner's 0.2.0 phone test
 (the P1 and 15 further points) and closes BUGS items 58 and 59. Unsigned release APK: `app/build/outputs/apk/release/app-release-unsigned.apk` (byte-identical copy: `.local-tools/releases/SourceScribe-0.4.0-f7dd7d2-unsigned.apk`,
@@ -65,7 +69,7 @@ Signed with the 0.1.0 release key and attached to the GitHub release: 146,688,33
 release APK: 147,376,546 bytes, SHA-256 `410b654fd08bdb2b7f8142dd88f440b7f49ffe123e363dd3607582b9e855c20a`. Full
 evidence: [2026-09-08 preview report](reports/2026-09-08-preview.md).
 
-## Latest verified gates (2026-09-16, commit `f7dd7d2`)
+## Verified gates for published 0.4.0 (2026-09-16, commit `f7dd7d2`)
 
 - `215` JVM tests in `core`, 0 failures.
 - `app` instrumentation on `emulator-5556`: 239 run, 230 passed, 0 failed, 9 skipped as opt-in (listed under Skipped), 22:29 to 22:31.
@@ -87,28 +91,27 @@ one stage per invocation fails the others. The tests that need a live video (`En
 `EngineUpdateManagerTest`'s real-release round trip, `ExtractionChainTest`, and `NativeRuntimeTest`'s public-source
 probe) take `engineProbeSource` or `publicSourceUrl` and run before every release.
 
-`app`'s `LiveGroqTranscriptionTest` is the only test that spends money: with `-e sourcescribeLiveProvider groq
+`app`'s opt-in `LiveGroqTranscriptionTest` sends one real Groq request: with `-e sourcescribeLiveProvider groq
 -e liveProviderKey <key> -e publicSourceUrl <url of a clip of at most 30 seconds>` it sends exactly one real request
-to Groq through the whole pipeline, and without all three arguments it skips with that sentence. The owner keeps a
-Groq key for this purpose outside the repository, at `~/.local/share/sourcescribe/groq-key` in WSL (mode 600, one
-line, never committed, never logged); a build script reads it into a variable and passes it as the instrumentation
-argument, and the run ends with `adb logcat -b all -c` because `adbd` otherwise keeps the whole `am instrument`
-command line — key included — in the device's system log (see [LEARNINGS.md](LEARNINGS.md)). Commands and details:
+to Groq through the whole pipeline, and without all three arguments it skips with that sentence. The owner keeps the
+Groq key outside version control and has supplied credentials for the other authorized provider checks. Do not put
+credential values in this document or logs. The run ends with `adb logcat -b all -c` because `adbd` otherwise keeps
+the whole `am instrument` command line — key included — in the device's system log (see [LEARNINGS.md](LEARNINGS.md)).
+Commands and details:
 [BUILD.md](BUILD.md).
 
 `emulator-5556` is the agent device; `emulator-5554` belongs to the owner and agents do not touch it. Device tests
 run on Android 17 (API 37); on 14 September 2026 the owner decided that older Android versions get no separate run.
 
-## Blockers
+## Remaining gates and blockers for 0.4.1
 
 | Blocked | Why | What would unblock it |
 |---|---|---|
 | Physical ARM64 device | All device coverage ran on x86_64 emulators only. | The owner installs the release APK on the owner's phone and repeats the main flows. |
-| Live transcription, AssemblyAI and OpenAI | Needs the owner's API keys and costs money; agents do not enter API keys. Only fixture responses have been exercised. | The owner runs a short real recording through each provider, the same way the one Groq request was made. |
-| Live transcription, Groq beyond the one request made | The owner's free tier is limited; a real request is opt-in and made to prove a fix, not routinely. | A further short recording, at the owner's discretion. |
+| OpenAI live transcription | No key was supplied. | Owner supplies a key and authorizes a live call. |
 | Full TalkBack operation | Semantics and dialog activation are tested, but full focus navigation has no suitable real-input automation. | A human tester, or suitable real-input automation, walking all main screens with TalkBack on. |
 | Fresh-clone build | Never run on a second machine or a clean Linux/WSL system without existing project caches. | Run BUILD.md's fresh-clone steps on such a system. |
-| Upgrade test, 0.1.0/0.2.0-preview.1 to 0.4.0 | Not yet run on the emulator or a phone. | Install 0.4.0 over an existing 0.1.0 or 0.2.0-preview.1 install and confirm the schema-4 database still opens and history survives. |
+| Upgrade test to candidate 0.4.1 | The 0.1.0 and 0.2.0-preview.1 upgrade to published 0.4.0 passed on a fresh emulator. An upgrade to candidate 0.4.1 has not been recorded. | Install the signed 0.4.1 candidate over a supported preview and verify the stored job, transcript, and settings survive. |
 
 ## Local environment
 
@@ -116,7 +119,7 @@ Windows ADB: `/mnt/c/Users/thoma/AppData/Local/Android/Sdk/platform-tools/adb.ex
 37/x86_64/16 KB, 1280x2856, density 480) belongs to the owner — agents do not operate or read it. Agents use
 `emulator-5556`, API 37/x86_64/16 KB, 1080x2424, density 420; free space on `/data` there needs watching (uninstall
 `app.sourcescribe.extractor.test` and `app.sourcescribe.debug.test` first when tight, never the app itself). Java
-17.0.20.1, Gradle 9.7.1, AGP 9.4.0, Kotlin 2.4.20, Compose BOM 2026.08.00. SDK and caches under `.local-tools/`.
+17.0.20.1, Gradle 9.7.1 (measured compatibility hold), AGP 9.4.1, Kotlin 2.4.20, Compose BOM 2026.09.00. SDK and caches under `.local-tools/`.
 
 16 GiB of WSL swap is active. One Gradle build worker, 2 GiB heap; do not move SDK/build data to RAM-backed `/tmp`.
 Only one build or one ADB check stream runs at a time — never instrumentation beside a running Gradle build. The
@@ -126,5 +129,6 @@ locations (no password values). Details and the full history of environment find
 ## Open issues and evidence
 
 Known open issues, with impact, priority, location, and evidence, are tracked in the single list in
-[BUGS.md](BUGS.md); as of today no P1 (critical) issue is open. Raw build/device/licensing evidence is under
+[BUGS.md](BUGS.md). The 0.4.0 release ledger recorded no P1; final scoped GPT-6 Luna reviews of the 0.4.1 changes were empty; the older issue list is not claimed empty.
+Raw build/device/licensing evidence is under
 [docs/reports/](reports/).

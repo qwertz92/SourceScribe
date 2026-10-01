@@ -4,6 +4,8 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.sourcescribe.MainViewModel
 import app.sourcescribe.core.JobConfig
 import app.sourcescribe.core.Provider
+import app.sourcescribe.core.ProviderOperation
+import app.sourcescribe.core.ProviderRejectionReason
 import app.sourcescribe.core.Region
 import app.sourcescribe.core.providers.AssemblyAiAdapter
 import app.sourcescribe.core.providers.GroqAdapter
@@ -201,5 +203,21 @@ class SttStepTest {
         assertNull(SttStep.storedAudioTrack(""))
         assertNull(SttStep.storedAudioTrack("not json at all"))
         assertNull(SttStep.storedAudioTrack("{\"audio\":\"a string, not a record\"}"))
+    }
+
+    @Test
+    fun storedProviderFailureReadsSafeFieldsAndToleratesOlderOrNewerCheckpoints() {
+        val failure = requireNotNull(SttStep.storedProviderFailure(
+            """{"providerFailure":{"httpStatus":413,"operation":"SUBMIT","reason":"FILE_TOO_LARGE"},"future":true}""",
+        ))
+
+        assertEquals(413, failure.httpStatus)
+        assertEquals(ProviderOperation.SUBMIT, failure.operation)
+        assertEquals(ProviderRejectionReason.FILE_TOO_LARGE, failure.reason)
+        assertNull(SttStep.storedProviderFailure("{}"))
+
+        assertNull(SttStep.storedProviderFailure(""))
+        assertNull(SttStep.storedProviderFailure("not json at all"))
+        assertNull(SttStep.storedProviderFailure("{\"providerFailure\":\"invalid\"}"))
     }
 }

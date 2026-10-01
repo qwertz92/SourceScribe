@@ -232,7 +232,8 @@ class ProviderHttp(client: OkHttpClient = OkHttpClient()) {
         return when {
             request.method == "POST" && path == "/v2/upload" -> ProviderOperation.UPLOAD
             request.method == "POST" && path in SUBMIT_PATHS -> ProviderOperation.SUBMIT
-            request.method == "GET" && isTranscriptIdPath(path) -> ProviderOperation.RETRIEVE
+            request.method == "GET" && (isTranscriptIdPath(path) ||
+                path.endsWith("/sentences") && isTranscriptIdPath(path.removeSuffix("/sentences"))) -> ProviderOperation.RETRIEVE
             request.method == "DELETE" && isTranscriptIdPath(path) -> ProviderOperation.DELETE
             else -> null
         }

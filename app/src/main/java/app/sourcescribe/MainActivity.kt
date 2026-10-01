@@ -32,13 +32,63 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.sourcescribe.core.*
+import app.sourcescribe.data.JobNotifications
+import app.sourcescribe.data.JobCoordinator
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.launch
 import app.sourcescribe.ui.*
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
+    @Inject lateinit var jobNotifications: JobNotifications
+    @Inject lateinit var coordinator: JobCoordinator
+    private val connectivity get() = getSystemService(android.net.ConnectivityManager::class.java)
+    private var observingNetwork = false
+    private var networkRefresh: Job? = null
+    private val networkCallback = object : android.net.ConnectivityManager.NetworkCallback() {
+        private var current: android.net.Network? = null
+        override fun onCapabilitiesChanged(network: android.net.Network, capabilities: android.net.NetworkCapabilities) {
+            current = network
+            refreshNetwork(capabilities)
+        }
+        override fun onLost(network: android.net.Network) {
+            if (network != current) return
+            current = null
+            refreshNetwork(null)
+        }
+    }
+    private fun refreshNetwork(capabilities: android.net.NetworkCapabilities?) {
+        if (!observingNetwork) return
+        val previous = networkRefresh
+        networkRefresh = lifecycleScope.launch {
+            previous?.cancelAndJoin()
+            if (!observingNetwork) return@launch
+            withContext(Dispatchers.IO) { coordinator.refreshNetworkStates(capabilities) }
+        }
+    }
     private val incoming = mutableStateOf("")
     private val shareSerial = mutableIntStateOf(0)
+    override fun onStart() {
+        jobNotifications.setAppForeground(true)
+        super.onStart()
+        observingNetwork = true
+        connectivity.registerDefaultNetworkCallback(networkCallback, android.os.Handler(mainLooper))
+        val activeNetwork = connectivity.activeNetwork
+        refreshNetwork(activeNetwork?.let(connectivity::getNetworkCapabilities))
+    }
+    override fun onStop() {
+        jobNotifications.setAppForeground(false)
+        observingNetwork = false
+        connectivity.unregisterNetworkCallback(networkCallback)
+        networkRefresh?.cancel()
+        super.onStop()
+    }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()

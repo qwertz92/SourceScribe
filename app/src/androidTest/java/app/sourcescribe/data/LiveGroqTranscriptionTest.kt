@@ -31,6 +31,7 @@ import app.sourcescribe.core.SourceKind
 import app.sourcescribe.core.SourceResolver
 import app.sourcescribe.core.TrackSelection
 import app.sourcescribe.core.confirmedComplete
+import app.sourcescribe.core.providers.AssemblyAiAdapter
 import app.sourcescribe.core.providers.GroqAdapter
 import app.sourcescribe.extractor.EngineUpdateManager
 import app.sourcescribe.extractor.ExtractorEngine
@@ -57,18 +58,20 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * The one test that spends the owner's money: a real speech-to-text request against Groq.
+ * Opt-in real-provider speech-to-text tests for Groq and AssemblyAI.
  *
  * Everything else in this repository proves the pipeline against fixtures, and the phone test of 0.2.0
  * showed what that leaves open — the preparation stopped every job before a provider was ever asked, and no
  * request had ever left the device. This test runs the path the app itself runs (resolve the source with the
- * real engine, download the recommended rendition, prepare the audio, upload it, parse the answer, store the
- * transcript, finish the history row) through [JobCoordinator] and [SttStep], not by calling the adapter.
+ * real engine, download the default or explicitly selected rendition, prepare the audio, upload it, parse the
+ * answer, store the transcript, finish the history row) through [JobCoordinator] and [SttStep], not by calling
+ * the adapter.
  *
- * It is opt-in because it costs money and needs a key: without `sourcescribeLiveProvider=groq`,
- * `liveProviderKey=<key>` and `publicSourceUrl=<url>` it ends as an assumption failure with that sentence.
- * The clip must be at most [MAX_CLIP_MS]; a longer source fails the test before anything is uploaded, so a
- * mistyped URL cannot spend the free tier.
+ * Each test is opt-in because it costs money and needs a key: set `sourcescribeLiveProvider`,
+ * `liveProviderKey=<key>` and `publicSourceUrl=<url>`. The optional `liveAudioTrackId` selects one exact track
+ * from that resolved source; an unknown ID fails without falling back. Clips longer than the configured duration
+ * ceiling fail before a job is created, and the AssemblyAI test also applies the ceiling to prepared audio before
+ * upload.
  *
  * The key arrives as an instrumentation argument and is never printed, never sent to `sendStatus`, and never
  * written to a file by this test: it goes straight into [CredentialStore], which is where the app keeps keys,
@@ -79,27 +82,53 @@ import org.junit.runner.RunWith
 class LiveGroqTranscriptionTest {
     @Test
     fun aShortPublicVideoIsTranscribedByGroqAndStoredWithItsProvenance() {
+        runLiveProvider(Provider.GROQ)
+    }
+
+    @Test
+    fun aShortPublicVideoIsTranscribedByAssemblyAiAndStoredWithItsProvenance() {
+        assumeTrue(
+            "Live AssemblyAI evidence is opt-in and chargeable: pass sourcescribeLiveProvider=assemblyai, " +
+                "liveProviderKey=<key> and publicSourceUrl=<url of a clip of at most 30 seconds>",
+            InstrumentationRegistry.getArguments().getString("sourcescribeLiveProvider") == "assemblyai",
+        )
+        runLiveProvider(Provider.ASSEMBLYAI)
+    }
+
+    private fun runLiveProvider(provider: Provider) {
         val arguments = InstrumentationRegistry.getArguments()
         assumeTrue(
-            "Live Groq evidence is opt-in and chargeable: pass sourcescribeLiveProvider=groq," +
-                " liveProviderKey=<key> and publicSourceUrl=<url of a clip of at most 30 seconds>",
-            arguments.getString("sourcescribeLiveProvider") == "groq",
+            "Live provider evidence is opt-in and chargeable: set sourcescribeLiveProvider=${provider.name.lowercase(Locale.ROOT)}",
+            arguments.getString("sourcescribeLiveProvider") == provider.name.lowercase(Locale.ROOT),
         )
         val apiKey = arguments.getString("liveProviderKey").orEmpty().trim()
         assumeTrue(
-            "liveProviderKey instrumentation argument is required for a live Groq request",
+            "liveProviderKey instrumentation argument is required for a live provider request",
             apiKey.isNotBlank(),
         )
         val sourceUrl = arguments.getString("publicSourceUrl").orEmpty().trim()
         assumeTrue(
-            "publicSourceUrl instrumentation argument is required; the clip must be at most 30 seconds",
+            "publicSourceUrl instrumentation argument is required",
             sourceUrl.isNotBlank(),
         )
+        val clipArgument = arguments.getString("liveMaxClipSeconds")?.trim().orEmpty()
+        val requestedClipSeconds = if (clipArgument.isBlank()) DEFAULT_CLIP_SECONDS else
+            requireNotNull(clipArgument.toLongOrNull()) { "liveMaxClipSeconds must be a positive integer" }
+        require(requestedClipSeconds > 0) { "liveMaxClipSeconds must be a positive integer" }
+        val maxClipSeconds = requestedClipSeconds.coerceAtMost(
+            if (provider == Provider.ASSEMBLYAI) ASSEMBLYAI_MAX_CLIP_SECONDS else JobLimits.MAX_AUDIO_SECONDS,
+        )
+        val maxClipMs = maxClipSeconds * 1000L
+        val model = when (provider) {
+            Provider.GROQ -> arguments.getString("liveModel")?.trim()?.takeIf { it.isNotEmpty() } ?: GroqAdapter.DEFAULT_MODEL
+            Provider.ASSEMBLYAI -> MainViewModel.models(provider).first()
+            else -> error("Unsupported live provider: $provider")
+        }
         val requested = SourceResolver.youtube(sourceUrl)
 
         // Proves afterwards that the log really was read back: a scan that finds nothing at all would
         // otherwise pass without having looked anywhere.
-        val canary = "sourcescribe-live-groq-canary-${UUID.randomUUID()}"
+        val canary = "sourcescribe-live-${provider.name.lowercase(Locale.ROOT)}-canary-${UUID.randomUUID()}"
         val logWindowStart = System.currentTimeMillis() - LOG_WINDOW_MARGIN_MS
         Log.i(LOG_TAG, canary)
 
@@ -109,29 +138,34 @@ class LiveGroqTranscriptionTest {
             assertEquals(SourceKind.YOUTUBE, resolved.source.kind)
             val durationMs = requireNotNull(resolved.source.durationMs) { "SOURCE_DURATION_UNKNOWN" }
             assertTrue(
-                "the live clip must be at most ${MAX_CLIP_MS / 1000} seconds, this one is $durationMs ms",
-                durationMs in 1..MAX_CLIP_MS,
+                "the live clip must be at most $maxClipSeconds seconds, this one is $durationMs ms",
+                durationMs in 1..maxClipMs,
             )
-            val track = requireNotNull(TrackSelection.audio(resolved, null)) { "NO_AUDIO_ON_CONFIGURED_SOURCE" }
+            val explicitAudioTrackId = arguments.getString("liveAudioTrackId")
+            val track = requireNotNull(TrackSelection.audio(resolved, explicitAudioTrackId)) {
+                if (explicitAudioTrackId == null) "NO_AUDIO_ON_CONFIGURED_SOURCE"
+                else "REQUESTED_AUDIO_TRACK_NOT_AVAILABLE_FOR_SOURCE"
+            }
+            assertEquals("selected audio track must belong to the resolved video", resolved.source.videoId, track.sourceVideoId)
 
-            val credentialId = credentials.save(Provider.GROQ, Region.US, apiKey)
+            val credentialId = credentials.save(provider, Region.US, apiKey)
             val stored = credentials.list()
             // The configuration the new-source screen would hand to the coordinator for this source, built
             // through the screen's own function so this test cannot start a job the screen could not.
             val config = MainViewModel.configurationForStart(
                 JobConfig(
                     mode = AcquisitionMode.STT_ONLY,
-                    provider = Provider.GROQ,
-                    model = GroqAdapter.DEFAULT_MODEL,
+                    provider = provider,
+                    model = model,
                     region = Region.US,
                     credentialId = credentialId,
                     audioTrackId = track.id,
                     audioRetention = AudioRetention.TEMPORARY,
                 ),
                 stored,
-            )
+            ).copy(maxAudioSeconds = maxClipSeconds)
             assertTrue(config.uploadApproved)
-            assertEquals(JobLimits.MAX_AUDIO_SECONDS, config.maxAudioSeconds)
+            assertEquals(maxClipSeconds, config.maxAudioSeconds)
             assertNull(MainViewModel.previewError(SourcePreview(resolved, config, null), stored))
 
             val jobId = coordinator.create(resolved.source, config)
@@ -149,6 +183,9 @@ class LiveGroqTranscriptionTest {
             val deadline = System.currentTimeMillis() + RUN_DEADLINE_MS
             var current = requireNotNull(dao.attempt(attemptId))
             while (true) {
+                if (provider == Provider.ASSEMBLYAI && current.phase in setOf(Phase.UPLOAD, Phase.SUBMIT) &&
+                    providerRequests().count { it == "POST api.assemblyai.com/v2/transcript" } > 0
+                ) break
                 assertTrue("the attempt did not finish within ${executed.size} phases: $executed", executed.size < MAX_PHASE_RUNS)
                 assertTrue("the attempt did not finish within ${RUN_DEADLINE_MS / 1000} s: $executed", System.currentTimeMillis() < deadline)
                 val wait = (current.nextAt - System.currentTimeMillis()).coerceIn(0, MAX_WAIT_MS)
@@ -166,13 +203,16 @@ class LiveGroqTranscriptionTest {
             // request is still an answer: the reason and the numbers reach the runner either way.
             val document = dao.artifacts(jobId).singleOrNull()?.let { artifacts.read(it.id) }
             InstrumentationRegistry.getInstrumentation().sendStatus(127, Bundle().apply {
-                putString("live.provider", Provider.GROQ.name)
-                putString("live.requestedModel", GroqAdapter.DEFAULT_MODEL)
+                putString("live.provider", provider.name)
+                putString("live.requestedModel", model)
                 putString("live.reportedModel", document?.provenance?.reportedModel ?: "NONE")
                 putString("live.sourceId", resolved.source.id)
                 putString("live.audioTrackId", track.id)
                 putLong("live.sourceDurationMs", durationMs)
                 putInt("live.providerRequests", providerRequests().size)
+                putInt("live.uploadRequests", providerRequests().count { it == "POST api.assemblyai.com/v2/upload" })
+                putInt("live.transcriptPosts", providerRequests().count { it == "POST api.assemblyai.com/v2/transcript" })
+                putInt("live.pollRequests", providerRequests().count { it.startsWith("GET api.assemblyai.com/v2/transcript/") })
                 putString("live.language", document?.language ?: "NONE")
                 putString("live.reportedLanguages", document?.provenance?.reportedLanguages?.joinToString(",").orEmpty().ifBlank { "NONE" })
                 putInt("live.segments", document?.segments?.size ?: 0)
@@ -185,20 +225,35 @@ class LiveGroqTranscriptionTest {
                 putString("live.warnings", document?.warnings?.joinToString(",").orEmpty().ifBlank { "NONE" })
             })
 
+            val requests = providerRequests()
+            when (provider) {
+                Provider.GROQ -> assertEquals(listOf("POST api.groq.com/openai/v1/audio/transcriptions"), requests)
+                Provider.ASSEMBLYAI -> {
+                    assertEquals(1, requests.count { it == "POST api.assemblyai.com/v2/upload" })
+                    assertEquals(1, requests.count { it == "POST api.assemblyai.com/v2/transcript" })
+                    assertEquals(
+                        2 + requests.count { it.startsWith("GET api.assemblyai.com/v2/transcript/") },
+                        requests.size,
+                    )
+                }
+            }
+
             assertEquals("the attempt stopped with ${current.error}", null, current.error)
             assertEquals(ExecutionState.FINISHED, current.state)
             assertEquals(ExecutionState.FINISHED, requireNotNull(dao.job(jobId)).state)
             assertEquals(
-                listOf(Phase.RESOLVE, Phase.DOWNLOAD_AUDIO, Phase.PREPARE_AUDIO, Phase.SUBMIT, Phase.NORMALIZE, Phase.PERSIST),
+                if (provider == Provider.GROQ) {
+                    listOf(Phase.RESOLVE, Phase.DOWNLOAD_AUDIO, Phase.PREPARE_AUDIO, Phase.SUBMIT, Phase.NORMALIZE, Phase.PERSIST)
+                } else {
+                    listOf(Phase.RESOLVE, Phase.DOWNLOAD_AUDIO, Phase.PREPARE_AUDIO, Phase.SUBMIT, Phase.RETRIEVE, Phase.NORMALIZE, Phase.PERSIST)
+                },
                 executed.distinct(),
             )
 
-            // One short clip is one chunk, so one POST to Groq and nothing else. A second request would
-            // mean a retry nobody asked for, and the owner's free tier would pay for it.
-            assertEquals(listOf("api.groq.com/openai/v1/audio/transcriptions"), providerRequests())
             val submission = dao.submissions(attemptId).single()
             assertEquals(SubmissionState.RESPONSE_SAVED, submission.state)
             assertEquals(0, submission.chunkIndex)
+            if (provider == Provider.ASSEMBLYAI) assertFalse("AssemblyAI transcript id was not saved", submission.remoteId.isNullOrBlank())
 
             val artifact = dao.artifacts(jobId).single()
             val transcript = requireNotNull(document) { "the job finished without a stored transcript" }
@@ -206,16 +261,15 @@ class LiveGroqTranscriptionTest {
             assertTrue("the stored transcript has no text", transcript.text.isNotBlank())
             assertTrue(transcript.segments.isNotEmpty())
             assertEquals(Origin.PROVIDER, transcript.provenance.origin)
-            assertEquals(Provider.GROQ, transcript.provenance.provider)
-            // The model the app asked for, written out rather than read back from the same constant the
-            // configuration above used, so a changed default is a failure here instead of a silent switch.
-            assertEquals("whisper-large-v3-turbo", transcript.provenance.requestedModel)
-            // The model the response named. Measured on 16 September 2026 against the real endpoint: Groq's
-            // `verbose_json` body carries `task`, `language`, `duration`, `text` and `segments` and **no**
-            // `model` field, so `reportedModel` is null and `artifact.providerModel` falls back to the
-            // requested model. Null is therefore the expected answer, not a defect. What must never happen is
-            // a present-but-empty claim: that would put a blank string where the UI promises the model that
-            // ran, and it would mean the parser invented a field the response did not carry.
+            assertEquals(provider, transcript.provenance.provider)
+            // The initial AssemblyAI choice on the new-source screen is its first offered model.
+            assertEquals(model, transcript.provenance.requestedModel)
+            if (provider == Provider.GROQ && arguments.getString("liveModel").isNullOrBlank()) {
+                assertEquals("whisper-large-v3-turbo", model)
+            }
+            if (provider == Provider.ASSEMBLYAI) assertEquals("universal-3-5-pro", model)
+            // A provider may omit its reported model; then the artifact uses the requested model. A present
+            // report must be nonblank and match the artifact's display value.
             val reportedModel = transcript.provenance.reportedModel
             assertTrue(
                 "the provider named an empty model: '$reportedModel'",
@@ -224,17 +278,16 @@ class LiveGroqTranscriptionTest {
             assertEquals(reportedModel ?: transcript.provenance.requestedModel, artifact.providerModel)
             assertEquals(track.id, transcript.provenance.sourceAudioTrack?.id)
 
-            // Language: the app promises to say where a language claim comes from and to keep only what the
-            // response itself named as an ISO-639-1 code — `SyncTranscriptParser` accepts nothing else. What
-            // Groq's `verbose_json` puts in its `language` field (the code `en`, or the word `english` the
-            // OpenAI-shaped API is known for) is not established in this project, so this asserts the app's
-            // own rule and the evidence bundle above reports what actually arrived. A run that reports
-            // `language=NONE` means Groq named no code and no Groq transcript will ever carry a language.
+            // Keep the provider's reported language claim intact and bounded to the provider's supported
+            // syntax; Groq's parser intentionally accepts only ISO-639-1 codes.
             assertEquals("provider_response", transcript.provenance.languageEvidence)
             assertEquals(transcript.provenance.reportedLanguages.singleOrNull(), transcript.language)
             assertTrue(
-                "a language that is not an ISO-639-1 code was stored: ${transcript.provenance.reportedLanguages}",
-                transcript.provenance.reportedLanguages.all { it.length == 2 },
+                "a malformed provider language was stored: ${transcript.provenance.reportedLanguages}",
+                transcript.provenance.reportedLanguages.all {
+                    if (provider == Provider.GROQ) it.length == 2
+                    else it.matches(Regex("[A-Za-z0-9]{1,8}([_-][A-Za-z0-9]{1,8}){0,3}"))
+                },
             )
             assertEquals(transcript.language, artifact.language)
 
@@ -328,7 +381,7 @@ class LiveGroqTranscriptionTest {
      * linked to the copy the app already unpacked, because a second one costs hundreds of megabytes.
      */
     private class LiveFixture(private val base: Context) {
-        private val root = File(base.cacheDir, "live-groq-${UUID.randomUUID()}").also { check(it.mkdirs()) }
+        private val root = File(base.cacheDir, "live-provider-${UUID.randomUUID()}").also { check(it.mkdirs()) }
         private val context = IsolatedContext(base, root)
         private val runtimeLink = File(context.noBackupFilesDir, "youtubedl-android")
         private val workManager = WorkManager.getInstance(base)
@@ -343,7 +396,7 @@ class LiveGroqTranscriptionTest {
                 Interceptor { chain ->
                     // The host and path only. A provider request carries the key in its Authorization
                     // header, and nothing in this test may hold a copy of it.
-                    requests += "${chain.request().url.host}${chain.request().url.encodedPath}"
+                    requests += "${chain.request().method} ${chain.request().url.host}${chain.request().url.encodedPath}"
                     chain.proceed(chain.request())
                 },
             ).build(),
@@ -449,8 +502,9 @@ class LiveGroqTranscriptionTest {
     }
 
     private companion object {
-        const val LOG_TAG = "SourceScribeLiveGroq"
-        const val MAX_CLIP_MS = 30_000L
+        const val LOG_TAG = "SourceScribeLiveProvider"
+        const val DEFAULT_CLIP_SECONDS = 30L
+        const val ASSEMBLYAI_MAX_CLIP_SECONDS = 30L
         const val LOG_WINDOW_MARGIN_MS = 5_000L
         const val MAX_LOG_CHARS = 4 * 1024 * 1024
         const val MAX_PHASE_RUNS = 16

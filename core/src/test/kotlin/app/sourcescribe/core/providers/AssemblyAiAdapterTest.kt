@@ -16,10 +16,14 @@ import app.sourcescribe.core.TimeEvidence
 import app.sourcescribe.core.TranscriptionRequest
 import app.sourcescribe.core.Warnings
 import java.io.File
+import java.io.IOException
 import java.util.Collections
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
@@ -35,6 +39,8 @@ import org.junit.Test
 
 class AssemblyAiAdapterTest {
 
+    private val transcriptId = "0072a82b-aa22-4962-add2-6121c36c17c6"
+
     private lateinit var server: MockWebServer
     private lateinit var adapter: AssemblyAiAdapter
     private lateinit var audio: File
@@ -42,6 +48,13 @@ class AssemblyAiAdapterTest {
 
     @Before
     fun setUp() {
+        startServer()
+        audio = File.createTempFile("sourcescribe-assembly", ".wav").apply {
+            writeBytes(byteArrayOf(0, 1, 2, 3, 4))
+        }
+    }
+
+    private fun startServer() {
         server = MockWebServer()
         server.start()
         val client = OkHttpClient.Builder().addInterceptor { chain ->
@@ -51,9 +64,12 @@ class AssemblyAiAdapterTest {
             chain.proceed(original.newBuilder().url(fixtureUrl).build())
         }.build()
         adapter = AssemblyAiAdapter(ProviderHttp(client))
-        audio = File.createTempFile("sourcescribe-assembly", ".wav").apply {
-            writeBytes(byteArrayOf(0, 1, 2, 3, 4))
-        }
+    }
+
+    private fun restartServer() {
+        server.shutdown()
+        originalHosts.clear()
+        startServer()
     }
 
     @After
@@ -137,6 +153,297 @@ class AssemblyAiAdapterTest {
             assertFalse(payload.containsKey(it))
         }
         assertEquals(listOf("api.assemblyai.com", "api.assemblyai.com"), originalHosts)
+    }
+
+    @Test
+    fun completedUniversal35WithoutUtterancesUsesNativeSentencesAndKeepsBothEvidenceSets() {
+        enqueueFixture("upload.json")
+        enqueueFixture("completed_without_utterances.json")
+        // Keep a bounded response ready for the old submit-time sentence GET. It will be consumed
+        // in place of the intended poll response and rejected, making the ordering regression fail fast.
+        enqueueFixture("completed_without_utterances.json")
+        val request = sentenceRequest()
+        val saved = mutableListOf<ByteArray>()
+
+        val submitted = runBlocking {
+            adapter.submit(request, "raw-test-key", ResponseSpool { saved += it.copyOf() })
+        }
+        val handle = (submitted as SubmissionResult.Remote).handle
+        assertEquals(sentenceHandle(), handle)
+        assertEquals(2, server.requestCount)
+        assertEquals(JsonNull, receipt(saved.single())["sourcescribe_sentences"])
+
+        enqueueFixture("sentences_completed.json")
+        val result = runBlocking {
+            adapter.poll(handle, request, "raw-test-key", ResponseSpool { saved += it.copyOf() })
+        }
+
+        val transcript = (result as PollResult.Complete).transcript
+        val nativeText = ((Json.parseToJsonElement(fixture("completed_without_utterances.json")) as JsonObject)
+            .getValue("text")).toString().removeSurrounding("\"")
+        assertTrue(transcript.technicallyComplete)
+        assertEquals(nativeText, transcript.segments.joinToString(" ", transform = Segment::text))
+        assertEquals(
+            listOf(
+                Segment(
+                    "alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi omicron pi rho sigma tau upsilon.",
+                    2_000,
+                    11_000,
+                    timeEvidence = TimeEvidence.PROVIDER_SEGMENT,
+                    chunkIndex = 3,
+                ),
+                Segment(
+                    "phi chi psi omega aleph beth gimel daleth he waw zayin heth teth yodh kaph lamed mem nun.",
+                    11_000,
+                    21_000,
+                    timeEvidence = TimeEvidence.PROVIDER_SEGMENT,
+                    chunkIndex = 3,
+                ),
+            ),
+            transcript.segments,
+        )
+        assertEquals(38, transcript.words.size)
+        assertEquals("alpha", transcript.words.first().text)
+        assertEquals(2_000L, transcript.words.first().startMs)
+        assertEquals("nun", transcript.words.last().text)
+        assertEquals(18_950L, transcript.words.last().endMs)
+        assertTrue(transcript.words.all { it.timeEvidence == TimeEvidence.PROVIDER_WORD })
+        assertEquals("universal-3-5-pro", transcript.reportedModel)
+
+        val upload = server.takeRequest()
+        val submit = server.takeRequest()
+        assertEquals("POST", upload.method)
+        assertEquals("/v2/upload", upload.path)
+        assertEquals("POST", submit.method)
+        assertEquals("/v2/transcript", submit.path)
+        val submitPayload = Json.parseToJsonElement(submit.body.readUtf8()) as JsonObject
+        assertEquals("false", submitPayload.getValue("speaker_labels").toString())
+        val native = server.takeRequest()
+        val sentences = server.takeRequest()
+        assertEquals("GET", native.method)
+        assertEquals("/v2/transcript/$transcriptId", native.path)
+        assertEquals("GET", sentences.method)
+        assertEquals("/v2/transcript/$transcriptId/sentences", sentences.path)
+        assertEquals(4, server.requestCount)
+
+        assertEquals(3, saved.size)
+        val pending = saved.first().decodeToString().let { Json.parseToJsonElement(it) as JsonObject }
+        val completed = receipt(saved.last())
+        assertEquals(JsonNull, pending["sourcescribe_sentences"])
+        assertEquals(
+            Json.parseToJsonElement(fixture("sentences_completed.json")),
+            completed["sourcescribe_sentences"],
+        )
+        assertEquals(transcriptId, completed["id"]?.toString()?.removeSurrounding("\""))
+        assertEquals(nativeText, completed["text"]?.toString()?.removeSurrounding("\""))
+    }
+
+    @Test
+    fun pendingSentenceRetrievalReplaysRemoteAndRecoversWithGetsOnly() {
+        val request = sentenceRequest()
+        val handle = sentenceHandle()
+        enqueueFixture("completed_without_utterances.json")
+        server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST))
+        val saved = mutableListOf<ByteArray>()
+
+        val interrupted = assertThrows(ProviderError::class.java) {
+            runBlocking { adapter.poll(handle, request, "key", ResponseSpool { saved += it.copyOf() }) }
+        }
+        assertEquals(ProviderErrorCode.NETWORK, interrupted.code)
+        assertEquals(1, saved.size)
+        assertEquals(JsonNull, receipt(saved.single())["sourcescribe_sentences"])
+        val replay = adapter.parseSavedResponse(saved.single(), request) as SubmissionResult.Remote
+        assertEquals(handle, replay.handle)
+        assertEquals(2, server.requestCount)
+
+        enqueueFixture("completed_without_utterances.json")
+        enqueueFixture("sentences_completed.json")
+        val recovered = runBlocking {
+            adapter.poll(handle, request, "key", ResponseSpool { saved += it.copyOf() })
+        } as PollResult.Complete
+        assertTrue(recovered.transcript.technicallyComplete)
+        assertEquals(4, server.requestCount)
+        val requests = (0 until server.requestCount).map { server.takeRequest() }
+        assertEquals(
+            listOf(
+                "/v2/transcript/$transcriptId",
+                "/v2/transcript/$transcriptId/sentences",
+                "/v2/transcript/$transcriptId",
+                "/v2/transcript/$transcriptId/sentences",
+            ),
+            requests.map { it.path },
+        )
+        assertTrue(requests.all { it.method == "GET" })
+
+        val requestCount = server.requestCount
+        val replayedComposite = adapter.parseSavedResponse(saved.last(), request) as SubmissionResult.Direct
+        assertTrue(replayedComposite.transcript.technicallyComplete)
+        assertEquals(recovered.transcript, replayedComposite.transcript)
+        assertEquals(requestCount, server.requestCount)
+    }
+
+    @Test
+    fun wrongIdPartialTextAndInvalidSentenceTimesCannotCompleteTheTranscript() {
+        val valid = fixture("sentences_completed.json")
+        val validObject = Json.parseToJsonElement(valid) as JsonObject
+        val onlyFirstSentence = JsonObject(
+            validObject.toMutableMap().apply {
+                put("sentences", JsonArray(listOf((validObject.getValue("sentences") as JsonArray).first())))
+            },
+        ).toString()
+        val responses = listOf(
+            valid.replace(transcriptId, "1072a82b-aa22-4962-add2-6121c36c17c6"),
+            onlyFirstSentence,
+            valid.replace(
+                "phi chi psi omega aleph beth gimel daleth he waw zayin heth teth yodh kaph lamed mem nun.",
+                "changed provider text.",
+            ),
+            valid.replace("\"end\": 9000", "\"end\": 0"),
+            """{"id":"$transcriptId","sentences":null}""",
+        )
+        val failures = mutableListOf<String>()
+
+        responses.forEachIndexed { index, response ->
+            if (index > 0) restartServer()
+            enqueueFixture("completed_without_utterances.json")
+            server.enqueue(MockResponse().setHeader("Content-Type", "application/json").setBody(response))
+            val saved = mutableListOf<ByteArray>()
+            val outcome = try {
+                runBlocking {
+                    adapter.poll(sentenceHandle(), sentenceRequest(), "key", ResponseSpool { saved += it.copyOf() })
+                }
+            } catch (failure: Exception) {
+                failure
+            }
+            if (outcome !is ProviderError || outcome.code != ProviderErrorCode.INVALID_RESPONSE) {
+                failures += "case $index did not reject the sentence response as INVALID_RESPONSE"
+            }
+            val pending = saved.singleOrNull()?.let(::receipt)?.get("sourcescribe_sentences")
+            if (pending != JsonNull) failures += "case $index did not retain a pending accepted receipt"
+        }
+        assertTrue(failures.joinToString("; "), failures.isEmpty())
+    }
+
+    @Test
+    fun diarizationOrDisabledSegmentTimestampsDoesNotFetchSentences() {
+        val diarizationRequest = sentenceRequest(
+            baseConfig(model = AssemblyAiAdapter.MODEL_U35, diarization = true, wordTimestamps = true),
+        )
+        val wordOnlyRequest = sentenceRequest(
+            baseConfig(
+                model = AssemblyAiAdapter.MODEL_U35,
+                wordTimestamps = true,
+                segmentTimestamps = false,
+            ),
+        )
+        enqueueFixture("completed_without_utterances.json")
+        enqueueFixture("completed_without_utterances.json")
+
+        val diarization = runBlocking {
+            adapter.poll(sentenceHandle(), diarizationRequest, "key", ResponseSpool {})
+        } as PollResult.Complete
+        val wordOnly = runBlocking {
+            adapter.poll(sentenceHandle(), wordOnlyRequest, "key", ResponseSpool {})
+        } as PollResult.Complete
+
+        assertFalse(diarization.transcript.technicallyComplete)
+        assertTrue(wordOnly.transcript.technicallyComplete)
+        assertEquals(2, server.requestCount)
+        repeat(2) {
+            assertEquals("/v2/transcript/$transcriptId", server.takeRequest().path)
+        }
+    }
+
+    @Test
+    fun failedCompositeSpoolKeepsThePendingAcceptedReceipt() {
+        enqueueFixture("completed_without_utterances.json")
+        enqueueFixture("sentences_completed.json")
+        var persisted: ByteArray? = null
+        val spool = ResponseSpool { bytes ->
+            val root = Json.parseToJsonElement(bytes.decodeToString()) as JsonObject
+            if (root["sourcescribe_sentences"] != null && root["sourcescribe_sentences"] !is JsonNull) {
+                throw IOException("storage unavailable")
+            }
+            persisted = bytes.copyOf()
+        }
+
+        val error = assertThrows(ProviderError::class.java) {
+            runBlocking { adapter.poll(sentenceHandle(), sentenceRequest(), "key", spool) }
+        }
+
+        assertEquals(ProviderErrorCode.RESPONSE_STORAGE, error.code)
+        assertEquals(JsonNull, receipt(requireNotNull(persisted))["sourcescribe_sentences"])
+        assertEquals(2, server.requestCount)
+    }
+
+    @Test
+    fun aggregateReceiptSizeLimitKeepsThePendingAcceptedReceipt() {
+        val sentenceResponse = fixture("sentences_completed.json")
+        val maxBytes = 16 * 1024 * 1024
+        val padding = "x".repeat(maxBytes - sentenceResponse.toByteArray().size - 512)
+        val oversizedCompositePart = sentenceResponse.replace("\n}", ",\n  \"padding\":\"$padding\"\n}")
+        assertTrue(oversizedCompositePart.toByteArray().size < maxBytes)
+        enqueueFixture("completed_without_utterances.json")
+        server.enqueue(MockResponse().setHeader("Content-Type", "application/json").setBody(oversizedCompositePart))
+        val saved = mutableListOf<ByteArray>()
+
+        val error = assertThrows(ProviderError::class.java) {
+            runBlocking {
+                adapter.poll(sentenceHandle(), sentenceRequest(), "key", ResponseSpool { saved += it.copyOf() })
+            }
+        }
+
+        assertEquals(ProviderErrorCode.RESPONSE_STORAGE, error.code)
+        assertEquals(JsonNull, receipt(saved.single())["sourcescribe_sentences"])
+    }
+
+    @Test
+    fun pendingMarkerOverflowMakesPaidSubmitUncertainWithoutSavingRawSuccess() {
+        enqueueFixture("upload.json")
+        val native = nativeReceiptNearPendingMarkerLimit()
+        server.enqueue(MockResponse().setHeader("Content-Type", "application/json").setBody(native))
+        // The old submit path unexpectedly asks for sentences before returning acceptance. Bound it here
+        // so the regression fails promptly instead of waiting for a default MockWebServer response timeout.
+        server.enqueue(MockResponse().setResponseCode(500).setBody("{}"))
+        val saved = mutableListOf<ByteArray>()
+
+        val error = assertThrows(ProviderError::class.java) {
+            runBlocking {
+                adapter.submit(sentenceRequest(), "key", ResponseSpool { saved += it.copyOf() })
+            }
+        }
+
+        assertEquals(ProviderErrorCode.SUBMISSION_UNCERTAIN, error.code)
+        assertTrue(saved.isEmpty())
+        assertEquals(2, server.requestCount)
+        assertEquals("/v2/upload", server.takeRequest().path)
+        assertEquals("/v2/transcript", server.takeRequest().path)
+    }
+
+    @Test
+    fun pendingMarkerOverflowDuringPollDoesNotReplaceAcceptedReceipt() {
+        val native = nativeReceiptNearPendingMarkerLimit()
+        server.enqueue(MockResponse().setHeader("Content-Type", "application/json").setBody(native))
+        // A compliant adapter rejects marker overflow before asking for sentence evidence.
+        server.enqueue(MockResponse().setResponseCode(500).setBody("{}"))
+        val previousAcceptedReceipt = fixture("submit_queued.json").toByteArray()
+        var persisted = previousAcceptedReceipt.copyOf()
+
+        val error = assertThrows(ProviderError::class.java) {
+            runBlocking {
+                adapter.poll(
+                    sentenceHandle(),
+                    sentenceRequest(),
+                    "key",
+                    ResponseSpool { persisted = it.copyOf() },
+                )
+            }
+        }
+
+        assertEquals(ProviderErrorCode.RESPONSE_STORAGE, error.code)
+        assertEquals(previousAcceptedReceipt.toList(), persisted.toList())
+        assertEquals(1, server.requestCount)
+        assertEquals("/v2/transcript/$transcriptId", server.takeRequest().path)
     }
 
     @Test
@@ -878,6 +1185,35 @@ class AssemblyAiAdapterTest {
         chunkStartMs = chunkStartMs,
         durationMs = durationMs,
     )
+
+    private fun sentenceRequest(
+        config: JobConfig = baseConfig(
+            model = AssemblyAiAdapter.MODEL_U35,
+            wordTimestamps = true,
+            segmentTimestamps = true,
+        ),
+    ) = request(config, chunkIndex = 3, chunkStartMs = 2_000, durationMs = 19_000)
+
+    private fun sentenceHandle() = RemoteHandle(Provider.ASSEMBLYAI, Region.US, transcriptId)
+
+    private fun receipt(raw: ByteArray): JsonObject = Json.parseToJsonElement(raw.decodeToString()) as JsonObject
+
+    private fun nativeReceiptNearPendingMarkerLimit(): String {
+        val maxBytes = 16 * 1024 * 1024
+        val source = receipt(fixture("completed_without_utterances.json").toByteArray())
+        val emptyPadding = JsonObject(source.toMutableMap().apply { put("padding", JsonPrimitive("")) })
+        val targetNativeSize = maxBytes - 8
+        val padding = "x".repeat(targetNativeSize - emptyPadding.toString().encodeToByteArray().size)
+        val native = JsonObject(source.toMutableMap().apply { put("padding", JsonPrimitive(padding)) })
+        val nativeText = native.toString()
+        val marked = JsonObject(native.toMutableMap().apply { put("sourcescribe_sentences", JsonNull) })
+            .toString()
+            .encodeToByteArray()
+        assertEquals(targetNativeSize, nativeText.encodeToByteArray().size)
+        assertTrue(nativeText.encodeToByteArray().size < maxBytes)
+        assertTrue(marked.size > maxBytes)
+        return nativeText
+    }
 
     private fun baseConfig(
         model: String = AssemblyAiAdapter.MODEL_U2,

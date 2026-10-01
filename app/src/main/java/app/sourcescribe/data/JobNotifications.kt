@@ -11,10 +11,10 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import androidx.core.content.edit
 import app.sourcescribe.R
 import app.sourcescribe.core.ExecutionState
 import app.sourcescribe.core.Outcome
-import app.sourcescribe.core.Phase
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -24,23 +24,38 @@ class JobNotifications @Inject constructor(
     @ApplicationContext private val context: Context,
 ) {
     private val notifications = NotificationManagerCompat.from(context)
+    private val deduplicator = NotificationDeduplicator(context.getSharedPreferences("job_notification_events", Context.MODE_PRIVATE))
+    @Volatile private var appForeground = false
 
-    fun update(job: JobRow, attempts: List<AttemptRow>) {
+    fun setAppForeground(foreground: Boolean) {
+        appForeground = foreground
+    }
+
+    @Synchronized
+    fun update(job: JobRow, attempts: List<AttemptRow>, notifyCompletion: Boolean = true) {
+        if (!notifyCompletion && job.state == ExecutionState.FINISHED) {
+            JobNotificationPolicy.key(job, attempts, foreground = false)?.let { deduplicator.recordHandled(job.id, it) }
+            return
+        }
+        val key = JobNotificationPolicy.key(job, attempts, appForeground)
+        if (key == null) {
+            notifications.cancel(job.id, NOTIFICATION_ID)
+            if (job.state == ExecutionState.FINISHED) {
+                JobNotificationPolicy.key(job, attempts, foreground = false)?.let { deduplicator.recordHandled(job.id, it) }
+            } else if (job.state !in setOf(ExecutionState.WAITING_USER, ExecutionState.SUBMISSION_UNCERTAIN)) {
+                deduplicator.forget(job.id)
+            }
+            return
+        }
         if (!notificationsAllowed()) return
         ensureChannel()
         val localized = ContextCompat.getContextForLanguage(context)
         val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName) ?: return
-        val phase = attempts
-            .firstOrNull { it.state in ACTIVE_STATES }
-            ?.phase
-            ?: attempts.firstOrNull { it.state !in TERMINAL_STATES }?.phase
-            ?: attempts.maxByOrNull { it.createdAt }?.phase
-            ?: Phase.RESOLVE
-        val stateLabel = localized.getString(stateResource(job.state))
-        val phaseLabel = localized.getString(phaseResource(phase))
-        val outcomeLabel = if (job.outcome == Outcome.NONE) null else localized.getString(outcomeResource(job.outcome))
-        val text = listOfNotNull(stateLabel, phaseLabel, outcomeLabel).joinToString(" · ")
-        val ongoing = job.state in ACTIVE_STATES
+        if (!deduplicator.needsNotification(job.id, key)) return
+        val text = when (key.state) {
+            ExecutionState.WAITING_USER, ExecutionState.SUBMISSION_UNCERTAIN -> localized.getString(stateResource(key.state))
+            else -> localized.getString(outcomeResource(key.outcome))
+        }
         val pendingIntent = PendingIntent.getActivity(
             context,
             job.id.hashCode(),
@@ -52,12 +67,13 @@ class JobNotifications @Inject constructor(
             .setContentTitle(context.getString(R.string.app_name))
             .setContentText(text)
             .setContentIntent(pendingIntent)
-            .setOngoing(ongoing)
-            .setAutoCancel(!ongoing)
+            .setAutoCancel(true)
             .setOnlyAlertOnce(true)
             .build()
         try {
             notifications.notify(job.id, NOTIFICATION_ID, notification)
+            // Posting first avoids losing an event; a crash before this mark can replay the stable tagged notice.
+            deduplicator.recordHandled(job.id, key)
         } catch (_: SecurityException) {
             // Permission may be revoked between the check and notify().
         }
@@ -65,12 +81,13 @@ class JobNotifications @Inject constructor(
 
     fun dismiss(jobId: String) {
         notifications.cancel(jobId, NOTIFICATION_ID)
+        deduplicator.forget(jobId)
     }
 
     private fun notificationsAllowed(): Boolean {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-        ) return false
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return false
+        }
         return notifications.areNotificationsEnabled()
     }
 
@@ -81,27 +98,9 @@ class JobNotifications @Inject constructor(
     }
 
     private fun stateResource(state: ExecutionState): Int = when (state) {
-        ExecutionState.QUEUED -> R.string.state_queued
-        ExecutionState.RUNNING -> R.string.state_running
-        ExecutionState.WAITING_NETWORK -> R.string.state_waiting_network
-        ExecutionState.WAITING_RATE_LIMIT -> R.string.state_waiting_rate_limit
         ExecutionState.WAITING_USER -> R.string.state_waiting_user
-        ExecutionState.WAITING_REMOTE -> R.string.state_waiting_remote
         ExecutionState.SUBMISSION_UNCERTAIN -> R.string.state_submission_uncertain
-        ExecutionState.FINISHED -> R.string.state_finished
-        ExecutionState.CANCELLED -> R.string.state_cancelled
-    }
-
-    private fun phaseResource(phase: Phase): Int = when (phase) {
-        Phase.RESOLVE -> R.string.phase_resolve
-        Phase.FETCH_CAPTIONS -> R.string.phase_fetch_captions
-        Phase.DOWNLOAD_AUDIO -> R.string.phase_download_audio
-        Phase.PREPARE_AUDIO -> R.string.phase_prepare_audio
-        Phase.UPLOAD -> R.string.phase_upload
-        Phase.SUBMIT -> R.string.phase_submit
-        Phase.RETRIEVE -> R.string.phase_retrieve
-        Phase.NORMALIZE -> R.string.phase_normalize
-        Phase.PERSIST -> R.string.phase_persist
+        else -> error("No notification label for $state")
     }
 
     private fun outcomeResource(outcome: Outcome): Int = when (outcome) {
@@ -116,12 +115,55 @@ class JobNotifications @Inject constructor(
     private companion object {
         const val CHANNEL_ID = "job_updates"
         const val NOTIFICATION_ID = 1
-        val ACTIVE_STATES = setOf(
-            ExecutionState.RUNNING,
-            ExecutionState.WAITING_NETWORK,
-            ExecutionState.WAITING_RATE_LIMIT,
-            ExecutionState.WAITING_REMOTE,
-        )
-        val TERMINAL_STATES = setOf(ExecutionState.FINISHED, ExecutionState.CANCELLED)
     }
+}
+
+internal data class JobNotificationKey(
+    val state: ExecutionState,
+    val outcome: Outcome,
+)
+
+internal object JobNotificationPolicy {
+    fun key(job: JobRow, attempts: List<AttemptRow>, foreground: Boolean): JobNotificationKey? {
+        val latest = attempts.groupBy { it.branch }.values.map { rows -> rows.maxBy { it.number } }
+        val actionableState = when {
+            job.state == ExecutionState.WAITING_USER || job.state == ExecutionState.SUBMISSION_UNCERTAIN -> job.state
+            latest.any { it.state == ExecutionState.SUBMISSION_UNCERTAIN } -> ExecutionState.SUBMISSION_UNCERTAIN
+            latest.any { it.state == ExecutionState.WAITING_USER } -> ExecutionState.WAITING_USER
+            else -> null
+        }
+        if (foreground && actionableState == null) return null
+        val state = actionableState ?: if (job.state == ExecutionState.FINISHED && job.outcome in TERMINAL_OUTCOMES) {
+            ExecutionState.FINISHED
+        } else {
+            return null
+        }
+        return JobNotificationKey(state, job.outcome)
+    }
+
+    private val TERMINAL_OUTCOMES = setOf(
+        Outcome.SUCCESS,
+        Outcome.SUCCESS_WITH_WARNINGS,
+        Outcome.PARTIAL_SUCCESS,
+        Outcome.FAILED,
+    )
+}
+
+internal class NotificationDeduplicator(private val preferences: android.content.SharedPreferences) {
+
+    @Synchronized
+    fun needsNotification(jobId: String, key: JobNotificationKey): Boolean = preferences.getString(jobId, null) != signature(key)
+
+    @Synchronized
+    fun recordHandled(jobId: String, key: JobNotificationKey) {
+        // Synchronous durability prevents an immediate process death from reposting the same event.
+        preferences.edit(commit = true) { putString(jobId, signature(key)) }
+    }
+
+    @Synchronized
+    fun forget(jobId: String) {
+        preferences.edit(commit = true) { remove(jobId) }
+    }
+
+    private fun signature(key: JobNotificationKey) = "${key.state.name}|${key.outcome.name}"
 }

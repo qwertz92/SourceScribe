@@ -222,6 +222,7 @@ class ProviderHttpTest {
             RejectionCase(415, "/v2/upload", "POST", ProviderOperation.UPLOAD, ProviderRejectionReason.UNSUPPORTED_MEDIA),
             RejectionCase(400, "/v1/audio/transcriptions", "POST", ProviderOperation.SUBMIT, ProviderRejectionReason.UNKNOWN),
             RejectionCase(422, "/v2/transcript/00000000-0000-0000-0000-000000000000", "GET", ProviderOperation.RETRIEVE, ProviderRejectionReason.UNKNOWN),
+            RejectionCase(422, "/v2/transcript/00000000-0000-0000-0000-000000000000/sentences", "GET", ProviderOperation.RETRIEVE, ProviderRejectionReason.UNKNOWN),
             RejectionCase(400, "/v2/transcript/00000000-0000-0000-0000-000000000000", "DELETE", ProviderOperation.DELETE, ProviderRejectionReason.UNKNOWN),
         )
 
