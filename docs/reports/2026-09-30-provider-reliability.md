@@ -136,11 +136,12 @@ not a claim that the project's older issue list is empty.
 
 ## Signed candidate, native visual check and upgrade
 
-Implementation `297e553` and the first provider slice `c93d5e8` are signed and pushed to `main`. The local candidate
-is `.local-tools/releases/SourceScribe-0.4.1-297e553.apk`: version `0.4.1`, versionCode 4, 147,040,589 bytes,
+Implementation `297e553` and the first provider slice `c93d5e8` are signed and pushed to `main`. The signed candidate
+was originally saved as `SourceScribe-0.4.1-297e553.apk` (now the canonical local
+`.local-tools/releases/SourceScribe-0.4.1.apk`): version `0.4.1`, versionCode 4, 147,040,589 bytes,
 SHA-256 `a344994e3638494a1edfc96e968dabd5898d06c6662589beb34c3e4b42e72e9c`. `apksigner verify --print-certs`
 and `zipalign -c -P 16 4` passed. The existing release certificate SHA-256 is
-`19d1da9a8fe704082a531faed8a24d966c485aae581a7076dd4b4f66c11d3881`. No tag or public release was created.
+`19d1da9a8fe704082a531faed8a24d966c485aae581a7076dd4b4f66c11d3881`. It remained unpublished on 1 October; GitHub publication was completed on 3 October as recorded below.
 
 On the dedicated `emulator-5556`, an actual native touch-down, screenshot, then touch-up showed the ripple covers
 the card through the Actions footer. The screen contains an explicitly marked synthetic fixture:
@@ -267,3 +268,40 @@ unique content has not been established here; they do not affect the app or the 
 The temporary device-side UI dump `/sdcard/sourcescribe-final-window.xml` was also removed from the dedicated
 `emulator-5556` (15,487 bytes). Its SourceScribe origin and absence after deletion were checked; the emulator was
 then stopped again. Installed app data and the owner's emulator were retained.
+
+## GitHub publication and APK cleanup — 3 October 2026
+
+The tested 0.4.1 APK had remained local while only its source was pushed, so the owner still found 0.4.0 on GitHub. The owner explicitly requested publication and removal of obsolete local APKs.
+
+Signed tag `v0.4.1` points to `9de3509692aa45edfad051d93eaee208ffd92ce2`; its tag object is `2833e7a8f1bf13ec12b78d1e453f43d948339d27`. `git verify-tag` passed. The app source is unchanged from tested implementation `297e553`; intervening commits only adjust CI setup and verification documentation. Release `402669856` was published at `2026-10-03T20:03:08Z`, with asset `608440583`, and the GitHub latest-release API returns `v0.4.1`, not a draft or prerelease.
+
+[Release page](https://github.com/qwertz92/SourceScribe/releases/tag/v0.4.1); [direct signed APK](https://github.com/qwertz92/SourceScribe/releases/download/v0.4.1/SourceScribe-0.4.1.apk). An unauthenticated `curl --fail --location` download returned HTTP 200, 147,040,589 bytes and SHA-256 `a344994e3638494a1edfc96e968dabd5898d06c6662589beb34c3e4b42e72e9c`, identical to the local signed APK and GitHub asset digest. The first download attempt hit a redirect DNS-resolution timeout; the bounded IPv4 retry passed. Signature, versionCode 4, version 0.4.1 and 16 KiB alignment were rechecked before upload. No rebuild or additional provider request was made for publication.
+
+The retained canonical local artifact is `.local-tools/releases/SourceScribe-0.4.1.apk`. The following 15 obsolete APKs were removed after the public download passed (2,087,611,391 regular-file bytes, approximately 2.09 GB; this is not a measurement of allocated disk blocks):
+
+| Removed local APK | Bytes |
+|---|---:|
+| `.local-tools/build-reports/release-r50-test-signed.apk` | 147,286,251 |
+| `.local-tools/releases/SourceScribe-0.1.0-preview.1-rebuilt.apk` | 147,376,546 |
+| `.local-tools/releases/SourceScribe-0.2.0-preview.1-1fe2dad-debug.apk` | 157,997,263 |
+| `.local-tools/releases/SourceScribe-0.2.0-preview.1-1fe2dad-unsigned.apk` | 146,638,298 |
+| `.local-tools/releases/SourceScribe-0.2.0-preview.1.apk` | 146,688,333 |
+| `.local-tools/releases/SourceScribe-0.4.0-f22389c-debug.apk` | 157,081,059 |
+| `.local-tools/releases/SourceScribe-0.4.0-f22389c-unsigned.apk` | 146,851,554 |
+| `.local-tools/releases/SourceScribe-0.4.0-f7dd7d2-debug.apk` | 159,093,003 |
+| `.local-tools/releases/SourceScribe-0.4.0-f7dd7d2-unsigned.apk` | 146,859,674 |
+| `.local-tools/releases/SourceScribe-0.4.0.apk` | 146,909,517 |
+| `.local-tools/releases/SourceScribe-0.4.1-297e553.apk` | 147,040,589 |
+| `app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk` | 2,950,787 |
+| `app/build/outputs/apk/debug/app-debug.apk` | 159,353,379 |
+| `app/build/outputs/apk/release/app-release-unsigned.apk` | 146,991,514 |
+| `extractor/build/outputs/apk/androidTest/debug/extractor-debug-androidTest.apk` | 128,493,624 |
+
+Debug APKs use the separate development app ID; androidTest APKs are device-test runners; unsigned APKs are signing inputs. Preview labels identify an early product version, and rebuilt files were regenerated copies. These variants are necessary while testing, but archiving them after completed checks had no remaining purpose. Build outputs regenerate when needed. Source tags, verification receipts and the external release key are preserved. The published 0.4.0 and 0.2.0 APKs remain downloadable on GitHub; the older 0.1.0 release currently has no APK asset and can be rebuilt from its tag. Rebuilding does not guarantee the original byte-for-byte APK.
+
+Temporary publication helpers were also removed after their contents were verified:
+
+- `/mnt/c/users/thoma/mystuff/personal/projects/sourcescribe/.local-tools/tmp/SourceScribe-0.4.1-public-download.apk` — 147,040,589 bytes.
+- `/tmp/sourcescribe-0.4.1-release-notes.md` — 2,045 bytes.
+
+Raw publication, public-download and deletion receipts remain in ignored `.local-tools/build-reports/2026-10-03-*.json`. Release completion and artifact retention are now explicit in `AGENTS.md`, `docs/BUILD.md` and the dated `docs/LEARNINGS.md` entry “An Android release must be downloadable.”

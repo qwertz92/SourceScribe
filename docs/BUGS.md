@@ -1,11 +1,11 @@
 # Known bugs
 
-**As of:** 1 October 2026. The published release remains 0.4.0; local candidate 0.4.1 (versionCode 4) has
-signed/pushed implementation `297e553` and passed local build, device, signing and in-place upgrade gates. This is the one list of every known, unfixed item, with its
+**As of:** 3 October 2026. Published release 0.4.1 (versionCode 4), signed tag `v0.4.1` at `9de3509`, has
+signed/pushed implementation `297e553` and passed build, device, signing and in-place upgrade gates. This is the one list of every known, unfixed item, with its
 location, trigger, evidence, and priority in one place — `docs/DEFECTS.md` no longer exists; what used to live there
 is folded into the entry for its number below. Item 1 is the still-open feedback from the 10 September 2026 device
 test; item 2 (the bottom button "could use more space") was set aside on 16 September 2026 because the owner could
-not recall what was meant, and comes back only if it is reported again. Candidate item 74 is closed after its
+not recall what was meant, and comes back only if it is reported again. Item 74 is closed after its
 measured 200% layout checks passed; item 73 remains open for the specific running-worker network interruption.
 Offline startup and automatic unmetered wakeup passed; they do not exercise that running interruption.
 Closed, and kept only as a number so references stay valid, are 3, 4, 6, 7, 8, 9, 12, 13, 17, 18, 19, 20, 23, 31,

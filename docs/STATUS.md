@@ -1,8 +1,9 @@
 # Project Status
 
-**As of 2026-10-01.** The published personal preview remains `0.4.0` (18 September 2026). Candidate `0.4.1`
-(versionCode 4) is signed, locally installable and verified from pushed implementation commit `297e553`.
-It has not been tagged or published. The candidate gates below passed; full v1 acceptance is not reached yet.
+**As of 2026-10-03.** Version `0.4.1` (versionCode 4) is published as the latest GitHub release with its signed
+[APK](https://github.com/qwertz92/SourceScribe/releases/download/v0.4.1/SourceScribe-0.4.1.apk). Signed tag
+`v0.4.1` points to `9de3509`; the tested app implementation is `297e553`, followed only by CI setup and
+verification documentation. The release gates below passed; full v1 acceptance is not reached yet.
 The published app source is in public repo [qwertz92/SourceScribe](https://github.com/qwertz92/SourceScribe); this
 file describes the current state only; the dated log of how it got here, including 23 rounds of independent
 adversarial review over 0.1.0/0.2.0 and the 0.4.0 work, is in [HISTORY.md](HISTORY.md), and the lessons that work
@@ -44,10 +45,10 @@ aside on 16 September 2026 because the owner could not recall what was meant. Th
 
 ## Releases
 
-**0.4.1 candidate** — version `0.4.1`, versionCode 4; signed/pushed implementation `297e553` (first slice `c93d5e8`). Local signed APK: `.local-tools/releases/SourceScribe-0.4.1-297e553.apk`, 147,040,589 bytes, SHA-256 `a344994e3638494a1edfc96e968dabd5898d06c6662589beb34c3e4b42e72e9c`; signature and 16 KiB alignment verified with the existing release certificate. No tag or public release was created. Core: 231 passed; all four lint reports: zero issues; normal app instrumentation: 260 passed, 11 documented opt-in skips, zero failures. All app opt-in flows were separately exercised; extractor: 55 passed, zero skips. Three Groq jobs and two paid AssemblyAI POSTs were tested. Signed 0.4.0-to-0.4.1 upgrade preserved the real caption job, all six displayed passages, language and appearance. Independent GitHub run `36846190794` passed on CI setup fix `2cdd6ee`; its normal suites retain documented opt-in skips, all exercised separately locally. Evidence and coverage boundaries: [provider reliability report](reports/2026-09-30-provider-reliability.md), [structured receipt](reports/2026-10-01-candidate-0.4.1-evidence.json).
+**0.4.1** — published 3 October 2026 as [the latest GitHub release](https://github.com/qwertz92/SourceScribe/releases/tag/v0.4.1), signed tag `v0.4.1` at `9de3509`; version `0.4.1`, versionCode 4; signed/pushed implementation `297e553` (first slice `c93d5e8`). Local signed APK: `.local-tools/releases/SourceScribe-0.4.1.apk`, 147,040,589 bytes, SHA-256 `a344994e3638494a1edfc96e968dabd5898d06c6662589beb34c3e4b42e72e9c`; signature and 16 KiB alignment verified with the existing release certificate. An unauthenticated public download returned HTTP 200 and matched both the local SHA-256 and GitHub asset digest. Fifteen obsolete APKs (2,087,611,391 bytes) were removed; only the current canonical signed APK remains locally. Core: 231 passed; all four lint reports: zero issues; normal app instrumentation: 260 passed, 11 documented opt-in skips, zero failures. All app opt-in flows were separately exercised; extractor: 55 passed, zero skips. Three Groq jobs and two paid AssemblyAI POSTs were tested. Signed 0.4.0-to-0.4.1 upgrade preserved the real caption job, all six displayed passages, language and appearance. Independent GitHub run `36846190794` passed on CI setup fix `2cdd6ee`; its normal suites retain documented opt-in skips, all exercised separately locally. Evidence and coverage boundaries: [provider reliability report](reports/2026-09-30-provider-reliability.md), [structured receipt](reports/2026-10-01-candidate-0.4.1-evidence.json).
 
 **0.4.0** — built and verified 16 September 2026 at commit `f7dd7d2`, published 18 September 2026. Version 0.4.0, versionCode 3. Answers the owner's 0.2.0 phone test
-(the P1 and 15 further points) and closes BUGS items 58 and 59. Retained unsigned 0.4.0 APK: `.local-tools/releases/SourceScribe-0.4.0-f7dd7d2-unsigned.apk`,
+(the P1 and 15 further points) and closes BUGS items 58 and 59. Historical unsigned 0.4.0 build (local copy removed 3 October 2026):
 146,859,674 bytes, SHA-256 `031d37af5759a1055153a5f98f6fb7f92e0debe3302624afe93f6fe130dcbd7a`. Tag `v0.4.0`, on the documentation commit that follows `7868497`. Gates: 215 JVM tests, 4 lint reports clean, repository check PASS, app instrumentation 239 tests (230 passed, 9 opt-in skips), 4 process stages, extractor 55 (51 passed, 4 opt-in skips) plus its 5 live tests, 1 real Groq request SUCCESS, CI green at `7868497`, update 0.1.0 to 0.4.0 and 0.2.0 to 0.4.0 PASS on a fresh emulator. Full evidence:
 [2026-09-16 preview report](reports/2026-09-16-preview-0.4.md).
 

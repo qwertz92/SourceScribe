@@ -170,10 +170,15 @@ In WSL on the build machine, from the project folder. `ANDROID_HOME` must point 
 
 ```bash
 export ANDROID_HOME="$PWD/.local-tools/sdk"
-tools/sign-release.sh .local-tools/releases/SourceScribe-<version>-<commit>-unsigned.apk .local-tools/releases/SourceScribe-<version>.apk
-gh release upload v<version> .local-tools/releases/SourceScribe-<version>.apk
+timeout 180 tools/sign-release.sh app/build/outputs/apk/release/app-release-unsigned.apk .local-tools/releases/SourceScribe-<version>.apk
+timeout 60 git tag -s v<version> <tested-commit> -F <release-notes-file>
+timeout 30 git verify-tag v<version>
+timeout 120 git push origin refs/tags/v<version>
+timeout 900 gh release create v<version> .local-tools/releases/SourceScribe-<version>.apk --repo qwertz92/SourceScribe --verify-tag --latest --notes-from-tag --title 'SourceScribe <version>'
 ```
 
-`<version>` is the app version, for example `0.4.0`, and `<commit>` the short commit the release build ran at. Signing went correctly if the script ends with `signed APK:` and `certificate SHA-256: 19d1da9a8fe704082a531faed8a24d966c485aae581a7076dd4b4f66c11d3881`; otherwise it stops with an error and writes no APK. After the upload, compare the SHA-256 digest GitHub shows for the asset with `sha256sum` of the local file.
+Run publication only for an owner-authorized release. Replace the placeholders with the app version, the tested source commit and an English release-notes file. Signing went correctly if the script ends with `signed APK:` and `certificate SHA-256: 19d1da9a8fe704082a531faed8a24d966c485aae581a7076dd4b4f66c11d3881`; otherwise it stops with an error and writes no APK. A build, tag push, draft, or source-only release does not deliver an installable update. Confirm the release is published and listed as latest, then download the APK through its public asset URL without authentication and compare its SHA-256 with the local file and GitHub's asset digest. Record the URL, tag commit and result in STATUS and the dated verification report.
+
+Keep only `.local-tools/releases/SourceScribe-<version>.apk` as the current local release artifact. Debug APKs run the separate development app; androidTest APKs run device tests; unsigned APKs are signing inputs. They are generated when needed and do not need archived release copies. `preview` describes an early product version, and `rebuilt` was an ad hoc filename for a regenerated build. After publication and upgrade verification, remove older APKs and duplicate generated outputs. Published old assets can be downloaded again, or a source tag can be rebuilt and signed with the preserved release key; a rebuild is not guaranteed to reproduce the original bytes.
 
 Preview 0.2.0-preview.1 was signed this way on 14 September 2026, after its tag, and its APK attached to the release: 146,688,333 bytes, SHA-256 `ea8bf17fa1262c5d4869ad7a5db9f6183b54746714f82ac46c7c031c449f971b`. In the same check the script refused an APK signed with a throwaway key. Preview 0.3.0 reached only a version bump (`5ebc11e`); its release-APK build attempt crashed before packaging finished, so it was never signed or published, and 0.4.0 carries its fixes instead (see [STATUS.md](STATUS.md)).

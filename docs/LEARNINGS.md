@@ -221,3 +221,8 @@ recorded so the investigation is not repeated.
   intentionally fail when `POST_NOTIFICATIONS` is absent. The local gate granted it, but CI did not; preinstall the
   debug APK and grant the permission before connected tests on the ephemeral runner. Do not replace delivery
   assertions with assumptions or skips.
+
+- **An Android release must be downloadable.** (3 October 2026) A signed local APK and pushed source left the
+  owner installing the old GitHub version. Complete owner-authorized delivery with a signed tag, published APK,
+  latest-release check and an unauthenticated download whose SHA-256 matches. Then remove obsolete local APKs;
+  keep one current signed artifact, source tags, the release key and verification receipts.

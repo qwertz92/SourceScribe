@@ -170,3 +170,7 @@ the same day. Independent review of the 0.4.0 work: round 1 (Sonnet, read-only, 
 Provider checks exposed missing default AssemblyAI sentence timestamps and a paid-resubmission path; the fix now stores acceptance before sentence retrieval (LEARNINGS: “Persist paid acceptance before performing another HTTP request”). Native two-line layout closed BUGS74; the first candidate slice was signed and pushed as `c93d5e8`.
 Implementation `297e553` is signed/pushed. Three Groq jobs and two AssemblyAI paid POSTs were tested. Final build, all opt-ins, negative controls, whole-card ripple, signing and 0.4.0-to-0.4.1 upgrade passed; scoped Luna reviews were empty. Physical/full-accessibility limits remain in [the report](reports/2026-09-30-provider-reliability.md).
 CI initially missed the notification runtime grant (four real delivery-test failures); `2cdd6ee` applies the local setup; GitHub run `36846190794` passed. LEARNINGS: “Grant runtime permissions in every device gate that tests delivery.”
+
+## 2026-10-03 - Publish 0.4.1 and remove obsolete APKs
+
+The tested APK had remained local, leaving the owner installing 0.4.0. Published signed tag `v0.4.1` at `9de3509` and the APK as latest; verified its public download. Removed 15 obsolete APKs (2,087,611,391 bytes). LEARNINGS: “An Android release must be downloadable.”

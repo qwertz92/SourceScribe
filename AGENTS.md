@@ -34,6 +34,8 @@ A reviewer should not simply approve their own code. Findings need a file/locati
 
 ## Evidence and completion
 
+An owner-authorized Android release is complete only after its signed tag and signed APK are published on GitHub and an unauthenticated download matches the local APK's SHA-256. A local build or source push is not delivery. Confirm that the intended update is discoverable as the latest release before reporting it available.
+
 Record real commands and their results. Tests must never be weakened, deleted, or skipped just to turn green. Reproduce network or provider failures with controlled fixtures; document live tests separately. Report missing credentials or devices as `BLOCKED`/`NOT_RUN`, never as `PASS`.
 
 Add a matching regression test after every review finding. Before release, rerun all affected tests and run one final, independent review pass. P1 and P2 findings are fixed; only a P2 whose fix needs a design decision or costs far more than the defect is worth is recorded and put to the owner instead. P3 and P4 findings that take minutes are fixed on the spot; everything else goes into `docs/BUGS.md` with a priority and is reported to the owner. Only open P1 or P2 findings, or unmet acceptance criteria, block a release.
@@ -41,6 +43,8 @@ Add a matching regression test after every review finding. Before release, rerun
 ## Repository hygiene
 
 Version source code, tests, small approved fixtures, lock/version files, Room schemas, and documentation. Ignore keys, local SDK paths, signing files, private test data, audio downloads, and runtime logs. Run CI without real provider keys. Test helpers, cleartext HTTP for local fixtures, and demo providers must not be reachable in the personal release build. No persistent test backdoors.
+
+Keep one canonical local signed APK for the current release. Debug and androidTest APKs belong in their generated build directories, not a release archive. After the release and upgrade checks pass, remove obsolete local APK copies unless a named unfinished check still needs them; preserve the source tags, signing key and test receipts.
 
 Each project question has exactly one file, kept current rather than reset. `docs/STATUS.md` describes the current
 state only: what the app does today, phase-by-phase implementation and live-verification status, the release
