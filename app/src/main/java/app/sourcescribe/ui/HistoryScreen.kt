@@ -774,7 +774,9 @@ private fun StatusRow(job: JobRow, config: JobConfig?, attempts: List<AttemptRow
     // tallest, so a job that leaves the queue moves nothing under it either.
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         StatusChip(stringResource(stateChipLabel(job.state)), container, content)
-        ReservedText(
+        if (job.state in setOf(ExecutionState.FINISHED, ExecutionState.CANCELLED)) {
+            Text(outcome, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        } else ReservedText(
             when (reason) {
                 QueueReason.UNMETERED_CONNECTION -> unmetered
                 QueueReason.ANOTHER_JOB -> otherJob

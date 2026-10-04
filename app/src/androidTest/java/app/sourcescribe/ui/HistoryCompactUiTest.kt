@@ -8,6 +8,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import android.graphics.Rect
+import android.os.Build
+import androidx.compose.material3.Text
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
@@ -218,6 +222,49 @@ class HistoryCompactUiTest {
         assertTrue(shouldShowJobActions(completed.copy(outcome = Outcome.FAILED), open = false))
         assertTrue(shouldShowJobActions(completed.copy(state = ExecutionState.CANCELLED, outcome = Outcome.CANCELLED), open = false))
         assertTrue(shouldShowJobActions(completed.copy(state = ExecutionState.SUBMISSION_UNCERTAIN, outcome = Outcome.NONE), open = false))
+    }
+
+    @Test
+    fun finishedOutcomeUsesOnlyItsTextHeightAtBothFontScales() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val outcome = instrumentation.targetContext.getString(outcomeLabel(Outcome.SUCCESS))
+        val job = JobRow("completed", "source", "{}", 1_000L,
+            state = ExecutionState.FINISHED, outcome = Outcome.SUCCESS)
+        for (scale in SCALES) {
+            val expectedHeight = java.util.concurrent.atomic.AtomicInteger()
+            ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+                scenario.onActivity { activity -> activity.setContent {
+                    MaterialTheme {
+                        val density = LocalDensity.current.density
+                        CompositionLocalProvider(LocalDensity provides Density(density, scale)) {
+                            Column(Modifier.width(WIDTH)) {
+                                Text(outcome, Modifier.clearAndSetSemantics {}.onSizeChanged { expectedHeight.set(it.height) },
+                                    style = MaterialTheme.typography.bodySmall)
+                                JobCard(job, "Source", null, null, false, {}, emptyList(), emptyList(), emptyList(),
+                                    emptyList(), 10_000L, {}, {}, {}, {}, {})
+                            }
+                        }
+                    }
+                } }
+                val deadline = System.nanoTime() + TIMEOUT_NANOS
+                var height: Int? = null
+                do {
+                    if (Build.VERSION.SDK_INT >= 34) instrumentation.uiAutomation.clearCache()
+                    height = instrumentation.uiAutomation.rootInActiveWindow?.textBounds(outcome)?.height()
+                    if (height != null && expectedHeight.get() > 0) break
+                    Thread.sleep(POLL_MS)
+                } while (System.nanoTime() < deadline)
+                assertTrue("Font scale $scale: finished outcome reserves empty waiting-message lines " +
+                    "($height px instead of ${expectedHeight.get()} px)",
+                    height != null && expectedHeight.get() > 0 && kotlin.math.abs(height - expectedHeight.get()) <= 1)
+            }
+        }
+    }
+
+    private fun AccessibilityNodeInfo.textBounds(label: String): Rect? {
+        if (text?.toString() == label) return Rect().also(::getBoundsInScreen)
+        for (index in 0 until childCount) getChild(index)?.textBounds(label)?.let { return it }
+        return null
     }
 
     private fun artifact(id: String, branch: Branch, model: String? = null) = ArtifactRow(
