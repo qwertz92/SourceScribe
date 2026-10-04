@@ -1,6 +1,6 @@
 # Learnings for Resumption
 
-**As of 2026-09-16.** Failed attempts and fixes are in the
+**As of 2026-10-04.** Failed attempts and fixes are in the
 [2026-09-07 integration report](reports/2026-09-07-integration.md) and the
 [2026-09-08 preview report](reports/2026-09-08-preview.md); this file holds the reusable conclusions.
 
@@ -245,3 +245,14 @@ recorded so the investigation is not repeated.
   returned cached virtual nodes whose `refresh()` failed after scrolling. Clear UiAutomation's cache on API 34+
   and reacquire a valid node before acting; the installed SDK's API metadata places `clearCache()` at API 34.
   Contextual full-help navigation scrolls to its topic, so assert that destination rather than an offscreen search field.
+
+
+- **Bind result provenance to the artifact branch.** (4 October 2026) A configured fallback may differ from the branch that produced a result. Show the artifact's actual origin/provider/model and the source channel from its stored snapshot.
+- **Keep export names readable and collision-safe.** (4 October 2026) Build names from sanitized `Channel - Title`, add a numeric suffix only when the selected destination already contains that name, and never open an existing document for overwrite. Keep the returned document URI because a SAF provider may rename its new document.
+- **Persist phase spans using UTC plus monotonic elapsed time.** (4 October 2026) UTC wall time identifies when a span started; a monotonic clock measures elapsed duration. Nullable elapsed time marks an incomplete span. Legacy totals remain unknown, and app-observed timings cannot reveal provider computation.
+- **Verify the exact release artifact after any provenance rebuild.** (4 October 2026) If the APK embeds its source SHA, repeat the in-place upgrade check after the final rebuild so the tested and published APK are the same artifact.
+- **Use the active feedback surface after submission.** (4 October 2026) Success and error feedback must remain visible in the result viewer as well as its origin surface; a snackbar hidden behind a full-screen destination is not user-visible.
+- **Constrain dynamic native folder labels.** (4 October 2026) A long provider-returned folder name can expand an action row vertically. Cap its displayed lines and ellipsize, keeping folder actions reachable at narrow widths.
+- **Keep shared cache files independent of display names.** (4 October 2026) Store each shared artifact under its validated UUID and pass its readable filename as FileProvider display metadata. Same-title sibling artifacts must retain distinct URIs and unchanged contents.
+
+- **Reserve dynamic status height only for live jobs.** (4 October 2026) Completed and cancelled outcomes use their actual text height; longer queue reasons must not leave blank lines between the terminal status and result action. Verify both normal and 200% font scale.

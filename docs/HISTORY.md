@@ -70,6 +70,8 @@ CI initially missed the notification runtime grant (four real delivery-test fail
 
 The tested APK had remained local, leaving the owner installing 0.4.0. Published signed tag `v0.4.1` at `9de3509` and the APK as latest; verified its public download. Removed 15 obsolete APKs (2,087,611,391 bytes). LEARNINGS: “An Android release must be downloadable.”
 
-## 2026-10-04 — history and workflow candidate 0.4.2
+## 2026-10-04 — publish workflow update 0.4.2
 
-Compact completed cards, actual result provenance/channel, readable collision-safe exports, quick start, contextual help, native folder selection and durable times implemented. Four native Luna review stages fixed normal-flow defects; rare timing and share-wiring coverage limits remain in BUGS75/76. UI controls initially targeted removed cached nodes and an offscreen help search field; fresh-cache/topic checks pass and the expert draft-loss negative control now fails correctly. Lessons: [history and workflow](LEARNINGS.md#history-and-workflow-4-october-2026). BUGS71 closed by compact stable provider-status rows. Publication remains pending in the current verification report.
+Published v0.4.2 (`df32dede854355ac38f933c8cdb0a266c3ba0657`; APK `7b1fac241672c7bb16739d440069ea97edeffc6c6e03857e3c250c69d2690c26`, `147200333` bytes; `2026-10-04T05:57:01Z`); public download matched.
+Gates: core 234, lint 4 clean, app 291 plus 10 skips (all opt-ins separately exercised), extractor 55; upgrade and folder opening passed.
+Two live transcripts succeeded; six Luna review stages found no P1/P2. Device, TalkBack, OpenAI and other limits: [report](reports/2026-10-03-workflow-polish.md).

@@ -1,6 +1,6 @@
 # SourceScribe
 
-**As of:** 4 October 2026 · Published personal release 0.4.1; workflow update 0.4.2 under verification · known issues in
+**As of:** 2026-10-04T05:57:01Z · Published personal release 0.4.2 · known issues in
 [BUGS](docs/BUGS.md) · **Status:** Personal preview; full v1 acceptance not reached
 
 SourceScribe is a personal-use Android app for traceable transcripts. An explicitly entered YouTube source can be shared or pasted in; existing captions are archived, and audio can be transcribed through the chosen provider. Results stay internal at first and can be shared as a file through the Android share sheet. Summarization and fact-checking in German happen outside the app.
@@ -9,13 +9,9 @@ SourceScribe is a personal-use Android app for traceable transcripts. An explici
 
 The public repository is [qwertz92/SourceScribe](https://github.com/qwertz92/SourceScribe); its [releases page](https://github.com/qwertz92/SourceScribe/releases) is where signed, installable APKs are published.
 
-The latest published release includes its APK signed with the original project key, so it can update an existing
-installation without uninstalling. [Latest release](https://github.com/qwertz92/SourceScribe/releases/latest) ·
-[Try it](docs/TRY_PREVIEW.md) · [Workflow update evidence](docs/reports/2026-10-03-workflow-polish.md).
+The latest release is signed with the original project key and includes an installable APK: [download SourceScribe-0.4.2](https://github.com/qwertz92/SourceScribe/releases/download/v0.4.2/SourceScribe-0.4.2.apk). It updates an existing installation in place. Signed source `df32dede854355ac38f933c8cdb0a266c3ba0657`; APK SHA-256 `7b1fac241672c7bb16739d440069ea97edeffc6c6e03857e3c250c69d2690c26`, `147200333` bytes; published `2026-10-04T05:57:01Z`.
 
-Real Groq and AssemblyAI transcription have been verified on a short public source. OpenAI lacks a supplied key;
-a physical ARM64 phone and complete TalkBack navigation remain unverified. [STATUS](docs/STATUS.md) separates
-implemented features, fixture tests, live evidence and the published version.
+Version 0.4.2 passed one live Groq Turbo and one AssemblyAI `universal-3-5-pro` transcription on the exact 19-second public source; Groq returned no reported model name. OpenAI has no supplied key. A physical ARM64 phone and complete TalkBack navigation remain unverified. [STATUS](docs/STATUS.md) separates implemented features, fixture tests, live evidence and the published version.
 
 CI builds, tests, and lints, and runs the device tests of both modules on an emulator.
 

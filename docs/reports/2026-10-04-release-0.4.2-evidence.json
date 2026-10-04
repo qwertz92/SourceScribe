@@ -1,0 +1,665 @@
+{
+  "date": "2026-10-04",
+  "repository": "qwertz92/SourceScribe",
+  "host": "HomeBase / WSL with Android 17 API 37 x86_64 emulator-5556",
+  "version": "0.4.2",
+  "version_code": 5,
+  "source": {
+    "source_commit": "df32dede854355ac38f933c8cdb0a266c3ba0657",
+    "apk_path": ".local-tools/releases/SourceScribe-0.4.2.apk",
+    "apk_bytes": 147200333,
+    "apk_sha256": "7b1fac241672c7bb16739d440069ea97edeffc6c6e03857e3c250c69d2690c26",
+    "certificate_sha256": "19d1da9a8fe704082a531faed8a24d966c485aae581a7076dd4b4f66c11d3881",
+    "version_name": "0.4.2",
+    "version_code": 5,
+    "signature": "PASS",
+    "alignment_16k": "PASS",
+    "embedded_git_provenance": "PASS"
+  },
+  "publication": {
+    "result": "PASS",
+    "release_url": "https://github.com/qwertz92/SourceScribe/releases/tag/v0.4.2",
+    "download_url": "https://github.com/qwertz92/SourceScribe/releases/download/v0.4.2/SourceScribe-0.4.2.apk",
+    "tag": "v0.4.2",
+    "latest_tag": "v0.4.2",
+    "draft": false,
+    "prerelease": false,
+    "published_at": "2026-10-04T05:57:01Z",
+    "verified_at": "2026-10-04T05:59:21.245181+00:00",
+    "remote_source_sha": "df32dede854355ac38f933c8cdb0a266c3ba0657",
+    "remote_signed_tag_sha": "5c36120cf77c0e4361eaac028cf2a4b8dd355332",
+    "github_tag_signature_verified": true,
+    "asset_id": 609234993,
+    "asset_bytes": 147200333,
+    "github_asset_digest": "sha256:7b1fac241672c7bb16739d440069ea97edeffc6c6e03857e3c250c69d2690c26",
+    "unauthenticated_http_status": 200,
+    "downloaded_bytes": 147200333,
+    "download_sha256": "7b1fac241672c7bb16739d440069ea97edeffc6c6e03857e3c250c69d2690c26",
+    "authorization_header_sent": false,
+    "download_saved_as_duplicate_apk": false
+  },
+  "tests": {
+    "core": {
+      "tests": 234,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "app_normal": {
+      "passed": 291,
+      "failed": 0,
+      "ignored": 0,
+      "documented_optins": 10
+    },
+    "extractor_all_flags": {
+      "passed": 55,
+      "failed": 0,
+      "ignored": 0,
+      "documented_optins": 0
+    },
+    "strict_lint_issue_counts": {
+      "app-debug": 0,
+      "app-release": 0,
+      "extractor-debug": 0,
+      "extractor-release": 0
+    },
+    "documented_default_optins_exercised_separately": 10,
+    "non_provider_optin_and_additional_seed_receipts": [
+      {
+        "name": "workflow-process-1",
+        "success": true,
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "assumed": 0
+      },
+      {
+        "name": "workflow-process-2",
+        "success": true,
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "assumed": 0
+      },
+      {
+        "name": "workflow-process-import-1",
+        "success": true,
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "assumed": 0
+      },
+      {
+        "name": "workflow-process-import-2",
+        "success": true,
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "assumed": 0
+      },
+      {
+        "name": "workflow-engine-pinning",
+        "success": true,
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "assumed": 0
+      },
+      {
+        "name": "workflow-offline-positive",
+        "success": true,
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "assumed": 0
+      },
+      {
+        "name": "workflow-unmetered-wait",
+        "success": true,
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "assumed": 0
+      },
+      {
+        "name": "workflow-unmetered-resume",
+        "success": true,
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "assumed": 0
+      },
+      {
+        "name": "workflow-ui-fixture",
+        "success": true,
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "assumed": 0
+      }
+    ],
+    "providers": [
+      {
+        "provider": "groq",
+        "source_url": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+        "status": {
+          "live.error": "NONE",
+          "live.language": "en",
+          "live.outcome": "SUCCESS",
+          "live.phases": "RESOLVE>DOWNLOAD_AUDIO>PREPARE_AUDIO>PREPARE_AUDIO>SUBMIT>NORMALIZE>PERSIST",
+          "live.pollRequests": "0",
+          "live.provider": "GROQ",
+          "live.providerRequests": "1",
+          "live.reportedLanguages": "en",
+          "live.reportedModel": "NONE",
+          "live.requestedModel": "whisper-large-v3-turbo",
+          "live.segments": "4",
+          "live.sourceDurationMs": "19000",
+          "live.sourceId": "youtube:jNQXAC9IVRw",
+          "live.state": "FINISHED",
+          "live.transcriptChars": "197",
+          "live.transcriptPosts": "0",
+          "live.uploadRequests": "0",
+          "live.warnings": "NONE"
+        },
+        "test_duration_seconds": "34"
+      },
+      {
+        "provider": "assemblyai",
+        "source_url": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+        "status": {
+          "live.error": "NONE",
+          "live.language": "en",
+          "live.outcome": "SUCCESS",
+          "live.phases": "RESOLVE>DOWNLOAD_AUDIO>PREPARE_AUDIO>PREPARE_AUDIO>SUBMIT>RETRIEVE>NORMALIZE>PERSIST",
+          "live.pollRequests": "2",
+          "live.provider": "ASSEMBLYAI",
+          "live.providerRequests": "4",
+          "live.reportedLanguages": "en",
+          "live.reportedModel": "universal-3-5-pro",
+          "live.requestedModel": "universal-3-5-pro",
+          "live.segments": "3",
+          "live.sourceDurationMs": "19000",
+          "live.sourceId": "youtube:jNQXAC9IVRw",
+          "live.state": "FINISHED",
+          "live.transcriptChars": "193",
+          "live.transcriptPosts": "1",
+          "live.uploadRequests": "1",
+          "live.warnings": "NONE"
+        },
+        "test_duration_seconds": "64.819"
+      }
+    ],
+    "build": "9m51s / 257 tasks; source-stamped release rebuild 2m02s / 91 tasks; no compiler warnings",
+    "test_controls": {
+      "distinct_automated_android_cases": 12,
+      "final_terminal_status_control": {
+        "result": "PASS",
+        "test": "HistoryCompactUiTest#finishedOutcomeUsesOnlyItsTextHeightAtBothFontScales",
+        "old_apk_path": ".local-tools/workflow-app-control/terminal-status-old-app-debug.apk",
+        "old_apk_bytes": 158466103,
+        "old_apk_sha256": "be0dbc3ca67dabc355e8916313240c4bfdd936954f9ca6ee80c0cf648a59547c",
+        "negative": {
+          "failed": 1,
+          "font_scale": 2.0,
+          "actual_height_px": 252,
+          "required_height_px": 84
+        },
+        "positive": {
+          "passed": 1,
+          "font_scales": [
+            1.0,
+            2.0
+          ]
+        },
+        "enforcement": "Single StatusRow terminal-text branch; old APK has queue-text reservation for terminal states."
+      },
+      "review_round_core_control_failures": 4,
+      "manual_folder_label_control": {
+        "before_px": 212,
+        "after_px": 53,
+        "label_chars": 173
+      },
+      "final_signed_german_terminal_card": {
+        "result": "PASS",
+        "final_source": "df32dede854355ac38f933c8cdb0a266c3ba0657",
+        "language": "de",
+        "font_scale": 1.0,
+        "terminal_outcome_text_height_px": 42,
+        "previous_source385_height_px": 84,
+        "collapsed_job_actions_absent": true,
+        "actual_origin": "YouTube-Untertitel",
+        "total": "0:07",
+        "note": "Measurement is scoped to the latest job card, excluding the equally named success filter chip."
+      }
+    }
+  },
+  "review": {
+    "runtime_model": "gpt-6-luna",
+    "route": "native agent spawn and native follow-up turns",
+    "product_review_stages": 6,
+    "separate_ksp_metadata_review": true,
+    "reviewers": [
+      {
+        "task": "/root/dependency_release_check",
+        "session_id": "01a103c1-c53f-7e40-9aea-4ad5a04eba17",
+        "model": "gpt-6-luna",
+        "effort": "high"
+      },
+      {
+        "task": "/root/review_export_names",
+        "session_id": "01a103ac-4bfa-7063-bb3d-8850a200a6f6",
+        "model": "gpt-6-luna",
+        "effort": "xhigh"
+      },
+      {
+        "task": "/root/review_history",
+        "session_id": "01a103b5-a53b-7561-a725-c67c7de0dcdc",
+        "model": "gpt-6-luna",
+        "effort": "xhigh"
+      },
+      {
+        "task": "/root/review_quick_folder",
+        "session_id": "01a103b2-d180-7b73-8254-ef6e68506aec",
+        "model": "gpt-6-luna",
+        "effort": "xhigh"
+      },
+      {
+        "task": "/root/review_setup_help",
+        "session_id": "01a103b3-9048-79b3-9058-76b06862b34d",
+        "model": "gpt-6-luna",
+        "effort": "xhigh"
+      },
+      {
+        "task": "/root/review_timing",
+        "session_id": "01a103c1-2e9b-78f3-8a89-f74c8e3f8e36",
+        "model": "gpt-6-luna",
+        "effort": "max"
+      }
+    ],
+    "final_scoped_remaining_p1_p2": 0,
+    "stop_rule": "Small P3 fixes received their checks; no new round for the one-line folder/terminal-height corrections. Larger P3/P4 work is documented under the current owner/repository stop rule.",
+    "deferred": [
+      "BUGS75 P3: rare late body-writer cancellation may leave upload timing explicitly incomplete",
+      "BUGS76 P4: dual share-intent boundary needs a production intent regression despite currently verified revision wiring"
+    ]
+  },
+  "upgrade": {
+    "package": {
+      "versionCode": "5",
+      "versionName": "0.4.2",
+      "appId": "10235",
+      "firstInstallTime": "2026-10-01 11:35:15",
+      "ceDataInode": "581642",
+      "deDataInode": "393813"
+    },
+    "viewer_text_sha256": "d610e92232d258dac12ff987d007c9eb8ea0309d62dbd24b44e4491306273d58",
+    "hash_method": "sha256 of newline-joined visible app text",
+    "visible_text_nodes": 18,
+    "visible_text_chars": 341,
+    "transcript_logged": false,
+    "existing_history_entries": 2,
+    "recorded_total": "0:07 (including waiting)",
+    "result": "PASS",
+    "final_source": "df32dede854355ac38f933c8cdb0a266c3ba0657",
+    "final_apk_sha256": "7b1fac241672c7bb16739d440069ea97edeffc6c6e03857e3c250c69d2690c26",
+    "chain": "0.4.1 -> candidate13f 0.4.2 -> candidate385 0.4.2 -> finaldf32 0.4.2",
+    "settings": {
+      "language": "English",
+      "appearance": "Dark",
+      "export_folder": "SourceScribe-0.4.2-test",
+      "open_folders_with": "Choose an app each time",
+      "font_scale": 1.0
+    }
+  },
+  "quick_start_and_persistent_times": {
+    "source": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+    "acquisition_mode": "YOUTUBE_THEN_STT",
+    "selected_provider_before_start": "AssemblyAI",
+    "configured_credential_available": false,
+    "technical_configuration_label": "STT configuration: No provider yet",
+    "actual_origin": "YouTube captions",
+    "channel": "jawed",
+    "start": "Start with settings after ACTION_SEND",
+    "input_cleared_after_restart": true,
+    "total_before_and_after_restart": "0:07 (including waiting)",
+    "phase_labels_before_and_after_restart": [
+      "Resolve source \u00b7 0:05",
+      "Retrieve captions \u00b7 0:01",
+      "Process result \u00b7 3 ms",
+      "Save internally \u00b7 13 ms"
+    ],
+    "timings_persisted": true,
+    "automatic_markdown_export": "saved",
+    "result": "PASS",
+    "notes": [
+      "Provider selection without a configured production credential is displayed as No provider yet in technical details. Caption acquisition did not require an STT request.",
+      "Assertions use separate viewports for the card total, source input, and lower phase rows. Two initial helper assertions stopped on offscreen labels; the labels were verified after scrolling."
+    ]
+  },
+  "native_folder_opening": {
+    "result": "PASS",
+    "via": "history Open export folders",
+    "handler": "com.google.android.documentsui",
+    "folder": "Downloads/SourceScribe-0.4.2-test",
+    "files": [
+      "jawed - Me_at_the_zoo.md"
+    ],
+    "one_installed_folder_handler": true,
+    "both_choose_app_and_android_default": "PASS",
+    "multiple_file_managers": "NOT_RUN; only Android Files is installed"
+  },
+  "readable_export_collision": {
+    "result": "PASS",
+    "actual_export_feedback_visible_with_viewer": true,
+    "numeric_collision_without_overwrite": true,
+    "files": [
+      {
+        "name": "jawed - Me_at_the_zoo.md",
+        "bytes": 3390,
+        "mtime_unix": 1791086969,
+        "sha256": "8aa8e812b51fcda5e75db9c3ce96f6ca4d1efdab9960eb710ff19da6d897b020"
+      },
+      {
+        "name": "jawed - Me_at_the_zoo_1.md",
+        "bytes": 3390,
+        "mtime_unix": 1791090679,
+        "sha256": "8aa8e812b51fcda5e75db9c3ce96f6ca4d1efdab9960eb710ff19da6d897b020"
+      }
+    ],
+    "folder": "Downloads/SourceScribe-0.4.2-test",
+    "provider_requests": 0
+  },
+  "retained_real_export_baseline": {
+    "files": [
+      {
+        "path": "/sdcard/Download/SourceScribe-0.4.2-test/jawed - Me_at_the_zoo.md",
+        "bytes": 3390,
+        "modified_unix": 1791086969,
+        "sha256": "8aa8e812b51fcda5e75db9c3ce96f6ca4d1efdab9960eb710ff19da6d897b020"
+      },
+      {
+        "path": "/sdcard/Download/SourceScribe-0.4.2-test/jawed - Me_at_the_zoo_1.md",
+        "bytes": 3390,
+        "modified_unix": 1791090679,
+        "sha256": "8aa8e812b51fcda5e75db9c3ce96f6ca4d1efdab9960eb710ff19da6d897b020"
+      },
+      {
+        "path": "/sdcard/Download/SourceScribe-0.4.2-test/jawed - Me_at_the_zoo_2.md",
+        "bytes": 3383,
+        "modified_unix": 1791090897,
+        "sha256": "ee9960af06589b77db4e4f7cf98efb9b4fdc26af0559006cd0cef9a3312ef83e"
+      }
+    ],
+    "retention_reason": "Tiny real caption exports and persisted SAF grant are retained as a concrete future upgrade/export baseline, alongside the two real production jobs."
+  },
+  "cleanup": {
+    "result": "PASS",
+    "removed": [
+      {
+        "path": "app/build",
+        "regular_file_bytes": 1358560143,
+        "regular_files": 7627,
+        "reason": "Own reproducible generated build/control output"
+      },
+      {
+        "path": "extractor/build",
+        "regular_file_bytes": 605594031,
+        "regular_files": 2169,
+        "reason": "Own reproducible generated build/control output"
+      },
+      {
+        "path": "core/build",
+        "regular_file_bytes": 10859789,
+        "regular_files": 1944,
+        "reason": "Own reproducible generated build/control output"
+      },
+      {
+        "path": ".local-tools/workflow-app-control",
+        "regular_file_bytes": 475028469,
+        "regular_files": 9,
+        "reason": "Own reproducible generated build/control output"
+      },
+      {
+        "path": ".local-tools/releases/SourceScribe-0.4.1.apk",
+        "regular_file_bytes": 147040589,
+        "regular_files": 1,
+        "reason": "Obsolete published APK copy"
+      },
+      {
+        "path": "/tmp/sourcescribe-2026-10-04-5556-source.xml",
+        "regular_file_bytes": 28974,
+        "regular_files": 1,
+        "reason": "Own temporary helper, patch or proven synthetic fixture"
+      },
+      {
+        "path": "/tmp/sourcescribe-feedback-production.patch",
+        "regular_file_bytes": 16176,
+        "regular_files": 1,
+        "reason": "Own temporary helper, patch or proven synthetic fixture"
+      },
+      {
+        "path": "/tmp/sourcescribe-final-docs.patch",
+        "regular_file_bytes": 40053,
+        "regular_files": 1,
+        "reason": "Own temporary helper, patch or proven synthetic fixture"
+      },
+      {
+        "path": "/tmp/sourcescribe-final-docs-resolved.patch",
+        "regular_file_bytes": 40567,
+        "regular_files": 1,
+        "reason": "Own temporary helper, patch or proven synthetic fixture"
+      },
+      {
+        "path": "/tmp/sourcescribe-folder-buttons.patch",
+        "regular_file_bytes": 1827,
+        "regular_files": 1,
+        "reason": "Own temporary helper, patch or proven synthetic fixture"
+      },
+      {
+        "path": "/tmp/sourcescribe-ksp-2.3.12.patch",
+        "regular_file_bytes": 6056,
+        "regular_files": 1,
+        "reason": "Own temporary helper, patch or proven synthetic fixture"
+      },
+      {
+        "path": "/tmp/sourcescribe-release-0.4.2.md",
+        "regular_file_bytes": 1624,
+        "regular_files": 1,
+        "reason": "Own temporary helper, patch or proven synthetic fixture"
+      },
+      {
+        "path": "/tmp/sourcescribe-share-collision-corrected-test.patch",
+        "regular_file_bytes": 7615,
+        "regular_files": 1,
+        "reason": "Own temporary helper, patch or proven synthetic fixture"
+      },
+      {
+        "path": "/tmp/sourcescribe-share-collision-production.patch",
+        "regular_file_bytes": 1132,
+        "regular_files": 1,
+        "reason": "Own temporary helper, patch or proven synthetic fixture"
+      },
+      {
+        "path": "/tmp/sourcescribe-share-collision-test.patch",
+        "regular_file_bytes": 7285,
+        "regular_files": 1,
+        "reason": "Own temporary helper, patch or proven synthetic fixture"
+      },
+      {
+        "path": "/tmp/sourcescribe-share-collision.patch",
+        "regular_file_bytes": 8417,
+        "regular_files": 1,
+        "reason": "Own temporary helper, patch or proven synthetic fixture"
+      },
+      {
+        "path": "/tmp/sourcescribe_app_control.py",
+        "regular_file_bytes": 3740,
+        "regular_files": 1,
+        "reason": "Own temporary helper, patch or proven synthetic fixture"
+      },
+      {
+        "path": "/tmp/sourcescribe_device_gates.py",
+        "regular_file_bytes": 6305,
+        "regular_files": 1,
+        "reason": "Own temporary helper, patch or proven synthetic fixture"
+      },
+      {
+        "path": "/tmp/sourcescribe_feedback_gates.py",
+        "regular_file_bytes": 1458,
+        "regular_files": 1,
+        "reason": "Own temporary helper, patch or proven synthetic fixture"
+      },
+      {
+        "path": "/tmp/sourcescribe_long_folder.txt",
+        "regular_file_bytes": 173,
+        "regular_files": 1,
+        "reason": "Own temporary helper, patch or proven synthetic fixture"
+      },
+      {
+        "path": "/tmp/sourcescribe_negative_gates.py",
+        "regular_file_bytes": 1619,
+        "regular_files": 1,
+        "reason": "Own temporary helper, patch or proven synthetic fixture"
+      },
+      {
+        "path": "/tmp/sourcescribe_ui_5556.py",
+        "regular_file_bytes": 1106,
+        "regular_files": 1,
+        "reason": "Own temporary helper, patch or proven synthetic fixture"
+      },
+      {
+        "path": "/tmp/sourcescribe_terminal_gates.py",
+        "regular_file_bytes": 1166,
+        "regular_files": 1,
+        "reason": "Own temporary helper, patch or proven synthetic fixture"
+      },
+      {
+        "path": "/tmp/sourcescribe_final_upgrade.py",
+        "regular_file_bytes": 3451,
+        "regular_files": 1,
+        "reason": "Own temporary helper, patch or proven synthetic fixture"
+      },
+      {
+        "path": "/tmp/sourcescribe-assembly10704540782646588816.wav",
+        "regular_file_bytes": 5,
+        "regular_files": 1,
+        "reason": "Own temporary helper, patch or proven synthetic fixture"
+      },
+      {
+        "path": "/tmp/__pycache__/sourcescribe_feedback_gates.cpython-314.pyc",
+        "regular_file_bytes": 2574,
+        "regular_files": 1,
+        "reason": "Own temporary helper, patch or proven synthetic fixture"
+      },
+      {
+        "path": "/tmp/__pycache__/sourcescribe_device_gates.cpython-314.pyc",
+        "regular_file_bytes": 7055,
+        "regular_files": 1,
+        "reason": "Own temporary helper, patch or proven synthetic fixture"
+      }
+    ],
+    "regular_file_bytes_removed": 2597271399,
+    "kept": [
+      ".local-tools/releases/SourceScribe-0.4.2.apk",
+      ".local-tools/build-reports",
+      "Android SDK/Gradle/dependency caches",
+      "original release signing key outside repository",
+      "Upgrade10 production app with two real caption jobs and three tiny caption exports"
+    ],
+    "retention_reason": "Current public APK, reproducible-build tools, test receipts, and concrete future upgrade/SAF-grant baseline.",
+    "absence_verified": true
+  },
+  "device_cleanup": {
+    "result": "PASS",
+    "removed_packages": [
+      {
+        "package": "app.sourcescribe.debug.test",
+        "apk_bytes": 3686962,
+        "app_data_kib_on_disk": 136,
+        "removed": true
+      },
+      {
+        "package": "app.sourcescribe.debug",
+        "apk_bytes": 158466431,
+        "app_data_kib_on_disk": 163312,
+        "removed": true
+      },
+      {
+        "package": "app.sourcescribe.extractor.test",
+        "apk_bytes": 128500768,
+        "app_data_kib_on_disk": 157832,
+        "removed": true
+      }
+    ],
+    "removed_ui_dump_files": [
+      "/sdcard/sourcescribe-agent-window.xml",
+      "/sdcard/sourcescribe-agent-ime.xml",
+      "/sdcard/sourcescribe-agent-collapse.xml"
+    ],
+    "retained_production": "app.sourcescribe",
+    "retained_history_entries": 2,
+    "retained_real_export_files": 3,
+    "reason": "Owned fixtures, provider-test credentials and generated development/test apps; production upgrade baseline retained."
+  },
+  "empty_folder_fixture_cleanup": {
+    "removed": {
+      "path": "/sdcard/Download/SourceScribe-0.4.2-test/SourceScribe-layout-long-folder-name-long-folder-name-long-folder-name-long-folder-name-long-folder-name-long-folder-name-long-folder-name-long-folder-name-long-folder-name-",
+      "regular_file_bytes": 0
+    },
+    "reason": "Empty long-folder-name UI fixture; manual negative/positive geometry receipts secured.",
+    "production_folder_preference_restored": "Choose an app each time"
+  },
+  "superseded_unpublished_candidate_artifacts": [
+    {
+      "path": ".local-tools/releases/SourceScribe-0.4.2.apk",
+      "bytes": 147196237,
+      "source": "13f9493596f47e8c87b752eda41764eb14ec40bf",
+      "reason": "Unpublished own candidate replaced by final committed-source build; source and signing key retained",
+      "removed": true
+    },
+    {
+      "path": ".local-tools/releases/SourceScribe-0.4.2.apk",
+      "bytes": 147200333,
+      "sha256": "09c845a01c8dd6a5f8f720a31e05e4affb66c2807a782e875715e77d319af323",
+      "reason": "Unpublished source385 candidate superseded after terminal-status whitespace correction; upgrade and negative controls are secured."
+    }
+  ],
+  "local_apks_remaining": [
+    "./.local-tools/releases/SourceScribe-0.4.2.apk"
+  ],
+  "limits": [
+    "Physical ARM64 phone NOT_RUN",
+    "Full TalkBack focus/navigation NOT_RUN",
+    "OpenAI live transcription NOT_RUN: no supplied key",
+    "Solid Explorer / multiple folder-handler chooser NOT_RUN: only DocumentsUI installed",
+    "Manual fresh-clone BUILD.md walkthrough NOT_RUN",
+    "Owner exact URL/model failure cannot be reproduced without exact inputs"
+  ],
+  "processes": {
+    "own_build_and_instrumentation_commands_finished": true,
+    "own_emulator_5556_stopped": true,
+    "owner_emulator_5554_untouched": true
+  },
+  "ci": {
+    "url": "https://github.com/qwertz92/SourceScribe/actions/runs/37180877887",
+    "status": "completed",
+    "conclusion": "success",
+    "headSha": "df32dede854355ac38f933c8cdb0a266c3ba0657",
+    "startedAt": "2026-10-04T05:47:04Z",
+    "updatedAt": "2026-10-04T06:03:50Z",
+    "jobs": [
+      {
+        "name": "build",
+        "conclusion": "success"
+      }
+    ]
+  },
+  "repository_checks": {
+    "files_read": 266,
+    "binary_files_skipped": 21,
+    "unreadable": 0,
+    "executable_scripts_checked": 6,
+    "self_test": "PASS"
+  }
+}

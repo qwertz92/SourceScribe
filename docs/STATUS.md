@@ -1,20 +1,6 @@
 # Project Status
 
-**As of 2026-10-03.** Version `0.4.1` (versionCode 4) is published as the latest GitHub release with its signed
-[APK](https://github.com/qwertz92/SourceScribe/releases/download/v0.4.1/SourceScribe-0.4.1.apk). Signed tag
-`v0.4.1` points to `9de3509`; the tested app implementation is `297e553`, followed only by CI setup and
-verification documentation. The release gates below passed; full v1 acceptance is not reached yet.
-The owner's history and workflow improvements are implemented in candidate 0.4.2 (versionCode 5): compact
-finished cards, actual provenance/channel, readable export names, quick start, contextual help, native folder
-selection and durable measured times. Local gates passed: 234 core tests, four zero-issue lint reports, 287 app
-tests, 55 extractor tests, four process/permission stages, engine pinning and three network stages. Ten default
-app opt-ins were separately enabled where applicable; the two real-provider runs and synthetic UI helper remain
-pending. KSP upgrade verification, final screenshots, signed upgrade and publication also remain pending. See the
-[current verification report](reports/2026-10-03-workflow-polish.md). These features are not in published 0.4.1 yet.
-The published app source is in public repo [qwertz92/SourceScribe](https://github.com/qwertz92/SourceScribe); this
-file describes the current state only; the dated log of how it got here, including 23 rounds of independent
-adversarial review over 0.1.0/0.2.0 and the 0.4.0 work, is in [HISTORY.md](HISTORY.md), and the lessons that work
-produced are in [LEARNINGS.md](LEARNINGS.md). Open items are in [BUGS.md](BUGS.md), the only list of them.
+**As of 2026-10-04T05:57:01Z.** Version `0.4.2` (versionCode 5) is the latest GitHub release. Signed tag `v0.4.2` points to `df32dede854355ac38f933c8cdb0a266c3ba0657`; its signed APK has SHA-256 `7b1fac241672c7bb16739d440069ea97edeffc6c6e03857e3c250c69d2690c26` and is `147200333` bytes. [Download the APK](https://github.com/qwertz92/SourceScribe/releases/download/v0.4.2/SourceScribe-0.4.2.apk). Full v1 acceptance is not reached. Version 0.4.2 adds compact completed cards, actual result provenance/channel, readable collision-safe export names, quick start, contextual help, native folder opening and durable app-observed timing. The [workflow report](reports/2026-10-03-workflow-polish.md) records evidence and limits. Open issues are in [BUGS.md](BUGS.md), the only issue list.
 
 ## What it does today
 
@@ -42,8 +28,8 @@ its own. Full requirements: [PRODUCT.md](PRODUCT.md) (SS-01 to SS-12). Phase def
 | P2 First STT pipeline | Groq, local import, audio prep/chunking, credentials, submission limits | Live Groq transcription succeeded; one default-v3 rendition failed during free extraction before any provider call. The owner's unspecified source/model failure remains unreproduced. |
 | P3 Full acquisition | AssemblyAI, OpenAI, all four modes, `BOTH` partial-failure handling, language/tracks/options/presets | Live AssemblyAI verification stored a complete post-fix result after the initial run exposed missing default sentence timestamps. OpenAI has no supplied key. |
 | P4 Reliability | Queue/limits, recovery, unsafe submissions, export repair, update failures, source length taken from the source itself | Live-verified: process/permission boundaries, reboot recovery with a provider fixture, a signed engine update plus rollback, concurrent fixture jobs, and waiting/resume behavior. The specific interruption when a running job loses its unmetered network remains open under BUGS73. |
-| P5 UX and delivery | German/English, stable history cards and actions, measured transfer progress, quiet notifications, viewer/export, signing path | Normal instrumentation, all separately enabled opt-ins, full negative controls, visual whole-card ripple, release signing and the in-place 0.4.0-to-0.4.1 upgrade passed. Full TalkBack operation remains unverified. |
-| P6 Acceptance | Integrated regressions; confirmed P1/P2 findings in the changed provider/history/recovery/notification scopes fixed | Core tests, four lint reports and final scoped GPT-6 Luna reviews passed. Full acceptance remains open for physical ARM64, full TalkBack, a fresh-clone build, OpenAI (no key), and the owner's unspecified URL/model failure. Detailed evidence and coverage limits: [provider reliability report](reports/2026-09-30-provider-reliability.md). |
+| P5 UX and delivery | German/English, compact completed cards, actual provenance/channel, readable exports, quick start, contextual help, folder opening and durable timings | App normal suite: 291 passed, 10 documented opt-in skips; all ten opt-in cases ran separately. In-place upgrade preserved the job, transcript hash, settings, app ID and data inodes. Folder opening succeeded in both chooser/default settings on the API 37 emulator. Physical ARM64 and full TalkBack remain unverified. |
+| P6 Acceptance | Integrated regressions; demonstrated P1/P2 findings in the changed workflow scope fixed | Core: 234 passed; four lint reports: zero issues; app: 291 passed and 10 documented skips; extractor: 55 passed, zero failures/skips. Six native GPT-6 Luna review stages found no remaining P1/P2 in scope; an independent KSP metadata review also completed. Full acceptance remains open for physical ARM64, full TalkBack, fresh-clone build, OpenAI (no key), multiple-folder-handler chooser behavior, and the owner's unspecified URL/model failure. See the [workflow report](reports/2026-10-03-workflow-polish.md). |
 
 Of the 20 items from the owner's 2026-09-10 device test, 18 are implemented and verified on-device or by test; item 1 (result-view scrolling) is unreproduced and tracked in [BUGS.md](BUGS.md); item 2 (button spacing) was set
 aside on 16 September 2026 because the owner could not recall what was meant. The owner's second device test, of preview 0.2.0 on 15-16 September 2026, added a P1
@@ -52,7 +38,9 @@ aside on 16 September 2026 because the owner could not recall what was meant. Th
 
 ## Releases
 
-**0.4.1** — published 3 October 2026 as [the latest GitHub release](https://github.com/qwertz92/SourceScribe/releases/tag/v0.4.1), signed tag `v0.4.1` at `9de3509`; version `0.4.1`, versionCode 4; signed/pushed implementation `297e553` (first slice `c93d5e8`). Local signed APK: `.local-tools/releases/SourceScribe-0.4.1.apk`, 147,040,589 bytes, SHA-256 `a344994e3638494a1edfc96e968dabd5898d06c6662589beb34c3e4b42e72e9c`; signature and 16 KiB alignment verified with the existing release certificate. An unauthenticated public download returned HTTP 200 and matched both the local SHA-256 and GitHub asset digest. Fifteen obsolete APKs (2,087,611,391 bytes) were removed; only the current canonical signed APK remains locally. Core: 231 passed; all four lint reports: zero issues; normal app instrumentation: 260 passed, 11 documented opt-in skips, zero failures. All app opt-in flows were separately exercised; extractor: 55 passed, zero skips. Three Groq jobs and two paid AssemblyAI POSTs were tested. Signed 0.4.0-to-0.4.1 upgrade preserved the real caption job, all six displayed passages, language and appearance. Independent GitHub run `36846190794` passed on CI setup fix `2cdd6ee`; its normal suites retain documented opt-in skips, all exercised separately locally. Evidence and coverage boundaries: [provider reliability report](reports/2026-09-30-provider-reliability.md), [structured receipt](reports/2026-10-01-candidate-0.4.1-evidence.json).
+**0.4.2** — published 2026-10-04T05:57:01Z, signed tag `v0.4.2` at `df32dede854355ac38f933c8cdb0a266c3ba0657`; versionCode 5. Signed APK `.local-tools/releases/SourceScribe-0.4.2.apk`, `147200333` bytes, SHA-256 `7b1fac241672c7bb16739d440069ea97edeffc6c6e03857e3c250c69d2690c26`. An unauthenticated GitHub download matched the local APK SHA-256. The signed 0.4.1-to-0.4.2 upgrade retained the completed job, transcript text hash, settings, app ID and data inodes. Release gates: 234 core passed; four lint reports zero issues; app 291 passed with 10 opt-in skips (all ten exercised separately); extractor 55 passed; four process stages, engine pinning, offline/network-resume and the UI fixture passed; one live Groq and one live AssemblyAI transcript succeeded. See the [workflow report](reports/2026-10-03-workflow-polish.md) for exact scope and limitations.
+
+**0.4.1** — published 3 October 2026 as [a GitHub release](https://github.com/qwertz92/SourceScribe/releases/tag/v0.4.1), signed tag `v0.4.1` at `9de3509`; version `0.4.1`, versionCode 4; signed/pushed implementation `297e553` (first slice `c93d5e8`). Local signed APK: `.local-tools/releases/SourceScribe-0.4.1.apk`, 147,040,589 bytes, SHA-256 `a344994e3638494a1edfc96e968dabd5898d06c6662589beb34c3e4b42e72e9c`; signature and 16 KiB alignment verified with the existing release certificate. An unauthenticated public download returned HTTP 200 and matched both the local SHA-256 and GitHub asset digest. At that publication, fifteen obsolete APKs (2,087,611,391 bytes) were removed and the 0.4.1 signed APK was the canonical local artifact. Core: 231 passed; all four lint reports: zero issues; normal app instrumentation: 260 passed, 11 documented opt-in skips, zero failures. All app opt-in flows were separately exercised; extractor: 55 passed, zero skips. Three Groq jobs and two paid AssemblyAI POSTs were tested. Signed 0.4.0-to-0.4.1 upgrade preserved the real caption job, all six displayed passages, language and appearance. Independent GitHub run `36846190794` passed on CI setup fix `2cdd6ee`; its normal suites retain documented opt-in skips, all exercised separately locally. Evidence and coverage boundaries: [provider reliability report](reports/2026-09-30-provider-reliability.md), [structured receipt](reports/2026-10-01-candidate-0.4.1-evidence.json).
 
 **0.4.0** — built and verified 16 September 2026 at commit `f7dd7d2`, published 18 September 2026. Version 0.4.0, versionCode 3. Answers the owner's 0.2.0 phone test
 (the P1 and 15 further points) and closes BUGS items 58 and 59. Historical unsigned 0.4.0 build (local copy removed 3 October 2026):
@@ -77,17 +65,8 @@ Signed with the 0.1.0 release key and attached to the GitHub release: 146,688,33
 release APK: 147,376,546 bytes, SHA-256 `410b654fd08bdb2b7f8142dd88f440b7f49ffe123e363dd3607582b9e855c20a`. Full
 evidence: [2026-09-08 preview report](reports/2026-09-08-preview.md).
 
-## Verified gates for published 0.4.0 (2026-09-16, commit `f7dd7d2`)
 
-- `215` JVM tests in `core`, 0 failures.
-- `app` instrumentation on `emulator-5556`: 239 run, 230 passed, 0 failed, 9 skipped as opt-in (listed under Skipped), 22:29 to 22:31.
-- `extractor` instrumentation on `emulator-5556`: 55 run, 51 passed, 0 failed, 4 skipped as opt-in and run separately right after with their URLs (1 + 1 + 2 + 1 tests, all passed).
-- The one opt-in live test that spends money, `LiveGroqTranscriptionTest`: run once, PASS: one request, outcome SUCCESS, 197 characters in 4 segments, language en.
-- All 4 lint reports (`app` and `extractor`, debug and release): `PASS`.
-- `tools/check-repository.py`, including its self-test: `PASS (237 files read, 5 scripts checked for their executable bit, no issue)`.
-- CI run `35146671787` on commit `7868497`: `PASS`.
-- Upgrade test, an installed 0.1.0 or 0.2.0-preview.1 updated in place to 0.4.0: Verified on 16 September 2026 on a fresh emulator (Pixel 10, Android 17, the same system image as the test device, started as AVD `Upgrade10` at port 5556 because the usual AVD had no room for a second 147 MB install): a 0.1.0-preview.1 and a 0.2.0-preview.1 install, each with one finished captions job of the 19-second clip, were updated in place to the signed 0.4.0 with `adb install -r`; after the update the job, its stored transcript and the settings were still there and the crash log stayed empty.
-- Independent review rounds over the 0.4.0 work: round 1 (Sonnet, read-only, over the sixteen 0.4.0 commits `f18937f` to `f22389c`): 0 P1, 2 P2, 3 P3, 1 P4; all five fixed in `46d92e3`, `d0c55fb`, `c832a9c`, `0d1953d` and `75af4f3`, each with its test seen failing first, plus BUGS item 60 closed in `96b9588` and item 63 by the new `JobCardLayoutTest`; the round's other P3, progress that goes back after a retried upload, is recorded as deliberate in LEARNINGS, round 2 (Sonnet, read-only, over the seven fix commits `46d92e3` to `f7dd7d2`): 0 P1, 1 reported P2 that verification re-rated P3 because it needs two engine switches during one job's life (BUGS item 72), 2 further P3 (items 73 and 74, recorded), 1 overstated KDoc corrected in `7868497`; no code changed, so no third round.
+Independent GitHub Actions run [`37180877887`](https://github.com/qwertz92/SourceScribe/actions/runs/37180877887) passed on the released source `df32ded`. The [structured evidence](reports/2026-10-04-release-0.4.2-evidence.json) includes public download, gate, upgrade and cleanup receipts.
 
 ## Running the test gates correctly
 
@@ -111,14 +90,17 @@ Commands and details:
 `emulator-5556` is the agent device; `emulator-5554` belongs to the owner and agents do not touch it. Device tests
 run on Android 17 (API 37); on 14 September 2026 the owner decided that older Android versions get no separate run.
 
-## Remaining gates and blockers for 0.4.1
+## Remaining gates and blockers after 0.4.2
 
-| Blocked | Why | What would unblock it |
+| Open | Evidence or blocker | What would close it |
 |---|---|---|
-| Physical ARM64 device | All device coverage ran on x86_64 emulators only. | The owner installs the release APK on the owner's phone and repeats the main flows. |
-| OpenAI live transcription | No key was supplied. | Owner supplies a key and authorizes a live call. |
-| Full TalkBack operation | Semantics and dialog activation are tested, but full focus navigation has no suitable real-input automation. | A human tester, or suitable real-input automation, walking all main screens with TalkBack on. |
-| Fresh-clone build | Never run on a second machine or a clean Linux/WSL system without existing project caches. | Run BUILD.md's fresh-clone steps on such a system. |
+| Physical ARM64 device | Device checks ran on x86_64/API 37 emulators. | Run the primary flows on the owner's ARM64 phone. |
+| Full TalkBack operation | Accessibility semantics and UI actions are covered, but full focus navigation has not been completed. | Walk all main screens with TalkBack on a real device. |
+| OpenAI live transcription | No OpenAI key is available. | Supply a key and authorize one live request. |
+| Fresh-clone build | No clean second-machine build has been run. | Follow BUILD.md from a fresh checkout. |
+| Several folder handlers | Android DocumentsUI opened the selected folder in both setting branches; only one compatible handler was installed. | Verify chooser selection with multiple installed folder-capable apps. |
+| Owner's source/model failure | The exact URL/model combination was not supplied. | Reproduce with the exact inputs. |
+
 
 ## Local environment
 
@@ -136,6 +118,6 @@ locations (no password values). Details and the full history of environment find
 ## Open issues and evidence
 
 Known open issues, with impact, priority, location, and evidence, are tracked in the single list in
-[BUGS.md](BUGS.md). The 0.4.0 release ledger recorded no P1; final scoped GPT-6 Luna reviews of the 0.4.1 changes were empty; the older issue list is not claimed empty.
+[BUGS.md](BUGS.md). Six native GPT-6 Luna review stages of the 0.4.2 workflow scope found no remaining P1/P2. The broader open issue list remains in [BUGS.md](BUGS.md).
 Raw build/device/licensing evidence is under
 [docs/reports/](reports/).
