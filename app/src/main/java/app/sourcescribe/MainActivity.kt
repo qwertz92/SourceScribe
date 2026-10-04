@@ -234,7 +234,7 @@ private fun SourceScribeApp(incoming: String, shareSerial: Int, model: MainViewM
         }
     }
     MaterialTheme(colorScheme = colors) {
-        Scaffold(snackbarHost = { SnackbarHost(snackbar) }, bottomBar = {
+        Scaffold(snackbarHost = { if (state.document == null) SnackbarHost(snackbar) }, bottomBar = {
             NavigationBar {
                 Page.entries.forEach { entry ->
                     NavigationBarItem(selected = page == entry, onClick = { go(entry) },
@@ -324,7 +324,7 @@ private fun SourceScribeApp(incoming: String, shareSerial: Int, model: MainViewM
             TranscriptScreen(document, state.documentName, model::closeArtifact,
                 { model.shareArtifact(document.artifactId) },
                 { format, tree -> model.exportArtifact(document.artifactId, format, tree) },
-                { name -> model.renameArtifact(document.artifactId, name) }, openHelp)
+                { name -> model.renameArtifact(document.artifactId, name) }, openHelp, snackbar)
         }
     }
 }

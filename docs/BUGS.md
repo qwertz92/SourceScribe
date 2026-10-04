@@ -560,19 +560,9 @@ release notes suggest it holds up. On 14 September 2026 the owner decided that t
   (per-format export folders, item 14).
 - **What exists:** the underlying rules are unit-tested (`KeytermSetsTest`, `ExportTargetsTest`,
   `SettingsStoreTest`) and both controls were seen on screen and photographed during package B's device check, but
-  no test saves a keyterm set through the screen and loads it again, and none opens an export folder through the
-  screen.
+  no test saves a keyterm set through the screen and loads it again. The history folder action was executed
+  successfully on 2026-10-04 through Android Files; the per-format folder rows still lack a full device round trip.
 - **Effort to close:** about two hours for an instrumented flow that drives dialogs through accessibility actions.
-
-### 66. `openFolder` has never been run (P4)
-
-- **Location:** `SettingsScreen.kt` / `HistoryScreen.kt`, the "open folder" action added for item 14 of the 0.4.0
-  plan (`ACTION_VIEW` on a document URI built from the export tree, with `NO_FOLDER_APP` as the documented failure
-  path).
-- **Why it stays open:** no device available during the 0.4.0 work had a file manager that handles that intent, so
-  neither branch — a successful open or the `NO_FOLDER_APP` fallback — has actually been executed.
-- **Effort to close:** minutes on a real phone, or about an hour to write an instrumented test that resolves the
-  intent rather than starting it.
 
 ### 67. The engine list's new health-state line has no test of its own (P4)
 

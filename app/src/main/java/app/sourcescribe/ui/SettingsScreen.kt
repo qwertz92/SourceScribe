@@ -7,6 +7,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -235,8 +236,8 @@ internal fun SettingsScreen(
                     value = tree?.let { uri -> withContext(Dispatchers.IO) { folderLabel(context, uri) } }
                 }
                 Text(label ?: stringResource(R.string.no_export_tree), style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium)
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     TextButton({ folder.launch(null) }) {
                         Text(stringResource(if (tree == null) R.string.export_tree else R.string.export_tree_change))
                     }
@@ -270,7 +271,7 @@ internal fun SettingsScreen(
                         Text(ownLabel ?: stringResource(R.string.export_tree_default_used),
                             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                             TextButton({ folderFor = format; formatFolder.launch(null) }) {
                                 Text(stringResource(R.string.export_tree_change))
                             }

@@ -8,6 +8,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -28,6 +29,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -85,6 +88,7 @@ internal fun TranscriptScreen(
     export: (ExportFormat, String) -> Unit,
     rename: (String?) -> Unit,
     openHelp: (HelpTopic) -> Unit,
+    snackbar: SnackbarHostState,
 ) {
     val context = LocalContext.current
     var query by rememberSaveable(document.artifactId) { mutableStateOf("") }
@@ -141,86 +145,89 @@ internal fun TranscriptScreen(
                     Icon(painterResource(R.drawable.ic_close), stringResource(R.string.close), Modifier.size(24.dp))
                 }
             }
-            LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(14.dp),
-                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp)) {
-                item {
-                    OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth(), singleLine = true,
-                        label = { Text(stringResource(R.string.search_transcript)) })
-                }
-                item {
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("${originName(document.provenance)} · ${document.language ?: stringResource(R.string.unknown)}",
-                                Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
-                            InfoButton(HelpTopic.PROVENANCE, openHelp)
-                        }
-                        // While a search is running the total alone is misleading: the list underneath is
-                        // the filtered one, so the line says how much of the result is currently visible.
-                        // Both wordings are measured at the real width and font scale and the taller one is
-                        // reserved, so the first keystroke cannot push the warnings and the list down.
-                        val total = document.segments.size
-                        val totalText = pluralStringResource(R.plurals.segments_count, total, total)
-                        val widestMatchText = stringResource(R.string.segments_matching,
-                            numberText(total), numberText(total))
-                        BoxWithConstraints(Modifier.fillMaxWidth()) {
-                            val countHeight = remember(totalText, widestMatchText, countStyle, constraints.maxWidth, textMeasurer) {
-                                listOf(totalText, widestMatchText).maxOf { candidate ->
-                                    textMeasurer.measure(candidate, countStyle,
-                                        constraints = Constraints(maxWidth = constraints.maxWidth)).size.height
+            Box(Modifier.weight(1f)) {
+                LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(14.dp),
+                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp)) {
+                    item {
+                        OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth(), singleLine = true,
+                            label = { Text(stringResource(R.string.search_transcript)) })
+                    }
+                    item {
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("${originName(document.provenance)} · ${document.language ?: stringResource(R.string.unknown)}",
+                                    Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+                                InfoButton(HelpTopic.PROVENANCE, openHelp)
+                            }
+                            // While a search is running the total alone is misleading: the list underneath is
+                            // the filtered one, so the line says how much of the result is currently visible.
+                            // Both wordings are measured at the real width and font scale and the taller one is
+                            // reserved, so the first keystroke cannot push the warnings and the list down.
+                            val total = document.segments.size
+                            val totalText = pluralStringResource(R.plurals.segments_count, total, total)
+                            val widestMatchText = stringResource(R.string.segments_matching,
+                                numberText(total), numberText(total))
+                            BoxWithConstraints(Modifier.fillMaxWidth()) {
+                                val countHeight = remember(totalText, widestMatchText, countStyle, constraints.maxWidth, textMeasurer) {
+                                    listOf(totalText, widestMatchText).maxOf { candidate ->
+                                        textMeasurer.measure(candidate, countStyle,
+                                            constraints = Constraints(maxWidth = constraints.maxWidth)).size.height
+                                    }
+                                }
+                                Text(
+                                    if (filtered.query.isBlank()) totalText else stringResource(R.string.segments_matching,
+                                        numberText(segments.size), numberText(total)),
+                                    Modifier.heightIn(min = with(LocalDensity.current) { countHeight.toDp() }),
+                                    style = countStyle, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            if (showsPartialNotice(document.scope)) Text(stringResource(R.string.technically_partial),
+                                color = MaterialTheme.colorScheme.error)
+                            // One sentence per thing that is actually wrong with the result, instead of the
+                            // raw codes: a job of sixty sections can carry thousands of them, and they answer
+                            // a parser's question rather than the reader's. They stay available under the
+                            // details below, where a fault report can still quote them.
+                            warningTexts(document.warnings).forEach { warning ->
+                                Text(warning, style = MaterialTheme.typography.bodySmall)
+                            }
+                            TextButton({ showProvenance = !showProvenance }) { Text(stringResource(R.string.provenance_details)) }
+                            if (showProvenance) {
+                                Text("${stringResource(R.string.source)}: ${document.source.canonicalUrl ?: document.source.fileName ?: document.source.id}")
+                                Text("ID: ${document.source.id}")
+                                if (document.warnings.isNotEmpty()) Text(
+                                    stringResource(R.string.warning_codes) + ": " +
+                                        document.warnings.joinToString(" · "))
+                                Text(stringResource(R.string.model_requested, document.provenance.requestedModel ?: stringResource(R.string.unknown)))
+                                Text(stringResource(R.string.model_reported, document.provenance.reportedModel ?: stringResource(R.string.unknown)))
+                                Text(stringResource(R.string.original_language_value, document.source.originalLanguage ?: stringResource(R.string.unknown)))
+                                Text(stringResource(R.string.translation_value, translationName(document.provenance.translation)))
+                                document.provenance.sourceAudioTrack?.let { track ->
+                                    val described = AudioTracks.describe(listOf(track), document.source.durationMs).first()
+                                    Text(stringResource(R.string.audio_track_value, audioTrackDetail(described)))
+                                }
+                                document.provenance.captionTrack?.let {
+                                    Text(stringResource(R.string.caption_track_value, "${captionTrackTitle(it)} · ${it.format}"))
                                 }
                             }
-                            Text(
-                                if (filtered.query.isBlank()) totalText else stringResource(R.string.segments_matching,
-                                    numberText(segments.size), numberText(total)),
-                                Modifier.heightIn(min = with(LocalDensity.current) { countHeight.toDp() }),
-                                style = countStyle, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+                            if (copyRanges.size > 1) Text(stringResource(R.string.copy_large_help), style = MaterialTheme.typography.bodySmall)
                         }
-                        if (showsPartialNotice(document.scope)) Text(stringResource(R.string.technically_partial),
-                            color = MaterialTheme.colorScheme.error)
-                        // One sentence per thing that is actually wrong with the result, instead of the
-                        // raw codes: a job of sixty sections can carry thousands of them, and they answer
-                        // a parser's question rather than the reader's. They stay available under the
-                        // details below, where a fault report can still quote them.
-                        warningTexts(document.warnings).forEach { warning ->
-                            Text(warning, style = MaterialTheme.typography.bodySmall)
+                    }
+                    if (document.segments.isEmpty()) item { Text(stringResource(R.string.transcript_empty)) }
+                    // Read from the same state the list below is built from, not from the live search text:
+                    // those two disagree for as long as the filter is still running, and asking the live text
+                    // here would drop this line while the list is still empty, collapsing the area to nothing.
+                    else if (filtered.query.isNotBlank() && segments.isEmpty()) item { Text(stringResource(R.string.no_matches)) }
+                    items(segments.size) { index ->
+                        val segment = segments[index]
+                        Column {
+                            val evidence = listOfNotNull(segment.startMs?.let(::duration), segment.speaker)
+                            if (evidence.isNotEmpty()) Text(evidence.joinToString(" · "),
+                                style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                            Text(segment.text)
                         }
-                        TextButton({ showProvenance = !showProvenance }) { Text(stringResource(R.string.provenance_details)) }
-                        if (showProvenance) {
-                            Text("${stringResource(R.string.source)}: ${document.source.canonicalUrl ?: document.source.fileName ?: document.source.id}")
-                            Text("ID: ${document.source.id}")
-                            if (document.warnings.isNotEmpty()) Text(
-                                stringResource(R.string.warning_codes) + ": " +
-                                    document.warnings.joinToString(" · "))
-                            Text(stringResource(R.string.model_requested, document.provenance.requestedModel ?: stringResource(R.string.unknown)))
-                            Text(stringResource(R.string.model_reported, document.provenance.reportedModel ?: stringResource(R.string.unknown)))
-                            Text(stringResource(R.string.original_language_value, document.source.originalLanguage ?: stringResource(R.string.unknown)))
-                            Text(stringResource(R.string.translation_value, translationName(document.provenance.translation)))
-                            document.provenance.sourceAudioTrack?.let { track ->
-                                val described = AudioTracks.describe(listOf(track), document.source.durationMs).first()
-                                Text(stringResource(R.string.audio_track_value, audioTrackDetail(described)))
-                            }
-                            document.provenance.captionTrack?.let {
-                                Text(stringResource(R.string.caption_track_value, "${captionTrackTitle(it)} · ${it.format}"))
-                            }
-                        }
-                        if (copyRanges.size > 1) Text(stringResource(R.string.copy_large_help), style = MaterialTheme.typography.bodySmall)
                     }
                 }
-                if (document.segments.isEmpty()) item { Text(stringResource(R.string.transcript_empty)) }
-                // Read from the same state the list below is built from, not from the live search text:
-                // those two disagree for as long as the filter is still running, and asking the live text
-                // here would drop this line while the list is still empty, collapsing the area to nothing.
-                else if (filtered.query.isNotBlank() && segments.isEmpty()) item { Text(stringResource(R.string.no_matches)) }
-                items(segments.size) { index ->
-                    val segment = segments[index]
-                    Column {
-                        val evidence = listOfNotNull(segment.startMs?.let(::duration), segment.speaker)
-                        if (evidence.isNotEmpty()) Text(evidence.joinToString(" · "),
-                            style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-                        Text(segment.text)
-                    }
-                }
+                SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter))
             }
             HorizontalDivider()
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
