@@ -2,6 +2,9 @@ package app.sourcescribe
 
 import android.content.Context
 import android.content.ContextWrapper
+import android.net.Uri
+import android.provider.OpenableColumns
+import androidx.core.net.toUri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
@@ -12,6 +15,12 @@ import androidx.test.platform.app.InstrumentationRegistry
 import androidx.work.WorkManager
 import androidx.work.testing.WorkManagerTestInitHelper
 import app.sourcescribe.core.AcquisitionMode
+import app.sourcescribe.core.ExportFormat
+import app.sourcescribe.core.Origin
+import app.sourcescribe.core.Provenance
+import app.sourcescribe.core.Segment
+import app.sourcescribe.core.TranscriptDocument
+import app.sourcescribe.core.TranscriptExporter
 import app.sourcescribe.core.ArtifactFiles
 import app.sourcescribe.core.AudioTrack
 import app.sourcescribe.core.CaptionTrack
@@ -56,6 +65,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -66,6 +76,50 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class ViewModelStateTest {
+    @Test
+    fun sharingSiblingArtifactsWithTheSameReadableNameKeepsBothUrisAndContents() = withFixture {
+        awaitInitialization()
+        useProviderBackedCache()
+        val documents = seedShareableSiblings()
+        val first = documents.first
+        val second = documents.second
+        val readableName = TranscriptExporter.fileName(first, ExportFormat.MARKDOWN)
+        val shares = File(InstrumentationRegistry.getInstrumentation().targetContext.cacheDir, "shares")
+        val ownedCacheFiles = listOf(
+            File(shares, "${first.artifactId}.md"),
+            File(shares, "${second.artifactId}.md"),
+            File(shares, readableName),
+        )
+        try {
+            onMain { viewModel.shareArtifact(first.artifactId) }
+            val firstUri = requireNotNull(withTimeout(TIMEOUT_MS) {
+                viewModel.screen.first { !it.busy && it.shareUri != null }.shareUri
+            }).toUri()
+
+            onMain { viewModel.shareConsumed() }
+            assertNull(viewModel.screen.value.shareUri)
+            onMain { viewModel.shareArtifact(second.artifactId) }
+            val secondUri = requireNotNull(withTimeout(TIMEOUT_MS) {
+                viewModel.screen.first { !it.busy && it.shareUri != null }.shareUri
+            }).toUri()
+
+            // This first assertion is the negative control: the old filename-based cache path overwrites these bytes.
+            assertArrayEquals(
+                TranscriptExporter.render(first, ExportFormat.MARKDOWN).toByteArray(),
+                sharedBytes(firstUri),
+            )
+            assertNotEquals(firstUri, secondUri)
+            assertEquals(readableName, sharedDisplayName(firstUri))
+            assertEquals(readableName, sharedDisplayName(secondUri))
+            assertArrayEquals(
+                TranscriptExporter.render(second, ExportFormat.MARKDOWN).toByteArray(),
+                sharedBytes(secondUri),
+            )
+        } finally {
+            ownedCacheFiles.forEach { it.delete() }
+        }
+    }
+
     @Test
     fun quickStartRejectsInvalidInputWithoutCreatingJobsOrClearingDraft() = withFixture {
         awaitInitialization()
@@ -545,6 +599,43 @@ class ViewModelStateTest {
 
         fun onMain(action: () -> Unit) = instrumentation.runOnMainSync(action)
 
+        fun useProviderBackedCache() = context.useProviderBackedCache()
+
+        suspend fun seedShareableSiblings(): Pair<TranscriptDocument, TranscriptDocument> {
+            val unique = UUID.randomUUID().toString()
+            val source = Source(
+                id = "share-source-$unique",
+                kind = SourceKind.YOUTUBE,
+                canonicalUrl = "https://www.youtube.com/watch?v=$VIDEO_ID",
+                videoId = VIDEO_ID,
+                title = "Share title $unique",
+                channel = "Share channel $unique",
+            )
+            val config = JobConfig()
+            val createdAt = System.currentTimeMillis()
+            val captions = TranscriptDocument(
+                artifactId = UUID.randomUUID().toString(),
+                source = source,
+                acquisition = config,
+                provenance = Provenance(Origin.YOUTUBE, Generation.UPLOADER_PROVIDED, Translation.NONE),
+                language = "en",
+                segments = listOf(Segment("CAPTIONS sibling original bytes $unique")),
+                createdAt = createdAt,
+            )
+            val stt = TranscriptDocument(
+                artifactId = UUID.randomUUID().toString(),
+                source = source,
+                acquisition = config,
+                provenance = Provenance(Origin.PROVIDER, provider = Provider.GROQ),
+                language = "en",
+                segments = listOf(Segment("STT sibling different bytes $unique")),
+                createdAt = createdAt,
+            )
+            artifacts.write(captions)
+            artifacts.write(stt)
+            return captions to stt
+        }
+
         fun setScreen(state: ScreenState) = onMain {
             val field = MainViewModel::class.java.getDeclaredField("mutable").apply { isAccessible = true }
             val value = field.get(viewModel)
@@ -596,15 +687,32 @@ class ViewModelStateTest {
             requireNotNull(modelClass.java.cast(create()))
     }
 
-    private class IsolatedContext(base: Context, root: File) : ContextWrapper(base) {
+    private class IsolatedContext(private val base: Context, root: File) : ContextWrapper(base) {
         private val files = File(root, "files").also { check(it.mkdirs()) }
         private val noBackup = File(root, "no-backup").also { check(it.mkdirs()) }
         private val cache = File(root, "cache").also { check(it.mkdirs()) }
+        private var providerBackedCache = false
+
+        fun useProviderBackedCache() { providerBackedCache = true }
 
         override fun getApplicationContext(): Context = this
         override fun getFilesDir(): File = files
         override fun getNoBackupFilesDir(): File = noBackup
-        override fun getCacheDir(): File = cache
+        override fun getCacheDir(): File = if (providerBackedCache) base.cacheDir else cache
+    }
+
+    private fun sharedBytes(uri: Uri): ByteArray {
+        val resolver = InstrumentationRegistry.getInstrumentation().targetContext.contentResolver
+        return requireNotNull(resolver.openInputStream(uri)).use { it.readBytes() }
+    }
+
+    private fun sharedDisplayName(uri: Uri): String {
+        val resolver = InstrumentationRegistry.getInstrumentation().targetContext.contentResolver
+        val cursor = requireNotNull(resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null))
+        return cursor.use {
+            check(it.moveToFirst())
+            it.getString(it.getColumnIndexOrThrow(OpenableColumns.DISPLAY_NAME))
+        }
     }
 
     private class ProviderRequestGuard {

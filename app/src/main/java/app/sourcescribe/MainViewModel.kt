@@ -321,9 +321,10 @@ class MainViewModel @Inject constructor(
         val document = artifactFiles.read(id)
         val chosen = records.artifact(id)?.displayName
         val directory = File(context.cacheDir, ShareCache.DIRECTORY).also { check(it.isDirectory || it.mkdirs()) }
-        val file = File(directory, TranscriptExporter.fileName(document, ExportFormat.MARKDOWN, chosen))
+        val readableName = TranscriptExporter.fileName(document, ExportFormat.MARKDOWN, chosen)
+        val file = File(directory, "$id.md")
         FileOutputStream(file).use { output -> output.write(TranscriptExporter.render(document, ExportFormat.MARKDOWN).toByteArray()); output.fd.sync() }
-        val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", file)
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", file, readableName)
         mutable.update { it.copy(shareUri = uri.toString(), shareMime = "text/markdown") }
     }
     fun shareConsumed() { mutable.update { it.copy(shareUri = null) } }
