@@ -74,4 +74,4 @@ The tested APK had remained local, leaving the owner installing 0.4.0. Published
 
 Published v0.4.2 (`df32dede854355ac38f933c8cdb0a266c3ba0657`; APK `7b1fac241672c7bb16739d440069ea97edeffc6c6e03857e3c250c69d2690c26`, `147200333` bytes; `2026-10-04T05:57:01Z`); public download matched.
 Gates: core 234, lint 4 clean, app 291 plus 10 skips (all opt-ins separately exercised), extractor 55; upgrade and folder opening passed.
-Two live transcripts succeeded; six Luna review stages found no P1/P2. Device, TalkBack, OpenAI and other limits: [report](reports/2026-10-03-workflow-polish.md).
+Two live transcripts succeeded; after six Luna review stages no P1/P2 remained in the changed scope. Device, TalkBack, OpenAI and other limits: [report](reports/2026-10-03-workflow-polish.md).
