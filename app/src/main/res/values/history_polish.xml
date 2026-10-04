@@ -1,0 +1,17 @@
+<resources>
+    <string name="history_origin_youtube_captions">YouTube-Untertitel</string>
+    <string name="history_origin_stt">STT · %1$s</string>
+    <string name="history_origin_audio_transcription">Audio-Transkription</string>
+    <string name="history_total_elapsed">Gesamtzeit · %1$s (Wartezeit eingeschlossen)</string>
+    <string name="history_live_elapsed">Bisher · %1$s seit Auftragsstart (Wartezeit eingeschlossen)</string>
+    <string name="history_not_recorded">Gesamtzeit · nicht erfasst</string>
+    <string name="history_timings">Zeiten</string>
+    <string name="history_timing_scope">Erfasst sind beobachtete App-Phasen, nicht die unbekannte Rechenzeit beim Anbieter.</string>
+    <string name="history_no_timings">Für diesen Auftrag wurden keine Phasenzeiten erfasst.</string>
+    <string name="history_timing_phase">%1$s · %2$s</string>
+    <string name="history_timing_incomplete">%1$s · unvollständig</string>
+    <string name="history_timing_recorded_incomplete">%1$s · erfasst: %2$s · unvollständig</string>
+    <string name="history_technical_details">Technische Details und Versuche</string>
+    <string name="history_attempt_phase">%1$s · %2$s</string>
+    <string name="history_export_folders">Exportordner öffnen</string>
+</resources>

@@ -8,6 +8,7 @@ These Markdown files are the shared knowledge base for Codex, Claude Code, OpenC
 | [Roadmap](ROADMAP.md) | P0 through P6 and release gates |
 | [Status](STATUS.md) | Current state, releases, gates, blockers, and environment — the only "where do we stand" document |
 | [Provider reliability verification](reports/2026-09-30-provider-reliability.md) | Reproduced causes, controls, provider calls, and the 0.4.1 candidate checks |
+| [History and workflow verification](reports/2026-10-03-workflow-polish.md) | Compact history, result source, export names, quick start, folder access, contextual help, and recorded timings |
 | [0.4.0 verification report](reports/2026-09-16-preview-0.4.md) | Gates, APK hashes, device, and limits of preview 0.4.0 |
 | [0.2.0 verification report](reports/2026-09-14-preview-0.2.md) | Gates, APK hashes, device, and limits of preview 0.2.0 |
 | [0.1.0 verification report](reports/2026-09-08-preview.md) | Tests, APK hashes, device limits, and remaining acceptance for preview 0.1.0 |

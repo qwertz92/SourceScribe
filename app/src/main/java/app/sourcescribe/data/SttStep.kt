@@ -58,12 +58,15 @@ import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 import java.util.Locale
 import java.util.UUID
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -106,6 +109,7 @@ class SttStep @Inject constructor(
         explicitNulls = true
         ignoreUnknownKeys = true
     }
+    private val phaseTimings = PhaseTimings(dao)
 
     /** Room owns the lease; this method never releases it. */
     suspend fun run(
@@ -126,13 +130,13 @@ class SttStep @Inject constructor(
                 currentRow = save(currentRow.copy(checkpoint = encode(currentCheckpoint), error = null), owner)
             }
             when (currentRow.phase) {
-                Phase.RESOLVE -> resolve(currentRow, owner, config, currentCheckpoint)
-                Phase.DOWNLOAD_AUDIO -> download(currentRow, owner, config, currentCheckpoint, maxDownloadBytes)
-                Phase.PREPARE_AUDIO -> prepare(currentRow, owner, config, currentCheckpoint)
+                Phase.RESOLVE -> phaseTimings.measure(currentRow, owner, Phase.RESOLVE) { resolve(currentRow, owner, config, currentCheckpoint) }
+                Phase.DOWNLOAD_AUDIO -> phaseTimings.measure(currentRow, owner, Phase.DOWNLOAD_AUDIO) { download(currentRow, owner, config, currentCheckpoint, maxDownloadBytes) }
+                Phase.PREPARE_AUDIO -> phaseTimings.measure(currentRow, owner, Phase.PREPARE_AUDIO) { prepare(currentRow, owner, config, currentCheckpoint) }
                 Phase.UPLOAD, Phase.SUBMIT -> submit(currentRow, owner, config, currentCheckpoint)
                 Phase.RETRIEVE -> retrieve(currentRow, owner, config, currentCheckpoint)
-                Phase.NORMALIZE -> normalize(currentRow, owner, config, currentCheckpoint)
-                Phase.PERSIST -> persist(currentRow, owner, config, currentCheckpoint)
+                Phase.NORMALIZE -> phaseTimings.measure(currentRow, owner, Phase.NORMALIZE) { normalize(currentRow, owner, config, currentCheckpoint) }
+                Phase.PERSIST -> phaseTimings.measure(currentRow, owner, Phase.PERSIST) { persist(currentRow, owner, config, currentCheckpoint) }
                 Phase.FETCH_CAPTIONS -> waitForUser(currentRow, owner, "INVALID_STT_PHASE")
             }
         } catch (cancelled: CancellationException) {
@@ -658,7 +662,7 @@ class SttStep @Inject constructor(
         // and only where the extractor measured it: `bytesEstimated` means yt-dlp derived the number from
         // the bitrate, and a percentage of a guess is a percentage this app will not show.
         val expectedBytes = selected.bytes?.takeIf { !selected.bytesEstimated }
-        dao.recordProgress(row.id, owner, 0, expectedBytes)
+        recordProgressBestEffort(row, owner, 0, expectedBytes)
         val downloaded = withTimeout(DOWNLOAD_TIMEOUT_MS) {
             ensureFence(row, owner)
             currentCoroutineContext().ensureActive()
@@ -668,7 +672,7 @@ class SttStep @Inject constructor(
                 directory = directory,
                 maxBytes = minOf(MAX_SOURCE_AUDIO_BYTES, maxDownloadBytes),
                 engine = engines.file(installation),
-                onProgress = { bytes -> dao.recordProgress(row.id, owner, bytes, expectedBytes) },
+                onProgress = { bytes -> recordProgressBestEffort(row, owner, bytes, expectedBytes) },
             )
         }
         val canonicalDownloaded = downloaded.canonicalFile
@@ -912,11 +916,15 @@ class SttStep @Inject constructor(
         val sending = submission.copy(state = SubmissionState.SENDING, rejectionCode = null)
         updateSubmissionClaimed(row, owner, sending)
         val request = request(row.id, config, chunk)
+        ensureFence(row, owner)
+        currentCoroutineContext().ensureActive()
+        val uploadTiming = phaseTimings.begin(row, owner, Phase.UPLOAD)
+        val submitTiming = phaseTimings.begin(row, owner, Phase.SUBMIT)
         val result = try {
-            ensureFence(row, owner)
-            currentCoroutineContext().ensureActive()
             withTimeout(SUBMIT_TIMEOUT_MS) {
-                countingUpload(row, owner) {
+                countingUpload(row, owner, uploadTiming, submitTiming) {
+                    ensureFence(row, owner)
+                    currentCoroutineContext().ensureActive()
                     valid.adapter.submit(request, key, AtomicResponseSpool(responsePath(row.id, submission.id)))
                 }
             }
@@ -930,11 +938,16 @@ class SttStep @Inject constructor(
     private suspend fun <T> countingUpload(
         row: AttemptRow,
         owner: String,
+        uploadTiming: ActivePhaseTiming,
+        submitTiming: ActivePhaseTiming,
         send: suspend () -> T,
     ): T = coroutineScope {
         val sent = AtomicLong(0)
         val total = AtomicLong(-1)
-        dao.recordProgress(row.id, owner, 0, null)
+        recordProgressBestEffort(row, owner, 0, null)
+        val uploadedBodyNanos = AtomicLong(0)
+        val uploadStartedAt = AtomicLong(0)
+        val uploadObserved = AtomicBoolean(false)
         val reporter = launch {
             var reportedBytes = 0L
             var reportedTotal = -1L
@@ -945,20 +958,51 @@ class SttStep @Inject constructor(
                 if (now != reportedBytes || currentTotal != reportedTotal) {
                     reportedBytes = now
                     reportedTotal = currentTotal
-                    dao.recordProgress(row.id, owner, now, currentTotal.takeIf { it >= 0 })
+                    recordProgressBestEffort(row, owner, now, currentTotal.takeIf { it >= 0 })
                 }
             }
         }
+        val requestStartedAtUtc = System.currentTimeMillis()
+        val requestStartedNanos = System.nanoTime()
         try {
-            withContext(UploadProgress { written, requestTotal ->
-                sent.set(written)
-                total.set(requestTotal)
-            }) { send() }
+            withContext(UploadProgress(
+                onBytes = { written, requestTotal ->
+                    sent.set(written)
+                    total.set(requestTotal)
+                },
+                onTiming = { startedAtUtc, elapsedNanos ->
+                    uploadObserved.set(true)
+                    uploadStartedAt.compareAndSet(0, startedAtUtc)
+                    uploadedBodyNanos.updateAndGet { current ->
+                        val duration = elapsedNanos.coerceAtLeast(0)
+                        if (Long.MAX_VALUE - current < duration) Long.MAX_VALUE else current + duration
+                    }
+                },
+            )) { send() }
         } finally {
-            reporter.cancel()
+            val requestNanos = (System.nanoTime() - requestStartedNanos).coerceAtLeast(0)
             withContext(NonCancellable) {
-                dao.recordProgress(row.id, owner, sent.get(), total.get().takeIf { it >= 0 })
+                reporter.cancelAndJoin()
+                recordProgressBestEffort(row, owner, sent.get(), total.get().takeIf { it >= 0 })
+                if (uploadObserved.get()) {
+                    phaseTimings.finish(uploadTiming,
+                        TimeUnit.NANOSECONDS.toMillis(uploadedBodyNanos.get()), uploadStartedAt.get())
+                } else {
+                    phaseTimings.discard(uploadTiming)
+                }
+                val submitNanos = (requestNanos - uploadedBodyNanos.get()).coerceAtLeast(0)
+                phaseTimings.finish(submitTiming, TimeUnit.NANOSECONDS.toMillis(submitNanos), requestStartedAtUtc)
             }
+        }
+    }
+
+    private suspend fun recordProgressBestEffort(row: AttemptRow, owner: String, processed: Long, total: Long?) {
+        try {
+            dao.recordProgress(row.id, owner, processed, total)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            // Missing progress must not cancel the transfer or hide a durably spooled provider response.
         }
     }
 
@@ -1100,8 +1144,13 @@ class SttStep @Inject constructor(
         val result = try {
             ensureFence(row, owner)
             currentCoroutineContext().ensureActive()
+            val timing = phaseTimings.begin(row, owner, Phase.RETRIEVE)
             withTimeout(POLL_TIMEOUT_MS) {
-                valid.adapter.poll(handle, request, key, AtomicResponseSpool(responsePath(row.id, submission.id)))
+                try {
+                    valid.adapter.poll(handle, request, key, AtomicResponseSpool(responsePath(row.id, submission.id)))
+                } finally {
+                    phaseTimings.finish(timing)
+                }
             }
         } catch (failure: ProviderError) {
             return handlePollError(row, owner, submission, checkpoint, failure)

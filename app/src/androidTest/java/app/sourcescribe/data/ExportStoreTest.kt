@@ -212,7 +212,7 @@ class ExportStoreTest {
     }
 
     @Test
-    fun aRawSiblingCountsAsATakenNameBecauseTheRowDoesNotRecordItsExtension() = runBlocking {
+    fun rawExportUsesItsActualExtensionWhenCheckingFolderCollisions() = runBlocking {
         withHarness(ExportFixtureProvider.Mode.NAME_COLLISION, retainRaw = true) { harness ->
             assertEquals(1, harness.dao.renameArtifact(harness.artifactId, "Folge 12 Interview"))
             val raw = harness.store.export(harness.artifactId, ExportFormat.RAW, harness.treeUri)
@@ -220,15 +220,12 @@ class ExportStoreTest {
 
             val text = harness.store.export(harness.artifactId, ExportFormat.TEXT, harness.treeUri)
 
-            // An export row records the format but not the extension a raw export actually wrote, because
-            // that comes from the retained provider file. The check therefore cannot tell whether this
-            // sibling holds the name the text export wants, and counts it as held rather than risk writing
-            // over it. Only this test puts that rule through a real export instead of the name builder.
             assertEquals(ExportState.EXPORTED, text.state)
             val names = providerAdmin { ExportFixtureProvider.names(context) }
-            assertEquals(names.toString(), 2, names.size)
-            assertTrue(names.toString(), names.contains("Folge_12_Interview.$RAW_EXTENSION"))
-            assertTrue(names.toString(), names.any { it.startsWith("Folge_12_Interview-") && it.endsWith(".txt") })
+            assertEquals(
+                listOf("Folge_12_Interview.$RAW_EXTENSION", "Folge_12_Interview.txt"),
+                names,
+            )
         }
     }
 
@@ -268,12 +265,9 @@ class ExportStoreTest {
 
             val second = harness.store.export(harness.artifactId, ExportFormat.TEXT, harness.treeUri)
 
-            // The fixture provider refuses a colliding name outright, so a missing suffix fails the export.
             assertEquals(ExportState.EXPORTED, second.state)
             val names = providerAdmin { ExportFixtureProvider.names(context) }
-            assertEquals(names.toString(), 2, names.size)
-            assertTrue(names.toString(), names.contains("Folge_12_Interview.txt"))
-            assertTrue(names.toString(), names.any { it.startsWith("Folge_12_Interview-") && it.endsWith(".txt") })
+            assertEquals(listOf("Folge_12_Interview.txt", "Folge_12_Interview_1.txt"), names)
         }
     }
 
@@ -383,7 +377,10 @@ class ExportStoreTest {
             assertEquals(ExportState.EXPORTED, second.state)
             assertNotEquals(first.id, second.id)
             assertNotEquals(first.documentUri, second.documentUri)
-            assertEquals(2, providerAdmin { ExportFixtureProvider.names(context) }.size)
+            assertEquals(
+                listOf("Fixture_channel - Fixture_source.txt", "Fixture_channel - Fixture_source_1.txt"),
+                providerAdmin { ExportFixtureProvider.names(context) },
+            )
             assertArrayEquals(
                 providerAdmin { ExportFixtureProvider.bytes(context, requireNotNull(first.documentUri)) },
                 providerAdmin { ExportFixtureProvider.bytes(context, requireNotNull(second.documentUri)) },
@@ -403,50 +400,71 @@ class ExportStoreTest {
             assertEquals(ExportState.EXPORTED, second.state)
             assertNotEquals(first.documentUri, second.documentUri)
             val names = providerAdmin { ExportFixtureProvider.names(context) }
-            assertEquals(names.toString(), 2, names.size)
-            // The chosen wording is written exactly once; only the repeat carries the separating suffix.
-            assertTrue(names.toString(), names.contains("Folge_12_Interview.txt"))
-            assertTrue(names.toString(), names.any { it.startsWith("Folge_12_Interview-") && it.endsWith(".txt") })
+            assertEquals(listOf("Folge_12_Interview.txt", "Folge_12_Interview_1.txt"), names)
         }
     }
 
     @Test
-    fun generatedNameSeparatesArtifactsAndExportsOfTheSameSource() {
-        val firstArtifact = "ffffffff-ffff-ffff-ffff-ffffffffffff"
-        val secondArtifact = "dddddddd-dddd-dddd-dddd-dddddddddddd"
-        val firstExport = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"
-        val secondExport = "cccccccc-cccc-cccc-cccc-cccccccccccc"
+    fun twoArtifactsWithTheSameGeneratedNameUseFolderScopedSuffixes() = runBlocking {
+        withHarness(ExportFixtureProvider.Mode.NAME_COLLISION) { harness ->
+            val first = harness.store.export(harness.artifactId, ExportFormat.TEXT, harness.treeUri)
+            val secondDocument = harness.document.copy(artifactId = UUID.randomUUID().toString())
+            val stored = harness.artifacts.write(secondDocument)
+            val firstArtifact = requireNotNull(harness.dao.artifact(harness.artifactId))
+            harness.dao.insertArtifact(firstArtifact.copy(
+                id = secondDocument.artifactId,
+                createdAt = secondDocument.createdAt,
+                sha256 = stored.sha256,
+                bytes = stored.bytes,
+            ))
 
-        val name = ExportStore.collisionSafeFileName(document(firstArtifact), ExportFormat.MARKDOWN, firstExport)
+            val second = harness.store.export(secondDocument.artifactId, ExportFormat.TEXT, harness.treeUri)
 
-        assertTrue(name, name.endsWith(".md"))
-        assertNotEquals(name,
-            ExportStore.collisionSafeFileName(document(secondArtifact), ExportFormat.MARKDOWN, firstExport))
-        assertNotEquals(name,
-            ExportStore.collisionSafeFileName(document(firstArtifact), ExportFormat.MARKDOWN, secondExport))
+            assertEquals(ExportState.EXPORTED, first.state)
+            assertEquals(ExportState.EXPORTED, second.state)
+            assertEquals(
+                listOf("Fixture_channel - Fixture_source.txt", "Fixture_channel - Fixture_source_1.txt"),
+                providerAdmin { ExportFixtureProvider.names(context) },
+            )
+        }
     }
 
     @Test
-    fun rawNameRetainsExactMetadataExtension() {
-        val artifactId = "11111111-1111-1111-1111-111111111111"
-        val exportId = "22222222-2222-2222-2222-222222222222"
+    fun anExistingManualFileInTheTargetFolderForcesTheNextName() = runBlocking {
+        withHarness(ExportFixtureProvider.Mode.NAME_COLLISION) { harness ->
+            providerAdmin {
+                ExportFixtureProvider.seedDocument(
+                    context,
+                    "Fixture_channel - Fixture_source.txt",
+                    "manual export".toByteArray(),
+                )
+            }
 
-        val name = ExportStore.collisionSafeFileName(document(artifactId), ExportFormat.RAW, exportId, "json3")
+            val row = harness.store.export(harness.artifactId, ExportFormat.TEXT, harness.treeUri)
 
-        assertTrue(name, name.endsWith(".json3"))
-        assertNotEquals(name,
-            ExportStore.collisionSafeFileName(document(artifactId), ExportFormat.RAW, exportId, "json"))
+            assertEquals(ExportState.EXPORTED, row.state)
+            assertEquals(
+                listOf("Fixture_channel - Fixture_source.txt", "Fixture_channel - Fixture_source_1.txt"),
+                providerAdmin { ExportFixtureProvider.names(context) },
+            )
+        }
     }
 
     @Test
-    fun aChosenExportNameReplacesTheGeneratedOneWithoutLosingItsExtension() {
-        val artifactId = "33333333-3333-3333-3333-333333333333"
-        val exportId = "44444444-4444-4444-4444-444444444444"
+    fun aDifferentTargetFolderDoesNotInheritCollisionSuffixes() = runBlocking {
+        withHarness(ExportFixtureProvider.Mode.NAME_COLLISION) { harness ->
+            val first = harness.store.export(harness.artifactId, ExportFormat.TEXT, harness.treeUri)
+            val otherTreeUri = configureProvider(ExportFixtureProvider.Mode.NAME_COLLISION)
 
-        val name = ExportStore.collisionSafeFileName(
-            document(artifactId), ExportFormat.MARKDOWN, exportId, null, "Folge 12 Interview")
+            val second = harness.store.export(harness.artifactId, ExportFormat.TEXT, otherTreeUri)
 
-        assertEquals("Folge_12_Interview.md", name)
+            assertEquals(ExportState.EXPORTED, first.state)
+            assertEquals(ExportState.EXPORTED, second.state)
+            assertEquals(
+                listOf("Fixture_channel - Fixture_source.txt"),
+                providerAdmin { ExportFixtureProvider.names(context) },
+            )
+        }
     }
 
     private suspend fun withHarness(
@@ -517,7 +535,7 @@ class ExportStoreTest {
 
     private fun document(artifactId: String, retainRaw: Boolean = false) = TranscriptDocument(
         artifactId = artifactId,
-        source = Source(id = "source-1", kind = SourceKind.YOUTUBE, title = "Fixture source"),
+        source = Source(id = "source-1", kind = SourceKind.YOUTUBE, title = "Fixture source", channel = "Fixture channel"),
         acquisition = JobConfig(mode = AcquisitionMode.CAPTIONS_ONLY, retainRaw = retainRaw),
         provenance = Provenance(origin = Origin.YOUTUBE),
         segments = listOf(Segment("fixture transcript")),

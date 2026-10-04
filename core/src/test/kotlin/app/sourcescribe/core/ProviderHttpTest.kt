@@ -389,6 +389,87 @@ class ProviderHttpTest {
         assertEquals(total, server.takeRequest().body.size)
     }
 
+    @Test
+    fun uploadTimingExcludesAssemblyAiJsonAndResponseWait() {
+        server.enqueue(MockResponse().setResponseCode(200).setBodyDelay(200, TimeUnit.MILLISECONDS).setBody("upload-url"))
+        server.enqueue(MockResponse().setResponseCode(200).setBody("{}"))
+        val audio = ByteArray(4096) { (it and 0xff).toByte() }
+        val json = "{\"audio_url\":\"https://upload.example/audio\"}"
+        val spans = java.util.Collections.synchronizedList(mutableListOf<Pair<Long, Long>>())
+        val uploadRequest = Request.Builder()
+            .url("https://api.assemblyai.com/v2/upload")
+            .post(audio.toRequestBody("application/octet-stream".toMediaType()))
+            .build()
+        val submitRequest = Request.Builder()
+            .url("https://api.assemblyai.com/v2/transcript")
+            .post(json.toRequestBody("application/json".toMediaType()))
+            .build()
+        val before = System.currentTimeMillis()
+
+        runBlocking {
+            withContext(UploadProgress(
+                onBytes = { _, _ -> },
+                onTiming = { startedAt, elapsedNanos -> spans += startedAt to elapsedNanos },
+            )) {
+                http.perform(uploadRequest, mayCharge = false)
+                http.perform(submitRequest, mayCharge = true)
+            }
+        }
+
+        assertEquals("only the binary upload body is timed", 1, spans.size)
+        assertTrue(spans.single().first in before..System.currentTimeMillis())
+        assertTrue(spans.single().second >= 0L)
+        assertTrue("response wait is outside body timing",
+            TimeUnit.NANOSECONDS.toMillis(spans.single().second) < System.currentTimeMillis() - before)
+        assertEquals(2, server.requestCount)
+        assertArrayEquals(audio, server.takeRequest().body.readByteArray())
+        assertEquals(json, server.takeRequest().body.readUtf8())
+    }
+
+    @Test
+    fun failedBodyStillReportsElapsedTimeWithoutChangingPaidUncertainty() {
+        server.enqueue(MockResponse().setResponseCode(200).setBody("unused"))
+        val spans = java.util.Collections.synchronizedList(mutableListOf<Long>())
+        val body = object : okhttp3.RequestBody() {
+            override fun contentType() = "audio/mpeg".toMediaType()
+            override fun writeTo(sink: okio.BufferedSink) { throw IOException("fixture upload failure") }
+        }
+        val request = Request.Builder()
+            .url("https://api.groq.com/openai/v1/audio/transcriptions")
+            .post(body)
+            .build()
+
+        val error = assertThrows(ProviderError::class.java) {
+            runBlocking {
+                withContext(UploadProgress(
+                    onBytes = { _, _ -> },
+                    onTiming = { _, elapsedNanos -> spans += elapsedNanos },
+                )) { http.perform(request, mayCharge = true) }
+            }
+        }
+
+        assertEquals(ProviderErrorCode.SUBMISSION_UNCERTAIN, error.code)
+        assertTrue("the failed body write is timed", spans.isNotEmpty())
+        assertTrue(spans.all { it >= 0L })
+        assertTrue("the failed request is never retried", server.requestCount <= 1)
+    }
+
+    @Test
+    fun timingCallbackFailureDoesNotChangeTheRequest() {
+        server.enqueue(MockResponse().setResponseCode(200).setBody("ok"))
+        val audio = ByteArray(4096) { (it and 0xff).toByte() }
+
+        runBlocking {
+            withContext(UploadProgress(
+                onBytes = { _, _ -> },
+                onTiming = { _, _ -> error("fixture telemetry failure") },
+            )) { http.perform(upload(audio), mayCharge = true) }
+        }
+
+        assertEquals(1, server.requestCount)
+        assertArrayEquals(audio, server.takeRequest().body.readByteArray())
+    }
+
     private fun request(): Request = Request.Builder()
         .url("https://api.groq.com/openai/v1/audio/transcriptions")
         .get()

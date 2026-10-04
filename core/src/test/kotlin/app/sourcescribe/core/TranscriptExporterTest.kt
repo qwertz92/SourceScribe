@@ -214,87 +214,59 @@ class TranscriptExporterTest {
     }
 
     @Test
-    fun generatedFilenamesLeadWithTheTitleAndStillCarryIdentity() {
+    fun generatedFilenameUsesSanitizedChannelAndTitleWithoutIdentityMetadata() {
         val document = document(
-            sourceId = "youtube:abc/../CON",
-            title = "title leads the name",
+            sourceId = "youtube:secret-video-id",
+            title = "../A:title",
         ).copy(
-            artifactId = "artifact/with\\separators",
-            language = "de\n..",
-            provenance = Provenance(
-                origin = Origin.YOUTUBE,
-                requestedModel = "model/with:*?",
-            ),
+            artifactId = "private-artifact-id",
+            language = "de",
+            createdAt = 1_782_000_000_000L,
+            source = document(title = "../A:title").source.copy(channel = "My channel/one"),
         )
 
         val fileName = TranscriptExporter.fileName(document, ExportFormat.MARKDOWN)
 
-        assertTrue(fileName, fileName.endsWith(".md"))
-        assertTrue(fileName, fileName.startsWith("title_leads_the_name-"))
-        assertTrue(fileName, fileName.contains("youtube_abc"))
-        assertTrue(fileName, fileName.contains("1970-01-01"))
+        assertEquals("My_channel_one - _A_title.md", fileName)
+        assertFalse(fileName, fileName.contains("secret-video-id"))
+        assertFalse(fileName, fileName.contains("private-artifact-id"))
+        assertFalse(fileName, fileName.contains("de"))
+        assertFalse(fileName, fileName.contains("2026"))
         assertFalse(fileName, fileName.contains('/'))
         assertFalse(fileName, fileName.contains('\\'))
-        assertFalse(fileName, fileName.contains(".."))
-        assertTrue(fileName, fileName.length <= 180)
-        assertNotEquals("title_leads_the_name.md", fileName)
     }
 
     @Test
-    fun theIdentityInAGeneratedNameIsADigestOfAStatedWidth() {
-        // Written down because the width is a bound the name depends on, not a formatting choice: the
-        // identity is what keeps two runs of one source apart once day, language and source id match.
-        val first = document()
-        val name = TranscriptExporter.fileName(first, ExportFormat.MARKDOWN)
-        val identity = name.removeSuffix(".md").substringAfterLast('-')
-        assertEquals(name, TranscriptExporter.SHORT_ID_BYTES * 2, identity.length)
-        assertTrue(name, identity.all { it in "0123456789abcdef" })
-
-        // A digest and not a prefix: two ids that share everything but their last character still differ.
-        assertNotEquals(
-            TranscriptExporter.fileName(first.copy(artifactId = "artifact-1-a"), ExportFormat.MARKDOWN),
-            TranscriptExporter.fileName(first.copy(artifactId = "artifact-1-b"), ExportFormat.MARKDOWN),
+    fun generatedFilenameOmitsMissingChannelAndFallsBackToImportNameThenTranscript() {
+        val imported = document(title = null).copy(
+            source = document(title = null).source.copy(fileName = "lecture.wav"),
+        )
+        val unnamed = document(title = null).copy(
+            source = document(title = null).source.copy(fileName = null),
         )
 
-        // The discriminator that separates two exports of one document is hashed to the same width.
-        val discriminated = TranscriptExporter.fileName(
-            first,
-            ExportFormat.MARKDOWN,
-            override = "Interview",
-            discriminator = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
-        )
-        assertEquals(
-            discriminated,
-            TranscriptExporter.SHORT_ID_BYTES * 2,
-            discriminated.removeSuffix(".md").substringAfterLast('-').length,
-        )
+        assertEquals("lecture.wav.txt", TranscriptExporter.fileName(imported, ExportFormat.TEXT))
+        assertEquals("transcript.md", TranscriptExporter.fileName(unnamed, ExportFormat.MARKDOWN))
     }
 
     @Test
-    fun twoArtifactsOfTheSameSourceNeverShareAGeneratedName() {
-        val first = document()
-        val second = first.copy(artifactId = "artifact-2")
-
-        assertNotEquals(
-            TranscriptExporter.fileName(first, ExportFormat.MARKDOWN),
-            TranscriptExporter.fileName(second, ExportFormat.MARKDOWN),
-        )
+    fun readableTitleUsesAvailableBudgetRatherThanTheOldFortyBytePartLimit() {
+        val title = "Episode ".repeat(10).trim()
+        assertEquals("${title.replace(' ', '_')}.txt", TranscriptExporter.fileName(document(title = title), ExportFormat.TEXT))
     }
 
     @Test
-    fun aVeryLongTitleYieldsSpaceInsteadOfTruncatingIdentityOrDiscriminator() {
+    fun aVeryLongTitleStaysWithinTheUtf8FilenameBudget() {
         val document = document(title = "T".repeat(400))
 
         val fileName = TranscriptExporter.fileName(
             document,
             ExportFormat.MARKDOWN,
-            discriminator = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
         )
 
-        assertTrue(fileName, fileName.length <= 180)
-        assertTrue(fileName, fileName.contains("youtube_BaW_jenozKc"))
+        assertTrue(fileName, fileName.toByteArray(Charsets.UTF_8).size <= 180)
         assertTrue(fileName, fileName.endsWith(".md"))
-        assertTrue(fileName, fileName.startsWith("T".repeat(40)))
+        assertTrue(fileName, fileName.startsWith("T".repeat(160)))
     }
 
     @Test
@@ -315,19 +287,15 @@ class TranscriptExporterTest {
     }
 
     @Test
-    fun aRepeatedExportOfAChosenNameGetsItsOwnFile() {
+    fun collisionSuffixFollowsTheChosenNameAndKeepsItsExtension() {
         val document = document()
         val first = TranscriptExporter.fileName(document, ExportFormat.MARKDOWN, override = "Interview")
-        val second = TranscriptExporter.fileName(document, ExportFormat.MARKDOWN, override = "Interview",
-            discriminator = "export-2")
-        val third = TranscriptExporter.fileName(document, ExportFormat.MARKDOWN, override = "Interview",
-            discriminator = "export-3")
+        val second = TranscriptExporter.fileName(document, ExportFormat.MARKDOWN, override = "Interview", collisionIndex = 1)
+        val third = TranscriptExporter.fileName(document, ExportFormat.MARKDOWN, override = "Interview", collisionIndex = 2)
 
         assertEquals("Interview.md", first)
-        assertNotEquals(first, second)
-        assertNotEquals(second, third)
-        assertTrue(second, second.startsWith("Interview-"))
-        assertTrue(second, second.endsWith(".md"))
+        assertEquals("Interview_1.md", second)
+        assertEquals("Interview_2.md", third)
     }
 
     @Test
@@ -378,7 +346,8 @@ class TranscriptExporterTest {
 
         val cyrillic = TranscriptExporter.fileName(document(title = "\u041f\u0440\u0438\u0432\u0435\u0442".repeat(80)), ExportFormat.MARKDOWN)
         assertTrue(cyrillic, cyrillic.toByteArray(Charsets.UTF_8).size <= 180)
-        assertTrue(cyrillic, cyrillic.contains("youtube_BaW_jenozKc"))
+        assertTrue(cyrillic, cyrillic.startsWith("\u041f\u0440\u0438\u0432\u0435\u0442".repeat(3)))
+        assertFalse(cyrillic, cyrillic.contains("youtube_BaW_jenozKc"))
     }
 
     @Test
@@ -395,43 +364,24 @@ class TranscriptExporterTest {
     }
 
     @Test
-    fun noPartOfANameMeasuredInCharactersPushesTheIdentityOutOfIt() {
-        // The budget left for the readable head was a byte limit minus the *character* count of the part that
-        // must survive, and a language or a source id made of three-byte characters makes those two differ by
-        // up to 52. This passed before that arithmetic was corrected, which is the finding: the head is
-        // capped at 40 bytes of its own and an overridden name at 160, so the caps kept every reachable name
-        // inside the limit while the arithmetic did not. The grid below is the widest set of parts the name
-        // builder accepts, so it pins the property to the arithmetic — and raising the title's share of the
-        // name stays the one-line change it looks like.
-        val plain = "youtube:BaW_jenozKc"
+    fun filenameAndCollisionSuffixBudgetsCountUtf8Bytes() {
         for (title in listOf("T".repeat(300), "あ".repeat(300))) {
-            for (sourceId in listOf(plain, "あ".repeat(40), "録音".repeat(30) + ".m4a")) {
-                for (language in listOf(null, "de")) {
-                    for (originalLanguage in listOf(null, "de", "あ".repeat(40))) {
-                        val base = document(title = title, sourceId = sourceId)
-                        val wide = base.copy(
-                            language = language,
-                            source = base.source.copy(originalLanguage = originalLanguage),
-                        )
-                        for (discriminator in listOf(null, "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee")) {
-                            for (override in listOf(null, "あ".repeat(200), "O".repeat(200))) {
-                                for ((format, rawExtension) in listOf(
-                                    ExportFormat.MARKDOWN to null,
-                                    ExportFormat.RAW to "字幕テキスト",
-                                    ExportFormat.RAW to "json3",
-                                )) {
-                                    val name = TranscriptExporter.fileName(
-                                        wide, format, override, discriminator, rawExtension,
-                                    )
-                                    assertTrue(name, name.toByteArray(Charsets.UTF_8).size <= 180)
-                                    // A name the reader chose ends where the reader ended it, unless a
-                                    // discriminator was appended; every generated name ends in the digest.
-                                    if (override != null && discriminator == null) continue
-                                    val identity = name.substringBeforeLast('.').substringAfterLast('-')
-                                    assertEquals(name, TranscriptExporter.SHORT_ID_BYTES * 2, identity.length)
-                                    assertTrue(name, identity.all { it in "0123456789abcdef" })
-                                }
-                            }
+            for (channel in listOf(null, "錄音".repeat(30))) {
+                val base = document(title = title).copy(source = document(title = title).source.copy(channel = channel))
+                for (collisionIndex in listOf(0, 1, 99)) {
+                    for (override in listOf(null, "あ".repeat(200), "O".repeat(200))) {
+                        for ((format, rawExtension, expectedExtension) in listOf(
+                            Triple(ExportFormat.MARKDOWN, null, "md"),
+                            Triple(ExportFormat.RAW, "字幕テキスト", "字幕テキ"),
+                            Triple(ExportFormat.RAW, "json3", "json3"),
+                        )) {
+                            val name = TranscriptExporter.fileName(
+                                base, format, override, collisionIndex, rawExtension,
+                            )
+                            assertTrue(name, name.toByteArray(Charsets.UTF_8).size <= 180)
+                            assertFalse(name, name.contains('\uFFFD'))
+                            if (collisionIndex > 0) assertTrue(name, name.substringBeforeLast('.').endsWith("_$collisionIndex"))
+                            assertTrue(name, name.endsWith(".$expectedExtension"))
                         }
                     }
                 }
@@ -585,7 +535,7 @@ class TranscriptExporterTest {
     }
 
     private fun document(
-        title: String = "A title",
+        title: String? = "A title",
         sourceId: String = "youtube:BaW_jenozKc",
         segments: List<Segment> = listOf(Segment("text")),
     ): TranscriptDocument = TranscriptDocument(

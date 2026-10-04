@@ -1,0 +1,11 @@
+<resources>
+    <string name="help_overlay_close">Close</string>
+    <string name="help_overlay_open_page">Open help page</string>
+    <string name="expert_options_header">Expert options</string>
+    <string name="expert_options_collapse">Collapse</string>
+    <string name="expert_status_available">Available</string>
+    <string name="expert_status_unavailable">Unavailable</string>
+    <string name="expert_status_choose_provider">Choose provider</string>
+    <string name="quick_start_label">Start with settings</string>
+    <string name="quick_start_explanation">Uses current settings. Their cost and upload rules still apply.</string>
+</resources>

@@ -3,7 +3,6 @@ package app.sourcescribe.core
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.nio.charset.StandardCharsets
-import java.security.MessageDigest
 import java.time.Instant
 import java.util.Locale
 
@@ -16,13 +15,8 @@ class TranscriptExportException(val reason: String) : IllegalArgumentException(r
 }
 
 object TranscriptExporter {
-    /**
-     * Budgets in UTF-8 bytes, because ext4, f2fs and FAT all cap a path component at 255 bytes rather than
-     * at 255 characters. A name written in Japanese or Cyrillic costs two to three bytes per character.
-     */
+    /** Conservative app filename budget; UTF-8 counting also bounds non-ASCII names. */
     private const val MAX_FILENAME_BYTES = 180
-    private const val MAX_FILENAME_PART_BYTES = 40
-    internal const val SHORT_ID_BYTES = 6
     /** Leaves room for the longest extension a provider raw payload can carry. */
     private const val MAX_FILENAME_STEM_BYTES = 160
     private val json = Json {
@@ -50,91 +44,39 @@ object TranscriptExporter {
         ExportFormat.RAW -> "raw"
     }
 
-    /**
-     * The generated file stem: readable title first, then the parts that keep two runs of the same
-     * source apart. The identity part is never truncated; only the title yields when the budget runs out.
-     */
-    fun generatedStem(document: TranscriptDocument, discriminator: String? = null): String {
-        val title = safePart(
-            document.source.title ?: document.source.fileName ?: "transcript",
-            "transcript",
-        )
-        val identity = identitySuffix(document) +
-            (discriminator?.let(::shortId)?.let { "-$it" } ?: "")
-        return compose(title, identity)
+    /** Generated names expose only a sanitized channel and title, or the best available source name. */
+    fun generatedStem(document: TranscriptDocument): String {
+        val source = document.source
+        val title = safePart(source.title.orEmpty(), "")
+            .ifBlank { safePart(source.fileName.orEmpty(), "") }
+            .ifBlank { "transcript" }
+        val channel = safePart(source.channel.orEmpty(), "")
+        return if (channel.isBlank()) title else "$channel - $title"
     }
 
     /** A user-chosen stem, sanitised. Provenance stays inside the document, so the name is the reader's. */
     fun customStem(value: String): String? =
         safePart(value, "", MAX_FILENAME_STEM_BYTES).takeIf { it.isNotBlank() }
 
-    /**
-     * The file name for one export. A discriminator, where given, separates this export from every other
-     * export of the same document, so the caller passes one exactly when a plain name would land on a file
-     * that already exists.
-     */
+    /** The collision index is chosen from names actually present in the user's selected folder. */
     fun fileName(
         document: TranscriptDocument,
         format: ExportFormat,
         override: String? = null,
-        discriminator: String? = null,
+        collisionIndex: Int = 0,
         rawExtension: String? = null,
     ): String {
+        require(collisionIndex >= 0)
         val chosen = override?.let(::customStem)
-        val stem = when {
-            chosen == null -> generatedStem(document, discriminator)
-            discriminator == null -> chosen
-            else -> compose(chosen, shortId(discriminator))
-        }
+        val stem = chosen ?: generatedStem(document)
         val suffix = ".${rawExtension?.let { safePart(it, "raw", 12) } ?: extension(format)}"
-        return takeBytes(stem, MAX_FILENAME_BYTES - byteSize(suffix)).trimEnd('.', ' ', '-', '_') + suffix
+        val collisionSuffix = if (collisionIndex == 0) "" else "_$collisionIndex"
+        val stemBudget = (MAX_FILENAME_BYTES - byteSize(suffix) - byteSize(collisionSuffix)).coerceAtLeast(1)
+        val shortened = takeBytes(stem, stemBudget).trimEnd('.', ' ', '-', '_').ifBlank { "transcript" }
+        return shortened + collisionSuffix + suffix
     }
 
-    private fun identitySuffix(document: TranscriptDocument): String {
-        val source = safePart(document.source.id, "source")
-        val language = safePart(document.language ?: document.source.originalLanguage ?: "lang-unknown", "lang-unknown")
-        val date = createdAtUtc(document.createdAt).take(10)
-        return listOf(date, language, source, shortId(document.artifactId)).joinToString("-")
-    }
-
-    /**
-     * Enough of an identifier to separate runs without turning the name into an identifier.
-     * A digest rather than a prefix, so two ids that merely share their opening characters still differ.
-     *
-     * A digest of n bytes reaches an even chance of a collision after about 1.18 times the square root of
-     * its value range. At four bytes that point sat near 77 000, and while only names that already agree on
-     * day, language and source compete for it, that argument is what made the width an assumption rather
-     * than a bound. Six bytes put the point near twenty million and make the argument unnecessary. The four
-     * extra characters come out of the title's share of the name, which is trimmed for the identity anyway.
-     */
-    private fun shortId(value: String): String {
-        val digest = MessageDigest.getInstance("SHA-256").digest(value.toByteArray(StandardCharsets.UTF_8))
-        return buildString(SHORT_ID_BYTES * 2) {
-            for (index in 0 until SHORT_ID_BYTES) append("%02x".format(digest[index]))
-        }
-    }
-
-    /** Joins a readable head with a suffix that must survive, trimming only the head. */
-    private fun compose(head: String, suffix: String): String {
-        val tail = "-$suffix"
-        val budget = (MAX_FILENAME_STEM_BYTES - byteSize(tail)).coerceAtLeast(1)
-        val shortened = takeBytes(head, budget).trimEnd('.', ' ', '-', '_').ifBlank { "transcript" }
-        return shortened + tail
-    }
-
-    /**
-     * The only length that means anything for a file name here: every limit in this file is a byte limit,
-     * while a Kotlin length counts UTF-16 units. The part that must survive used to be measured in units and
-     * subtracted from a byte limit, which handed the head a budget too large by the difference — up to 52
-     * bytes, since the language and the source id each reach 40 bytes and one unit can spend three of them.
-     *
-     * No name came out wrong because of it, and the reason is worth writing down rather than relying on
-     * again: the head carries a 40-byte cap of its own before it reaches [compose], an overridden name a
-     * 160-byte one, and those caps kept every reachable name inside the limit on their own. So the limits
-     * held through two bounds that know nothing about each other instead of through the arithmetic here,
-     * and raising the title's share of the name — the obvious next change to this file — would have been
-     * enough to start cutting the digest off the end, which is the one part that may never be shortened.
-     */
+    /** Counts a component's actual UTF-8 size within the app's filename budget. */
     private fun byteSize(value: String) = value.toByteArray(StandardCharsets.UTF_8).size
 
     fun supports(document: TranscriptDocument, format: ExportFormat): Boolean = when (format) {
@@ -526,7 +468,7 @@ object TranscriptExporter {
         return kept.toString()
     }
 
-    private fun safePart(value: String, fallback: String, maxBytes: Int = MAX_FILENAME_PART_BYTES): String {
+    private fun safePart(value: String, fallback: String, maxBytes: Int = MAX_FILENAME_STEM_BYTES): String {
         val cleaned = buildString {
             for (character in value.trim()) {
                 when {

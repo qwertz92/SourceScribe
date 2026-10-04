@@ -126,6 +126,7 @@ class MainViewModel @Inject constructor(
     val sources = records.observeSources().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val attempts = records.observeAttempts().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val artifacts = records.observeArtifacts().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val phaseTimings = records.observePhaseTimings().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val exports = records.observeExports().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val remoteDeletionJobIds = records.observeRemoteDeletionJobIds().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
@@ -159,21 +160,37 @@ class MainViewModel @Inject constructor(
     fun inspect(text: String, config: JobConfig) {
         val revision = previewRevision.incrementAndGet()
         action(revision) {
+            val previews = resolvePreviews(text, config)
+            if (revision == previewRevision.get()) {
+                abandonCurrentImports()
+                mutable.update { it.withDraft(config.copy(uploadApproved = false, captionTrackId = null, audioTrackId = null)).copy(previews = previews, message = null) }
+            }
+        }
+    }
+
+    /** Skips the manual preview, while preserving the ordinary source and job validation. */
+    fun quickStart(text: String, config: JobConfig, onCreated: () -> Unit = {}) {
+        if (screen.value.busy) { notice("ACTION_BUSY"); return }
+        val revision = previewRevision.incrementAndGet()
+        action(revision, starting = true) {
+            val previews = resolvePreviews(text, config)
+            if (revision != previewRevision.get()) return@action
+            abandonCurrentImports()
+            mutable.update { it.withDraft(config.copy(uploadApproved = false, captionTrackId = null, audioTrackId = null)).copy(previews = previews, message = null) }
+            if (createJobs(previews, screen.value.credentials)) withContext(Dispatchers.Main) { onCreated() }
+        }
+    }
+
+    private suspend fun resolvePreviews(text: String, config: JobConfig): List<SourcePreview> {
         val selected = config.copy(uploadApproved = false, captionTrackId = null, audioTrackId = null)
         val sources = SourceResolver.sharedText(text)
-        // Reading a YouTube address needs the engine. An address the resolver refused is reported without waiting.
         awaitEngine()
-        val previews = sources.map { source ->
+        return sources.map { source ->
             val resolved = coordinator.inspect(source)
             val captions = TrackSelection.captions(resolved, selected)
             val audio = TrackSelection.audio(resolved, null)
             SourcePreview(resolved, selected.copy(captionTrackId = captions.firstOrNull()?.id,
                 audioTrackId = audio?.id), records.latestJob(source.id)?.id)
-        }
-        if (revision == previewRevision.get()) {
-            abandonCurrentImports()
-            mutable.update { it.withDraft(selected).copy(previews = previews, message = null) }
-        }
         }
     }
 
@@ -189,21 +206,23 @@ class MainViewModel @Inject constructor(
     }
 
     fun startPreviews() = action(starting = true) {
-        val current = screen.value
-        val previews = current.previews.map { it.copy(config = configurationForStart(it.config, current.credentials)) }
+        createJobs(screen.value.previews, screen.value.credentials)
+    }
+
+    private suspend fun createJobs(selected: List<SourcePreview>, credentials: List<CredentialInfo>): Boolean {
+        val previews = selected.map { it.copy(config = configurationForStart(it.config, credentials)) }
         check(previews.isNotEmpty())
         previews.forEach { preview ->
-            val error = previewError(preview, current.credentials)
+            val error = previewError(preview, credentials)
             if (error != null) {
                 mutable.update { it.copy(message = error) }
-                return@action
+                return false
             }
         }
         coordinator.createBatch(previews.map { it.resolved.source to it.config })
-        previews.forEach { preview ->
-            SourceFiles.releasePreview(preview.resolved.source.id, previewOwner)
-        }
+        previews.forEach { preview -> SourceFiles.releasePreview(preview.resolved.source.id, previewOwner) }
         mutable.update { it.withDraft(it.draft?.copy(uploadApproved = false)).copy(previews = emptyList(), message = "JOBS_CREATED") }
+        return true
     }
 
     fun clearPreview() {

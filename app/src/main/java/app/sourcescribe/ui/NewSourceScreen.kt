@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -43,6 +44,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
@@ -88,6 +90,7 @@ internal fun NewSourceScreen(
     onNotice: (String) -> Unit,
     onSaveKeyterms: (String) -> Unit,
     onDeleteKeyterms: (String) -> Unit,
+    onQuickStart: () -> Unit = {},
 ) {
     val listState = rememberLazyListState()
     val checked = state.previews.isNotEmpty()
@@ -133,16 +136,23 @@ internal fun NewSourceScreen(
                 onSaveKeyterms, onDeleteKeyterms, openHelp, enabled = !state.starting)
         }
         if (!checked) item(key = "actions") {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 // As tall as the sentence while it is empty too, so the buttons stay where they are when it comes and goes.
                 ReservedText(
                     if (state.waitingForEngine) stringResource(R.string.engine_preparing) else "",
                     listOf(stringResource(R.string.engine_preparing)),
                     MaterialTheme.typography.bodySmall,
                 )
-                Button(inspect, Modifier.fillMaxWidth().heightIn(min = 52.dp), enabled = input.isNotBlank() && !state.busy) {
-                    Text(stringResource(R.string.inspect_source))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(inspect, Modifier.weight(1f).heightIn(min = 52.dp), enabled = input.isNotBlank() && !state.busy) {
+                        Text(stringResource(R.string.inspect_source))
+                    }
+                    OutlinedButton(onQuickStart, Modifier.weight(1f).heightIn(min = 52.dp),
+                        enabled = input.isNotBlank() && !state.busy) {
+                        Text(stringResource(R.string.quick_start_label))
+                    }
                 }
+                Text(stringResource(R.string.quick_start_explanation), style = MaterialTheme.typography.bodySmall)
                 OutlinedButton(onImport, Modifier.fillMaxWidth().heightIn(min = 52.dp), enabled = !state.busy) {
                     Text(stringResource(R.string.import_audio))
                 }
@@ -444,13 +454,14 @@ private fun ConfigControls(
     enabled: Boolean = true,
 ) {
     var advanced by rememberSaveable { mutableStateOf(false) }
+    var keytermSetName by rememberSaveable { mutableStateOf("") }
     val cap = MainViewModel.capabilities(config)
     // Items 8 and 9 in one place: what an option can do in this job. An option nothing in the chosen mode
-    // reads is left out — the mode control is a few rows above and the group moves as a whole — and one the
-    // chosen provider cannot do stays visible with the reason written under it.
+    // reads is left out — the mode control is a few rows above and the group moves as a whole — and an option
+    // the chosen provider cannot do stays visible with its short status and full reason under help.
     fun availability(option: ExpertOption) = ExpertOptions.availability(option, config, cap)
     fun shown(option: ExpertOption) = availability(option) != OptionAvailability.POINTLESS_FOR_MODE
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (localAudio) Text(stringResource(R.string.local_stt_mode))
         else Choice(stringResource(R.string.mode), stringResource(modeLabel(config.mode)), AcquisitionMode.entries,
             { modeName(it) }, enabled = enabled, info = HelpTopic.MODES, openHelp = openHelp) { change(config.copy(mode = it)) }
@@ -475,77 +486,93 @@ private fun ConfigControls(
             if (config.credentialId == null) Text(stringResource(R.string.no_provider_help), style = MaterialTheme.typography.bodySmall)
             LimitFields(config, type, edits, openHelp, enabled)
         }
-        TextButton({ advanced = !advanced }, enabled = enabled) { Text(stringResource(R.string.advanced)) }
-        if (advanced) {
-            // These five only steer which caption track is read, so a mode that reads none leaves them out.
-            if (shown(ExpertOption.ORIGINAL_LANGUAGE)) {
-                Toggle(R.string.original_language, config.preferOriginalLanguage, enabled) { change(config.copy(preferOriginalLanguage = it)) }
-                Toggle(R.string.uploader_captions, config.allowUploaderCaptions, enabled,
-                    info = HelpTopic.CAPTION_TRACK, openHelp = openHelp) { change(config.copy(allowUploaderCaptions = it)) }
-                Toggle(R.string.automatic_captions, config.allowAutomaticCaptions, enabled) { change(config.copy(allowAutomaticCaptions = it)) }
-                Toggle(R.string.translated_captions, config.allowTranslatedCaptions, enabled) { change(config.copy(allowTranslatedCaptions = it)) }
-                DraftTextField(edits.epoch(TypedSetting.CAPTION_LANGUAGES), config.preferredLanguages.joinToString(","), { typed ->
-                    type(TypedSetting.CAPTION_LANGUAGES) { it.copy(preferredLanguages = typed.split(',').map(String::trim).filter(String::isNotBlank)) }
-                }, enabled, label = { Text(stringResource(R.string.languages)) })
-            }
-            // Read in exactly one branch of `AcquisitionPlanner.plan`: captions first, a provider only if
-            // fetching them failed. In every other mode this switch did nothing at all (item 9).
-            if (shown(ExpertOption.FALLBACK_ON_CAPTION_ERROR)) {
-                Toggle(R.string.fallback_errors, config.fallbackOnCaptionError, enabled) { change(config.copy(fallbackOnCaptionError = it)) }
-            }
-            if (shown(ExpertOption.STT_LANGUAGE)) {
-                DraftTextField(edits.epoch(TypedSetting.STT_LANGUAGE), config.language.orEmpty(), { typed ->
-                    type(TypedSetting.STT_LANGUAGE) { it.copy(language = typed.ifBlank { null }) }
-                }, enabled, label = { Text(stringResource(R.string.stt_language)) })
-            }
-            // The four options a provider decides, plus the keyterm sets that feed one of them. All four share
-            // one mode rule — a job that may reach a provider — so one of them stands for the group here.
-            if (shown(ExpertOption.DIARIZATION)) {
-                val notes = optionNotes()
-                // What the model cannot do stays operable while it is still set, because it was set for a model
-                // chosen before and the preview refuses the job as UNSUPPORTED_OPTION until it is gone. Enabled
-                // only by the capability, a switch that was on sat greyed out where it could not be turned off.
-                OptionToggle(ExpertOption.DIARIZATION, R.string.diarization, config.diarization, config, cap, notes,
-                    enabled, HelpTopic.DIARIZATION, openHelp) { change(config.copy(diarization = it)) }
-                OptionToggle(ExpertOption.WORD_TIMESTAMPS, R.string.word_times, config.wordTimestamps, config, cap, notes,
-                    enabled, HelpTopic.TIMESTAMPS, openHelp) { change(config.copy(wordTimestamps = it)) }
-                OptionToggle(ExpertOption.SEGMENT_TIMESTAMPS, R.string.segment_times, config.segmentTimestamps, config, cap, notes,
-                    enabled, null, openHelp) { change(config.copy(segmentTimestamps = it)) }
-                // Always in its place, so choosing a model that takes no terms moves nothing below it.
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(stringResource(R.string.context_terms), Modifier.weight(1f),
-                        style = MaterialTheme.typography.labelLarge)
-                    InfoButton(HelpTopic.CONTEXT_TERMS, openHelp)
+        if (!advanced) TextButton({ advanced = true }, Modifier.heightIn(min = 48.dp), enabled = enabled) {
+            Text(stringResource(R.string.advanced))
+        }
+        if (advanced) Surface(
+            Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.medium,
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        ) {
+            Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(R.string.expert_options_header), Modifier.weight(1f).semantics { heading() },
+                        style = MaterialTheme.typography.titleMedium)
+                    TextButton({ advanced = false }, Modifier.heightIn(min = 48.dp), enabled = enabled) {
+                        Text(stringResource(R.string.expert_options_collapse))
+                    }
                 }
-                ReservedText(optionNote(ExpertOption.CONTEXT_TERMS, config, cap), notes,
-                    MaterialTheme.typography.bodySmall, Modifier.padding(horizontal = 4.dp),
-                    MaterialTheme.colorScheme.onSurfaceVariant)
-                val termsOperable = enabled && ExpertOptions.operable(ExpertOption.CONTEXT_TERMS, config, cap)
-                DraftTextField(edits.epoch(TypedSetting.CONTEXT_TERMS), config.contextTerms.joinToString("\n"), { typed ->
-                    type(TypedSetting.CONTEXT_TERMS) { it.copy(contextTerms = ContextTerms.withoutBlanks(typed.lines())) }
-                }, termsOperable, minLines = 2, maxLines = 4)
-                KeytermSetControls(config, keytermSets, termsOperable, openHelp, change, saveKeyterms, deleteKeyterms)
-            }
-            Toggle(R.string.retain_raw, config.retainRaw, enabled, info = HelpTopic.RETENTION, openHelp = openHelp) {
-                change(config.copy(retainRaw = it))
-            }
-            Toggle(R.string.unmetered, config.networkPolicy == NetworkPolicy.UNMETERED, enabled) {
-                change(config.copy(networkPolicy = if (it) NetworkPolicy.UNMETERED else NetworkPolicy.ANY))
-            }
-            // Nothing is downloaded in a caption-only job, so there is no downloaded audio to keep (item 9).
-            if (shown(ExpertOption.AUDIO_RETENTION)) {
-                Choice(stringResource(R.string.audio_retention), audioRetentionName(config.audioRetention), AudioRetention.entries,
-                    { audioRetentionName(it) }, enabled = enabled, info = HelpTopic.RETENTION, openHelp = openHelp) {
-                    change(config.copy(audioRetention = it))
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    // These five only steer which caption track is read, so a mode that reads none leaves them out.
+                    if (shown(ExpertOption.ORIGINAL_LANGUAGE)) {
+                        Toggle(R.string.original_language, config.preferOriginalLanguage, enabled) { change(config.copy(preferOriginalLanguage = it)) }
+                        Toggle(R.string.uploader_captions, config.allowUploaderCaptions, enabled,
+                            info = HelpTopic.CAPTION_TRACK, openHelp = openHelp) { change(config.copy(allowUploaderCaptions = it)) }
+                        Toggle(R.string.automatic_captions, config.allowAutomaticCaptions, enabled) { change(config.copy(allowAutomaticCaptions = it)) }
+                        Toggle(R.string.translated_captions, config.allowTranslatedCaptions, enabled) { change(config.copy(allowTranslatedCaptions = it)) }
+                        DraftTextField(edits.epoch(TypedSetting.CAPTION_LANGUAGES), config.preferredLanguages.joinToString(","), { typed ->
+                            type(TypedSetting.CAPTION_LANGUAGES) { it.copy(preferredLanguages = typed.split(',').map(String::trim).filter(String::isNotBlank)) }
+                        }, enabled, label = { Text(stringResource(R.string.languages)) })
+                    }
+                    // Read in exactly one branch of `AcquisitionPlanner.plan`: captions first, a provider only if
+                    // fetching them failed. In every other mode this switch did nothing at all (item 9).
+                    if (shown(ExpertOption.FALLBACK_ON_CAPTION_ERROR)) {
+                        Toggle(R.string.fallback_errors, config.fallbackOnCaptionError, enabled) { change(config.copy(fallbackOnCaptionError = it)) }
+                    }
+                    if (shown(ExpertOption.STT_LANGUAGE)) {
+                        DraftTextField(edits.epoch(TypedSetting.STT_LANGUAGE), config.language.orEmpty(), { typed ->
+                            type(TypedSetting.STT_LANGUAGE) { it.copy(language = typed.ifBlank { null }) }
+                        }, enabled, label = { Text(stringResource(R.string.stt_language)) })
+                    }
+                    // The four options a provider decides, plus the keyterm sets that feed one of them. All four share
+                    // one mode rule — a job that may reach a provider — so one of them stands for the group here.
+                    if (shown(ExpertOption.DIARIZATION)) {
+                        // A checked option stays operable when the current model rejects it so the reader can turn it off.
+                        OptionToggle(ExpertOption.DIARIZATION, R.string.diarization, config.diarization, config, cap,
+                            enabled, HelpTopic.DIARIZATION, openHelp) { change(config.copy(diarization = it)) }
+                        OptionToggle(ExpertOption.WORD_TIMESTAMPS, R.string.word_times, config.wordTimestamps, config, cap,
+                            enabled, HelpTopic.TIMESTAMPS, openHelp) { change(config.copy(wordTimestamps = it)) }
+                        OptionToggle(ExpertOption.SEGMENT_TIMESTAMPS, R.string.segment_times, config.segmentTimestamps, config, cap,
+                            enabled, HelpTopic.TIMESTAMPS, openHelp) { change(config.copy(segmentTimestamps = it)) }
+                        // Always in its place, so choosing a model that takes no terms moves nothing below it.
+                        val contextAvailability = availability(ExpertOption.CONTEXT_TERMS)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(stringResource(R.string.context_terms), Modifier.weight(1f),
+                                style = MaterialTheme.typography.labelLarge)
+                            ExpertAvailabilityStatus(contextAvailability)
+                            InfoButton(HelpTopic.CONTEXT_TERMS, openHelp,
+                                optionNote(contextAvailability, config).takeIf(String::isNotBlank))
+                        }
+                        val termsOperable = enabled && ExpertOptions.operable(ExpertOption.CONTEXT_TERMS, config, cap)
+                        DraftTextField(edits.epoch(TypedSetting.CONTEXT_TERMS), config.contextTerms.joinToString("\n"), { typed ->
+                            type(TypedSetting.CONTEXT_TERMS) { it.copy(contextTerms = ContextTerms.withoutBlanks(typed.lines())) }
+                        }, termsOperable, minLines = 2, maxLines = 4)
+                        KeytermSetControls(config, keytermSets, termsOperable, keytermSetName,
+                            { keytermSetName = it }, openHelp, change, saveKeyterms, deleteKeyterms)
+                    }
+                    Toggle(R.string.retain_raw, config.retainRaw, enabled, info = HelpTopic.RETENTION, openHelp = openHelp) {
+                        change(config.copy(retainRaw = it))
+                    }
+                    Toggle(R.string.unmetered, config.networkPolicy == NetworkPolicy.UNMETERED, enabled) {
+                        change(config.copy(networkPolicy = if (it) NetworkPolicy.UNMETERED else NetworkPolicy.ANY))
+                    }
+                    // Nothing is downloaded in a caption-only job, so there is no downloaded audio to keep (item 9).
+                    if (shown(ExpertOption.AUDIO_RETENTION)) {
+                        Choice(stringResource(R.string.audio_retention), audioRetentionName(config.audioRetention), AudioRetention.entries,
+                            { audioRetentionName(it) }, enabled = enabled, info = HelpTopic.RETENTION, openHelp = openHelp) {
+                            change(config.copy(audioRetention = it))
+                        }
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(stringResource(R.string.export_formats), Modifier.weight(1f))
+                        InfoButton(HelpTopic.EXPORT_FORMATS, openHelp)
+                    }
+                    ExportFormatChips(config.exportFormats, enabled) { selection ->
+                        change(config.copy(exportFormats = selection,
+                            retainRaw = config.retainRaw || ExportFormat.RAW in selection))
+                    }
                 }
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(R.string.export_formats), Modifier.weight(1f))
-                InfoButton(HelpTopic.EXPORT_FORMATS, openHelp)
-            }
-            ExportFormatChips(config.exportFormats, enabled) { selection ->
-                change(config.copy(exportFormats = selection,
-                    retainRaw = config.retainRaw || ExportFormat.RAW in selection))
             }
         }
     }
@@ -589,21 +616,37 @@ internal fun ExportFormatChips(
     }
 }
 
-/** Every sentence an option note can be, so the line that holds one keeps its height while it changes. */
-@Composable
-private fun optionNotes(): List<String> =
-    Provider.entries.map { stringResource(R.string.option_unavailable, providerName(it)) } +
-        stringResource(R.string.option_needs_provider)
-
 /** Why this option cannot be used, or an empty string while it can. */
 @Composable
-private fun optionNote(option: ExpertOption, config: JobConfig, cap: ProviderCapabilities?): String =
-    when (ExpertOptions.availability(option, config, cap)) {
+private fun optionNote(availability: OptionAvailability, config: JobConfig): String =
+    when (availability) {
         OptionAvailability.UNSUPPORTED_BY_PROVIDER -> stringResource(R.string.option_unavailable,
             config.provider?.let(::providerName) ?: stringResource(R.string.unknown))
         OptionAvailability.PROVIDER_NOT_CHOSEN -> stringResource(R.string.option_needs_provider)
         else -> ""
     }
+
+@Composable
+private fun expertStatusText(availability: OptionAvailability): String =
+    stringResource(when (availability) {
+        OptionAvailability.AVAILABLE -> R.string.expert_status_available
+        OptionAvailability.PROVIDER_NOT_CHOSEN -> R.string.expert_status_choose_provider
+        else -> R.string.expert_status_unavailable
+    })
+
+@Composable
+internal fun ExpertAvailabilityStatus(availability: OptionAvailability) {
+    val available = stringResource(R.string.expert_status_available)
+    val chooseProvider = stringResource(R.string.expert_status_choose_provider)
+    val unavailable = stringResource(R.string.expert_status_unavailable)
+    ReservedText(
+        expertStatusText(availability),
+        listOf(available, chooseProvider, unavailable),
+        MaterialTheme.typography.labelSmall,
+        Modifier.width(104.dp),
+        MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
 
 @Composable
 private fun OptionToggle(
@@ -612,18 +655,19 @@ private fun OptionToggle(
     checked: Boolean,
     config: JobConfig,
     cap: ProviderCapabilities?,
-    notes: List<String>,
     enabled: Boolean,
     info: HelpTopic?,
     openHelp: (HelpTopic) -> Unit,
     change: (Boolean) -> Unit,
 ) {
+    val availability = ExpertOptions.availability(option, config, cap)
+    val explanation = optionNote(availability, config)
     Toggle(
         label = label,
         checked = checked,
         enabled = enabled && ExpertOptions.operable(option, config, cap),
-        supporting = optionNote(option, config, cap),
-        supportingReserve = notes,
+        availabilityStatus = expertStatusText(availability),
+        helpExplanation = explanation.takeIf(String::isNotBlank),
         info = info,
         openHelp = openHelp,
         change = change,
@@ -642,12 +686,13 @@ private fun KeytermSetControls(
     config: JobConfig,
     sets: Map<String, List<String>>,
     enabled: Boolean,
+    name: String,
+    changeName: (String) -> Unit,
     openHelp: (HelpTopic) -> Unit,
     change: (JobConfig) -> Unit,
     save: (String) -> Unit,
     delete: (String) -> Unit,
 ) {
-    var name by rememberSaveable { mutableStateOf("") }
     val names = remember(sets) { KeytermSets.names(sets) }
     val none = stringResource(R.string.keyterm_set_none)
     Choice(
@@ -660,17 +705,17 @@ private fun KeytermSetControls(
         info = HelpTopic.CONTEXT_TERMS,
         openHelp = openHelp,
     ) { chosen ->
-        name = chosen
+        changeName(chosen)
         change(config.copy(contextTerms = sets[chosen].orEmpty()))
     }
-    OutlinedTextField(name, { name = it.take(KeytermSets.MAX_NAME_LENGTH) }, Modifier.fillMaxWidth(),
+    OutlinedTextField(name, { changeName(it.take(KeytermSets.MAX_NAME_LENGTH)) }, Modifier.fillMaxWidth(),
         enabled = enabled, singleLine = true, label = { Text(stringResource(R.string.keyterm_set_name)) })
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         TextButton({ save(name) }, Modifier.weight(1f).heightIn(min = 48.dp),
             enabled = enabled && name.isNotBlank() && ContextTerms.charged(config.contextTerms)) {
             Text(stringResource(R.string.keyterm_set_save))
         }
-        TextButton({ delete(name); name = "" }, Modifier.weight(1f).heightIn(min = 48.dp),
+        TextButton({ delete(name); changeName("") }, Modifier.weight(1f).heightIn(min = 48.dp),
             enabled = enabled && name.trim() in sets) {
             Text(stringResource(R.string.keyterm_set_delete))
         }

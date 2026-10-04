@@ -245,13 +245,18 @@ internal fun SettingsScreen(
                         model.changeSettings { it.copy(defaults = it.defaults.copy(exportTreeUri = null)) }
                     }) { Text(stringResource(R.string.export_tree_clear)) }
                     if (tree != null) TextButton({
-                        if (!openFolder(context, tree)) model.notice("NO_FOLDER_APP")
+                        if (!openFolder(context, tree, settings.chooseFolderApp)) model.notice("NO_FOLDER_APP")
                     }) { Text(stringResource(R.string.open_folder)) }
                 }
             }
         }
         item {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Choice(stringResource(R.string.folder_app_choice),
+                    stringResource(if (settings.chooseFolderApp) R.string.folder_app_ask else R.string.folder_app_default),
+                    listOf(true, false), { stringResource(if (it) R.string.folder_app_ask else R.string.folder_app_default) }) { ask ->
+                    model.changeSettings { it.copy(chooseFolderApp = ask) }
+                }
                 Text(stringResource(R.string.export_tree_per_format), style = MaterialTheme.typography.titleSmall)
                 Text(stringResource(R.string.export_tree_per_format_help), style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -363,15 +368,22 @@ internal fun SettingsScreen(
  * is the document URI of the folder that tree stands for, with the directory MIME type on it. Android has no
  * rule that such an app is installed, so the caller says so rather than letting the tap do nothing.
  */
-internal fun openFolder(context: android.content.Context, treeUri: String): Boolean = try {
+internal fun folderViewIntent(treeUri: String): Intent {
     val tree = treeUri.toUri()
     val folder = DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
-    context.startActivity(
-        Intent(Intent.ACTION_VIEW)
-            .setDataAndType(folder, DocumentsContract.Document.MIME_TYPE_DIR)
-            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK),
-    )
-    true
+    return Intent(Intent.ACTION_VIEW).setDataAndType(folder, DocumentsContract.Document.MIME_TYPE_DIR)
+        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PREFIX_URI_PERMISSION)
+        .apply { clipData = android.content.ClipData.newRawUri("Export folder", tree) }
+}
+
+internal fun openFolder(context: android.content.Context, treeUri: String, chooseApp: Boolean = true): Boolean = try {
+    val view = folderViewIntent(treeUri)
+    if (view.resolveActivity(context.packageManager) == null) false else {
+        val launch = if (chooseApp) Intent.createChooser(view, context.getString(R.string.folder_app_choice)) else view
+        context.startActivity(launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or
+            Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PREFIX_URI_PERMISSION))
+        true
+    }
 } catch (_: ActivityNotFoundException) {
     false
 } catch (_: IllegalArgumentException) {
@@ -381,7 +393,7 @@ internal fun openFolder(context: android.content.Context, treeUri: String): Bool
 }
 
 /** The folder a reader recognises, falling back to the storage identifier when no display name is readable. */
-private fun folderLabel(context: android.content.Context, treeUri: String): String? = try {
+internal fun folderLabel(context: android.content.Context, treeUri: String): String? = try {
     val tree = treeUri.toUri()
     val documentId = DocumentsContract.getTreeDocumentId(tree)
     val document = DocumentsContract.buildDocumentUriUsingTree(tree, documentId)

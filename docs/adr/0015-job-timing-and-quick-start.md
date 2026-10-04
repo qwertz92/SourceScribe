@@ -1,0 +1,13 @@
+# Recorded job times and quick start
+
+Date: 2026-10-03. Status: accepted for the owner's history and workflow improvements.
+
+History must describe the branch that produced an artifact, rather than treating a configured fallback provider as its provenance. Channel metadata comes from the existing source snapshot. A finished card has no live phase to reserve space for; live progress keeps its stable layout.
+
+Record a nullable job completion time and durable per-attempt phase measurements. Total time is completion minus job creation and includes queueing, network/provider waits and user pauses. Retrying the same job clears its completion time until it terminates again. Do not infer completion or phase durations for old records. Measure completed operations with a monotonic clock; persist an open measurement first, so process loss leaves an explicitly incomplete measurement. Accumulate retries by phase, retain incomplete spans and distinguish observed client/request time from unknown provider computation time. Upload body duration is measured at the transport boundary; do not count an entire synchronous transcription request as upload time or double-count upload in request time. Storage migration preserves existing jobs, artifacts and exports.
+
+Quick start performs the same source resolution, track selection, configuration validation, upload authorization and batch creation as Check followed by Start, using the configuration captured by that button press. It skips the manual preview step, not source checks or budget/network limits. Ambiguous or unsupported selections leave the normal preview available for correction; they never switch source, provider or budget silently. Starting consecutive batches is deliberate; input remains available for the next paste.
+
+Generated export names are sanitized channel plus title, without permanent identity hashes. Only an existing name in that destination adds a numeric suffix. Internal artifact IDs and content hashes remain unchanged. External folder opening uses Android document URIs and the system app chooser, with an optional preference for Android's default handler; no hardcoded dependency on a particular file manager. The viewer receives read access to the selected export tree and its descendants, without write or persistable grants. Multiple configured or previously used destinations are selected before opening the app chooser.
+
+Clear quick-start input only if its revision still matches the submitted revision. An identical later paste or share is new input and must remain pending. Dynamic folder labels reserve two lines while being loaded, so the folder-selection dialog does not shift.

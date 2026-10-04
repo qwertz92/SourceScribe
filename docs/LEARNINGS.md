@@ -39,6 +39,8 @@
   `DexingNoClasspathTransform` complained about a path differing only in letter case; two runs named two
   different, sometimes unchanged, classes. Fixed with `rm -rf core/build` from WSL and `--no-watch-fs` —
   empty the build folder rather than chasing the named class.
+  Reproduced on 4 October 2026: cached classes used the Windows `Projects/SourceScribe` spelling while a
+  lowercased build root failed. Reusing that canonical spelling made DEX merge pass without changing the class.
 - **Don't edit the repository during a running build.** A string inserted after R generation made
   `compileDebugKotlin` fail on an "unresolved reference" that no longer existed by the time the message
   appeared. Batch changes and apply them between runs.
@@ -226,3 +228,20 @@ recorded so the investigation is not repeated.
   owner installing the old GitHub version. Complete owner-authorized delivery with a signed tag, published APK,
   latest-release check and an unauthenticated download whose SHA-256 matches. Then remove obsolete local APKs;
   keep one current signed artifact, source tags, the release key and verification receipts.
+
+## History and workflow, 4 October 2026
+
+- **Recheck cancellation after telemetry setup and immediately before submission.** Timing inserts and progress
+  updates suspend. A Room trigger that cancels during the SUBMIT timing insert reproduced one unwanted fixture
+  request with the earlier fence placement; the guard must run after those awaits, next to `adapter.submit`.
+- **Use the resumed Activity and traverse each current accessibility node in UI fixtures.** Rotation can replace
+  the Activity; breadth-first traversal must call `node.getChild`, and nested help buttons must win over clickable
+  ancestors. Check an actual tap before treating a fixture timeout as a production failure.
+- **Progress storage is an observer, not a prerequisite for accepting a provider response.** An injected ordinary
+  progress-update failure hid a durably spooled accepted response behind `SENDING` after one fixture request.
+  Route every progress write through the same best-effort helper, preserve cancellation, and keep receipt/state
+  persistence outside that helper. Timing and progress failures must never trigger a paid replay.
+- **Do not act on removed Compose accessibility nodes.** On the API 37 emulator, even a newly queried root
+  returned cached virtual nodes whose `refresh()` failed after scrolling. Clear UiAutomation's cache on API 34+
+  and reacquire a valid node before acting; the installed SDK's API metadata places `clearCache()` at API 34.
+  Contextual full-help navigation scrolls to its topic, so assert that destination rather than an offscreen search field.

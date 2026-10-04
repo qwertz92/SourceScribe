@@ -9,11 +9,14 @@ import java.util.Locale
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
-import kotlin.coroutines.resume
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -58,65 +61,69 @@ class ProviderHttp(client: OkHttpClient = OkHttpClient()) {
         val counted = if (progress == null || body == null || !isUploadBody(operation, body)) request
         else request.newBuilder().method(request.method, CountingBody(body, progress)).build()
         val call = client.newCall(counted)
-        return suspendCancellableCoroutine { continuation ->
-            continuation.invokeOnCancellation { call.cancel() }
-            call.enqueue(object : Callback {
-                override fun onFailure(call: Call, e: IOException) {
-                    if (continuation.isActive) continuation.resumeWithException(ProviderError(
-                        if (mayCharge) ProviderErrorCode.SUBMISSION_UNCERTAIN else ProviderErrorCode.NETWORK,
-                        failure = ProviderFailure(operation = operation),
-                    ))
-                }
-
-                override fun onResponse(call: Call, response: Response) {
-                    try {
-                        val bytes = response.use {
-                            if (!it.isSuccessful) throw statusError(it, mayCharge, operation)
-                            val body = it.body
-                            if (body.contentLength() > MAX_RESPONSE_BYTES) {
-                                throw responseSizeError(mayCharge)
-                            }
-                            body.byteStream().use { input ->
-                                val output = ByteArrayOutputStream()
-                                val buffer = ByteArray(8192)
-                                while (continuation.isActive) {
-                                    val size = input.read(buffer)
-                                    if (size < 0) break
-                                    if (output.size() > MAX_RESPONSE_BYTES - size) {
-                                        throw responseSizeError(mayCharge)
-                                    }
-                                    output.write(buffer, 0, size)
-                                }
-                                output.toByteArray()
-                            }
-                        }
-                        if (continuation.isActive) {
-                            try {
-                                spool?.save(bytes)
-                            } catch (cancelled: CancellationException) {
-                                throw cancelled
-                            } catch (_: Exception) {
-                                throw spoolError(mayCharge)
-                            }
-                            if (continuation.isActive) continuation.resume(bytes)
-                        }
-                    } catch (failure: ProviderError) {
-                        if (continuation.isActive) continuation.resumeWithException(failure)
-                    } catch (cancelled: CancellationException) {
-                        if (continuation.isActive) continuation.resumeWithException(cancelled)
-                    } catch (_: IOException) {
-                        if (continuation.isActive) continuation.resumeWithException(ProviderError(
-                            if (mayCharge) ProviderErrorCode.SUBMISSION_UNCERTAIN else ProviderErrorCode.NETWORK,
-                            failure = ProviderFailure(operation = operation),
-                        ))
-                    } catch (_: Exception) {
+        return try {
+            suspendCancellableCoroutine { continuation ->
+                continuation.invokeOnCancellation { call.cancel() }
+                call.enqueue(object : Callback {
+                    override fun onFailure(call: Call, e: IOException) {
                         if (continuation.isActive) continuation.resumeWithException(ProviderError(
                             if (mayCharge) ProviderErrorCode.SUBMISSION_UNCERTAIN else ProviderErrorCode.NETWORK,
                             failure = ProviderFailure(operation = operation),
                         ))
                     }
-                }
-            })
+
+                    override fun onResponse(call: Call, response: Response) {
+                        try {
+                            val bytes = response.use {
+                                if (!it.isSuccessful) throw statusError(it, mayCharge, operation)
+                                val body = it.body
+                                if (body.contentLength() > MAX_RESPONSE_BYTES) {
+                                    throw responseSizeError(mayCharge)
+                                }
+                                body.byteStream().use { input ->
+                                    val output = ByteArrayOutputStream()
+                                    val buffer = ByteArray(8192)
+                                    while (continuation.isActive) {
+                                        val size = input.read(buffer)
+                                        if (size < 0) break
+                                        if (output.size() > MAX_RESPONSE_BYTES - size) {
+                                            throw responseSizeError(mayCharge)
+                                        }
+                                        output.write(buffer, 0, size)
+                                    }
+                                    output.toByteArray()
+                                }
+                            }
+                            if (continuation.isActive) {
+                                try {
+                                    spool?.save(bytes)
+                                } catch (cancelled: CancellationException) {
+                                    throw cancelled
+                                } catch (_: Exception) {
+                                    throw spoolError(mayCharge)
+                                }
+                                if (continuation.isActive) continuation.resume(bytes)
+                            }
+                        } catch (failure: ProviderError) {
+                            if (continuation.isActive) continuation.resumeWithException(failure)
+                        } catch (cancelled: CancellationException) {
+                            if (continuation.isActive) continuation.resumeWithException(cancelled)
+                        } catch (_: IOException) {
+                            if (continuation.isActive) continuation.resumeWithException(ProviderError(
+                                if (mayCharge) ProviderErrorCode.SUBMISSION_UNCERTAIN else ProviderErrorCode.NETWORK,
+                                failure = ProviderFailure(operation = operation),
+                            ))
+                        } catch (_: Exception) {
+                            if (continuation.isActive) continuation.resumeWithException(ProviderError(
+                                if (mayCharge) ProviderErrorCode.SUBMISSION_UNCERTAIN else ProviderErrorCode.NETWORK,
+                                failure = ProviderFailure(operation = operation),
+                            ))
+                        }
+                    }
+                })
+            }
+        } finally {
+            if (progress != null) withContext(NonCancellable) { progress.awaitBodyWriters() }
         }
     }
 
@@ -265,17 +272,31 @@ class ProviderHttp(client: OkHttpClient = OkHttpClient()) {
         override fun isDuplex() = delegate.isDuplex()
 
         override fun writeTo(sink: BufferedSink) {
-            val total = delegate.contentLength()
-            var written = 0L
-            val counting = object : ForwardingSink(sink) {
-                override fun write(source: Buffer, byteCount: Long) {
-                    super.write(source, byteCount)
-                    written += byteCount
-                    progress.onBytes(written, total)
+            progress.bodyStarted()
+            val startedAt = System.currentTimeMillis()
+            val startedNanos = System.nanoTime()
+            try {
+                val total = delegate.contentLength()
+                var written = 0L
+                val counting = object : ForwardingSink(sink) {
+                    override fun write(source: Buffer, byteCount: Long) {
+                        super.write(source, byteCount)
+                        written += byteCount
+                        progress.onBytes(written, total)
+                    }
+                }.buffer()
+                delegate.writeTo(counting)
+                counting.flush()
+            } finally {
+                val elapsedNanos = (System.nanoTime() - startedNanos).coerceAtLeast(0)
+                try {
+                    progress.onTiming?.invoke(startedAt, elapsedNanos)
+                } catch (_: Exception) {
+                    // Optional timing must never alter request, retry, or cancellation behavior.
+                } finally {
+                    progress.bodyFinished()
                 }
-            }.buffer()
-            delegate.writeTo(counting)
-            counting.flush()
+            }
         }
     }
 
@@ -313,9 +334,41 @@ class ProviderHttp(client: OkHttpClient = OkHttpClient()) {
  * is built by the provider adapter: every adapter would otherwise have to carry a progress argument through a
  * concern none of them has. [onBytes] is called from the thread OkHttp writes the body on, once per written
  * block, so it has to be cheap and safe to call from another thread; a caller that writes anywhere expensive
- * hands the number on rather than doing the work there. [total] is -1 for a body of unknown length.
+ * hands the number on rather than doing the work there. [onTiming], when supplied, receives the body-write
+ * start time and monotonic elapsed nanoseconds after each counted body finishes. [total] is -1 for a body of
+ * unknown length.
  */
-class UploadProgress(val onBytes: (written: Long, total: Long) -> Unit) :
+class UploadProgress(
+    val onBytes: (written: Long, total: Long) -> Unit,
+    val onTiming: ((startedAtUtc: Long, elapsedNanos: Long) -> Unit)?,
+) :
     AbstractCoroutineContextElement(UploadProgress) {
+    private val bodyLock = Any()
+    private var activeBodyWriters = 0
+    private var idleBodyWriters = CompletableDeferred(Unit)
+
+    constructor(onBytes: (written: Long, total: Long) -> Unit) : this(onBytes, null)
+
+    internal fun bodyStarted() = synchronized(bodyLock) {
+        if (activeBodyWriters == 0) idleBodyWriters = CompletableDeferred()
+        activeBodyWriters++
+    }
+
+    internal fun bodyFinished() {
+        val idle = synchronized(bodyLock) {
+            activeBodyWriters--
+            check(activeBodyWriters >= 0)
+            idleBodyWriters.takeIf { activeBodyWriters == 0 }
+        }
+        idle?.complete(Unit)
+    }
+
+    internal suspend fun awaitBodyWriters() {
+        while (true) {
+            val active = synchronized(bodyLock) { idleBodyWriters.takeIf { activeBodyWriters > 0 } }
+            active?.await() ?: return
+        }
+    }
+
     companion object Key : CoroutineContext.Key<UploadProgress>
 }

@@ -149,6 +149,56 @@ class JobCardLayoutTest {
     }
 
     @Test
+    fun terminalAttemptLinesDoNotReserveEmptyTrackProgressOrErrorSlots() {
+        val base = AttemptRow(
+            id = "terminal", jobId = "job", branch = Branch.STT, number = 1, createdAt = 0L,
+            state = ExecutionState.FINISHED, phase = Phase.PERSIST,
+        )
+        val details = base.copy(
+            phase = Phase.DOWNLOAD_AUDIO,
+            checkpoint = Json.encodeToString(StoredAudio(TRACK)),
+            processedBytes = 2_400_000L,
+            totalBytes = 5_200_000L,
+            error = "AUDIO_LONGER_THAN_LIMIT",
+        )
+        val keys = SCALES.flatMap { scale -> listOf("empty", "recorded details").map { key(scale, it) } }
+        val heights = ConcurrentHashMap<String, Int>()
+
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            scenario.onActivity { activity ->
+                activity.setContent {
+                    MaterialTheme {
+                        Column(Modifier.verticalScroll(rememberScrollState())) {
+                            val density = LocalDensity.current.density
+                            for (scale in SCALES) {
+                                CompositionLocalProvider(LocalDensity provides Density(density, scale)) {
+                                    for ((name, attempt) in listOf("empty" to base, "recorded details" to details)) {
+                                        Box(Modifier.width(WIDTH).onSizeChanged { heights[key(scale, name)] = it.height }) {
+                                            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                                AttemptLines(attempt) {}
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            val deadline = System.nanoTime() + TIMEOUT_NANOS
+            while (heights.size < keys.size && System.nanoTime() < deadline) Thread.sleep(POLL_MS)
+        }
+
+        assertEquals("Slots that were laid out", keys.toSet(), heights.keys.toSet())
+        for (scale in SCALES) {
+            val emptyHeight = heights.getValue(key(scale, "empty"))
+            val detailsHeight = heights.getValue(key(scale, "recorded details"))
+            assertTrue("Font scale $scale: terminal phase line has no height", emptyHeight > 0)
+            assertTrue("Font scale $scale: real terminal details should be shown", detailsHeight > emptyHeight)
+        }
+    }
+
+    @Test
     fun collapsedPhaseAndTransferLinesKeepTheirHeightAndOnlyShowRealTransfers() {
         val base = AttemptRow(
             id = "summary", jobId = "job", branch = Branch.STT, number = 1, createdAt = 0L,

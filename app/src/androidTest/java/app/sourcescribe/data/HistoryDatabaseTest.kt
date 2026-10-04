@@ -77,7 +77,10 @@ class HistoryDatabaseTest {
                 )
                 dao.insertSubmission(submission)
 
+                val cancelledAtOrAfter = System.currentTimeMillis()
                 assertTrue(dao.requestDeletion(seeded.job.id))
+                val cancelledJob = requireNotNull(dao.job(seeded.job.id))
+                assertTrue(requireNotNull(cancelledJob.finishedAt) >= cancelledAtOrAfter)
 
                 assertEquals(
                     JobRow(
@@ -89,6 +92,7 @@ class HistoryDatabaseTest {
                         outcome = Outcome.CANCELLED,
                         cancelRequested = true,
                         deleteRequested = true,
+                        finishedAt = cancelledJob.finishedAt,
                     ),
                     dao.job(seeded.job.id),
                 )

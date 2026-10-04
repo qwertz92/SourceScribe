@@ -156,12 +156,6 @@ class StatedNumbersTest {
         // An address is kept whole or not at all, and this is where "not at all" begins.
         assertEquals(32768, ExtractorMetadata.MAX_URL_LENGTH)
 
-        // How much of a digest goes into an export file name. Six bytes rather than four is a decision the
-        // comment beside it argues out: it puts an even chance of two names colliding near twenty million
-        // instead of near seventy-seven thousand. Three tests read the length back from this constant, so
-        // until round 12 the argument fixed nothing at all.
-        assertEquals(6, TranscriptExporter.SHORT_ID_BYTES)
-
         // What one upload may weigh at Groq. It documents 25 MB on the free tier and 100 MB on the
         // developer tier, and this app cannot tell which tier a key holds, so it holds everyone to the
         // smaller figure. OpenAI's own 25 MB is a provider number and stays in the group above.
@@ -496,7 +490,6 @@ class StatedNumbersTest {
             "ReportedModel.MAX_LENGTH",
             "ShareCache.MAX_AGE_MS",
             "SyncTranscriptParser.MAX_PROMPT_BYTES",
-            "TranscriptExporter.SHORT_ID_BYTES",
             "Warnings.LIMIT", "Warnings.KIND_LIMIT",
         )
     }

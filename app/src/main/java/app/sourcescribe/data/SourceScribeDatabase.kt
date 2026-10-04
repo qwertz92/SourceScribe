@@ -57,7 +57,38 @@ data class JobRow(
     val outcome: Outcome = Outcome.NONE,
     val cancelRequested: Boolean = false,
     @androidx.room.ColumnInfo(defaultValue = "0") val deleteRequested: Boolean = false,
+    val finishedAt: Long? = null,
 )
+
+/** One durable measurement per observed span; null elapsed time means completion was not observed. */
+@Entity(
+    tableName = "phase_timings",
+    foreignKeys = [ForeignKey(entity = AttemptRow::class, parentColumns = ["id"], childColumns = ["attemptId"], onDelete = ForeignKey.CASCADE)],
+    indices = [Index("attemptId")],
+)
+data class PhaseTimingRow(
+    @PrimaryKey val id: String,
+    val attemptId: String,
+    val phase: Phase,
+    val startedAt: Long,
+    @androidx.room.ColumnInfo(defaultValue = "NULL") val elapsedMs: Long? = null,
+)
+
+internal fun JobRow.transitionTo(state: ExecutionState, outcome: Outcome, now: Long): JobRow {
+    val terminal = state in JOB_TERMINAL_STATES
+    val wasTerminal = this.state in JOB_TERMINAL_STATES
+    return copy(
+        state = state,
+        outcome = outcome,
+        finishedAt = when {
+            !terminal -> null
+            !wasTerminal -> now
+            else -> finishedAt
+        },
+    )
+}
+
+private val JOB_TERMINAL_STATES = setOf(ExecutionState.FINISHED, ExecutionState.CANCELLED)
 
 @Entity(tableName = "attempts", foreignKeys = [ForeignKey(entity = JobRow::class, parentColumns = ["id"], childColumns = ["jobId"], onDelete = ForeignKey.RESTRICT)], indices = [Index("jobId"), Index(value = ["jobId", "branch", "number"], unique = true), Index(value = ["state", "nextAt"])])
 data class AttemptRow(
@@ -146,6 +177,7 @@ abstract class SourceScribeDao {
     @Query("SELECT * FROM jobs ORDER BY createdAt DESC") abstract fun observeJobs(): Flow<List<JobRow>>
     @Query("SELECT * FROM sources") abstract fun observeSources(): Flow<List<SourceRow>>
     @Query("SELECT * FROM attempts ORDER BY createdAt") abstract fun observeAttempts(): Flow<List<AttemptRow>>
+    @Query("SELECT * FROM phase_timings ORDER BY startedAt,id") abstract fun observePhaseTimings(): Flow<List<PhaseTimingRow>>
     @Query("SELECT * FROM artifacts ORDER BY createdAt DESC") abstract fun observeArtifacts(): Flow<List<ArtifactRow>>
     @Query("SELECT * FROM exports ORDER BY createdAt DESC") abstract fun observeExports(): Flow<List<ExportRow>>
     @Query("SELECT DISTINCT attempts.jobId FROM submissions INNER JOIN attempts ON attempts.id = submissions.attemptId WHERE submissions.provider = 'ASSEMBLYAI' AND submissions.remoteId IS NOT NULL AND submissions.state != 'REMOTE_DELETED'")
@@ -167,6 +199,7 @@ abstract class SourceScribeDao {
     @Query("DELETE FROM sources WHERE id = :id AND NOT EXISTS (SELECT 1 FROM jobs WHERE sourceId = :id)") abstract suspend fun deleteUnusedSource(id: String)
     @Query("SELECT * FROM sources WHERE id = :id") abstract suspend fun source(id: String): SourceRow?
     @Query("SELECT * FROM attempts WHERE id = :id") abstract suspend fun attempt(id: String): AttemptRow?
+    @Query("SELECT * FROM phase_timings WHERE attemptId = :attemptId ORDER BY startedAt,id") abstract suspend fun timingsForAttempt(attemptId: String): List<PhaseTimingRow>
     @Query("SELECT * FROM attempts WHERE jobId = :jobId ORDER BY createdAt") abstract suspend fun attempts(jobId: String): List<AttemptRow>
     @Query("SELECT * FROM attempts WHERE state = 'RUNNING'") abstract suspend fun interrupted(): List<AttemptRow>
     @Query("SELECT DISTINCT attempts.* FROM attempts INNER JOIN artifacts ON artifacts.attemptId = attempts.id WHERE attempts.state = 'FINISHED'") abstract suspend fun completedWithArtifacts(): List<AttemptRow>
@@ -189,6 +222,7 @@ abstract class SourceScribeDao {
     @Update abstract suspend fun updateSource(row: SourceRow)
     @Insert abstract suspend fun insertJob(row: JobRow)
     @Insert abstract suspend fun insertAttempt(row: AttemptRow)
+    @Insert abstract suspend fun insertPhaseTiming(row: PhaseTimingRow)
     @Insert abstract suspend fun insertArtifact(row: ArtifactRow)
     @Insert abstract suspend fun insertSubmission(row: SubmissionRow)
     @Insert abstract suspend fun insertExport(row: ExportRow)
@@ -196,6 +230,8 @@ abstract class SourceScribeDao {
     @Update abstract suspend fun updateAttempt(row: AttemptRow)
     @Update abstract suspend fun updateSubmission(row: SubmissionRow)
     @Update abstract suspend fun updateExport(row: ExportRow)
+    @Query("UPDATE phase_timings SET elapsedMs = :elapsedMs,startedAt = COALESCE(:startedAt,startedAt) WHERE id = :id AND elapsedMs IS NULL") abstract suspend fun finishPhaseTiming(id: String, elapsedMs: Long, startedAt: Long?): Int
+    @Query("DELETE FROM phase_timings WHERE id = :id AND elapsedMs IS NULL") abstract suspend fun discardPhaseTiming(id: String): Int
     @Insert(onConflict = OnConflictStrategy.REPLACE) abstract suspend fun recordEngine(row: EngineRow)
     @Query("SELECT * FROM jobs WHERE sourceId = :sourceId ORDER BY createdAt DESC LIMIT 1") abstract suspend fun latestJob(sourceId: String): JobRow?
 
@@ -223,8 +259,7 @@ abstract class SourceScribeDao {
         if (job(id) == null) return false
         cancelJob(id)
         val cancelled = requireNotNull(job(id))
-        updateJob(cancelled.copy(deleteRequested = true, cancelRequested = true,
-            state = ExecutionState.CANCELLED, outcome = Outcome.CANCELLED))
+        updateJob(cancelled.copy(deleteRequested = true, cancelRequested = true))
         return true
     }
 
@@ -233,7 +268,8 @@ abstract class SourceScribeDao {
         val job = job(id) ?: return false
         val active = attempts(id).filter { it.state !in setOf(ExecutionState.FINISHED, ExecutionState.CANCELLED) }
         if (job.cancelRequested || active.isEmpty()) return false
-        updateJob(job.copy(cancelRequested = true, state = ExecutionState.CANCELLED, outcome = Outcome.CANCELLED))
+        updateJob(job.transitionTo(ExecutionState.CANCELLED, Outcome.CANCELLED, System.currentTimeMillis())
+            .copy(cancelRequested = true))
         for (row in active) {
             val pending = submissions(row.id).map { it.state }
             val uncertain = pending.any { it in setOf(SubmissionState.SENDING, SubmissionState.UNCERTAIN) }
@@ -279,6 +315,13 @@ abstract class SourceScribeDao {
         updateAttempt(row)
         return true
     }
+    @Transaction
+    open suspend fun beginPhaseTiming(row: PhaseTimingRow, owner: String): Boolean {
+        val held = attempt(row.attemptId) ?: return false
+        if (held.leaseOwner != owner || held.leaseUntil <= System.currentTimeMillis() || held.state != ExecutionState.RUNNING) return false
+        insertPhaseTiming(row)
+        return true
+    }
     @Query("UPDATE attempts SET state = 'WAITING_USER',error = 'SCHEDULING_FAILED',nextAt = 0 WHERE id = :id AND leaseOwner IS NULL AND state IN ('QUEUED','WAITING_NETWORK','WAITING_RATE_LIMIT','WAITING_REMOTE')")
     abstract suspend fun schedulingFailed(id: String): Int
 
@@ -309,11 +352,18 @@ class DatabaseTypes {
     @TypeConverter fun submission(value: String): SubmissionState = SubmissionState.valueOf(value)
 }
 
-@Database(entities = [SourceRow::class, JobRow::class, AttemptRow::class, ArtifactRow::class, SubmissionRow::class, ExportRow::class, ResourceLease::class, EngineRow::class], version = 4, exportSchema = true)
+@Database(entities = [SourceRow::class, JobRow::class, AttemptRow::class, PhaseTimingRow::class, ArtifactRow::class, SubmissionRow::class, ExportRow::class, ResourceLease::class, EngineRow::class], version = 5, exportSchema = true)
 @TypeConverters(DatabaseTypes::class)
 abstract class SourceScribeDatabase : RoomDatabase() {
     abstract fun records(): SourceScribeDao
     companion object {
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE jobs ADD COLUMN finishedAt INTEGER")
+                db.execSQL("CREATE TABLE IF NOT EXISTS phase_timings (id TEXT NOT NULL, attemptId TEXT NOT NULL, phase TEXT NOT NULL, startedAt INTEGER NOT NULL, elapsedMs INTEGER DEFAULT NULL, PRIMARY KEY(id), FOREIGN KEY(attemptId) REFERENCES attempts(id) ON UPDATE NO ACTION ON DELETE CASCADE)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_phase_timings_attemptId ON phase_timings(attemptId)")
+            }
+        }
         val MIGRATION_3_4 = object : Migration(3, 4) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE artifacts ADD COLUMN displayName TEXT")

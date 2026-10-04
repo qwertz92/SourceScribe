@@ -19,11 +19,13 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import app.sourcescribe.MainActivity
 import app.sourcescribe.MainViewModel
 import app.sourcescribe.R
 import app.sourcescribe.core.ExportFormat
 import app.sourcescribe.core.JobConfig
+import app.sourcescribe.core.OptionAvailability
 import app.sourcescribe.core.Provider
 import app.sourcescribe.core.Region
 import java.util.concurrent.ConcurrentHashMap
@@ -126,6 +128,60 @@ class NewSourceLayoutTest {
             }
         }
         assertSameHeightPerScale("option note", states.keys, measure(states))
+    }
+
+    @Test
+    fun expertAvailabilityStaysInACompactStableSlot() {
+        val states = linkedMapOf<String, @Composable () -> Unit>(
+            // Keep the help target present in both measurements; without it the label gets more width, so
+            // font scale 2 wraps differently and the comparison falsely attributes that width change to status.
+            "switch with help" to {
+                Toggle(R.string.diarization, checked = false, enabled = true,
+                    info = HelpTopic.DIARIZATION, openHelp = {}, helpExplanation = "") {}
+            },
+            "available" to {
+                Toggle(R.string.diarization, checked = false, enabled = true,
+                    availabilityStatus = stringResource(R.string.expert_status_available),
+                    info = HelpTopic.DIARIZATION, openHelp = {}, helpExplanation = "") {}
+            },
+            "provider needed" to {
+                Toggle(R.string.diarization, checked = false, enabled = true,
+                    availabilityStatus = stringResource(R.string.expert_status_choose_provider),
+                    info = HelpTopic.DIARIZATION, openHelp = {}, helpExplanation = "Choose a provider first") {}
+            },
+            "provider limitation" to {
+                Toggle(R.string.diarization, checked = true, enabled = true,
+                    availabilityStatus = stringResource(R.string.expert_status_unavailable),
+                    info = HelpTopic.DIARIZATION, openHelp = {}, helpExplanation = "Not available with AssemblyAI") {}
+            },
+        )
+        val heights = measure(states)
+        assertSameHeightPerScale("expert availability status", states.keys.drop(1), heights)
+        for (scale in SCALES) {
+            val plain = heights.getValue(key(scale, "switch with help"))
+            val withStatus = heights.getValue(key(scale, "provider limitation"))
+            assertTrue("Font scale $scale: capability status added more than one text line ($plain vs $withStatus)",
+                withStatus <= plain + (48 * InstrumentationRegistry.getInstrumentation()
+                    .targetContext.resources.displayMetrics.density).toInt())
+        }
+    }
+
+    @Test
+    fun contextAvailabilityWrapsAtLargeTextAndReservesEveryStatusHeight() {
+        // The old one-line ellipsis hid "Choose provider" at 200 %; all three states now share the wrapped
+        // height of the longest localized status while the full explanation remains behind its help button.
+        val states = linkedMapOf<String, @Composable () -> Unit>(
+            "one line" to {
+                Text("x", Modifier.width(104.dp), style = MaterialTheme.typography.labelSmall)
+            },
+            "available" to { ExpertAvailabilityStatus(OptionAvailability.AVAILABLE) },
+            "provider needed" to { ExpertAvailabilityStatus(OptionAvailability.PROVIDER_NOT_CHOSEN) },
+            "provider limitation" to { ExpertAvailabilityStatus(OptionAvailability.UNSUPPORTED_BY_PROVIDER) },
+        )
+        val heights = measure(states)
+        assertSameHeightPerScale("context availability status", states.keys.drop(1), heights)
+        assertTrue("Font scale 2: provider guidance did not wrap in its 104 dp slot",
+            heights.getValue(key(2f, "provider needed")) > heights.getValue(key(2f, "one line")))
     }
 
     private fun providerNameOf(provider: Provider) = when (provider) {

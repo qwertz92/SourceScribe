@@ -1,0 +1,11 @@
+<resources>
+    <string name="help_overlay_close">Schließen</string>
+    <string name="help_overlay_open_page">Hilfeseite öffnen</string>
+    <string name="expert_options_header">Expertenoptionen</string>
+    <string name="expert_options_collapse">Einklappen</string>
+    <string name="expert_status_available">Verfügbar</string>
+    <string name="expert_status_unavailable">Nicht verfügbar</string>
+    <string name="expert_status_choose_provider">Anbieter wählen</string>
+    <string name="quick_start_label">Mit Einstellungen starten</string>
+    <string name="quick_start_explanation">Es gelten die aktuellen Einstellungen sowie deren Kosten- und Uploadregeln.</string>
+</resources>

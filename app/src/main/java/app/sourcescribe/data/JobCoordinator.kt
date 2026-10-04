@@ -70,6 +70,7 @@ class JobCoordinator @Inject constructor(
     private val providerHttp: ProviderHttp,
 ) {
     private val json = Json { encodeDefaults = true }
+    private val phaseTimings = PhaseTimings(dao)
     private val startup = Mutex()
     private val lifecycle = SourceFiles.mutex
     private val executing = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
@@ -193,6 +194,7 @@ class JobCoordinator @Inject constructor(
         val resumed = database.withTransaction {
             val job = requireNotNull(dao.job(jobId))
             check(!job.cancelRequested && !job.deleteRequested)
+            if (job.finishedAt != null) dao.updateJob(job.copy(finishedAt = null))
             val attempts = dao.attempts(jobId)
             if (attempts.any { it.id in executing }) throw JobActionException("JOB_STILL_RUNNING")
             attempts.filter { it.state == ExecutionState.WAITING_USER }.map { row ->
@@ -255,7 +257,8 @@ class JobCoordinator @Inject constructor(
                 previous.filter { it.state !in setOf(ExecutionState.FINISHED, ExecutionState.CANCELLED) }.forEach {
                     dao.updateAttempt(it.copy(state = ExecutionState.CANCELLED, outcome = Outcome.CANCELLED, leaseOwner = null, leaseUntil = 0))
                 }
-                dao.updateJob(job.copy(cancelRequested = false, state = ExecutionState.QUEUED, outcome = Outcome.NONE))
+                dao.updateJob(job.transitionTo(ExecutionState.QUEUED, Outcome.NONE, System.currentTimeMillis())
+                    .copy(cancelRequested = false))
                 created.forEach { dao.insertAttempt(it) }
                 reused.forEach { dao.insertSubmission(it) }
             }
@@ -423,7 +426,9 @@ class JobCoordinator @Inject constructor(
             // reason, the way SttStep says it, instead of ending in a `single` that throws without a name (round 17).
             val installation = engines.installations().firstOrNull { it.id == row.engineId && it.healthy }
                 ?: return row.copy(state = ExecutionState.WAITING_USER, error = "ENGINE_NOT_AVAILABLE")
-            val resolved = extractor.resolve(requireNotNull(checkpoint.source), engines.file(installation))
+            val resolved = phaseTimings.measure(row, owner, Phase.RESOLVE) {
+                extractor.resolve(requireNotNull(checkpoint.source), engines.file(installation))
+            }
             val choices = TrackSelection.captions(resolved, config)
             if (choices.isEmpty()) {
                 if (config.captionTrackId != null) return row.copy(state = ExecutionState.WAITING_USER, error = "CAPTION_TRACK_CHANGED")
@@ -435,33 +440,42 @@ class JobCoordinator @Inject constructor(
             checkpoint = checkpoint.copy(source = resolved.source, caption = track, rawExtension = track.format)
             row = row.copy(phase = Phase.FETCH_CAPTIONS, checkpoint = json.encodeToString(checkpoint))
             if (!dao.saveClaimed(row, owner)) throw CancellationException()
-            val raw = extractor.caption(resolved, track, engines.file(installation), directory)
-            val parsed = CaptionParser.parse(raw.toString(Charsets.UTF_8), track.format)
-            val document = TranscriptDocument(artifactId = checkpoint.artifactId, source = resolved.source, acquisition = config,
-                provenance = Provenance(Origin.YOUTUBE, track.generation, track.translation, captionTrack = track,
-                    languageEvidence = track.evidence, engineVersions = mapOf("yt-dlp" to installation.version, "yt-dlp-ejs" to installation.ejsVersion)),
-                language = track.language, scope = TranscriptScope(resolved.source.durationMs, technicallyComplete = parsed.technicallyComplete),
-                segments = parsed.segments, warnings = parsed.warnings, createdAt = checkpoint.artifactCreatedAt,
-                rawHash = sha256(raw))
-            if (config.retainRaw) atomicWrite(AtomicFile(File(directory, "raw.${track.format}")), raw)
-            atomicWrite(normalized, json.encodeToString(document).toByteArray())
+            val raw = phaseTimings.measure(row, owner, Phase.FETCH_CAPTIONS) {
+                extractor.caption(resolved, track, engines.file(installation), directory)
+            }
+            row = row.copy(phase = Phase.NORMALIZE)
+            if (!dao.saveClaimed(row, owner)) throw CancellationException()
+            phaseTimings.measure(row, owner, Phase.NORMALIZE) {
+                val parsed = CaptionParser.parse(raw.toString(Charsets.UTF_8), track.format)
+                val document = TranscriptDocument(artifactId = checkpoint.artifactId, source = resolved.source, acquisition = config,
+                    provenance = Provenance(Origin.YOUTUBE, track.generation, track.translation, captionTrack = track,
+                        languageEvidence = track.evidence, engineVersions = mapOf("yt-dlp" to installation.version, "yt-dlp-ejs" to installation.ejsVersion)),
+                    language = track.language, scope = TranscriptScope(resolved.source.durationMs, technicallyComplete = parsed.technicallyComplete),
+                    segments = parsed.segments, warnings = parsed.warnings, createdAt = checkpoint.artifactCreatedAt,
+                    rawHash = sha256(raw))
+                if (config.retainRaw) atomicWrite(AtomicFile(File(directory, "raw.${track.format}")), raw)
+                atomicWrite(normalized, json.encodeToString(document).toByteArray())
+            }
         }
         row = row.copy(phase = Phase.PERSIST)
         if (!dao.saveClaimed(row, owner)) throw CancellationException()
-        val document = json.decodeFromString<TranscriptDocument>(boundedJsonText(readAttemptFile(normalized, ArtifactFiles.MAX_CANONICAL_BYTES).toString(Charsets.UTF_8)))
-        if (!persistedCaptionBindingMatches(row, config, checkpoint, document)) {
-            throw JobActionException("NORMALIZED_ARTIFACT_INVALID")
-        }
-        val raw = if (config.retainRaw) {
-            if (checkpoint.rawExtension !in setOf("vtt", "srt", "json3")) throw JobActionException("NORMALIZED_ARTIFACT_INVALID")
-            readAttemptFile(AtomicFile(File(directory, "raw.${checkpoint.rawExtension}")), ArtifactFiles.MAX_RAW_BYTES)
-        } else null
-        val stored = artifacts.write(document, raw, if (raw != null) checkpoint.rawExtension else null)
-        database.withTransaction {
-            val held = dao.attempt(row.id)
-            if (held?.leaseOwner != owner || held.leaseUntil <= System.currentTimeMillis()) throw CancellationException()
-            if (dao.artifact(document.artifactId) == null) dao.insertArtifact(ArtifactRow(document.artifactId, row.jobId, row.id, row.branch,
-                document.createdAt, stored.sha256, stored.bytes, document.language, null, document.scope.confirmedComplete, document.warnings.size))
+        val document = phaseTimings.measure(row, owner, Phase.PERSIST) {
+            val document = json.decodeFromString<TranscriptDocument>(boundedJsonText(readAttemptFile(normalized, ArtifactFiles.MAX_CANONICAL_BYTES).toString(Charsets.UTF_8)))
+            if (!persistedCaptionBindingMatches(row, config, checkpoint, document)) {
+                throw JobActionException("NORMALIZED_ARTIFACT_INVALID")
+            }
+            val raw = if (config.retainRaw) {
+                if (checkpoint.rawExtension !in setOf("vtt", "srt", "json3")) throw JobActionException("NORMALIZED_ARTIFACT_INVALID")
+                readAttemptFile(AtomicFile(File(directory, "raw.${checkpoint.rawExtension}")), ArtifactFiles.MAX_RAW_BYTES)
+            } else null
+            val stored = artifacts.write(document, raw, if (raw != null) checkpoint.rawExtension else null)
+            database.withTransaction {
+                val held = dao.attempt(row.id)
+                if (held?.leaseOwner != owner || held.leaseUntil <= System.currentTimeMillis()) throw CancellationException()
+                if (dao.artifact(document.artifactId) == null) dao.insertArtifact(ArtifactRow(document.artifactId, row.jobId, row.id, row.branch,
+                    document.createdAt, stored.sha256, stored.bytes, document.language, null, document.scope.confirmedComplete, document.warnings.size))
+            }
+            document
         }
         return row.copy(state = ExecutionState.FINISHED, outcome = if (!document.scope.confirmedComplete) Outcome.PARTIAL_SUCCESS
             else if (document.warnings.isNotEmpty()) Outcome.SUCCESS_WITH_WARNINGS else Outcome.SUCCESS, error = null)
@@ -594,7 +608,7 @@ class JobCoordinator @Inject constructor(
         }
         val state = states.firstOrNull { it == ExecutionState.RUNNING } ?: states.firstOrNull() ?: ExecutionState.FINISHED
         val outcome = if (remaining.isNotEmpty()) Outcome.NONE else AcquisitionPlanner.outcome(config.mode, saved.map { it.branch }.toSet(), saved.any { it.warningCount > 0 }, saved.all { it.complete == true })
-        val updated = job.copy(state = state, outcome = outcome)
+        val updated = job.transitionTo(state, outcome, System.currentTimeMillis())
         dao.updateJob(updated)
         notifications.update(updated, attempts, notifyCompletion)
     }
@@ -612,11 +626,11 @@ class JobCoordinator @Inject constructor(
                 error = "JOB_CONFIG_INVALID", leaseOwner = null, leaseUntil = 0,
             ))
         }
-        dao.updateJob(job.copy(
-            state = when { job.cancelRequested -> ExecutionState.CANCELLED
-                uncertain -> ExecutionState.SUBMISSION_UNCERTAIN; else -> ExecutionState.WAITING_USER },
-            outcome = if (job.cancelRequested) Outcome.CANCELLED else Outcome.FAILED,
-        ))
+        val state = when { job.cancelRequested -> ExecutionState.CANCELLED
+            uncertain -> ExecutionState.SUBMISSION_UNCERTAIN; else -> ExecutionState.WAITING_USER }
+        dao.updateJob(job.transitionTo(state,
+            if (job.cancelRequested) Outcome.CANCELLED else Outcome.FAILED,
+            System.currentTimeMillis()))
         return null
     }
 

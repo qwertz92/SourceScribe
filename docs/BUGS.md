@@ -1,6 +1,6 @@
 # Known bugs
 
-**As of:** 3 October 2026. Published release 0.4.1 (versionCode 4), signed tag `v0.4.1` at `9de3509`, has
+**As of:** 4 October 2026. Published release 0.4.1 (versionCode 4), signed tag `v0.4.1` at `9de3509`, has
 signed/pushed implementation `297e553` and passed build, device, signing and in-place upgrade gates. This is the one list of every known, unfixed item, with its
 location, trigger, evidence, and priority in one place — `docs/DEFECTS.md` no longer exists; what used to live there
 is folded into the entry for its number below. Item 1 is the still-open feedback from the 10 September 2026 device
@@ -9,7 +9,7 @@ not recall what was meant, and comes back only if it is reported again. Item 74 
 measured 200% layout checks passed; item 73 remains open for the specific running-worker network interruption.
 Offline startup and automatic unmetered wakeup passed; they do not exercise that running interruption.
 Closed, and kept only as a number so references stay valid, are 3, 4, 6, 7, 8, 9, 12, 13, 17, 18, 19, 20, 23, 31,
-32, 36, 41, 42, 47, 54, 56, 57, 58, 59, 60, 63, and 74; what each of them was and which commit closed it is in
+32, 36, 41, 42, 47, 54, 56, 57, 58, 59, 60, 63, 71, and 74; what each of them was and which commit closed it is in
 `docs/HISTORY.md` and in git.
 
 ## Scale
@@ -236,6 +236,21 @@ release notes suggest it holds up. On 14 September 2026 the owner decided that t
   open until that transition confirms the waiting reason and automatic resume.
 - **Missing to close:** on a device, move a network-required job offline and then onto an unmetered connection;
   verify the card names the constraint and the work resumes without user action.
+
+### 75. Cancellation immediately before body writing can leave upload timing incomplete (P3)
+
+- **Date:** 2026-10-04.
+- **Location:** `ProviderHttp.CountingBody`, `UploadProgress.awaitBodyWriters`, and `SttStep.countingUpload`.
+- **Trigger:** OkHttp passes its final exchange cancellation check, then cancellation occurs just before the
+  counted body writer starts. The writer count can still be zero when cancellation cleanup snapshots timing.
+- **Expected vs. actual:** the cancelled upload should retain every observed body duration; a late callback can
+  instead miss the final snapshot. An open timing row stays explicitly incomplete. Callbacks only update atomics;
+  no second provider request or changed submission/job state is demonstrated.
+- **Evidence:** independent native Luna review of cached OkHttp 5.5.0 bytecode, whose relevant classes match the
+  Android AAR; the transport is cancelled too. The scheduling race was not reproduced dynamically and provider
+  acceptance cannot be inferred from it.
+- **To close / effort:** deterministic late-writer scheduling fixture and a call-lifecycle completion boundary,
+  estimated several hours. Deferred because the supported effect is rare missing cancellation timing.
 
 ## P4
 
@@ -605,18 +620,18 @@ release notes suggest it holds up. On 14 September 2026 the owner decided that t
 - **Effort to close:** none planned; would need a real job hitting each of the remaining codes, which is not
   something to manufacture on purpose.
 
-### 71. The reserved note line under four provider-decided switches costs a blank line when it has nothing to say (P4, deliberate)
+### 76. Quick-start revision regression does not drive the Android share-intent boundary (P4)
 
-- **Location:** `Components.kt`'s `Toggle` (`supportingReserve`), used by the four provider-capability switches in
-  `NewSourceScreen.kt` added for items 8 and 9 of the 0.4.0 plan.
-- **What happens:** the note line under speaker separation, word timestamps, segment timestamps, and context terms
-  always reserves its height, so when a provider supports the option, the line is present but empty.
-- **Why it stands (a deliberate decision, not an oversight):** the alternative — the note appearing only when there
-  is something to say — was measured to move the whole advanced-options block by 84 pixels at font scale 2 every
-  time the provider changes, which the owner's standing no-jump rule forbids. The empty line is the smaller,
-  chosen cost.
-- **Effort to change:** about half an hour to move the note into the help topic instead, but that trades the blank
-  line for the exact layout shift this decision avoids — a question for the owner, not a defect to fix silently.
+- **Date:** 4 October 2026.
+- **Location:** `QuickStartInputTest.kt` and `MainActivity.kt` (`onNewIntent`, shared-source revision).
+- **Precondition:** a quick start is resolving while an identical link is shared into the activity again.
+- **Expected vs. actual coverage:** the later input must remain pending. The guard regression exercises both
+  revisions and passes, but increments the revision directly rather than delivering the second Android intent.
+  Source review confirms that every share currently increments the revision; no failing production flow is demonstrated.
+- **Evidence:** final native Luna quick-start/folder review, 4 October 2026; the guard's controlled old comparison
+  clears the later input and fails its regression assertion.
+- **To close:** drive a second `ACTION_SEND` through the activity while the first resolution is blocked, then
+  assert the pending input remains. Estimated effort: one to two hours; deferred as test coverage, not a user defect.
 
 ## User decisions
 

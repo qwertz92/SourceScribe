@@ -23,6 +23,8 @@ import java.util.concurrent.CancellationException
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /** Writes an already committed artifact to a user-selected SAF tree. */
@@ -34,6 +36,7 @@ class ExportStore @Inject constructor(
 ) {
     private val appContext = context.applicationContext
     private val resolver = appContext.contentResolver
+    private val nameReservation = Mutex()
 
     suspend fun export(artifactId: String, format: ExportFormat, treeUri: String): ExportRow {
         val document = artifacts.read(artifactId)
@@ -134,17 +137,15 @@ class ExportStore @Inject constructor(
             if (!isDirectory) throw IOException("export tree is not a directory")
 
             val chosenName = dao.artifact(row.artifactId)?.displayName
-            // A chosen name belongs to the reader, so the first export into a given extension keeps it exactly.
-            // A second one would land on that same file, so only that one carries the per-export discriminator.
-            // A row without a document URI names no file: either it never created one, or `reconcile` asked
-            // the provider and was told the document is gone. An interrupted write is not that case — its
-            // file exists, because the URI is only stored once `createDocument` has returned.
-            val repeated = dao.exports(row.artifactId).any {
-                it.id != row.id && it.documentUri != null && targetExtension(it)?.equals(payload.extension) != false
-            }
-            val fileName = collisionSafeFileName(document, format, row.id, payload.extension, chosenName, repeated)
-            val createdDocument = DocumentsContract.createDocument(resolver, parent, payload.mimeType, fileName)
-                ?: throw IOException("export document could not be created")
+            val createdDocument = reserveAndCreate(
+                tree = tree,
+                parent = parent,
+                format = format,
+                document = document,
+                mimeType = payload.mimeType,
+                rawExtension = payload.extension,
+                override = chosenName,
+            )
             documentUri = createdDocument.toString()
             val writing = row.copy(state = ExportState.WRITING, documentUri = documentUri, error = null, verification = null)
             dao.updateExport(writing)
@@ -177,6 +178,86 @@ class ExportStore @Inject constructor(
         } catch (failure: IllegalArgumentException) {
             val remainingUri = cleanup(documentUri)
             return updateAfterFailure(row, ExportState.FAILED, failureCategory(failure), remainingUri)
+        }
+    }
+
+    /** Reserves the visible name in this SAF folder before creating the document. */
+    private suspend fun reserveAndCreate(
+        tree: Uri,
+        parent: Uri,
+        format: ExportFormat,
+        document: TranscriptDocument,
+        mimeType: String,
+        rawExtension: String,
+        override: String?,
+    ): Uri = nameReservation.withLock {
+        val parentId = DocumentsContract.getDocumentId(parent)
+        var existingNames = childDisplayNames(tree, parentId)
+        var collisionIndex = 0
+        var result: Uri? = null
+        while (result == null) {
+            val fileName = TranscriptExporter.fileName(
+                document = document,
+                format = format,
+                override = override,
+                rawExtension = rawExtension,
+                collisionIndex = collisionIndex,
+            )
+            if (fileName in existingNames) {
+                collisionIndex++
+                continue
+            }
+
+            try {
+                val created = DocumentsContract.createDocument(resolver, parent, mimeType, fileName)
+                if (created != null) {
+                    result = created
+                    continue
+                }
+            } catch (failure: IOException) {
+                existingNames = childDisplayNames(tree, parentId)
+                if (fileName in existingNames) {
+                    collisionIndex++
+                    continue
+                }
+                throw failure
+            }
+
+            existingNames = childDisplayNames(tree, parentId)
+            if (fileName in existingNames) {
+                collisionIndex++
+                continue
+            }
+            throw IOException("export document could not be created")
+        }
+        requireNotNull(result)
+    }
+
+    private fun childDisplayNames(tree: Uri, parentId: String): Set<String> {
+        val children = DocumentsContract.buildChildDocumentsUriUsingTree(tree, parentId)
+        try {
+            val cursor = resolver.query(
+                children,
+                arrayOf(DocumentsContract.Document.COLUMN_DISPLAY_NAME),
+                null,
+                null,
+                null,
+            ) ?: throw IOException("export folder contents are unavailable")
+            return cursor.use {
+                val displayName = it.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
+                if (displayName < 0) throw IOException("export folder names are unavailable")
+                buildSet {
+                    while (it.moveToNext()) {
+                        add(it.getString(displayName) ?: throw IOException("export folder contains an unnamed document"))
+                    }
+                }
+            }
+        } catch (failure: SecurityException) {
+            throw failure
+        } catch (failure: IOException) {
+            throw failure
+        } catch (failure: RuntimeException) {
+            throw IOException("export folder contents are unavailable", failure)
         }
     }
 
@@ -307,35 +388,6 @@ class ExportStore @Inject constructor(
         private const val ERROR_EXPORT_INTERRUPTED = "EXPORT_INTERRUPTED"
         private const val ERROR_RAW_NOT_RETAINED = "RAW_NOT_RETAINED"
         private const val ERROR_TOO_LARGE = "TOO_LARGE"
-
-        /**
-         * A generated name always carries a per-export discriminator, so two exports never collide silently.
-         * A chosen name keeps its exact wording and only takes the discriminator when this export would
-         * otherwise write the very same file name a previous export of this artifact already produced.
-         */
-        internal fun collisionSafeFileName(
-            document: TranscriptDocument,
-            format: ExportFormat,
-            exportId: String,
-            rawExtension: String? = null,
-            override: String? = null,
-            repeated: Boolean = false,
-        ): String = TranscriptExporter.fileName(
-            document = document,
-            format = format,
-            override = override,
-            discriminator = exportId.takeIf { override == null || repeated },
-            rawExtension = rawExtension,
-        )
-
-        /**
-         * The extension an earlier export wrote. A raw export takes it from the retained provider file,
-         * which the export row does not record, so that case answers null and counts as a possible repeat.
-         */
-        private fun targetExtension(export: ExportRow): String? {
-            val format = runCatching { ExportFormat.valueOf(export.format) }.getOrNull() ?: return null
-            return if (format == ExportFormat.RAW) null else TranscriptExporter.extension(format)
-        }
 
         private fun extension(format: ExportFormat): String = when (format) {
             ExportFormat.MARKDOWN -> "md"

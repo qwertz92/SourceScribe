@@ -63,6 +63,7 @@ import app.sourcescribe.data.JobActions
 import app.sourcescribe.data.JobRow
 import app.sourcescribe.data.JobSituation
 import app.sourcescribe.data.JobWaits
+import app.sourcescribe.data.PhaseTimingRow
 import app.sourcescribe.data.QueueReason
 import app.sourcescribe.data.SourceRow
 import app.sourcescribe.data.SttStep
@@ -100,6 +101,9 @@ internal fun HistoryScreen(
     model: MainViewModel,
     notificationsDisabled: Boolean,
     openHelp: (HelpTopic) -> Unit,
+    phaseTimings: List<PhaseTimingRow> = emptyList(),
+    onOpenFolders: () -> Unit = {},
+    hasExportFolders: Boolean = false,
     prepareAgain: (String) -> Unit,
 ) {
     var confirmation by remember { mutableStateOf<Pair<String, Int>?>(null) }
@@ -121,18 +125,21 @@ internal fun HistoryScreen(
     var query by rememberSaveable { mutableStateOf("") }
     var filter by rememberSaveable { mutableStateOf(HistoryFilter.ALL) }
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
-    LaunchedEffect(jobs.any { it.state == ExecutionState.WAITING_REMOTE }) {
-        while (jobs.any { it.state == ExecutionState.WAITING_REMOTE }) { delay(1000); now = System.currentTimeMillis() }
+    val hasUnfinishedJobs = jobs.any { it.state !in setOf(ExecutionState.FINISHED, ExecutionState.CANCELLED) }
+    LaunchedEffect(hasUnfinishedJobs) {
+        while (hasUnfinishedJobs) { delay(1000); now = System.currentTimeMillis() }
     }
     val sourceNames = remember(sources) { sources.associate { it.id to it.title } }
     // Whether a source is a downloaded video or a file already on the device decides whether resolving it
     // needs the network at all, which is what a queued job's own line is allowed to claim.
     val sourceKinds = remember(sources) { sources.associate { it.id to decodeStoredSourceKind(it.snapshot) } }
+    val sourceChannels = remember(sources) { sources.associate { it.id to decodeStoredSourceChannel(it.snapshot) } }
     // The date has to be searchable in the form the card shows it; the raw millisecond count matches nothing a reader types.
     val dateFormat = remember { DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT) }
     val visible = jobs.filter { job ->
         filter.matches(job) &&
-            "${sourceNames[job.sourceId]} ${job.sourceId} ${dateFormat.format(Date(job.createdAt))} ${job.config}"
+            historySearchText(sourceNames[job.sourceId], job.sourceId, sourceChannels[job.sourceId],
+                dateFormat.format(Date(job.createdAt)), job.config)
                 .contains(query, ignoreCase = true)
     }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -155,6 +162,11 @@ internal fun HistoryScreen(
         if (notificationsDisabled && jobs.isNotEmpty()) item {
             Text(stringResource(R.string.notifications_denied), style = MaterialTheme.typography.bodySmall)
         }
+        if (hasExportFolders || exports.any { it.documentUri != null }) item {
+            TextButton(onOpenFolders, Modifier.heightIn(min = 48.dp)) {
+                Text(stringResource(R.string.history_export_folders))
+            }
+        }
         if (exports.isNotEmpty()) item { TextButton({ model.reconcileExports() }) { Text(stringResource(R.string.check_exports)) } }
         if (jobs.isNotEmpty() && visible.isEmpty()) item {
             Text(stringResource(if (query.isBlank()) R.string.no_filter_matches else R.string.no_matches))
@@ -164,20 +176,25 @@ internal fun HistoryScreen(
             Text(stringResource(R.string.no_jobs_help), Modifier.padding(top = 12.dp))
         }
         items(visible, key = { it.id }) { job ->
+            val jobAttempts = attempts.filter { it.jobId == job.id }
+            val jobAttemptIds = jobAttempts.mapTo(hashSetOf()) { it.id }
             JobCard(
                 job = job,
                 title = sourceNames[job.sourceId] ?: job.sourceId,
+                sourceChannel = sourceChannels[job.sourceId],
                 sourceKind = sourceKinds[job.sourceId],
                 open = job.id in expanded,
                 toggle = { expanded = if (job.id in expanded) expanded - job.id else expanded + job.id },
-                attempts = attempts.filter { it.jobId == job.id },
+                attempts = jobAttempts,
                 jobArtifacts = artifacts.filter { it.jobId == job.id },
                 exports = exports,
+                phaseTimings = phaseTimings.filter { it.attemptId in jobAttemptIds },
                 now = now,
-                model = model,
                 openHelp = openHelp,
                 showActions = { actionsFor = job.id },
                 retryExport = { id -> retryExportId = id; exportFolder.launch(null) },
+                openArtifact = model::openArtifact,
+                shareArtifact = model::shareArtifact,
             )
         }
     }
@@ -244,13 +261,56 @@ internal fun HistoryScreen(
     }
 }
 
-// Stand-ins as wide as what `duration` and `byteSize` put into those two labels. `duration` has no unit
-// above hours, so a three-digit hour count is what the first reserves for; `byteSize` has none above GB,
-// so a terabyte prints as four digits of gigabytes, which is what the second reserves for. Neither is a
-// ceiling on the value: `ReservedText` measures the real text as well and gives it the room it needs, so a
-// longer one only costs the no-jump guarantee for that one case. Zeros stand in for every digit, which
+internal data class HistoryResultOrigin(
+    val branch: Branch,
+    val provider: Provider? = null,
+    val model: String? = null,
+)
+
+/** Provider settings are origin only after an artifact proves that the STT branch actually ran. */
+internal fun historyResultOrigins(artifacts: List<ArtifactRow>, config: JobConfig?): List<HistoryResultOrigin> = buildList {
+    if (artifacts.any { it.branch == Branch.CAPTIONS }) add(HistoryResultOrigin(Branch.CAPTIONS))
+    artifacts.asSequence().filter { it.branch == Branch.STT }
+        .map { HistoryResultOrigin(Branch.STT, config?.provider, it.providerModel) }
+        .distinct().forEach { add(it) }
+}
+
+internal fun shouldShowJobActions(job: JobRow, open: Boolean): Boolean =
+    !job.deleteRequested && (open || job.outcome !in setOf(Outcome.SUCCESS, Outcome.SUCCESS_WITH_WARNINGS))
+
+internal fun historySearchText(
+    title: String?,
+    sourceId: String,
+    channel: String?,
+    formattedDate: String,
+    config: String,
+): String = listOfNotNull(title, sourceId, channel, formattedDate, config).joinToString(" ")
+
+internal fun decodeStoredSourceChannel(raw: String): String? = try {
+    kotlinx.serialization.json.Json.decodeFromString<Source>(raw).channel
+} catch (_: IllegalArgumentException) {
+    null
+}
+
+internal data class PhaseTimingSummary(val phase: Phase, val elapsedMs: Long?, val incomplete: Boolean)
+
+internal fun summarizePhaseTimings(rows: List<PhaseTimingRow>): List<PhaseTimingSummary> = Phase.entries.mapNotNull { phase ->
+    val phaseRows = rows.filter { it.phase == phase }
+    if (phaseRows.isEmpty()) null else {
+        val elapsed = phaseRows.mapNotNull { it.elapsedMs }.takeIf { it.isNotEmpty() }?.sum()
+        PhaseTimingSummary(phase, elapsed, phaseRows.any { it.elapsedMs == null })
+    }
+}
+
+internal fun historyElapsedMillis(job: JobRow, now: Long): Long? {
+    val end = job.finishedAt ?: if (job.state in setOf(ExecutionState.FINISHED, ExecutionState.CANCELLED)) return null else now
+    if (end < job.createdAt) return null
+    return (end - job.createdAt).takeIf { it >= 0 }
+}
+
+// A stand-in as wide as `byteSize` for a terabyte. It is not a ceiling on the value: `ReservedText`
+// measures the real text as well and gives it the room it needs. Zeros stand in for every digit, which
 // holds exactly in a font whose digits share one width and approximately in any other.
-private const val LONGEST_ELAPSED = "000:00:00"
 private const val LONGEST_BYTE_SIZE = "0000.0 GB"
 
 /** Below this the two counts are too close together in time for their difference to be a rate. */
@@ -263,36 +323,45 @@ private const val MIN_RATE_INTERVAL_MS = 250L
 private val TEXT_BUTTON_INSET = 12.dp
 
 @Composable
-private fun JobCard(
+internal fun JobCard(
     job: JobRow,
     title: String,
+    sourceChannel: String?,
     sourceKind: SourceKind?,
     open: Boolean,
     toggle: () -> Unit,
     attempts: List<AttemptRow>,
     jobArtifacts: List<ArtifactRow>,
     exports: List<ExportRow>,
+    phaseTimings: List<PhaseTimingRow>,
     now: Long,
-    model: MainViewModel,
     openHelp: (HelpTopic) -> Unit,
     showActions: () -> Unit,
     retryExport: (String) -> Unit,
+    openArtifact: (String) -> Unit,
+    shareArtifact: (String) -> Unit,
 ) {
     val rotation by animateFloatAsState(if (open) 180f else 0f, label = "job-chevron")
     val savedConfig = remember(job.config) { decodeStoredJobConfig(job.config) }
     val dateFormat = remember { DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT) }
+    val origins = remember(jobArtifacts, savedConfig) { historyResultOrigins(jobArtifacts, savedConfig) }
+    val completed = job.outcome in setOf(Outcome.SUCCESS, Outcome.SUCCESS_WITH_WARNINGS)
+    var timingDetails by rememberSaveable(job.id, "timings") { mutableStateOf(false) }
+    var technicalDetails by rememberSaveable(job.id, "technical") { mutableStateOf(false) }
     OutlinedCard(onClick = toggle, modifier = Modifier.fillMaxWidth()) {
         Column {
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    Text(listOfNotNull(
-                        dateFormat.format(Date(job.createdAt)),
-                        savedConfig?.provider?.let(::providerName)
-                            ?: stringResource(R.string.mode_captions_only).takeIf { savedConfig?.mode == AcquisitionMode.CAPTIONS_ONLY },
-                    ).joinToString(" · "), style = MaterialTheme.typography.bodySmall,
+                    Text(listOfNotNull(sourceChannel?.takeIf { it.isNotBlank() },
+                        dateFormat.format(Date(job.createdAt))).joinToString(" · "), style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (origins.isNotEmpty()) Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        for (origin in origins) Text(historyOriginText(origin),
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    HistoryElapsedLine(job, now)
                     StatusRow(job, savedConfig, attempts, sourceKind)
                 }
                 Icon(painterResource(R.drawable.ic_expand_more),
@@ -302,26 +371,20 @@ private fun JobCard(
             Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (open) {
-                    if (savedConfig == null) Text(stringResource(R.string.job_config_invalid), color = MaterialTheme.colorScheme.error)
-                    else if (savedConfig.mode != AcquisitionMode.CAPTIONS_ONLY) {
-                        val provider = savedConfig.provider?.let(::providerName) ?: stringResource(R.string.no_provider)
-                        Text(stringResource(R.string.stt_configuration,
-                            listOfNotNull(provider, savedConfig.model).joinToString(" · ")),
-                            style = MaterialTheme.typography.bodySmall)
-                        Text(stringResource(R.string.limits_summary, limitDuration(savedConfig.maxAudioSeconds),
-                            savedConfig.maxCostMicrousd?.let { budgetText(it) } ?: stringResource(R.string.budget_none)),
-                            style = MaterialTheme.typography.bodySmall)
+                    if (completed) {
+                        TextButton({ technicalDetails = !technicalDetails }, Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                            Text(stringResource(R.string.history_technical_details))
+                        }
+                        if (technicalDetails) {
+                            JobTechnicalDetails(savedConfig, attempts, openHelp)
+                        }
+                    } else {
+                        JobTechnicalDetails(savedConfig, attempts, openHelp)
                     }
-                    // The one line on this screen that changes without anybody touching it: `now` is
-                    // refreshed every second while a job waits, and the time inside it grows from 9:59 to
-                    // 10:00 to 1:00:00. Whether a wrap point falls inside that range depends on the width
-                    // and the font scale, and it has not been measured on a device. Reserving the widest
-                    // case is what makes the answer not matter: the card cannot gain a line mid-wait.
-                    if (job.state == ExecutionState.WAITING_REMOTE) ReservedText(
-                        stringResource(R.string.provider_elapsed, duration((now - job.createdAt).coerceAtLeast(0))),
-                        listOf(stringResource(R.string.provider_elapsed, LONGEST_ELAPSED)),
-                        MaterialTheme.typography.bodySmall)
-                    attempts.forEach { attempt -> AttemptLines(attempt, openHelp) }
+                    TextButton({ timingDetails = !timingDetails }, Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                        Text(stringResource(R.string.history_timings))
+                    }
+                    if (timingDetails) PhaseTimingDetails(phaseTimings)
                     val artifactIds = jobArtifacts.map { it.id }.toSet()
                     exports.filter { it.artifactId in artifactIds }.forEach { row ->
                         val statusMessage = messageText("EXPORT_${row.state.name}")
@@ -337,22 +400,91 @@ private fun JobCard(
                 }
                 jobArtifacts.forEach { artifact ->
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilledTonalButton({ model.openArtifact(artifact.id) }, Modifier.weight(1f).heightIn(min = 48.dp)) {
+                        FilledTonalButton({ openArtifact(artifact.id) }, Modifier.weight(1f).heightIn(min = 48.dp)) {
                             Text("${stringResource(R.string.open_result)} · ${branchName(artifact.branch)}", maxLines = 2)
                         }
-                        OutlinedButton({ model.shareArtifact(artifact.id) }, Modifier.heightIn(min = 48.dp)) {
+                        OutlinedButton({ shareArtifact(artifact.id) }, Modifier.heightIn(min = 48.dp)) {
                             Icon(painterResource(R.drawable.ic_share), stringResource(R.string.share_result), Modifier.size(20.dp))
                         }
                     }
                 }
                 if (job.deleteRequested) Text(stringResource(R.string.delete_pending))
-                else OutlinedButton(showActions, Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                else if (shouldShowJobActions(job, open)) OutlinedButton(showActions, Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
                     Text(stringResource(R.string.job_actions))
                 }
             }
         }
     }
 }
+
+@Composable
+private fun historyOriginText(origin: HistoryResultOrigin): String = when (origin.branch) {
+    Branch.CAPTIONS -> stringResource(R.string.history_origin_youtube_captions)
+    Branch.STT -> {
+        val providerModel = listOfNotNull(
+            origin.provider?.let(::providerName),
+            origin.model?.takeIf { it.isNotBlank() },
+        ).joinToString(" · ")
+        if (providerModel.isEmpty()) stringResource(R.string.history_origin_audio_transcription)
+        else stringResource(R.string.history_origin_stt, providerModel)
+    }
+}
+
+@Composable
+private fun HistoryElapsedLine(job: JobRow, now: Long) {
+    val elapsed = historyElapsedMillis(job, now)
+    when {
+        job.finishedAt != null && elapsed != null ->
+            Text(stringResource(R.string.history_total_elapsed, historyDuration(elapsed)), style = MaterialTheme.typography.bodySmall)
+        job.finishedAt != null || job.state in setOf(ExecutionState.FINISHED, ExecutionState.CANCELLED) ->
+            Text(stringResource(R.string.history_not_recorded), style = MaterialTheme.typography.bodySmall)
+        elapsed != null -> ReservedText(
+            stringResource(R.string.history_live_elapsed, historyDuration(elapsed)),
+            listOf(stringResource(R.string.history_live_elapsed, historyDuration(999L * 60 * 60 * 1000))),
+            MaterialTheme.typography.bodySmall,
+        )
+        else -> Text(stringResource(R.string.history_not_recorded), style = MaterialTheme.typography.bodySmall)
+    }
+}
+
+@Composable
+private fun JobTechnicalDetails(
+    config: JobConfig?,
+    attempts: List<AttemptRow>,
+    openHelp: (HelpTopic) -> Unit,
+) {
+    if (config == null) Text(stringResource(R.string.job_config_invalid), color = MaterialTheme.colorScheme.error)
+    else if (config.mode != AcquisitionMode.CAPTIONS_ONLY) {
+        val provider = config.provider?.let(::providerName) ?: stringResource(R.string.no_provider)
+        Text(stringResource(R.string.stt_configuration,
+            listOfNotNull(provider, config.model).joinToString(" · ")), style = MaterialTheme.typography.bodySmall)
+        Text(stringResource(R.string.limits_summary, limitDuration(config.maxAudioSeconds),
+            config.maxCostMicrousd?.let { budgetText(it) } ?: stringResource(R.string.budget_none)),
+            style = MaterialTheme.typography.bodySmall)
+    }
+    attempts.forEach { AttemptLines(it, openHelp) }
+}
+
+@Composable
+internal fun PhaseTimingDetails(rows: List<PhaseTimingRow>) {
+    val summaries = remember(rows) { summarizePhaseTimings(rows) }
+    Text(stringResource(R.string.history_timing_scope), style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant)
+    if (summaries.isEmpty()) Text(stringResource(R.string.history_no_timings), style = MaterialTheme.typography.bodySmall)
+    summaries.forEach { summary ->
+        val phase = stringResource(phaseLabel(summary.phase))
+        val text = when {
+            summary.incomplete && summary.elapsedMs != null -> stringResource(
+                R.string.history_timing_recorded_incomplete, phase, historyDuration(summary.elapsedMs))
+            summary.incomplete -> stringResource(R.string.history_timing_incomplete, phase)
+            else -> stringResource(R.string.history_timing_phase, phase, historyDuration(requireNotNull(summary.elapsedMs)))
+        }
+        Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+internal fun historyDuration(milliseconds: Long): String =
+    if (milliseconds in 1L..999L) "$milliseconds ms" else duration(milliseconds)
 
 /**
  * What one attempt of an open job card says about itself: its branch and phase, the rendition it bound, how
@@ -363,6 +495,25 @@ private fun JobCard(
  */
 @Composable
 internal fun AttemptLines(attempt: AttemptRow, openHelp: (HelpTopic) -> Unit) {
+    if (attempt.state in setOf(ExecutionState.FINISHED, ExecutionState.CANCELLED)) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(stringResource(R.string.history_attempt_phase,
+                branchName(attempt.branch), stringResource(phaseLabel(attempt.phase))),
+                style = MaterialTheme.typography.bodySmall)
+            val track = remember(attempt.checkpoint) { SttStep.storedAudioTrack(attempt.checkpoint) }
+            if (track != null) Text(stringResource(R.string.audio_track_value, audioTrackSummary(track)),
+                style = MaterialTheme.typography.bodySmall)
+            if (showsTransferProgress(attempt)) {
+                val total = attempt.totalBytes?.takeIf { it > 0 && attempt.processedBytes <= it }
+                val progress = if (total == null) stringResource(R.string.processed_bytes, byteSize(attempt.processedBytes))
+                else stringResource(R.string.transfer_of_total,
+                    percentOf(attempt.processedBytes, total), byteSize(attempt.processedBytes), byteSize(total))
+                Text(progress, style = MaterialTheme.typography.bodySmall)
+            }
+            attempt.error?.let { AttemptError(it, openHelp) }
+        }
+        return
+    }
     ReservedText(attemptPhaseText(attempt), attemptPhaseAlternatives(), MaterialTheme.typography.bodySmall,
     )
     // Which rendition this attempt actually bound, from what it stored when it resolved
@@ -573,9 +724,9 @@ internal fun CollapsedAttemptLines(attempt: AttemptRow?) {
  * rendition, at its widest - codec, container, a four-digit data rate, channels, the format id with the
  * longest suffix the extractor appends, the size, and a full language tag.
  *
- * Like [LONGEST_ELAPSED] it is not a ceiling on the value. `ReservedText` measures the real summary as well
- * and gives it whatever room it needs, so an unusually long codec name or language tag costs the no-jump
- * guarantee for that one card and never a word of the text.
+ * It is not a ceiling on the value. `ReservedText` measures the real summary as well and gives it whatever
+ * room it needs, so an unusually long codec name or language tag costs the no-jump guarantee for that one
+ * card and never a word of the text.
  */
 @Composable
 private fun boundTrackAlternative(): String = stringResource(R.string.audio_track_value, listOf(
@@ -634,7 +785,7 @@ private fun StatusRow(job: JobRow, config: JobConfig?, attempts: List<AttemptRow
             MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        CollapsedAttemptLines(currentAttempt(attempts))
+        currentAttempt(attempts)?.let { CollapsedAttemptLines(it) }
     }
 }
 

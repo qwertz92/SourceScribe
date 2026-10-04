@@ -240,7 +240,14 @@ class LiveGroqTranscriptionTest {
 
             assertEquals("the attempt stopped with ${current.error}", null, current.error)
             assertEquals(ExecutionState.FINISHED, current.state)
-            assertEquals(ExecutionState.FINISHED, requireNotNull(dao.job(jobId)).state)
+            val finishedJob = requireNotNull(dao.job(jobId))
+            assertEquals(ExecutionState.FINISHED, finishedJob.state)
+            assertTrue("completion time was not retained", requireNotNull(finishedJob.finishedAt) >= finishedJob.createdAt)
+            val measured = dao.timingsForAttempt(attemptId)
+            for (phase in listOf(Phase.RESOLVE, Phase.DOWNLOAD_AUDIO, Phase.PREPARE_AUDIO, Phase.UPLOAD,
+                Phase.SUBMIT, Phase.NORMALIZE, Phase.PERSIST)) {
+                assertTrue("$phase timing was not completed", measured.any { it.phase == phase && it.elapsedMs != null })
+            }
             assertEquals(
                 if (provider == Provider.GROQ) {
                     listOf(Phase.RESOLVE, Phase.DOWNLOAD_AUDIO, Phase.PREPARE_AUDIO, Phase.SUBMIT, Phase.NORMALIZE, Phase.PERSIST)

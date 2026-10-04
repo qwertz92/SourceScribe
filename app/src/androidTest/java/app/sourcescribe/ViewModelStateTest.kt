@@ -67,6 +67,39 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class ViewModelStateTest {
     @Test
+    fun quickStartRejectsInvalidInputWithoutCreatingJobsOrClearingDraft() = withFixture {
+        awaitInitialization()
+        val config = approvedConfig()
+        setScreen(ScreenState(draft = config))
+        var created = false
+        onMain { viewModel.quickStart("not a video URL", config) { created = true } }
+        val completed = withTimeout(TIMEOUT_MS) {
+            viewModel.screen.first { !it.busy && it.message != null }
+        }
+        assertEquals("EXPLICIT_VIDEO_REQUIRED", completed.message)
+        assertEquals(config, completed.draft)
+        assertFalse(created)
+        assertTrue(dao.observeJobs().first().isEmpty())
+    }
+
+    @Test
+    fun quickStartWhileBusyKeepsTheActivePreviewRevision() = withFixture {
+        awaitInitialization()
+        val config = approvedConfig()
+        val existing = preview(config)
+        setScreen(ScreenState(busy = true, previews = listOf(existing), draft = config))
+        val field = MainViewModel::class.java.getDeclaredField("previewRevision").apply { isAccessible = true }
+        val revision = field.get(viewModel) as java.util.concurrent.atomic.AtomicLong
+        val before = revision.get()
+        onMain { viewModel.quickStart("https://youtu.be/dQw4w9WgXcQ", config) { error("Must not start") } }
+        assertEquals(before, revision.get())
+        assertEquals("ACTION_BUSY", viewModel.screen.value.message)
+        assertEquals(listOf(existing), viewModel.screen.value.previews)
+        assertTrue(dao.observeJobs().first().isEmpty())
+        setScreen(viewModel.screen.value.copy(busy = false))
+    }
+
+    @Test
     fun clearPreviewRevokesDraftUploadApproval() = withFixture {
         awaitInitialization()
         val config = approvedConfig()
@@ -432,7 +465,7 @@ class ViewModelStateTest {
             ensureWorkManager(base)
         }
         private val database = Room.inMemoryDatabaseBuilder(context, SourceScribeDatabase::class.java).build()
-        private val dao = database.records()
+        val dao = database.records()
         val settings = SettingsStore(context)
         private val runtime = NativeRuntime(context)
         private val extractor = ExtractorEngine(runtime)

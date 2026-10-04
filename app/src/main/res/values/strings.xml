@@ -178,7 +178,6 @@
     <string name="delete_remote_help">Entfernt die zu diesem Auftrag gespeicherten Transkripte und Audiodaten bei AssemblyAI über dessen API. Lokale Ergebnisse bleiben erhalten. Das ist keine bestätigte Unterbrechung laufender Berechnung und keine Kostenerstattung. Die Bestätigung erscheint nur nach erfolgreicher Providerantwort.</string>
     <string name="remote_delete_confirmed">AssemblyAI hat die Datenlöschung bestätigt. Dies bestätigt keine Kostenerstattung.</string>
     <string name="no_remote_handle">Keine noch nicht gelöschte AssemblyAI-Auftrags-ID vorhanden.</string>
-    <string name="provider_elapsed">Provider verarbeitet · seit Auftragsstart %1$s</string>
     <string name="history_current_phase">Aktueller Schritt: %1$s · %2$s</string>
     <string name="history_waiting_provider_response">Upload abgeschlossen · Antwort des Anbieters ausstehend</string>
     <string name="processed_bytes">Dieser Transfer: %1$s</string>
@@ -245,7 +244,7 @@
 
     <!-- Hilfe und Glossar -->
     <string name="help">Hilfe</string>
-    <string name="help_intro">Diese Seite erklärt die Begriffe, die in der App vorkommen. Tippe einen Eintrag an, um ihn aufzuklappen. Das Fragezeichen neben einem Bedienelement öffnet direkt den passenden Eintrag.</string>
+    <string name="help_intro">Diese Seite erklärt die Begriffe, die in der App vorkommen. Tippe einen Eintrag an, um ihn aufzuklappen. Das Fragezeichen neben einem Bedienelement zeigt die Erklärung in einem Overlay; dort kannst du auch diese Hilfeseite öffnen.</string>
     <string name="help_search">Im Glossar suchen</string>
     <string name="help_open">Erklärung öffnen</string>
     <string name="help_section_basics">Grundlagen</string>

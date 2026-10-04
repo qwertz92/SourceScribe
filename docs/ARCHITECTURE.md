@@ -33,8 +33,9 @@ The UI knows use cases and states, not request bodies, API keys, yt-dlp paths, o
 | Entity | Purpose |
 |---|---|
 | `Source` | UUID, type, original/canonical URL, video ID or file hash; observed metadata |
-| `JobRow` | User request, immutable configuration snapshot, desired branches, creation time |
+| `JobRow` | User request, immutable configuration snapshot, desired branches, creation time, nullable completion time (`finishedAt`) |
 | `AttemptRow` | Execution attempt per branch: versions, options, stage, request state, checkpoints, errors |
+| `PhaseTimingRow` | One durable observed phase span per attempt; UTC start and nullable elapsed milliseconds |
 | `ArtifactRow` | Immutable, internally persisted result with provenance, scope, quality warnings |
 | `ExportRow` | Format, target URI, content version, write status, and export errors of an artifact |
 | `SubmissionRow` | Provider, account reference, region, audio/configuration hash, submission state, and remote ID |
@@ -43,6 +44,8 @@ The UI knows use cases and states, not request bodies, API keys, yt-dlp paths, o
 The names in A2 and in this table are the ones actually used in code. The first version of this document (`758186b`, September 7, 2026) called them `ArtifactStore`, `Exporter`, `ExtractorUpdateManager`, `Job`, `Attempt`, `TranscriptArtifact`, `ExportRecord`, and `SubmissionRecord`; none of those names occur in the code. Aligned on September 13, 2026, because `AGENTS.md` requires reading this document before changing its area. The prose below the table still uses "job" and "attempt" as terms, not as type names.
 
 Store requested model names separately from what the provider actually reports. Without a reported snapshot, never invent a supposedly exact model version. Log fallback lists and the alternative actually chosen. Store timestamps in UTC; display them locally, with a fixed time zone in export metadata where relevant. Configuration snapshots hold no secrets; key rotation goes through a credential reference.
+
+`JobRow.finishedAt` is nullable so historical rows without a recorded completion stay unknown. The displayed total is `finishedAt - createdAt`, including queueing and waits. `PhaseTimingRow.elapsedMs` is also nullable: completed spans use a monotonic clock for elapsed time, while their stored start is UTC; an interrupted span remains explicitly incomplete. Retries accumulate by phase. These are best-effort app-observed durations, not provider computation time. See [ADR 0015](adr/0015-job-timing-and-quick-start.md) for the timing and quick-start contract.
 
 A source can have many jobs. A job can have multiple attempts and artifacts. BOTH is therefore not a special case with two file paths in a single job row. Re-exporting never triggers a new transcription. A deliberate re-transcription creates a new attempt, never a mutation of a finished transcript.
 

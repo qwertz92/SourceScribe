@@ -176,7 +176,6 @@
     <string name="delete_remote_help">Deletes the transcripts and audio data stored for this job at AssemblyAI through its API. Local results remain available. This does not confirm that ongoing processing has stopped and is not a refund. Confirmation appears only after a successful provider response.</string>
     <string name="remote_delete_confirmed">AssemblyAI confirmed the data deletion. This does not confirm a refund.</string>
     <string name="no_remote_handle">No undeleted AssemblyAI job ID is available.</string>
-    <string name="provider_elapsed">Provider is processing · %1$s since job started</string>
     <string name="history_current_phase">Current step: %1$s · %2$s</string>
     <string name="history_waiting_provider_response">Upload complete · waiting for provider response</string>
     <string name="processed_bytes">This transfer: %1$s</string>
@@ -243,7 +242,7 @@
 
     <!-- Help and glossary -->
     <string name="help">Help</string>
-    <string name="help_intro">This page explains the terms used in the app. Tap an entry to expand it. The question mark next to a control opens the matching entry directly.</string>
+    <string name="help_intro">This page explains the terms used in the app. Tap an entry to expand it. The question mark next to a control shows its explanation in an overlay, where you can also open this help page.</string>
     <string name="help_search">Search the glossary</string>
     <string name="help_open">Open explanation</string>
     <string name="help_section_basics">Basics</string>

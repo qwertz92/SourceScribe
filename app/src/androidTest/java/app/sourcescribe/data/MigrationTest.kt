@@ -43,11 +43,11 @@ class MigrationTest {
     )
 
     @Test
-    fun migrateFromVersion1To4PreservesRowsAndAddsNullableColumns() {
+    fun migrateFromVersion1To5PreservesRowsAndLeavesHistoricalTimingUnknown() {
         val databaseName = "migration-${UUID.randomUUID()}.db".also { databaseNames += it }
         helper.createDatabase(databaseName, 1).apply {
             execSQL("INSERT INTO sources(id,snapshot,title,importedPath) VALUES ('source-v1','snapshot-v1','Migration source',NULL)")
-            execSQL("INSERT INTO jobs(id,sourceId,config,createdAt,state,outcome,cancelRequested) VALUES ('job-v1','source-v1','config-v1',11,'QUEUED','NONE',0)")
+            execSQL("INSERT INTO jobs(id,sourceId,config,createdAt,state,outcome,cancelRequested) VALUES ('job-v1','source-v1','config-v1',11,'FINISHED','SUCCESS',0)")
             execSQL("INSERT INTO attempts(id,jobId,branch,number,createdAt,state,phase,outcome,checkpoint,engineId,nextAt,retries,error,leaseOwner,leaseUntil,processedBytes,totalBytes) VALUES ('attempt-v1','job-v1','CAPTIONS',1,12,'FINISHED','PERSIST','SUCCESS','checkpoint-v1','engine-v1',13,0,NULL,NULL,0,100,100)")
             execSQL("INSERT INTO artifacts(id,jobId,attemptId,branch,createdAt,sha256,bytes,language,providerModel,complete,warningCount) VALUES ('artifact-v1','job-v1','attempt-v1','CAPTIONS',14,'sha-v1',100,'de','model-v1',1,2)")
             execSQL("INSERT INTO submissions(id,attemptId,chunkIndex,provider,credentialId,region,inputHash,configHash,state,createdAt,estimatedMicrousd,remoteId,rawResponsePath) VALUES ('submission-v1','attempt-v1',0,'GROQ','credential-v1','US','input-v1','config-hash-v1','RESPONSE_SAVED',15,42,'remote-v1','/private/response-v1.json')")
@@ -59,11 +59,12 @@ class MigrationTest {
 
         val migrated = helper.runMigrationsAndValidate(
             databaseName,
-            4,
+            5,
             true,
             SourceScribeDatabase.MIGRATION_1_2,
             SourceScribeDatabase.MIGRATION_2_3,
             SourceScribeDatabase.MIGRATION_3_4,
+            SourceScribeDatabase.MIGRATION_4_5,
         )
         try {
             assertEquals(1, count(migrated, "sources"))
@@ -74,6 +75,7 @@ class MigrationTest {
             assertEquals(1, count(migrated, "exports"))
             assertEquals(1, count(migrated, "resource_leases"))
             assertEquals(1, count(migrated, "engines"))
+            assertEquals(0, count(migrated, "phase_timings"))
 
             row(migrated, "SELECT id,snapshot,title,importedPath FROM sources WHERE id = 'source-v1'") { cursor ->
                 assertEquals("source-v1", cursor.getString(0))
@@ -81,15 +83,16 @@ class MigrationTest {
                 assertEquals("Migration source", cursor.getString(2))
                 assertTrue(cursor.isNull(3))
             }
-            row(migrated, "SELECT id,sourceId,config,createdAt,state,outcome,cancelRequested,deleteRequested FROM jobs WHERE id = 'job-v1'") { cursor ->
+            row(migrated, "SELECT id,sourceId,config,createdAt,state,outcome,cancelRequested,deleteRequested,finishedAt FROM jobs WHERE id = 'job-v1'") { cursor ->
                 assertEquals("job-v1", cursor.getString(0))
                 assertEquals("source-v1", cursor.getString(1))
                 assertEquals("config-v1", cursor.getString(2))
                 assertEquals(11L, cursor.getLong(3))
-                assertEquals("QUEUED", cursor.getString(4))
-                assertEquals("NONE", cursor.getString(5))
+                assertEquals("FINISHED", cursor.getString(4))
+                assertEquals("SUCCESS", cursor.getString(5))
                 assertEquals(0, cursor.getInt(6))
                 assertEquals(0, cursor.getInt(7))
+                assertTrue("historical completion remains unknown", cursor.isNull(8))
             }
             row(migrated, "SELECT id,jobId,branch,number,checkpoint FROM attempts WHERE id = 'attempt-v1'") { cursor ->
                 assertEquals("attempt-v1", cursor.getString(0))
@@ -146,6 +149,40 @@ class MigrationTest {
                 assertEquals("ACTIVE", cursor.getString(4))
                 assertEquals(18L, cursor.getLong(5))
             }
+        } finally {
+            migrated.close()
+        }
+    }
+
+    @Test
+    fun migrateFromVersion4AddsNullableCompletionAndCascadingPhaseTimings() {
+        val databaseName = "migration-${UUID.randomUUID()}.db".also { databaseNames += it }
+        helper.createDatabase(databaseName, 4).apply {
+            execSQL("INSERT INTO sources(id,snapshot,title,importedPath) VALUES ('source-v4','snapshot-v4','Migration source v4',NULL)")
+            execSQL("INSERT INTO jobs(id,sourceId,config,createdAt,state,outcome,cancelRequested,deleteRequested) VALUES ('job-v4','source-v4','config-v4',31,'FINISHED','SUCCESS',0,0)")
+            execSQL("INSERT INTO attempts(id,jobId,branch,number,createdAt,state,phase,outcome,checkpoint,engineId,nextAt,retries,error,leaseOwner,leaseUntil,processedBytes,totalBytes) VALUES ('attempt-v4','job-v4','STT',1,32,'FINISHED','PERSIST','SUCCESS','checkpoint-v4',NULL,0,0,NULL,NULL,0,0,NULL)")
+            close()
+        }
+
+        val migrated = helper.runMigrationsAndValidate(databaseName, 5, true, SourceScribeDatabase.MIGRATION_4_5)
+        try {
+            row(migrated, "SELECT finishedAt FROM jobs WHERE id = 'job-v4'") { cursor ->
+                assertTrue("migration does not infer completion", cursor.isNull(0))
+            }
+            assertEquals(0, count(migrated, "phase_timings"))
+            migrated.execSQL("INSERT INTO phase_timings(id,attemptId,phase,startedAt) VALUES ('timing-v4','attempt-v4','RESOLVE',33)")
+            row(migrated, "SELECT id,attemptId,phase,startedAt,elapsedMs FROM phase_timings WHERE id = 'timing-v4'") { cursor ->
+                assertEquals("timing-v4", cursor.getString(0))
+                assertEquals("attempt-v4", cursor.getString(1))
+                assertEquals("RESOLVE", cursor.getString(2))
+                assertEquals(33L, cursor.getLong(3))
+                assertTrue("new spans remain incomplete until measured", cursor.isNull(4))
+            }
+            // MigrationTestHelper exposes a raw connection; enable Room's runtime foreign-key behavior.
+            migrated.execSQL("PRAGMA foreign_keys = ON")
+            row(migrated, "PRAGMA foreign_keys") { cursor -> assertEquals(1, cursor.getInt(0)) }
+            migrated.execSQL("DELETE FROM attempts WHERE id = 'attempt-v4'")
+            assertEquals("attempt deletion cascades its timing spans", 0, count(migrated, "phase_timings"))
         } finally {
             migrated.close()
         }

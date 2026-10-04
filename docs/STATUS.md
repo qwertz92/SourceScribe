@@ -4,6 +4,13 @@
 [APK](https://github.com/qwertz92/SourceScribe/releases/download/v0.4.1/SourceScribe-0.4.1.apk). Signed tag
 `v0.4.1` points to `9de3509`; the tested app implementation is `297e553`, followed only by CI setup and
 verification documentation. The release gates below passed; full v1 acceptance is not reached yet.
+The owner's history and workflow improvements are implemented in candidate 0.4.2 (versionCode 5): compact
+finished cards, actual provenance/channel, readable export names, quick start, contextual help, native folder
+selection and durable measured times. Local gates passed: 234 core tests, four zero-issue lint reports, 287 app
+tests, 55 extractor tests, four process/permission stages, engine pinning and three network stages. Ten default
+app opt-ins were separately enabled where applicable; the two real-provider runs and synthetic UI helper remain
+pending. KSP upgrade verification, final screenshots, signed upgrade and publication also remain pending. See the
+[current verification report](reports/2026-10-03-workflow-polish.md). These features are not in published 0.4.1 yet.
 The published app source is in public repo [qwertz92/SourceScribe](https://github.com/qwertz92/SourceScribe); this
 file describes the current state only; the dated log of how it got here, including 23 rounds of independent
 adversarial review over 0.1.0/0.2.0 and the 0.4.0 work, is in [HISTORY.md](HISTORY.md), and the lessons that work

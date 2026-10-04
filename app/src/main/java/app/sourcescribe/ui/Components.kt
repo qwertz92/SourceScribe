@@ -8,9 +8,12 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.Button
@@ -52,14 +55,54 @@ import app.sourcescribe.R
 internal fun dialogMaxHeight(fraction: Float): androidx.compose.ui.unit.Dp =
     with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() } * fraction
 
-/** Opens the glossary at one entry. Never changes the layout of the row it sits in. */
+/** Opens a bounded topic explanation; navigation to the full glossary is a separate action. */
 @Composable
-internal fun InfoButton(topic: HelpTopic, openHelp: (HelpTopic) -> Unit) {
+internal fun InfoButton(
+    topic: HelpTopic,
+    openHelp: (HelpTopic) -> Unit,
+    extraExplanation: String? = null,
+) {
     val label = stringResource(R.string.help_open) + ": " + stringResource(topic.title)
+    var showHelp by remember { mutableStateOf(false) }
     // 48 dp is the smallest target a finger hits reliably; the icon inside stays small so rows stay compact.
-    IconButton({ openHelp(topic) }, Modifier.size(48.dp)) {
+    IconButton({ showHelp = true }, Modifier.size(48.dp)) {
         Icon(painterResource(R.drawable.ic_help), contentDescription = label,
             modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+    if (showHelp) HelpOverlay(topic, close = { showHelp = false }, openHelp = openHelp,
+        extraExplanation = extraExplanation)
+}
+
+@Composable
+internal fun HelpOverlay(
+    topic: HelpTopic,
+    close: () -> Unit,
+    openHelp: (HelpTopic) -> Unit,
+    extraExplanation: String? = null,
+) {
+    Dialog(close) {
+        Surface(shape = MaterialTheme.shapes.large) {
+            Column(
+                Modifier.fillMaxWidth().heightIn(max = dialogMaxHeight(0.78f).coerceAtMost(600.dp)).padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(stringResource(topic.title), style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.semantics { heading() })
+                Column(Modifier.weight(1f, fill = false).fillMaxWidth().verticalScroll(rememberScrollState())) {
+                    Text(stringResource(topic.body), style = MaterialTheme.typography.bodyMedium)
+                    extraExplanation?.takeIf(String::isNotBlank)?.let {
+                        Text(it, Modifier.padding(top = 12.dp), style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.error)
+                    }
+                }
+                TextButton({ close(); openHelp(topic) }, Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                    Text(stringResource(R.string.help_overlay_open_page))
+                }
+                TextButton(close, Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                    Text(stringResource(R.string.help_overlay_close))
+                }
+            }
+        }
     }
 }
 
@@ -161,6 +204,8 @@ internal fun Toggle(
      * is right for a caption that never changes.
      */
     supportingReserve: List<String> = emptyList(),
+    availabilityStatus: String? = null,
+    helpExplanation: String? = null,
     info: HelpTopic? = null,
     openHelp: (HelpTopic) -> Unit = {},
     change: (Boolean) -> Unit,
@@ -169,9 +214,17 @@ internal fun Toggle(
         Row(Modifier.fillMaxWidth().heightIn(min = 48.dp)
             .toggleable(value = checked, enabled = enabled, role = Role.Switch, onValueChange = change),
             horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(stringResource(label), Modifier.weight(1f).padding(vertical = 12.dp))
+            if (availabilityStatus == null) {
+                Text(stringResource(label), Modifier.weight(1f).padding(vertical = 12.dp))
+            } else {
+                Column(Modifier.weight(1f).padding(vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(stringResource(label))
+                    Text(availabilityStatus, style = MaterialTheme.typography.labelSmall, maxLines = 1,
+                        overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
             // The nested button consumes its own taps, so the explanation never flips the switch.
-            if (info != null) InfoButton(info, openHelp)
+            if (info != null) InfoButton(info, openHelp, helpExplanation)
             Switch(checked, null, enabled = enabled)
         }
         if (supportingReserve.isNotEmpty()) ReservedText(supporting.orEmpty(), supportingReserve,

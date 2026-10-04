@@ -132,6 +132,8 @@ data class AppSettings(
     val parallelJobs: Int = 2,
     val storageLimitBytes: Long = 2L * 1024 * 1024 * 1024,
     val theme: String = "SYSTEM",
+    /** Use Android's app chooser for export folders; false uses the system's default handler. */
+    val chooseFolderApp: Boolean = true,
 )
 
 @Serializable

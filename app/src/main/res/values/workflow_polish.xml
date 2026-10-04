@@ -1,0 +1,6 @@
+<resources>
+    <string name="folder_app_choice">Ordner öffnen mit</string>
+    <string name="folder_app_ask">App jedes Mal auswählen</string>
+    <string name="folder_app_default">Android-Standardapp verwenden</string>
+    <string name="history_folder_select">Exportordner auswählen</string>
+</resources>

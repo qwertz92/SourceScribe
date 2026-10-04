@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.Intent
 import androidx.core.net.toUri
 import android.os.Bundle
+import android.provider.DocumentsContract
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.appcompat.app.AppCompatActivity
@@ -112,6 +113,11 @@ class MainActivity : AppCompatActivity() {
 
 internal enum class Page { NEW, HISTORY, SETTINGS, HELP }
 
+/** A newer paste or share remains pending even when its text equals the submitted source. */
+internal fun clearStartedInput(submittedRevision: Long, currentRevision: Long, clear: () -> Unit) {
+    if (submittedRevision == currentRevision) clear()
+}
+
 @Composable
 private fun SourceScribeApp(incoming: String, shareSerial: Int, model: MainViewModel = viewModel()) {
     val settings by model.settings.collectAsStateWithLifecycle()
@@ -120,6 +126,7 @@ private fun SourceScribeApp(incoming: String, shareSerial: Int, model: MainViewM
     val jobs by model.jobs.collectAsStateWithLifecycle()
     val sources by model.sources.collectAsStateWithLifecycle()
     val attempts by model.attempts.collectAsStateWithLifecycle()
+    val phaseTimings by model.phaseTimings.collectAsStateWithLifecycle()
     val artifacts by model.artifacts.collectAsStateWithLifecycle()
     val exports by model.exports.collectAsStateWithLifecycle()
     val remoteDeletionJobIds by model.remoteDeletionJobIds.collectAsStateWithLifecycle()
@@ -160,8 +167,25 @@ private fun SourceScribeApp(incoming: String, shareSerial: Int, model: MainViewM
     val openHelp: (HelpTopic) -> Unit = { topic -> helpFocus = topic.name; go(Page.HELP) }
 
     var input by rememberSaveable { mutableStateOf("") }
+    var inputRevision by rememberSaveable { mutableLongStateOf(0L) }
+    fun replaceInput(value: String) { input = value; inputRevision++ }
     val config = state.draft ?: settings.defaults
     val change: (JobConfig) -> Unit = model::updatePreviewConfig
+    val exportFolders = remember(settings.defaults, config, exports) {
+        (listOfNotNull(settings.defaults.exportTreeUri, config.exportTreeUri) +
+            settings.defaults.exportTreeUris.values + config.exportTreeUris.values +
+            exports.mapNotNull { row -> row.documentUri?.let { value ->
+                try {
+                    val uri = value.toUri()
+                    DocumentsContract.buildTreeDocumentUri(requireNotNull(uri.authority),
+                        DocumentsContract.getTreeDocumentId(uri)).toString()
+                } catch (_: IllegalArgumentException) { null }
+            } }).distinct()
+    }
+    var chooseFolder by remember { mutableStateOf(false) }
+    fun openExportFolder(folder: String) {
+        if (!openFolder(context, folder, settings.chooseFolderApp)) model.notice("NO_FOLDER_APP")
+    }
     val pageState = androidx.compose.runtime.saveable.rememberSaveableStateHolder()
     val snackbar = remember { SnackbarHostState() }
     val message = state.message?.let { messageText(it) }
@@ -174,7 +198,7 @@ private fun SourceScribeApp(incoming: String, shareSerial: Int, model: MainViewM
         val folder = state.exportedFolder
         val result = snackbar.showSnackbar(message, actionLabel = folder?.let { openFolderLabel })
         model.dismissMessage()
-        if (result == SnackbarResult.ActionPerformed && folder != null && !openFolder(context, folder)) {
+        if (result == SnackbarResult.ActionPerformed && folder != null && !openFolder(context, folder, settings.chooseFolderApp)) {
             model.notice("NO_FOLDER_APP")
         }
     }
@@ -201,7 +225,7 @@ private fun SourceScribeApp(incoming: String, shareSerial: Int, model: MainViewM
     var consumedShare by rememberSaveable { mutableIntStateOf(0) }
     LaunchedEffect(incoming, shareSerial) {
         if (incoming.isNotBlank() && shareSerial != consumedShare) {
-            input = incoming
+            replaceInput(incoming)
             // Through go(), so a share that arrives while another page is open clears the keyboard and
             // still leaves that page reachable with the back gesture.
             go(Page.NEW)
@@ -235,7 +259,7 @@ private fun SourceScribeApp(incoming: String, shareSerial: Int, model: MainViewM
                     fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp).semantics { heading() })
                 Box(Modifier.fillMaxWidth().height(4.dp)) { if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth()) }
                 pageState.SaveableStateProvider(page.name) { when (page) {
-                    Page.NEW -> NewSourceScreen(input, { input = it; model.clearPreview() }, config, change, model::typeIntoDraft, state, settings,
+                    Page.NEW -> NewSourceScreen(input, { replaceInput(it); model.clearPreview() }, config, change, model::typeIntoDraft, state, settings,
                         openHelp = openHelp,
                         inspect = { model.inspect(input, config) }, onPreset = { change(it) }, onTrack = model::selectTrack,
                         onStart = {
@@ -248,15 +272,49 @@ private fun SourceScribeApp(incoming: String, shareSerial: Int, model: MainViewM
                         onImport = { audioPicker.launch(arrayOf("audio/*", "video/mp4", "video/webm")) },
                         onNotice = model::notice,
                         onSaveKeyterms = { name -> model.saveKeytermSet(name, config.contextTerms) },
-                        onDeleteKeyterms = model::deleteKeytermSet)
+                        onDeleteKeyterms = model::deleteKeytermSet,
+                        onQuickStart = {
+                            val submitted = input
+                            val submittedRevision = inputRevision
+                            if (android.os.Build.VERSION.SDK_INT >= 33 && !notificationsAllowed()) {
+                                notificationPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                            }
+                            model.quickStart(submitted, config) {
+                                clearStartedInput(submittedRevision, inputRevision) { replaceInput("") }
+                            }
+                        })
                     Page.HISTORY -> HistoryScreen(jobs, sources, attempts, artifacts, exports, remoteDeletionJobIds, model,
-                        !notificationsGranted, openHelp) { id -> model.prepareAgain(id, config); go(Page.NEW) }
+                        !notificationsGranted, openHelp, phaseTimings = phaseTimings,
+                        onOpenFolders = {
+                            if (exportFolders.size == 1) openExportFolder(exportFolders.single()) else chooseFolder = true
+                        }, hasExportFolders = exportFolders.isNotEmpty(),
+                        prepareAgain = { id -> model.prepareAgain(id, config); go(Page.NEW) })
                     Page.SETTINGS -> SettingsScreen(settings, config, state, jobs, change, model, openHelp)
                     Page.HELP -> HelpScreen(helpFocus?.let { name -> HelpTopic.entries.firstOrNull { it.name == name } }) { helpFocus = null }
                 } }
             }
         }
         BackHandler(enabled = visited.size > 1 && state.document == null && state.information == null) { back() }
+        if (chooseFolder) androidx.compose.ui.window.Dialog({ chooseFolder = false }) {
+            Surface(shape = MaterialTheme.shapes.large) {
+                Column(Modifier.fillMaxWidth().height(dialogMaxHeight(0.7f)).padding(20.dp)) {
+                    Text(stringResource(R.string.history_folder_select), style = MaterialTheme.typography.titleLarge)
+                    LazyColumn(Modifier.weight(1f)) {
+                        items(exportFolders.size) { index ->
+                            val uri = exportFolders[index]
+                            val label by produceState<String?>(null, uri) {
+                                value = withContext(Dispatchers.IO) { folderLabel(context, uri) }
+                            }
+                            TextButton({ chooseFolder = false; openExportFolder(uri) }, Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                                Text(label ?: uri, minLines = 2, maxLines = 2,
+                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                            }
+                        }
+                    }
+                    TextButton({ chooseFolder = false }, Modifier.fillMaxWidth()) { Text(stringResource(R.string.back)) }
+                }
+            }
+        }
         state.information?.let { text ->
             InformationDialog(text, state.informationShareable, model::closeInformation, model::shareDiagnostics)
         }

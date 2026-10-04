@@ -13,6 +13,7 @@ import app.sourcescribe.core.AudioRetention
 import app.sourcescribe.core.Branch
 import app.sourcescribe.core.ExecutionState
 import app.sourcescribe.core.JobConfig
+import app.sourcescribe.core.Outcome
 import app.sourcescribe.core.Phase
 import app.sourcescribe.core.Provider
 import app.sourcescribe.core.ProviderHttp
@@ -33,6 +34,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import javax.net.ssl.HostnameVerifier
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.coroutineScope
@@ -57,6 +59,63 @@ import org.junit.runner.RunWith
 /** Parallel-job checks use only private files, Room, and a local HTTPS fixture. */
 @RunWith(AndroidJUnit4::class)
 class ParallelJobsTest {
+    @Test
+    fun cancellationPersistedDuringTimingSetupPreventsTheProviderRequest() = withFixture {
+        val pending = seed(Provider.GROQ, "cancel-before-submit")
+        databaseCancellingDuringSubmitTiming()
+        releaseGroq.countDown()
+        val cancelled = try {
+            coordinator.run(pending.attempt.id)
+            false
+        } catch (_: CancellationException) {
+            // The fixture persists cancellation and revokes the lease; cancellation is the expected exit.
+            true
+        }
+        assertTrue(requireNotNull(dao.job(pending.jobId)).cancelRequested)
+        assertTrue("persisted cancellation must propagate", cancelled)
+        assertEquals("no request may reach any fixture path", 0, requestCount)
+        assertEquals("persisted cancellation must be checked immediately before sending", 0, groqRequests.get())
+    }
+
+    @Test
+    fun progressFinalizationFailureDoesNotHideAnAcceptedSubmission() = withFixture {
+        val accepted = seed(Provider.GROQ, "progress-finalization")
+        databaseFailingPositiveProgress()
+        releaseGroq.countDown()
+
+        val continues = coordinator.run(accepted.attempt.id)
+        assertEquals(1, requestCount)
+        assertEquals("progress failure must not hide the accepted receipt", SubmissionState.RESPONSE_SAVED,
+            dao.submissions(accepted.attempt.id).single().state)
+        assertTrue(continues)
+        assertEquals(Phase.NORMALIZE, requireNotNull(dao.attempt(accepted.attempt.id)).phase)
+        assertTrue(coordinator.run(accepted.attempt.id))
+        assertFalse(coordinator.run(accepted.attempt.id))
+        assertTrue(requireNotNull(dao.job(accepted.jobId)).outcome in
+            setOf(Outcome.SUCCESS, Outcome.SUCCESS_WITH_WARNINGS))
+        assertEquals(true, dao.artifacts(accepted.jobId).single().complete)
+        assertEquals("progress failure never repeats a paid submission", 1, requestCount)
+    }
+
+    @Test
+    fun timingFinalizationFailureDoesNotRepeatAnAcceptedSubmission() = withFixture {
+        val accepted = seed(Provider.GROQ, "timing-finalization")
+        databaseFailingSubmitTimingFinalization()
+        releaseGroq.countDown()
+
+        assertTrue(coordinator.run(accepted.attempt.id))
+
+        assertEquals(1, groqRequests.get())
+        assertEquals(SubmissionState.RESPONSE_SAVED, dao.submissions(accepted.attempt.id).single().state)
+        assertEquals(Phase.NORMALIZE, requireNotNull(dao.attempt(accepted.attempt.id)).phase)
+        assertTrue(coordinator.run(accepted.attempt.id))
+        assertFalse(coordinator.run(accepted.attempt.id))
+        val completedJob = requireNotNull(dao.job(accepted.jobId))
+        assertEquals(ExecutionState.FINISHED, requireNotNull(dao.attempt(accepted.attempt.id)).state)
+        assertTrue("a real terminal transition records completion", completedJob.finishedAt != null)
+        assertEquals("timing failure never resubmits", 1, groqRequests.get())
+    }
+
     @Test
     fun twoProvidersRunConcurrentlyWhileCancellationAndSettingsChangesStayIsolated() = withFixture {
         val cancelled = seed(Provider.GROQ, "original-a")
@@ -169,6 +228,31 @@ class ParallelJobsTest {
         private val storage = StorageBudget(context, settings)
         val coordinator: JobCoordinator
         val requestCount get() = server.requestCount
+
+        fun databaseCancellingDuringSubmitTiming() {
+            database.openHelper.writableDatabase.execSQL(
+                "CREATE TRIGGER cancel_during_timing AFTER INSERT ON phase_timings " +
+                    "WHEN NEW.phase = 'SUBMIT' BEGIN " +
+                    "UPDATE jobs SET cancelRequested = 1, state = 'CANCELLED', outcome = 'CANCELLED' " +
+                    "WHERE id = (SELECT jobId FROM attempts WHERE id = NEW.attemptId); " +
+                    "UPDATE attempts SET state = 'SUBMISSION_UNCERTAIN', outcome = 'CANCELLED', " +
+                    "error = 'REMOTE_MAY_CONTINUE', leaseOwner = NULL, leaseUntil = 0 WHERE id = NEW.attemptId; END",
+            )
+        }
+
+        fun databaseFailingSubmitTimingFinalization() {
+            database.openHelper.writableDatabase.execSQL(
+                "CREATE TRIGGER fail_submit_timing_finish BEFORE UPDATE ON phase_timings " +
+                    "WHEN NEW.phase = 'SUBMIT' BEGIN SELECT RAISE(ABORT,'fixture timing failure'); END",
+            )
+        }
+
+        fun databaseFailingPositiveProgress() {
+            database.openHelper.writableDatabase.execSQL(
+                "CREATE TRIGGER fail_positive_progress BEFORE UPDATE OF processedBytes,totalBytes ON attempts " +
+                    "WHEN NEW.processedBytes > 0 BEGIN SELECT RAISE(ABORT,'fixture progress failure'); END",
+            )
+        }
 
         init {
             server.dispatcher = object : Dispatcher() {
